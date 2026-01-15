@@ -114,7 +114,7 @@ From NPM for use in your own node project:
 
 From Git:
 
-	git clone git://github.com/kovidgoyal/rapydscript-ng.git
+	git clone https://github.com/kovidgoyal/rapydscript-ng.git
 	cd rapydscript-ng
 	sudo npm link .
 	npm install  # This will automatically install the dependencies for RapydScript
