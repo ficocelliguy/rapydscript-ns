@@ -10,7 +10,8 @@
     var web_repl = null;
 
     function compile(code) {
-        return web_repl.compile(code);
+        const codeWithoutVariableTypeDefinitions = code.replace(/^ *(?!def\s)([\w.-]+) *: *[\w.-\[\]]+/gm, '$1');
+        return web_repl.compile(codeWithoutVariableTypeDefinitions);
     }
 
     function runjs(code) {

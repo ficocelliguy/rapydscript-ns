@@ -12,7 +12,8 @@
   "scripts": {
     "test": "node bin/rapydscript self --complete --test",
     "start": "node bin/rapydscript",
-    "build-self": "node bin/rapydscript self --complete; node bin/web-repl-export web-repl"
+    "build-self": "node bin/rapydscript self --complete",
+    "build": "rm -rf -- **/*pyj-cached dev; node bin/rapydscript self --complete; node bin/web-repl-export web-repl"
   },
   "version": "0.7.22",
   "license": "BSD-2-Clause",
