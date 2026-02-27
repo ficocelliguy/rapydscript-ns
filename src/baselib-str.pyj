@@ -562,6 +562,17 @@ define_str_func('upper', def():
     return this.toUpperCase()
 )
 
+define_str_func('title', def():
+    # Split the string into words based on spaces
+    words = this.split(' ')
+
+    # Capitalize the first letter of each word
+    title_cased_words = [word[0].upper() + word[1:].lower() if word else '' for word in words]
+
+    # Join the words back into a single string
+    return ' '.join(title_cased_words)
+)
+
 define_str_func('lstrip', def(chars):
     string = this
     pos = 0

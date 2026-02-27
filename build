@@ -1,2 +1,3 @@
 #!/bin/sh
 exec bin/rapydscript self --complete --test
+exec bin/web-repl-export web-repl

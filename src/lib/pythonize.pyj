@@ -4,7 +4,7 @@
 
 def strings():
     string_funcs = set((
-        'capitalize strip lstrip rstrip islower isupper isspace lower upper swapcase'
+        'capitalize strip lstrip rstrip islower isupper isspace lower upper swapcase title'
         ' center count endswith startswith find rfind index rindex format join ljust rjust'
         ' partition rpartition replace split rsplit splitlines zfill').split(' '))
 

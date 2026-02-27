@@ -99,9 +99,10 @@
     }
 
     function run_code() {
+        document.getElementById('output').innerHTML = '';
         var input = document.getElementById('input');
         var code = input.value;
-        input.value = '';
+        //input.value = '';
         if (code) read_eval(code);
         document.getElementById('input').focus();
     }
