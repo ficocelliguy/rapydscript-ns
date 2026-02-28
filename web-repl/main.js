@@ -10,7 +10,7 @@
     var web_repl = null;
 
     function compile(code) {
-        const codeWithoutVariableTypeDefinitions = code.replace(/^ *(?!def\s)([\w.-]+) *: *[\w.-\[\]]+/gm, '$1');
+        const codeWithoutVariableTypeDefinitions = code.replace(/^ *(?!def\s)([\w.-]+) *: *[\w.-]+ *[:+*\/%&|^><-]*=/gm, '$1');
         return web_repl.compile(codeWithoutVariableTypeDefinitions);
     }
 
