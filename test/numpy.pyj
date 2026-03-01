@@ -1,0 +1,734 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+import numpy as np
+
+eq = assrt.equal
+de = assrt.deepEqual
+ok = assrt.ok
+
+def close(a, b, tol=1e-9):
+    return Math.abs(a - b) < tol
+
+# -------------------------------------------------------
+# Array creation
+# -------------------------------------------------------
+z = np.zeros([3])
+ok(isinstance(z, np.ndarray))
+eq(z.shape[0], 3)
+eq(z[0], 0)
+eq(z[1], 0)
+eq(z.size, 3)
+eq(z.ndim, 1)
+
+o = np.ones([2, 3])
+ok(isinstance(o, np.ndarray))
+eq(o.shape[0], 2)
+eq(o.shape[1], 3)
+eq(o[0][0], 1)
+eq(o[1][2], 1)
+eq(o.ndim, 2)
+
+a = np.arange(5)
+eq(a[0], 0)
+eq(a[1], 1)
+eq(a[4], 4)
+eq(a.size, 5)
+
+a = np.arange(1, 6)
+eq(a[0], 1)
+eq(a[4], 5)
+
+a = np.arange(0, 10, 2)
+eq(a[0], 0)
+eq(a[1], 2)
+eq(a[2], 4)
+eq(a.size, 5)
+
+ls = np.linspace(0, 1, 5)
+eq(ls.size, 5)
+ok(close(ls[0], 0.0))
+ok(close(ls[4], 1.0))
+ok(close(ls[2], 0.5))
+
+e = np.eye(3)
+eq(e.shape[0], 3)
+eq(e.shape[1], 3)
+eq(e[0][0], 1)
+eq(e[1][1], 1)
+eq(e[2][2], 1)
+eq(e[0][1], 0)
+eq(e[1][0], 0)
+
+e2 = np.eye(3, k=1)
+eq(e2[0][1], 1)
+eq(e2[1][2], 1)
+eq(e2[0][0], 0)
+
+f = np.full([2, 3], 7.0)
+eq(f[0][0], 7)
+eq(f[1][2], 7)
+
+a = np.array([1.0, 2.0, 3.0])
+eq(a[0], 1)
+eq(a[2], 3)
+
+a2d = np.array([[1.0, 2.0], [3.0, 4.0]])
+eq(a2d[0][0], 1)
+eq(a2d[0][1], 2)
+eq(a2d[1][0], 3)
+eq(a2d[1][1], 4)
+
+zl = np.zeros_like(a2d)
+eq(zl.shape[0], 2)
+eq(zl.shape[1], 2)
+eq(zl[0][0], 0)
+
+ol = np.ones_like(a)
+eq(ol.size, 3)
+eq(ol[0], 1)
+
+# -------------------------------------------------------
+# Element access and item/itemset
+# -------------------------------------------------------
+arr1d = np.array([10.0, 20.0, 30.0])
+eq(arr1d.item(0), 10)
+eq(arr1d.item(2), 30)
+
+arr2d = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+eq(arr2d.item(0, 0), 1)
+eq(arr2d.item(0, 2), 3)
+eq(arr2d.item(1, 1), 5)
+
+# tolist
+tl = np.array([1.0, 2.0, 3.0]).tolist()
+de(tl, [1, 2, 3])
+
+# -------------------------------------------------------
+# Math operations
+# -------------------------------------------------------
+a = np.array([1.0, 4.0, 9.0])
+s = np.sqrt(a)
+ok(close(s[0], 1.0))
+ok(close(s[1], 2.0))
+ok(close(s[2], 3.0))
+
+a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+ok(close(a.sum(), 15.0))
+ok(close(a.mean(), 3.0))
+ok(close(np.sum(a), 15.0))
+ok(close(np.mean(a), 3.0))
+
+ok(close(a.std(), Math.sqrt(2.0)))
+ok(close(a.min(), 1.0))
+ok(close(a.max(), 5.0))
+
+# clip
+c = a.clip(2, 4)
+eq(c[0], 2)
+eq(c[2], 3)
+eq(c[4], 4)
+
+# cumsum
+cs = a.cumsum()
+eq(cs[0], 1)
+eq(cs[1], 3)
+eq(cs[4], 15)
+
+# cumprod
+a2 = np.array([1.0, 2.0, 3.0])
+cp = a2.cumprod()
+eq(cp[0], 1)
+eq(cp[1], 2)
+eq(cp[2], 6)
+
+# argmin / argmax
+eq(a.argmin(), 0)
+eq(a.argmax(), 4)
+
+# square, exp, log
+sq = np.square(np.array([2.0, 3.0]))
+eq(sq[0], 4)
+eq(sq[1], 9)
+
+ex = np.exp(np.array([0.0]))
+ok(close(ex[0], 1.0))
+
+lg = np.log(np.array([1.0, Math.E]))
+ok(close(lg[0], 0.0))
+ok(close(lg[1], 1.0))
+
+# trig
+sn = np.sin(np.array([0.0]))
+ok(close(sn[0], 0.0))
+cs2 = np.cos(np.array([0.0]))
+ok(close(cs2[0], 1.0))
+
+# degrees/radians
+deg = np.degrees(np.array([Math.PI]))
+ok(close(deg[0], 180.0))
+rad = np.radians(np.array([180.0]))
+ok(close(rad[0], Math.PI))
+
+# ceil / floor
+ok(close(np.ceil(np.array([1.2]))[0], 2.0))
+ok(close(np.floor(np.array([1.8]))[0], 1.0))
+
+# sign
+sg = np.sign(np.array([-3.0, 0.0, 5.0]))
+eq(sg[0], -1)
+eq(sg[1], 0)
+eq(sg[2], 1)
+
+# around
+ar = np.around(np.array([1.567]), 2)
+ok(close(ar[0], 1.57))
+
+# abs / absolute
+ab = np.abs(np.array([-1.0, 2.0, -3.0]))
+eq(ab[0], 1)
+eq(ab[1], 2)
+eq(ab[2], 3)
+
+# negative
+ng = np.negative(np.array([1.0, -2.0]))
+eq(ng[0], -1)
+eq(ng[1], 2)
+
+# log2 / log10
+l2 = np.log2(np.array([8.0]))
+ok(close(l2[0], 3.0))
+l10 = np.log10(np.array([1000.0]))
+ok(close(l10[0], 3.0))
+
+# -------------------------------------------------------
+# Broadcasting
+# -------------------------------------------------------
+a1 = np.array([1.0, 2.0, 3.0])
+r = np.add(a1, 10)
+eq(r[0], 11)
+eq(r[1], 12)
+eq(r[2], 13)
+
+r2 = np.multiply(a1, 2)
+eq(r2[0], 2)
+eq(r2[1], 4)
+eq(r2[2], 6)
+
+r3 = np.add(np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0]))
+eq(r3[0], 11)
+eq(r3[1], 22)
+eq(r3[2], 33)
+
+# subtract / divide
+r4 = np.subtract(np.array([5.0, 6.0]), np.array([1.0, 2.0]))
+eq(r4[0], 4)
+eq(r4[1], 4)
+
+r5 = np.divide(np.array([6.0, 9.0]), np.array([2.0, 3.0]))
+eq(r5[0], 3)
+eq(r5[1], 3)
+
+# power
+pw = np.power(np.array([2.0, 3.0]), 3)
+eq(pw[0], 8)
+eq(pw[1], 27)
+
+# maximum / minimum
+mx = np.maximum(np.array([1.0, 5.0, 3.0]), np.array([4.0, 2.0, 3.0]))
+eq(mx[0], 4)
+eq(mx[1], 5)
+eq(mx[2], 3)
+
+mn = np.minimum(np.array([1.0, 5.0, 3.0]), np.array([4.0, 2.0, 3.0]))
+eq(mn[0], 1)
+eq(mn[1], 2)
+eq(mn[2], 3)
+
+# -------------------------------------------------------
+# Linear algebra
+# -------------------------------------------------------
+v1 = np.array([1.0, 2.0, 3.0])
+v2 = np.array([4.0, 5.0, 6.0])
+ok(close(np.dot(v1, v2), 32.0))
+
+A = np.array([[1.0, 2.0], [3.0, 4.0]])
+B = np.array([[5.0, 6.0], [7.0, 8.0]])
+C = np.matmul(A, B)
+eq(C[0][0], 19)
+eq(C[0][1], 22)
+eq(C[1][0], 43)
+eq(C[1][1], 50)
+
+C2 = np.dot(A, B)
+eq(C2[0][0], 19)
+eq(C2[1][1], 50)
+
+tr = np.trace(A)
+eq(tr, 5)
+
+A3 = np.eye(3)
+ok(close(np.det(A3), 1.0))
+
+A2 = np.array([[1.0, 2.0], [3.0, 4.0]])
+ok(close(np.det(A2), -2.0))
+
+# outer product
+ov = np.outer(np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+eq(ov[0][0], 3)
+eq(ov[0][1], 4)
+eq(ov[1][0], 6)
+eq(ov[1][1], 8)
+
+# norm
+ok(close(np.norm(np.array([3.0, 4.0])), 5.0))
+
+# cross product
+cr = np.cross(np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0]))
+eq(cr[0], 0)
+eq(cr[1], 0)
+eq(cr[2], 1)
+
+# linalg.inv
+M = np.array([[1.0, 2.0], [3.0, 4.0]])
+Minv = np.linalg.inv(M)
+ok(close(Minv[0][0], -2.0))
+ok(close(Minv[0][1], 1.0))
+ok(close(Minv[1][0], 1.5))
+ok(close(Minv[1][1], -0.5))
+
+# linalg.solve
+a_mat = np.array([[2.0, 1.0], [1.0, 3.0]])
+b_vec = np.array([5.0, 10.0])
+x = np.linalg.solve(a_mat, b_vec)
+ok(close(x[0], 1.0))
+ok(close(x[1], 3.0))
+
+# -------------------------------------------------------
+# Sorting
+# -------------------------------------------------------
+unsorted = np.array([3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0])
+sorted_arr = np.sort(unsorted)
+eq(sorted_arr[0], 1)
+eq(sorted_arr[1], 1)
+eq(sorted_arr[6], 9)
+
+indices = np.argsort(np.array([3.0, 1.0, 2.0]))
+eq(indices[0], 1)
+eq(indices[1], 2)
+eq(indices[2], 0)
+
+ss = np.searchsorted(np.array([1.0, 2.0, 3.0, 4.0, 5.0]), 3)
+eq(ss, 2)
+
+nz = np.nonzero(np.array([0.0, 1.0, 0.0, 2.0]))
+eq(nz[0][0], 1)
+eq(nz[0][1], 3)
+
+# where
+cond = np.array([1.0, 0.0, 1.0])
+xv = np.array([10.0, 20.0, 30.0])
+yv = np.array([100.0, 200.0, 300.0])
+wh = np.where(cond, xv, yv)
+eq(wh[0], 10)
+eq(wh[1], 200)
+eq(wh[2], 30)
+
+# -------------------------------------------------------
+# Statistics
+# -------------------------------------------------------
+med = np.median(np.array([3.0, 1.0, 2.0]))
+ok(close(med, 2.0))
+
+med2 = np.median(np.array([1.0, 2.0, 3.0, 4.0]))
+ok(close(med2, 2.5))
+
+pct = np.percentile(np.array([0.0, 25.0, 50.0, 75.0, 100.0]), 50)
+ok(close(pct, 50.0))
+
+# diff
+d = np.diff(np.array([1.0, 3.0, 6.0, 10.0]))
+eq(d[0], 2)
+eq(d[1], 3)
+eq(d[2], 4)
+eq(d.size, 3)
+
+# -------------------------------------------------------
+# Logic
+# -------------------------------------------------------
+ok(np.all(np.array([1.0, 1.0, 1.0])))
+ok(not np.all(np.array([1.0, 0.0, 1.0])))
+ok(np.any(np.array([0.0, 1.0, 0.0])))
+ok(not np.any(np.array([0.0, 0.0, 0.0])))
+
+nan_arr = np.array([1.0, NaN, 3.0])
+isn = np.isnan(nan_arr)
+eq(isn[0], 0)
+ok(isn[1])
+eq(isn[2], 0)
+
+inf_arr = np.array([1.0, Infinity, 3.0])
+isi = np.isinf(inf_arr)
+eq(isi[0], 0)
+ok(isi[1])
+
+ok(np.array_equal(np.array([1.0, 2.0]), np.array([1.0, 2.0])))
+ok(not np.array_equal(np.array([1.0, 2.0]), np.array([1.0, 3.0])))
+
+isf = np.isfinite(np.array([1.0, Infinity, NaN]))
+ok(isf[0])
+eq(isf[1], 0)
+eq(isf[2], 0)
+
+# comparison ufuncs
+ge = np.greater(np.array([3.0, 1.0]), np.array([2.0, 2.0]))
+ok(ge[0])
+eq(ge[1], 0)
+
+le = np.less_equal(np.array([1.0, 2.0]), np.array([2.0, 2.0]))
+ok(le[0])
+ok(le[1])
+
+# -------------------------------------------------------
+# Shape manipulation
+# -------------------------------------------------------
+a = np.arange(6)
+r = a.reshape([2, 3])
+eq(r.shape[0], 2)
+eq(r.shape[1], 3)
+eq(r[0][0], 0)
+eq(r[0][2], 2)
+eq(r[1][0], 3)
+eq(r[1][2], 5)
+
+r2 = np.reshape(a, [3, 2])
+eq(r2.shape[0], 3)
+eq(r2.shape[1], 2)
+
+flat = r.ravel()
+eq(flat.size, 6)
+eq(flat[0], 0)
+eq(flat[5], 5)
+
+A = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+At = A.transpose()
+eq(At.shape[0], 3)
+eq(At.shape[1], 2)
+eq(At[0][0], 1)
+eq(At[0][1], 4)
+eq(At[2][0], 3)
+eq(At[2][1], 6)
+
+At2 = np.transpose(A)
+eq(At2[0][0], 1)
+eq(At2[2][1], 6)
+
+# concatenate
+a1 = np.array([1.0, 2.0, 3.0])
+a2 = np.array([4.0, 5.0, 6.0])
+cat = np.concatenate([a1, a2])
+eq(cat.size, 6)
+eq(cat[0], 1)
+eq(cat[5], 6)
+
+# 2D concatenate axis=0
+m1 = np.array([[1.0, 2.0], [3.0, 4.0]])
+m2 = np.array([[5.0, 6.0], [7.0, 8.0]])
+cat2 = np.concatenate([m1, m2], 0)
+eq(cat2.shape[0], 4)
+eq(cat2[2][0], 5)
+
+# 2D concatenate axis=1
+cat3 = np.concatenate([m1, m2], 1)
+eq(cat3.shape[1], 4)
+eq(cat3[0][2], 5)
+
+# hstack / vstack
+hs = np.hstack([a1, a2])
+eq(hs.size, 6)
+eq(hs[3], 4)
+
+vs = np.vstack([a1, a2])
+eq(vs.shape[0], 2)
+eq(vs.shape[1], 3)
+eq(vs[0][0], 1)
+eq(vs[1][0], 4)
+
+# expand_dims / squeeze
+ex = np.expand_dims(np.array([1.0, 2.0, 3.0]), 0)
+eq(ex.shape[0], 1)
+eq(ex.shape[1], 3)
+
+sq2 = np.squeeze(ex)
+eq(sq2.shape[0], 3)
+
+# flip
+fl = np.flip(np.array([1.0, 2.0, 3.0]))
+eq(fl[0], 3)
+eq(fl[2], 1)
+
+# roll
+rl = np.roll(np.array([1.0, 2.0, 3.0, 4.0]), 1)
+eq(rl[0], 4)
+eq(rl[1], 1)
+
+# repeat
+rp = np.repeat(np.array([1.0, 2.0, 3.0]), 2)
+eq(rp.size, 6)
+eq(rp[0], 1)
+eq(rp[1], 1)
+eq(rp[2], 2)
+
+# -------------------------------------------------------
+# Set operations
+# -------------------------------------------------------
+u = np.union1d(np.array([1.0, 2.0, 3.0]), np.array([2.0, 3.0, 4.0]))
+eq(u.size, 4)
+eq(u[0], 1)
+eq(u[3], 4)
+
+i = np.intersect1d(np.array([1.0, 2.0, 3.0]), np.array([2.0, 3.0, 4.0]))
+eq(i.size, 2)
+eq(i[0], 2)
+eq(i[1], 3)
+
+sd = np.setdiff1d(np.array([1.0, 2.0, 3.0]), np.array([2.0, 3.0]))
+eq(sd.size, 1)
+eq(sd[0], 1)
+
+i1d = np.in1d(np.array([1.0, 2.0, 3.0]), np.array([2.0, 4.0]))
+eq(i1d[0], 0)
+ok(i1d[1])
+eq(i1d[2], 0)
+
+# -------------------------------------------------------
+# Additional shape helpers
+# -------------------------------------------------------
+# diag: extract from matrix
+dg = np.diag(np.array([[1.0, 2.0], [3.0, 4.0]]))
+eq(dg[0], 1)
+eq(dg[1], 4)
+
+# diag: create matrix from vector
+dm = np.diag(np.array([1.0, 2.0, 3.0]))
+eq(dm.shape[0], 3)
+eq(dm[0][0], 1)
+eq(dm[1][1], 2)
+eq(dm[2][2], 3)
+eq(dm[0][1], 0)
+
+# tril / triu
+tri_m = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+tl_m = np.tril(tri_m)
+eq(tl_m[0][1], 0)
+eq(tl_m[1][0], 4)
+eq(tl_m[2][2], 9)
+
+tu_m = np.triu(tri_m)
+eq(tu_m[0][0], 1)
+eq(tu_m[1][0], 0)
+eq(tu_m[2][2], 9)
+
+# broadcast_to
+bt = np.broadcast_to(np.array([1.0, 2.0, 3.0]), [2, 3])
+eq(bt.shape[0], 2)
+eq(bt.shape[1], 3)
+eq(bt[0][0], 1)
+eq(bt[1][2], 3)
+
+# -------------------------------------------------------
+# Additional numeric
+# -------------------------------------------------------
+# nan_to_num
+nn = np.nan_to_num(np.array([1.0, NaN, 3.0]))
+eq(nn[0], 1)
+eq(nn[1], 0)
+eq(nn[2], 3)
+
+# fix (truncate toward zero)
+fx = np.fix(np.array([2.7, -2.7]))
+eq(fx[0], 2)
+eq(fx[1], -2)
+
+# ptp
+pt = np.ptp(np.array([1.0, 5.0, 2.0, 8.0]))
+eq(pt, 7)
+
+# count_nonzero
+cnz = np.count_nonzero(np.array([0.0, 1.0, 0.0, 2.0, 3.0]))
+eq(cnz, 3)
+
+# ediff1d
+ed = np.ediff1d(np.array([1.0, 2.0, 4.0, 7.0]))
+eq(ed[0], 1)
+eq(ed[1], 2)
+eq(ed[2], 3)
+
+# average (weighted)
+avg = np.average(np.array([1.0, 2.0, 3.0]), weights=np.array([1.0, 2.0, 1.0]))
+ok(close(avg, 2.0))
+
+# interp
+xi = np.interp(0.5, np.array([0.0, 1.0]), np.array([0.0, 10.0]))
+ok(close(xi, 5.0))
+
+# trapz
+tx = np.trapz(np.array([1.0, 2.0, 1.0]), dx=1.0)
+ok(close(tx, 3.0))
+
+# convolve
+cv = np.convolve(np.array([1.0, 2.0, 3.0]), np.array([0.0, 1.0, 0.5]))
+eq(cv.size, 5)
+ok(close(cv[0], 0))
+ok(close(cv[1], 1))
+ok(close(cv[2], 2.5))
+
+# polyval
+pv = np.polyval(np.array([1.0, 0.0, -1.0]), 2.0)
+ok(close(pv, 3.0))
+
+# shape / ndim / size utilities
+ok(close(np.shape(np.array([[1.0, 2.0]]))[0], 1))
+eq(np.ndim(np.array([1.0, 2.0, 3.0])), 1)
+eq(np.size(np.array([[1.0, 2.0], [3.0, 4.0]])), 4)
+
+# prod
+pr = np.prod(np.array([1.0, 2.0, 3.0, 4.0]))
+eq(pr, 24)
+
+# amin / amax / nanmin / nanmax / nanmean
+eq(np.amin(np.array([3.0, 1.0, 2.0])), 1)
+eq(np.amax(np.array([3.0, 1.0, 2.0])), 3)
+eq(np.nanmin(np.array([3.0, NaN, 1.0])), 1)
+eq(np.nanmax(np.array([3.0, NaN, 5.0])), 5)
+ok(close(np.nanmean(np.array([1.0, NaN, 3.0])), 2.0))
+
+# var / std
+ok(close(np.variance(np.array([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])), 4.0))
+ok(close(np.std(np.array([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])), 2.0))
+
+# mod
+mo = np.mod(np.array([10.0, 11.0, 12.0]), 3)
+eq(mo[0], 1)
+eq(mo[1], 2)
+eq(mo[2], 0)
+
+# hypot
+hp = np.hypot(np.array([3.0]), np.array([4.0]))
+ok(close(hp[0], 5.0))
+
+# arctan2
+at2 = np.arctan2(np.array([1.0]), np.array([1.0]))
+ok(close(at2[0], Math.PI / 4.0))
+
+# -------------------------------------------------------
+# 2D reduction operations
+# -------------------------------------------------------
+m = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+row_sum = m.sum(1)
+eq(row_sum[0], 6)
+eq(row_sum[1], 15)
+
+col_sum = m.sum(0)
+eq(col_sum[0], 5)
+eq(col_sum[1], 7)
+eq(col_sum[2], 9)
+
+# -------------------------------------------------------
+# astype / copy
+# -------------------------------------------------------
+float_arr = np.array([1.5, 2.7, 3.9])
+int_arr = float_arr.astype('int32')
+eq(int_arr[0], 1)
+eq(int_arr[1], 2)
+eq(int_arr[2], 3)
+
+cp = float_arr.copy()
+ok(np.array_equal(cp, float_arr))
+
+# -------------------------------------------------------
+# random sub-module
+# -------------------------------------------------------
+np.random.seed(42)
+r1 = np.random.rand(3)
+ok(isinstance(r1, np.ndarray))
+eq(r1.shape[0], 3)
+ok(r1[0] >= 0.0)
+ok(r1[0] < 1.0)
+ok(r1[1] >= 0.0)
+ok(r1[1] < 1.0)
+
+r2d = np.random.rand(2, 3)
+eq(r2d.shape[0], 2)
+eq(r2d.shape[1], 3)
+
+# seeded reproducibility
+np.random.seed(123)
+v1 = np.random.rand(1)[0]
+np.random.seed(123)
+v2 = np.random.rand(1)[0]
+ok(close(v1, v2))
+
+rn = np.random.randn(5)
+eq(rn.shape[0], 5)
+
+ri = np.random.randint(0, 10, 5)
+eq(ri.size, 5)
+ok(ri[0] >= 0)
+ok(ri[0] < 10)
+
+ru = np.random.uniform(1.0, 2.0, 4)
+eq(ru.size, 4)
+ok(ru[0] >= 1.0)
+ok(ru[0] < 2.0)
+
+rno = np.random.normal(0.0, 1.0, 3)
+eq(rno.size, 3)
+
+perm = np.random.permutation(5)
+eq(perm.size, 5)
+
+rc = np.random.choice(np.array([10.0, 20.0, 30.0]), 2)
+eq(rc.size, 2)
+
+# -------------------------------------------------------
+# bincount / histogram
+# -------------------------------------------------------
+bc = np.bincount(np.array([0, 1, 1, 2, 2, 2]))
+eq(bc[0], 1)
+eq(bc[1], 2)
+eq(bc[2], 3)
+
+hist = np.histogram(np.array([1.0, 2.0, 3.0, 4.0, 5.0]), 5)
+eq(hist[0].size, 5)
+eq(hist[1].size, 6)
+
+# -------------------------------------------------------
+# searchsorted and diff
+# -------------------------------------------------------
+eq(np.searchsorted(np.array([1.0, 3.0, 5.0]), 2.0), 1)
+eq(np.searchsorted(np.array([1.0, 3.0, 5.0]), 3.0), 1)
+eq(np.searchsorted(np.array([1.0, 3.0, 5.0]), 3.0, 'right'), 2)
+
+# -------------------------------------------------------
+# linspace / logspace
+# -------------------------------------------------------
+ls2 = np.linspace(0.0, 100.0, 11)
+eq(ls2.size, 11)
+ok(close(ls2[0], 0.0))
+ok(close(ls2[10], 100.0))
+ok(close(ls2[5], 50.0))
+
+log_s = np.logspace(0, 2, 3)
+ok(close(log_s[0], 1.0))
+ok(close(log_s[1], 10.0))
+ok(close(log_s[2], 100.0))
+
+# -------------------------------------------------------
+# polyfit / polyval roundtrip
+# -------------------------------------------------------
+xp = np.array([0.0, 1.0, 2.0])
+yp = np.array([0.0, 1.0, 4.0])
+coeffs = np.polyfit(xp, yp, 2)
+ok(close(np.polyval(coeffs, 0.0), 0.0, 1e-6))
+ok(close(np.polyval(coeffs, 1.0), 1.0, 1e-6))
+ok(close(np.polyval(coeffs, 2.0), 4.0, 1e-6))

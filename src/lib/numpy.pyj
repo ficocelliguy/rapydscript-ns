@@ -1,0 +1,2101 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+# numpy-like numerical array library for RapydScript
+# Provides ndarray class and ~120 numpy-compatible functions.
+###########################################################
+
+# -------------------------------------------------------
+# Module constants
+# -------------------------------------------------------
+nan = NaN
+inf = Infinity
+pi = Math.PI
+e = Math.E
+newaxis = None
+
+# -------------------------------------------------------
+# Internal helpers (no ndarray dependency)
+# -------------------------------------------------------
+def _coerce(val, dtype):
+    if dtype is 'int32':
+        return Math.trunc(+val)
+    elif dtype is 'bool':
+        return bool(val)
+    return +val
+
+def _compute_size(shape):
+    s = 1
+    for d in shape:
+        s *= d
+    return s
+
+def _compute_strides(shape):
+    n = shape.length
+    if n is 0:
+        return []
+    strides = []
+    for i in range(n):
+        strides.push(1)
+    i = n - 2
+    while i >= 0:
+        strides[i] = strides[i + 1] * shape[i + 1]
+        i -= 1
+    return strides
+
+def _get_shape(obj):
+    if not Array.isArray(obj):
+        return []
+    if obj.length is 0:
+        return [0]
+    inner = _get_shape(obj[0])
+    result = [obj.length]
+    for s in inner:
+        result.push(s)
+    return result
+
+def _flatten_to(obj, out):
+    if Array.isArray(obj):
+        for item in obj:
+            _flatten_to(item, out)
+    else:
+        out.push(obj)
+
+def _make_filled(size, val, dtype):
+    cv = _coerce(val, dtype)
+    data = []
+    for i in range(size):
+        data.push(cv)
+    return data
+
+# --- List reduction helpers ---
+def _sum_list(data):
+    s = 0
+    for v in data:
+        s += v
+    return s
+
+def _prod_list(data):
+    p = 1
+    for v in data:
+        p *= v
+    return p
+
+def _min_list(data):
+    m = data[0]
+    for v in data:
+        if v < m:
+            m = v
+    return m
+
+def _max_list(data):
+    m = data[0]
+    for v in data:
+        if v > m:
+            m = v
+    return m
+
+def _mean_list(data):
+    return _sum_list(data) / data.length
+
+def _var_list(data, ddof):
+    m = _mean_list(data)
+    s = 0
+    for v in data:
+        d = v - m
+        s += d * d
+    return s / (data.length - ddof)
+
+def _std_list(data, ddof):
+    return Math.sqrt(_var_list(data, ddof))
+
+def _argmin_list(data):
+    m = data[0]
+    idx = 0
+    for i in range(data.length):
+        if data[i] < m:
+            m = data[i]
+            idx = i
+    return idx
+
+def _argmax_list(data):
+    m = data[0]
+    idx = 0
+    for i in range(data.length):
+        if data[i] > m:
+            m = data[i]
+            idx = i
+    return idx
+
+def _broadcast_shapes(s1, s2):
+    n1 = s1.length
+    n2 = s2.length
+    n = Math.max(n1, n2)
+    result = []
+    for i in range(n):
+        d1 = 1
+        d2 = 1
+        if n1 - n + i >= 0:
+            d1 = s1[n1 - n + i]
+        if n2 - n + i >= 0:
+            d2 = s2[n2 - n + i]
+        if d1 is 1:
+            result.push(d2)
+        elif d2 is 1:
+            result.push(d1)
+        elif d1 is d2:
+            result.push(d1)
+        else:
+            raise ValueError("operands could not be broadcast together")
+    return result
+
+# -------------------------------------------------------
+# ndarray class
+# -------------------------------------------------------
+class ndarray:
+    def __init__(self, shape, dtype='float64', data=None, _nocopy=False):
+        if jstype(shape) is 'number':
+            shape = [int(shape)]
+        elif not Array.isArray(shape):
+            shape = list(shape)
+        self.shape = shape
+        self.dtype = dtype or 'float64'
+        self.ndim = shape.length
+        self.size = _compute_size(shape)
+        self.strides = _compute_strides(shape)
+        if data is not None:
+            if _nocopy:
+                self._data = data
+            else:
+                self._data = data.slice()
+        else:
+            self._data = _make_filled(self.size, 0, self.dtype)
+        self._update_indices()
+
+    def _update_indices(self):
+        if self.ndim is 1:
+            for i in range(self.size):
+                self[i] = self._data[i]
+        elif self.ndim >= 2:
+            row_shape = self.shape.slice(1)
+            row_size = _compute_size(row_shape)
+            for i in range(self.shape[0]):
+                row_data = self._data.slice(i * row_size, (i + 1) * row_size)
+                row = ndarray(row_shape, self.dtype, row_data, True)
+                self[i] = row
+
+    def __len__(self):
+        return self.shape[0] if self.ndim > 0 else 0
+
+    def __repr__(self):
+        return 'array(' + str(self.tolist()) + ')'
+
+    def __str__(self):
+        return self.__repr__()
+
+    def tolist(self):
+        if self.ndim is 0:
+            return self._data[0]
+        elif self.ndim is 1:
+            return self._data.slice()
+        else:
+            result = []
+            row_shape = self.shape.slice(1)
+            row_size = _compute_size(row_shape)
+            for i in range(self.shape[0]):
+                row_data = self._data.slice(i * row_size, (i + 1) * row_size)
+                row = ndarray(row_shape, self.dtype, row_data, True)
+                result.push(row.tolist())
+            return result
+
+    def item(self, *args):
+        if args.length is 0:
+            if self.size is 1:
+                return self._data[0]
+            raise IndexError("can only convert an array of size 1 to a Python scalar")
+        flat_idx = 0
+        for k in range(args.length):
+            flat_idx += args[k] * self.strides[k]
+        return self._data[flat_idx]
+
+    def itemset(self, *args):
+        val = args[args.length - 1]
+        flat_idx = 0
+        for k in range(args.length - 1):
+            flat_idx += args[k] * self.strides[k]
+        self._data[flat_idx] = _coerce(val, self.dtype)
+        if self.ndim is 1:
+            self[flat_idx] = self._data[flat_idx]
+
+    def copy(self):
+        return ndarray(self.shape.slice(), self.dtype, self._data.slice(), True)
+
+    def astype(self, dtype):
+        new_data = []
+        for v in self._data:
+            new_data.push(_coerce(v, dtype))
+        return ndarray(self.shape.slice(), dtype, new_data, True)
+
+    def reshape(self, *new_shape):
+        if new_shape.length is 1 and Array.isArray(new_shape[0]):
+            ns = new_shape[0].slice()
+        else:
+            ns = list(new_shape)
+        neg_idx = -1
+        known = 1
+        for i in range(ns.length):
+            if ns[i] < 0:
+                neg_idx = i
+            else:
+                known *= ns[i]
+        if neg_idx >= 0:
+            ns[neg_idx] = self.size // known
+        return ndarray(ns, self.dtype, self._data.slice(), True)
+
+    def ravel(self):
+        return ndarray([self.size], self.dtype, self._data.slice(), True)
+
+    def flatten(self):
+        return ndarray([self.size], self.dtype, self._data.slice(), True)
+
+    def transpose(self, axes=None):
+        if self.ndim is 1:
+            return ndarray(self.shape.slice(), self.dtype, self._data.slice(), True)
+        if axes is None:
+            axes = []
+            for i in range(self.ndim - 1, -1, -1):
+                axes.push(i)
+        new_shape = []
+        for ax in axes:
+            new_shape.push(self.shape[ax])
+        new_data = []
+        for i in range(self.size):
+            new_data.push(0)
+        t_strides = _compute_strides(new_shape)
+        for flat_i in range(self.size):
+            remaining = flat_i
+            src_flat = 0
+            for d in range(self.ndim):
+                coord = Math.floor(remaining / t_strides[d])
+                remaining = remaining % t_strides[d]
+                src_flat += coord * self.strides[axes[d]]
+            new_data[flat_i] = self._data[src_flat]
+        return ndarray(new_shape, self.dtype, new_data, True)
+
+    def sum(self, axis=None, keepdims=False):
+        return _reduce(self, axis, _sum_list, keepdims)
+
+    def prod(self, axis=None, keepdims=False):
+        return _reduce(self, axis, _prod_list, keepdims)
+
+    def min(self, axis=None):
+        return _reduce(self, axis, _min_list, False)
+
+    def max(self, axis=None):
+        return _reduce(self, axis, _max_list, False)
+
+    def mean(self, axis=None):
+        return _reduce(self, axis, _mean_list, False)
+
+    def std(self, axis=None, ddof=0):
+        captured_ddof = ddof
+        return _reduce(self, axis, def(data): return _std_list(data, captured_ddof);, False)
+
+    def variance(self, axis=None, ddof=0):
+        captured_ddof = ddof
+        return _reduce(self, axis, def(data): return _var_list(data, captured_ddof);, False)
+
+    def argmin(self, axis=None):
+        return _reduce(self, axis, _argmin_list, False)
+
+    def argmax(self, axis=None):
+        return _reduce(self, axis, _argmax_list, False)
+
+    def clip(self, a_min, a_max):
+        new_data = []
+        for v in self._data:
+            new_data.push(Math.min(Math.max(v, a_min), a_max))
+        return ndarray(self.shape.slice(), self.dtype, new_data, True)
+
+    def cumsum(self, axis=None):
+        data = self._data
+        result = []
+        s = 0
+        for v in data:
+            s += v
+            result.push(s)
+        return ndarray([result.length], self.dtype, result, True)
+
+    def cumprod(self, axis=None):
+        data = self._data
+        result = []
+        p = 1
+        for v in data:
+            p *= v
+            result.push(p)
+        return ndarray([result.length], self.dtype, result, True)
+
+    def squeeze(self, axis=None):
+        if axis is None:
+            new_shape = []
+            for d in self.shape:
+                if d is not 1:
+                    new_shape.push(d)
+            if new_shape.length is 0:
+                new_shape = [1]
+        else:
+            new_shape = []
+            for i in range(self.shape.length):
+                if i is axis and self.shape[i] is 1:
+                    pass
+                else:
+                    new_shape.push(self.shape[i])
+        return ndarray(new_shape, self.dtype, self._data.slice(), True)
+
+    def T(self):
+        return self.transpose()
+
+# -------------------------------------------------------
+# Standalone helpers that use ndarray
+# -------------------------------------------------------
+def _reduce(arr, axis, fn, keepdims):
+    if axis is None:
+        result = fn(arr._data)
+        if keepdims:
+            shape = []
+            for i in range(arr.ndim):
+                shape.push(1)
+            return ndarray(shape, arr.dtype, [result], True)
+        return result
+    if axis < 0:
+        axis = arr.ndim + axis
+    out_shape = []
+    for i in range(arr.ndim):
+        if i is axis:
+            if keepdims:
+                out_shape.push(1)
+        else:
+            out_shape.push(arr.shape[i])
+    if out_shape.length is 0:
+        out_shape = [1]
+    out_size = _compute_size(out_shape)
+    out_data = []
+    out_strides = _compute_strides(out_shape)
+    for out_flat in range(out_size):
+        remaining = out_flat
+        out_multi = []
+        for d in range(out_shape.length):
+            coord = Math.floor(remaining / out_strides[d])
+            remaining = remaining % out_strides[d]
+            out_multi.push(coord)
+        slice_data = []
+        for j in range(arr.shape[axis]):
+            src_flat = 0
+            out_idx = 0
+            for d in range(arr.ndim):
+                if d is axis:
+                    src_flat += j * arr.strides[d]
+                else:
+                    if keepdims:
+                        src_flat += out_multi[d] * arr.strides[d]
+                    else:
+                        src_flat += out_multi[out_idx] * arr.strides[d]
+                        out_idx += 1
+            slice_data.push(arr._data[src_flat])
+        out_data.push(fn(slice_data))
+    return ndarray(out_shape, arr.dtype, out_data, True)
+
+def _broadcast_to_flat(arr, target_shape):
+    target_size = _compute_size(target_shape)
+    target_strides = _compute_strides(target_shape)
+    result = []
+    target_ndim = target_shape.length
+    src_ndim = arr.ndim
+    for i in range(target_size):
+        remaining = i
+        src_flat = 0
+        for d in range(target_ndim):
+            coord = Math.floor(remaining / target_strides[d])
+            remaining = remaining % target_strides[d]
+            src_d = d - (target_ndim - src_ndim)
+            if src_d >= 0:
+                if arr.shape[src_d] > 1:
+                    src_flat += coord * arr.strides[src_d]
+        result.push(arr._data[src_flat])
+    return result
+
+def _apply_ufunc(a, fn):
+    a = asarray(a)
+    result_data = []
+    for v in a._data:
+        result_data.push(fn(v))
+    return ndarray(a.shape.slice(), a.dtype, result_data, True)
+
+def _apply_ufunc2(a, b, fn):
+    a = asarray(a)
+    b = asarray(b)
+    bs = _broadcast_shapes(a.shape, b.shape)
+    same_a = a.shape.join(',') is bs.join(',')
+    same_b = b.shape.join(',') is bs.join(',')
+    if same_a and same_b:
+        result_data = []
+        for i in range(a.size):
+            result_data.push(fn(a._data[i], b._data[i]))
+        return ndarray(bs, 'float64', result_data, True)
+    a_data = _broadcast_to_flat(a, bs)
+    b_data = _broadcast_to_flat(b, bs)
+    result_data = []
+    for i in range(a_data.length):
+        result_data.push(fn(a_data[i], b_data[i]))
+    return ndarray(bs, 'float64', result_data, True)
+
+# -------------------------------------------------------
+# asarray / array (must be after ndarray class)
+# -------------------------------------------------------
+def asarray(a, dtype=None):
+    if isinstance(a, ndarray):
+        if dtype and dtype is not a.dtype:
+            return a.astype(dtype)
+        return a
+    if Array.isArray(a):
+        shp = _get_shape(a)
+        data = []
+        _flatten_to(a, data)
+        dt = dtype or 'float64'
+        coerced = []
+        for v in data:
+            coerced.push(_coerce(v, dt))
+        return ndarray(shp, dt, coerced, True)
+    # scalar
+    dt = dtype or 'float64'
+    return ndarray([1], dt, [_coerce(a, dt)], True)
+
+def array(object, dtype=None):
+    return asarray(object, dtype)
+
+# -------------------------------------------------------
+# Array creation
+# -------------------------------------------------------
+def zeros(shape, dtype='float64'):
+    if jstype(shape) is 'number':
+        shape = [int(shape)]
+    elif not Array.isArray(shape):
+        shape = list(shape)
+    return ndarray(shape, dtype or 'float64')
+
+def ones(shape, dtype='float64'):
+    if jstype(shape) is 'number':
+        shape = [int(shape)]
+    elif not Array.isArray(shape):
+        shape = list(shape)
+    dt = dtype or 'float64'
+    sz = _compute_size(shape)
+    data = _make_filled(sz, 1, dt)
+    return ndarray(shape, dt, data, True)
+
+def empty(shape, dtype='float64'):
+    return zeros(shape, dtype)
+
+def full(shape, fill_value, dtype=None):
+    if jstype(shape) is 'number':
+        shape = [int(shape)]
+    elif not Array.isArray(shape):
+        shape = list(shape)
+    dt = dtype or 'float64'
+    sz = _compute_size(shape)
+    data = _make_filled(sz, fill_value, dt)
+    return ndarray(shape, dt, data, True)
+
+def arange(start, stop=None, step=1, dtype=None):
+    if stop is None:
+        stop = start
+        start = 0
+    if step is 0:
+        raise ValueError("arange: step cannot be zero")
+    data = []
+    x = start
+    if step > 0:
+        while x < stop:
+            data.push(x)
+            x += step
+    else:
+        while x > stop:
+            data.push(x)
+            x += step
+    dt = dtype or 'float64'
+    coerced = []
+    for v in data:
+        coerced.push(_coerce(v, dt))
+    return ndarray([coerced.length], dt, coerced, True)
+
+def linspace(start, stop, num=50, endpoint=True, dtype=None):
+    if num < 0:
+        raise ValueError("linspace: num must be >= 0")
+    data = []
+    if num is 0:
+        return ndarray([0], dtype or 'float64', [], True)
+    if num is 1:
+        data.push(start)
+    else:
+        denom = endpoint and (num - 1) or num
+        for i in range(num):
+            data.push(start + i * (stop - start) / denom)
+    dt = dtype or 'float64'
+    coerced = []
+    for v in data:
+        coerced.push(_coerce(v, dt))
+    return ndarray([coerced.length], dt, coerced, True)
+
+def logspace(start, stop, num=50, endpoint=True, base=10.0, dtype=None):
+    lin = linspace(start, stop, num, endpoint)
+    data = []
+    for v in lin._data:
+        data.push(Math.pow(base, v))
+    dt = dtype or 'float64'
+    coerced = []
+    for v in data:
+        coerced.push(_coerce(v, dt))
+    return ndarray([coerced.length], dt, coerced, True)
+
+def eye(N, M=None, k=0, dtype='float64'):
+    if M is None:
+        M = N
+    dt = dtype or 'float64'
+    data = []
+    for i in range(N):
+        for j in range(M):
+            if j - i is k:
+                data.push(_coerce(1, dt))
+            else:
+                data.push(_coerce(0, dt))
+    return ndarray([N, M], dt, data, True)
+
+def zeros_like(a, dtype=None):
+    a = asarray(a)
+    dt = dtype or a.dtype
+    data = _make_filled(a.size, 0, dt)
+    return ndarray(a.shape.slice(), dt, data, True)
+
+def ones_like(a, dtype=None):
+    a = asarray(a)
+    dt = dtype or a.dtype
+    data = _make_filled(a.size, 1, dt)
+    return ndarray(a.shape.slice(), dt, data, True)
+
+def full_like(a, fill_value, dtype=None):
+    a = asarray(a)
+    dt = dtype or a.dtype
+    data = _make_filled(a.size, fill_value, dt)
+    return ndarray(a.shape.slice(), dt, data, True)
+
+# -------------------------------------------------------
+# Array manipulation
+# -------------------------------------------------------
+def reshape(a, newshape):
+    a = asarray(a)
+    return a.reshape(newshape)
+
+def ravel(a):
+    a = asarray(a)
+    return a.ravel()
+
+def transpose(a, axes=None):
+    a = asarray(a)
+    return a.transpose(axes)
+
+def concatenate(arrays, axis=0):
+    arrs = [asarray(x) for x in arrays]
+    if arrs.length is 0:
+        raise ValueError("concatenate: need at least one array")
+    if axis < 0:
+        axis = arrs[0].ndim + axis
+    # Only handles 1D and 2D
+    if arrs[0].ndim is 1 and axis is 0:
+        data = []
+        for a in arrs:
+            for v in a._data:
+                data.push(v)
+        return ndarray([data.length], arrs[0].dtype, data, True)
+    # 2D along axis 0 (vertical)
+    if axis is 0:
+        data = []
+        new_rows = 0
+        cols = arrs[0].shape[1]
+        for a in arrs:
+            new_rows += a.shape[0]
+            for v in a._data:
+                data.push(v)
+        return ndarray([new_rows, cols], arrs[0].dtype, data, True)
+    # 2D along axis 1 (horizontal)
+    if axis is 1:
+        rows = arrs[0].shape[0]
+        new_cols = 0
+        for a in arrs:
+            new_cols += a.shape[1]
+        data = []
+        for i in range(rows):
+            for a in arrs:
+                c = a.shape[1]
+                row_start = i * c
+                for j in range(c):
+                    data.push(a._data[row_start + j])
+        return ndarray([rows, new_cols], arrs[0].dtype, data, True)
+    raise ValueError("concatenate: axis out of bounds")
+
+def stack(arrays, axis=0):
+    arrs = [asarray(x) for x in arrays]
+    n = arrs.length
+    orig_shape = arrs[0].shape
+    if axis < 0:
+        axis = orig_shape.length + 1 + axis
+    new_shape = []
+    for i in range(orig_shape.length):
+        if i is axis:
+            new_shape.push(n)
+        new_shape.push(orig_shape[i])
+    if axis is orig_shape.length:
+        new_shape.push(n)
+    data = []
+    elem_size = _compute_size(orig_shape)
+    for i in range(n):
+        for v in arrs[i]._data:
+            data.push(v)
+    a = ndarray(new_shape, arrs[0].dtype, data, True)
+    return a
+
+def hstack(tup):
+    arrs = [asarray(x) for x in tup]
+    if arrs[0].ndim is 1:
+        return concatenate(arrs, 0)
+    return concatenate(arrs, 1)
+
+def vstack(tup):
+    arrs = [asarray(x) for x in tup]
+    if arrs[0].ndim is 1:
+        reshaped = [a.reshape([1, a.size]) for a in arrs]
+        return concatenate(reshaped, 0)
+    return concatenate(arrs, 0)
+
+def split(ary, indices_or_sections, axis=0):
+    ary = asarray(ary)
+    n = ary.shape[axis]
+    if jstype(indices_or_sections) is 'number':
+        k = indices_or_sections
+        sz = n // k
+        indices = []
+        for i in range(1, k):
+            indices.push(i * sz)
+    else:
+        indices = list(indices_or_sections)
+    starts = [0]
+    for idx in indices:
+        starts.push(idx)
+    starts.push(n)
+    result = []
+    for i in range(starts.length - 1):
+        s = starts[i]
+        e = starts[i + 1]
+        if axis is 0 and ary.ndim is 1:
+            data = ary._data.slice(s, e)
+            result.push(ndarray([e - s], ary.dtype, data, True))
+        elif axis is 0:
+            cols = ary.shape[1]
+            data = ary._data.slice(s * cols, e * cols)
+            result.push(ndarray([e - s, cols], ary.dtype, data, True))
+        elif axis is 1:
+            rows = ary.shape[0]
+            new_cols = e - s
+            data = []
+            for r in range(rows):
+                for c in range(s, e):
+                    data.push(ary._data[r * ary.shape[1] + c])
+            result.push(ndarray([rows, new_cols], ary.dtype, data, True))
+    return result
+
+def hsplit(ary, indices_or_sections):
+    return split(ary, indices_or_sections, 1)
+
+def vsplit(ary, indices_or_sections):
+    return split(ary, indices_or_sections, 0)
+
+def squeeze(a, axis=None):
+    a = asarray(a)
+    return a.squeeze(axis)
+
+def expand_dims(a, axis):
+    a = asarray(a)
+    if axis < 0:
+        axis = a.ndim + 1 + axis
+    new_shape = a.shape.slice()
+    new_shape.splice(axis, 0, 1)
+    return ndarray(new_shape, a.dtype, a._data.slice(), True)
+
+def flip(m, axis=None):
+    m = asarray(m)
+    if axis is None:
+        data = m._data.slice()
+        data.reverse()
+        return ndarray(m.shape.slice(), m.dtype, data, True)
+    if axis < 0:
+        axis = m.ndim + axis
+    data = m._data.slice()
+    if m.ndim is 1:
+        data.reverse()
+        return ndarray(m.shape.slice(), m.dtype, data, True)
+    if m.ndim is 2:
+        rows = m.shape[0]
+        cols = m.shape[1]
+        new_data = []
+        if axis is 0:
+            for i in range(rows - 1, -1, -1):
+                for j in range(cols):
+                    new_data.push(m._data[i * cols + j])
+        else:
+            for i in range(rows):
+                for j in range(cols - 1, -1, -1):
+                    new_data.push(m._data[i * cols + j])
+        return ndarray(m.shape.slice(), m.dtype, new_data, True)
+    return m
+
+def roll(a, shift, axis=None):
+    a = asarray(a)
+    if axis is None:
+        data = a._data.slice()
+        n = data.length
+        shift = ((shift % n) + n) % n
+        return ndarray([n], a.dtype, data.slice(n - shift).concat(data.slice(0, n - shift)), True)
+    rows = a.shape[0]
+    cols = a.shape[1] if a.ndim > 1 else 1
+    if axis is 0:
+        shift = ((shift % rows) + rows) % rows
+        data = a._data.slice((rows - shift) * cols).concat(a._data.slice(0, (rows - shift) * cols))
+        return ndarray(a.shape.slice(), a.dtype, data, True)
+    if axis is 1:
+        shift = ((shift % cols) + cols) % cols
+        new_data = []
+        for i in range(rows):
+            row = a._data.slice(i * cols, (i + 1) * cols)
+            new_row = row.slice(cols - shift).concat(row.slice(0, cols - shift))
+            for v in new_row:
+                new_data.push(v)
+        return ndarray(a.shape.slice(), a.dtype, new_data, True)
+    return a
+
+def tile(A, reps):
+    A = asarray(A)
+    if jstype(reps) is 'number':
+        reps = [int(reps)]
+    data = A._data.slice()
+    n = reps[reps.length - 1]
+    new_data = []
+    for i in range(n):
+        for v in data:
+            new_data.push(v)
+    new_shape = [A.size * n]
+    return ndarray(new_shape, A.dtype, new_data, True)
+
+def repeat(a, repeats, axis=None):
+    a = asarray(a)
+    if axis is None:
+        data = a._data
+        new_data = []
+        for v in data:
+            for i in range(repeats):
+                new_data.push(v)
+        return ndarray([new_data.length], a.dtype, new_data, True)
+    if a.ndim is 1:
+        new_data = []
+        for v in a._data:
+            for i in range(repeats):
+                new_data.push(v)
+        return ndarray([new_data.length], a.dtype, new_data, True)
+    rows = a.shape[0]
+    cols = a.shape[1]
+    new_data = []
+    if axis is 0:
+        for i in range(rows):
+            for r in range(repeats):
+                for j in range(cols):
+                    new_data.push(a._data[i * cols + j])
+        return ndarray([rows * repeats, cols], a.dtype, new_data, True)
+    else:
+        for i in range(rows):
+            for j in range(cols):
+                for r in range(repeats):
+                    new_data.push(a._data[i * cols + j])
+        return ndarray([rows, cols * repeats], a.dtype, new_data, True)
+
+# -------------------------------------------------------
+# Math ufuncs
+# -------------------------------------------------------
+def add(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return a + b;)
+
+def subtract(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return a - b;)
+
+def multiply(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return a * b;)
+
+def divide(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return a / b;)
+
+def true_divide(x1, x2):
+    return divide(x1, x2)
+
+def floor_divide(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return Math.floor(a / b);)
+
+def power(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return Math.pow(a, b);)
+
+def mod(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return a % b;)
+
+def remainder(x1, x2):
+    return mod(x1, x2)
+
+def negative(x):
+    return _apply_ufunc(x, def(v): return -v;)
+
+def absolute(x):
+    return _apply_ufunc(x, def(v): return Math.abs(v);)
+
+def abs(x):
+    return absolute(x)
+
+def sqrt(x):
+    return _apply_ufunc(x, def(v): return Math.sqrt(v);)
+
+def square(x):
+    return _apply_ufunc(x, def(v): return v * v;)
+
+def exp(x):
+    return _apply_ufunc(x, def(v): return Math.exp(v);)
+
+def log(x):
+    return _apply_ufunc(x, def(v): return Math.log(v);)
+
+def log2(x):
+    return _apply_ufunc(x, def(v): return Math.log(v) / Math.LN2;)
+
+def log10(x):
+    return _apply_ufunc(x, def(v): return Math.log(v) / Math.LN10;)
+
+def sin(x):
+    return _apply_ufunc(x, def(v): return Math.sin(v);)
+
+def cos(x):
+    return _apply_ufunc(x, def(v): return Math.cos(v);)
+
+def tan(x):
+    return _apply_ufunc(x, def(v): return Math.tan(v);)
+
+def arcsin(x):
+    return _apply_ufunc(x, def(v): return Math.asin(v);)
+
+def arccos(x):
+    return _apply_ufunc(x, def(v): return Math.acos(v);)
+
+def arctan(x):
+    return _apply_ufunc(x, def(v): return Math.atan(v);)
+
+def arctan2(y, x):
+    return _apply_ufunc2(y, x, def(a, b): return Math.atan2(a, b);)
+
+def degrees(x):
+    return _apply_ufunc(x, def(v): return v * 180.0 / Math.PI;)
+
+def rad2deg(x):
+    return degrees(x)
+
+def radians(x):
+    return _apply_ufunc(x, def(v): return v * Math.PI / 180.0;)
+
+def deg2rad(x):
+    return radians(x)
+
+def around(a, decimals=0):
+    factor = Math.pow(10, decimals)
+    return _apply_ufunc(a, def(v): return Math.round(v * factor) / factor;)
+
+def round_(a, decimals=0):
+    return around(a, decimals)
+
+def ceil(x):
+    return _apply_ufunc(x, def(v): return Math.ceil(v);)
+
+def floor(x):
+    return _apply_ufunc(x, def(v): return Math.floor(v);)
+
+def _sign_fn(v):
+    if v > 0:
+        return 1
+    elif v < 0:
+        return -1
+    return 0
+
+def sign(x):
+    return _apply_ufunc(x, _sign_fn)
+
+def maximum(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return a if a >= b else b;)
+
+def minimum(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return a if a <= b else b;)
+
+def hypot(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return Math.sqrt(a * a + b * b);)
+
+def clip(a, a_min, a_max):
+    a = asarray(a)
+    return a.clip(a_min, a_max)
+
+# -------------------------------------------------------
+# Reduction operations
+# -------------------------------------------------------
+def sum(a, axis=None, keepdims=False):
+    a = asarray(a)
+    return a.sum(axis, keepdims)
+
+def prod(a, axis=None, keepdims=False):
+    a = asarray(a)
+    return a.prod(axis, keepdims)
+
+def amin(a, axis=None):
+    a = asarray(a)
+    return a.min(axis)
+
+def nanmin(a):
+    a = asarray(a)
+    data = []
+    for v in a._data:
+        if not isNaN(v):
+            data.push(v)
+    return _min_list(data)
+
+def amax(a, axis=None):
+    a = asarray(a)
+    return a.max(axis)
+
+def nanmax(a):
+    a = asarray(a)
+    data = []
+    for v in a._data:
+        if not isNaN(v):
+            data.push(v)
+    return _max_list(data)
+
+def mean(a, axis=None):
+    a = asarray(a)
+    return a.mean(axis)
+
+def nanmean(a):
+    a = asarray(a)
+    data = []
+    for v in a._data:
+        if not isNaN(v):
+            data.push(v)
+    return _mean_list(data)
+
+def std(a, axis=None, ddof=0):
+    a = asarray(a)
+    return a.std(axis, ddof)
+
+def nanstd(a, ddof=0):
+    a = asarray(a)
+    data = []
+    for v in a._data:
+        if not isNaN(v):
+            data.push(v)
+    return _std_list(data, ddof)
+
+def variance(a, axis=None, ddof=0):
+    a = asarray(a)
+    return a.variance(axis, ddof)
+
+def nanvar(a, ddof=0):
+    a = asarray(a)
+    data = []
+    for v in a._data:
+        if not isNaN(v):
+            data.push(v)
+    return _var_list(data, ddof)
+
+def cumsum(a, axis=None):
+    a = asarray(a)
+    return a.cumsum(axis)
+
+def cumprod(a, axis=None):
+    a = asarray(a)
+    return a.cumprod(axis)
+
+def diff(a, n=1, axis=-1):
+    a = asarray(a)
+    data = a._data.slice()
+    for iteration in range(n):
+        new_data = []
+        for i in range(data.length - 1):
+            new_data.push(data[i + 1] - data[i])
+        data = new_data
+    return ndarray([data.length], a.dtype, data, True)
+
+def argmin(a, axis=None):
+    a = asarray(a)
+    return a.argmin(axis)
+
+def argmax(a, axis=None):
+    a = asarray(a)
+    return a.argmax(axis)
+
+# -------------------------------------------------------
+# Sorting & Searching
+# -------------------------------------------------------
+def sort(a, axis=-1):
+    a = asarray(a)
+    if a.ndim is 1 or axis is None:
+        data = a._data.slice()
+        data.sort(def(x, y): return x - y;)
+        return ndarray(a.shape.slice(), a.dtype, data, True)
+    # 2D sort along last axis (axis=1 or axis=-1)
+    if axis < 0:
+        axis = a.ndim + axis
+    rows = a.shape[0]
+    cols = a.shape[1]
+    new_data = []
+    if axis is 1:
+        for i in range(rows):
+            row = a._data.slice(i * cols, (i + 1) * cols)
+            row.sort(def(x, y): return x - y;)
+            for v in row:
+                new_data.push(v)
+    elif axis is 0:
+        for j in range(cols):
+            col = []
+            for i in range(rows):
+                col.push(a._data[i * cols + j])
+            col.sort(def(x, y): return x - y;)
+            for i in range(rows):
+                new_data[i * cols + j] = col[i]
+        if new_data.length is 0:
+            for i in range(a.size):
+                new_data.push(a._data[i])
+    return ndarray(a.shape.slice(), a.dtype, new_data, True)
+
+def argsort(a, axis=-1):
+    a = asarray(a)
+    if a.ndim is 1:
+        indices = []
+        for i in range(a.size):
+            indices.push(i)
+        data = a._data.slice()
+        indices.sort(def(i, j): return data[i] - data[j];)
+        return ndarray([a.size], 'int32', indices, True)
+    # Flatten and sort
+    data = a._data.slice()
+    indices = []
+    for i in range(data.length):
+        indices.push(i)
+    indices.sort(def(i, j): return data[i] - data[j];)
+    return ndarray([indices.length], 'int32', indices, True)
+
+def searchsorted(a, v, side='left'):
+    a = asarray(a)
+    data = a._data
+    if jstype(v) is 'number':
+        lo = 0
+        hi = data.length
+        while lo < hi:
+            mid = Math.floor((lo + hi) / 2)
+            if side is 'left':
+                if data[mid] < v:
+                    lo = mid + 1
+                else:
+                    hi = mid
+            else:
+                if data[mid] <= v:
+                    lo = mid + 1
+                else:
+                    hi = mid
+        return lo
+    v = asarray(v)
+    result = []
+    for val in v._data:
+        result.push(searchsorted(a, val, side))
+    return ndarray([result.length], 'int32', result, True)
+
+def nonzero(a):
+    a = asarray(a)
+    indices = []
+    for i in range(a.size):
+        if a._data[i]:
+            indices.push(i)
+    result = ndarray([indices.length], 'int32', indices, True)
+    return [result]
+
+def where(condition, x=None, y=None):
+    condition = asarray(condition)
+    if x is None:
+        return nonzero(condition)
+    x = asarray(x)
+    y = asarray(y)
+    bs = _broadcast_shapes(_broadcast_shapes(condition.shape, x.shape), y.shape)
+    c_data = _broadcast_to_flat(condition, bs)
+    x_data = _broadcast_to_flat(x, bs)
+    y_data = _broadcast_to_flat(y, bs)
+    result_data = []
+    for i in range(c_data.length):
+        if c_data[i]:
+            result_data.push(x_data[i])
+        else:
+            result_data.push(y_data[i])
+    return ndarray(bs, 'float64', result_data, True)
+
+# -------------------------------------------------------
+# Statistics
+# -------------------------------------------------------
+def median(a, axis=None):
+    a = asarray(a)
+    data = a._data.slice()
+    data.sort(def(x, y): return x - y;)
+    n = data.length
+    if n % 2 is 1:
+        return data[Math.floor(n / 2)]
+    return (data[n // 2 - 1] + data[n // 2]) / 2.0
+
+def percentile(a, q, axis=None):
+    a = asarray(a)
+    data = a._data.slice()
+    data.sort(def(x, y): return x - y;)
+    n = data.length
+    idx = q / 100.0 * (n - 1)
+    lo = Math.floor(idx)
+    hi = Math.ceil(idx)
+    if lo is hi:
+        return data[lo]
+    return data[lo] + (idx - lo) * (data[hi] - data[lo])
+
+def corrcoef(x, y=None, rowvar=True):
+    x = asarray(x)
+    if y is not None:
+        y = asarray(y)
+        # Stack rows
+        xdata = x._data.slice()
+        ydata = y._data.slice()
+        n = xdata.length
+        mx = _mean_list(xdata)
+        my = _mean_list(ydata)
+        cxx = 0
+        cyy = 0
+        cxy = 0
+        for i in range(n):
+            cxx += (xdata[i] - mx) * (xdata[i] - mx)
+            cyy += (ydata[i] - my) * (ydata[i] - my)
+            cxy += (xdata[i] - mx) * (ydata[i] - my)
+        cxx /= n
+        cyy /= n
+        cxy /= n
+        r = cxy / Math.sqrt(cxx * cyy)
+        data = [1.0, r, r, 1.0]
+        return ndarray([2, 2], 'float64', data, True)
+    return eye(x.shape[0])
+
+def cov(m, y=None, rowvar=True, ddof=1):
+    m = asarray(m)
+    if y is not None:
+        y = asarray(y)
+        xdata = m._data.slice()
+        ydata = y._data.slice()
+        n = xdata.length
+        mx = _mean_list(xdata)
+        my = _mean_list(ydata)
+        cxx = 0
+        cyy = 0
+        cxy = 0
+        for i in range(n):
+            cxx += (xdata[i] - mx) * (xdata[i] - mx)
+            cyy += (ydata[i] - my) * (ydata[i] - my)
+            cxy += (xdata[i] - mx) * (ydata[i] - my)
+        cxx /= (n - ddof)
+        cyy /= (n - ddof)
+        cxy /= (n - ddof)
+        data = [cxx, cxy, cxy, cyy]
+        return ndarray([2, 2], 'float64', data, True)
+    data = m._data.slice()
+    n = data.length
+    m_val = _mean_list(data)
+    c = 0
+    for v in data:
+        c += (v - m_val) * (v - m_val)
+    c /= (n - ddof)
+    return ndarray([1, 1], 'float64', [c], True)
+
+def histogram(a, bins=10, data_range=None):
+    a = asarray(a)
+    data = a._data.slice()
+    if data_range is None:
+        mn = _min_list(data)
+        mx = _max_list(data)
+    else:
+        mn = data_range[0]
+        mx = data_range[1]
+    bin_edges = []
+    for i in range(bins + 1):
+        bin_edges.push(mn + i * (mx - mn) / bins)
+    counts = _make_filled(bins, 0, 'int32')
+    for v in data:
+        if v < mn or v > mx:
+            continue
+        idx = Math.floor((v - mn) / (mx - mn) * bins)
+        if idx is bins:
+            idx = bins - 1
+        counts[idx] += 1
+    return [ndarray([bins], 'int32', counts, True), ndarray([bins + 1], 'float64', bin_edges, True)]
+
+# -------------------------------------------------------
+# Linear algebra
+# -------------------------------------------------------
+def dot(a, b):
+    a = asarray(a)
+    b = asarray(b)
+    if a.ndim is 1 and b.ndim is 1:
+        s = 0
+        for i in range(a.size):
+            s += a._data[i] * b._data[i]
+        return s
+    if a.ndim is 2 and b.ndim is 2:
+        return matmul(a, b)
+    if a.ndim is 2 and b.ndim is 1:
+        rows = a.shape[0]
+        cols = a.shape[1]
+        result_data = []
+        for i in range(rows):
+            s = 0
+            for j in range(cols):
+                s += a._data[i * cols + j] * b._data[j]
+            result_data.push(s)
+        return ndarray([rows], 'float64', result_data, True)
+    return _apply_ufunc2(a, b, def(x, y): return x * y;)
+
+def matmul(x1, x2):
+    a = asarray(x1)
+    b = asarray(x2)
+    ra = a.shape[0]
+    ca = a.shape[1]
+    rb = b.shape[0]
+    cb = b.shape[1]
+    if ca is not rb:
+        raise ValueError("matmul: dimension mismatch")
+    result_data = []
+    for i in range(ra):
+        for j in range(cb):
+            s = 0
+            for k in range(ca):
+                s += a._data[i * ca + k] * b._data[k * cb + j]
+            result_data.push(s)
+    return ndarray([ra, cb], 'float64', result_data, True)
+
+def inner(a, b):
+    a = asarray(a)
+    b = asarray(b)
+    if a.ndim is 1 and b.ndim is 1:
+        return dot(a, b)
+    return dot(a, b.transpose())
+
+def outer(a, b):
+    a = asarray(a).ravel()
+    b = asarray(b).ravel()
+    data = []
+    for av in a._data:
+        for bv in b._data:
+            data.push(av * bv)
+    return ndarray([a.size, b.size], 'float64', data, True)
+
+def cross(a, b):
+    a = asarray(a)
+    b = asarray(b)
+    if a.size is 3 and b.size is 3:
+        ax = a._data[0]
+        ay = a._data[1]
+        az = a._data[2]
+        bx = b._data[0]
+        by = b._data[1]
+        bz = b._data[2]
+        data = [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx]
+        return ndarray([3], 'float64', data, True)
+    if a.size is 2 and b.size is 2:
+        return a._data[0] * b._data[1] - a._data[1] * b._data[0]
+    raise ValueError("cross: incompatible dimensions")
+
+def trace(a, offset=0, axis1=0, axis2=1):
+    a = asarray(a)
+    rows = a.shape[0]
+    cols = a.shape[1]
+    s = 0
+    for i in range(rows):
+        j = i + offset
+        if j >= 0 and j < cols:
+            s += a._data[i * cols + j]
+    return s
+
+def norm(x, ord=None, axis=None):
+    x = asarray(x)
+    data = x._data
+    if ord is None:
+        s = 0
+        for v in data:
+            s += v * v
+        return Math.sqrt(s)
+    if ord is 1:
+        s = 0
+        for v in data:
+            s += Math.abs(v)
+        return s
+    if ord is 2:
+        s = 0
+        for v in data:
+            s += v * v
+        return Math.sqrt(s)
+    # Generic Lp norm
+    s = 0
+    for v in data:
+        s += Math.pow(Math.abs(v), ord)
+    return Math.pow(s, 1.0 / ord)
+
+def det(a):
+    a = asarray(a)
+    n = a.shape[0]
+    if n is 2:
+        return a._data[0] * a._data[3] - a._data[1] * a._data[2]
+    if n is 3:
+        d = a._data
+        return (d[0] * (d[4] * d[8] - d[5] * d[7])
+              - d[1] * (d[3] * d[8] - d[5] * d[6])
+              + d[2] * (d[3] * d[7] - d[4] * d[6]))
+    raise ValueError("det: only 2x2 and 3x3 matrices supported")
+
+# -------------------------------------------------------
+# Comparison / Logic
+# -------------------------------------------------------
+def _all_reduce_fn(data):
+    for v in data:
+        if not v:
+            return False
+    return True
+
+def _any_reduce_fn(data):
+    for v in data:
+        if v:
+            return True
+    return False
+
+def all(a, axis=None):
+    a = asarray(a)
+    if axis is None:
+        for v in a._data:
+            if not v:
+                return False
+        return True
+    return _reduce(a, axis, _all_reduce_fn, False)
+
+def any(a, axis=None):
+    a = asarray(a)
+    if axis is None:
+        for v in a._data:
+            if v:
+                return True
+        return False
+    return _reduce(a, axis, _any_reduce_fn, False)
+
+def isnan(a):
+    return _apply_ufunc(a, def(v): return isNaN(v);)
+
+def isinf(a):
+    return _apply_ufunc(a, def(v): return not isFinite(v) and not isNaN(v);)
+
+def isfinite(a):
+    return _apply_ufunc(a, def(v): return isFinite(v);)
+
+def array_equal(a1, a2):
+    a1 = asarray(a1)
+    a2 = asarray(a2)
+    if a1.shape.join(',') is not a2.shape.join(','):
+        return False
+    for i in range(a1.size):
+        if a1._data[i] is not a2._data[i]:
+            return False
+    return True
+
+def equal(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return 1 if a == b else 0;)
+
+def not_equal(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return 1 if a != b else 0;)
+
+def greater(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return 1 if a > b else 0;)
+
+def less(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return 1 if a < b else 0;)
+
+def greater_equal(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return 1 if a >= b else 0;)
+
+def less_equal(x1, x2):
+    return _apply_ufunc2(x1, x2, def(a, b): return 1 if a <= b else 0;)
+
+def _logical_and_fn(a, b):
+    return 1 if a and b else 0
+
+def _logical_or_fn(a, b):
+    return 1 if a or b else 0
+
+def _logical_not_fn(v):
+    return 1 if not v else 0
+
+def _logical_xor_fn(a, b):
+    return 1 if (a and not b) or (not a and b) else 0
+
+def logical_and(x1, x2):
+    return _apply_ufunc2(x1, x2, _logical_and_fn)
+
+def logical_or(x1, x2):
+    return _apply_ufunc2(x1, x2, _logical_or_fn)
+
+def logical_not(x):
+    return _apply_ufunc(x, _logical_not_fn)
+
+def logical_xor(x1, x2):
+    return _apply_ufunc2(x1, x2, _logical_xor_fn)
+
+# -------------------------------------------------------
+# Shape / Type Utilities
+# -------------------------------------------------------
+def shape(a):
+    a = asarray(a)
+    return a.shape
+
+def ndim(a):
+    a = asarray(a)
+    return a.ndim
+
+def size(a):
+    a = asarray(a)
+    return a.size
+
+# -------------------------------------------------------
+# Set Operations
+# -------------------------------------------------------
+def union1d(ar1, ar2):
+    ar1 = asarray(ar1)
+    ar2 = asarray(ar2)
+    combined = ar1._data.concat(ar2._data)
+    seen = {}
+    unique = []
+    for v in combined:
+        key = str(v)
+        if not seen[key]:
+            seen[key] = True
+            unique.push(v)
+    unique.sort(def(a, b): return a - b;)
+    return ndarray([unique.length], 'float64', unique, True)
+
+def intersect1d(ar1, ar2):
+    ar1 = asarray(ar1)
+    ar2 = asarray(ar2)
+    s = {}
+    for v in ar2._data:
+        s[str(v)] = True
+    result = []
+    seen = {}
+    for v in ar1._data:
+        key = str(v)
+        if s[key] and not seen[key]:
+            seen[key] = True
+            result.push(v)
+    result.sort(def(a, b): return a - b;)
+    return ndarray([result.length], 'float64', result, True)
+
+def setdiff1d(ar1, ar2):
+    ar1 = asarray(ar1)
+    ar2 = asarray(ar2)
+    s = {}
+    for v in ar2._data:
+        s[str(v)] = True
+    result = []
+    seen = {}
+    for v in ar1._data:
+        key = str(v)
+        if not s[key] and not seen[key]:
+            seen[key] = True
+            result.push(v)
+    result.sort(def(a, b): return a - b;)
+    return ndarray([result.length], 'float64', result, True)
+
+def in1d(ar1, ar2):
+    ar1 = asarray(ar1)
+    ar2 = asarray(ar2)
+    s = {}
+    for v in ar2._data:
+        s[str(v)] = True
+    result = []
+    for v in ar1._data:
+        result.push(1 if s[str(v)] else 0)
+    return ndarray([result.length], 'bool', result, True)
+
+# -------------------------------------------------------
+# Additional Shape Helpers
+# -------------------------------------------------------
+def diag(v, k=0):
+    v = asarray(v)
+    if v.ndim is 1:
+        n = v.size + Math.abs(k)
+        data = _make_filled(n * n, 0, v.dtype)
+        for i in range(v.size):
+            if k >= 0:
+                data[(i) * n + (i + k)] = v._data[i]
+            else:
+                data[(i - k) * n + i] = v._data[i]
+        return ndarray([n, n], v.dtype, data, True)
+    else:
+        n = v.shape[0]
+        m = v.shape[1]
+        result = []
+        for i in range(n):
+            j = i + k
+            if j >= 0 and j < m:
+                result.push(v._data[i * m + j])
+        return ndarray([result.length], v.dtype, result, True)
+
+def tril(m, k=0):
+    m = asarray(m)
+    rows = m.shape[0]
+    cols = m.shape[1]
+    data = m._data.slice()
+    for i in range(rows):
+        for j in range(cols):
+            if j - i > k:
+                data[i * cols + j] = 0
+    return ndarray(m.shape.slice(), m.dtype, data, True)
+
+def triu(m, k=0):
+    m = asarray(m)
+    rows = m.shape[0]
+    cols = m.shape[1]
+    data = m._data.slice()
+    for i in range(rows):
+        for j in range(cols):
+            if j - i < k:
+                data[i * cols + j] = 0
+    return ndarray(m.shape.slice(), m.dtype, data, True)
+
+def atleast_1d(*arys):
+    result = []
+    for a in arys:
+        a = asarray(a)
+        if a.ndim is 0:
+            result.push(ndarray([1], a.dtype, a._data.slice(), True))
+        else:
+            result.push(a)
+    if result.length is 1:
+        return result[0]
+    return result
+
+def atleast_2d(*arys):
+    result = []
+    for a in arys:
+        a = asarray(a)
+        if a.ndim is 0:
+            result.push(ndarray([1, 1], a.dtype, a._data.slice(), True))
+        elif a.ndim is 1:
+            result.push(ndarray([1, a.size], a.dtype, a._data.slice(), True))
+        else:
+            result.push(a)
+    if result.length is 1:
+        return result[0]
+    return result
+
+def column_stack(tup):
+    arrs = []
+    for a in tup:
+        a = asarray(a)
+        if a.ndim is 1:
+            arrs.push(ndarray([a.size, 1], a.dtype, a._data.slice(), True))
+        else:
+            arrs.push(a)
+    return concatenate(arrs, 1)
+
+def dstack(tup):
+    arrs = [asarray(a) for a in tup]
+    data = []
+    for a in arrs:
+        for v in a._data:
+            data.push(v)
+    total = data.length
+    return ndarray([total], arrs[0].dtype, data, True)
+
+def broadcast_to(array, shape):
+    array = asarray(array)
+    if jstype(shape) is 'number':
+        shape = [int(shape)]
+    elif not Array.isArray(shape):
+        shape = list(shape)
+    bs = _broadcast_shapes(array.shape, shape)
+    data = _broadcast_to_flat(array, bs)
+    return ndarray(bs, array.dtype, data, True)
+
+# -------------------------------------------------------
+# Additional Numeric Utilities
+# -------------------------------------------------------
+def nan_to_num(x, nan=0.0):
+    x = asarray(x)
+    data = []
+    for v in x._data:
+        if isNaN(v):
+            data.push(nan)
+        elif not isFinite(v) and v > 0:
+            data.push(1.7976931348623157e+308)
+        elif not isFinite(v) and v < 0:
+            data.push(-1.7976931348623157e+308)
+        else:
+            data.push(v)
+    return ndarray(x.shape.slice(), x.dtype, data, True)
+
+def fix(x):
+    return _apply_ufunc(x, def(v): return Math.trunc(v);)
+
+def ptp(a, axis=None):
+    a = asarray(a)
+    if axis is None:
+        return _max_list(a._data) - _min_list(a._data)
+    mx = _reduce(a, axis, _max_list, False)
+    mn = _reduce(a, axis, _min_list, False)
+    return subtract(mx, mn)
+
+def _count_nonzero_fn(data):
+    c = 0
+    for v in data:
+        if v:
+            c += 1
+    return c
+
+def count_nonzero(a, axis=None):
+    a = asarray(a)
+    if axis is None:
+        count = 0
+        for v in a._data:
+            if v:
+                count += 1
+        return count
+    return _reduce(a, axis, _count_nonzero_fn, False)
+
+def bincount(x, weights=None, minlength=0):
+    x = asarray(x)
+    mx = int(_max_list(x._data)) + 1
+    n = Math.max(mx, minlength)
+    counts = _make_filled(n, 0, 'float64')
+    if weights is None:
+        for v in x._data:
+            counts[int(v)] += 1
+    else:
+        weights = asarray(weights)
+        for i in range(x.size):
+            counts[int(x._data[i])] += weights._data[i]
+    return ndarray([n], 'float64', counts, True)
+
+def ediff1d(ary, to_end=None, to_begin=None):
+    ary = asarray(ary)
+    data = ary._data
+    result = []
+    if to_begin is not None:
+        b = asarray(to_begin)
+        for v in b._data:
+            result.push(v)
+    for i in range(data.length - 1):
+        result.push(data[i + 1] - data[i])
+    if to_end is not None:
+        e = asarray(to_end)
+        for v in e._data:
+            result.push(v)
+    return ndarray([result.length], ary.dtype, result, True)
+
+def average(a, axis=None, weights=None):
+    a = asarray(a)
+    if weights is None:
+        return mean(a, axis)
+    weights = asarray(weights)
+    s = 0
+    ws = 0
+    for i in range(a.size):
+        s += a._data[i] * weights._data[i]
+        ws += weights._data[i]
+    return s / ws
+
+def interp(x, xp, fp):
+    xp = asarray(xp)
+    fp = asarray(fp)
+    if jstype(x) is 'number':
+        if x <= xp._data[0]:
+            return fp._data[0]
+        if x >= xp._data[xp.size - 1]:
+            return fp._data[fp.size - 1]
+        for i in range(xp.size - 1):
+            if xp._data[i] <= x and x <= xp._data[i + 1]:
+                t = (x - xp._data[i]) / (xp._data[i + 1] - xp._data[i])
+                return fp._data[i] + t * (fp._data[i + 1] - fp._data[i])
+        return fp._data[fp.size - 1]
+    x = asarray(x)
+    result = []
+    for v in x._data:
+        result.push(interp(v, xp, fp))
+    return ndarray([result.length], 'float64', result, True)
+
+def trapz(y, x=None, dx=1.0, axis=-1):
+    y = asarray(y)
+    data = y._data
+    if x is not None:
+        x = asarray(x)
+        xdata = x._data
+        s = 0
+        for i in range(data.length - 1):
+            s += (data[i] + data[i + 1]) / 2.0 * (xdata[i + 1] - xdata[i])
+        return s
+    s = 0
+    for i in range(data.length - 1):
+        s += (data[i] + data[i + 1]) / 2.0 * dx
+    return s
+
+def convolve(a, v, mode='full'):
+    a = asarray(a)
+    v = asarray(v)
+    adata = a._data
+    vdata = v._data
+    na = adata.length
+    nv = vdata.length
+    full_len = na + nv - 1
+    result = _make_filled(full_len, 0, 'float64')
+    for i in range(na):
+        for j in range(nv):
+            result[i + j] += adata[i] * vdata[j]
+    if mode is 'full':
+        return ndarray([full_len], 'float64', result, True)
+    elif mode is 'same':
+        start = Math.floor((nv - 1) / 2)
+        return ndarray([na], 'float64', result.slice(start, start + na), True)
+    else:  # valid
+        vlen = na - nv + 1
+        if vlen <= 0:
+            return ndarray([0], 'float64', [], True)
+        start = nv - 1
+        return ndarray([vlen], 'float64', result.slice(start, start + vlen), True)
+
+# -------------------------------------------------------
+# Polynomial
+# -------------------------------------------------------
+def polyval(p, x):
+    p = asarray(p)
+    if jstype(x) is 'number':
+        result = 0
+        for v in p._data:
+            result = result * x + v
+        return result
+    x = asarray(x)
+    out = []
+    for xv in x._data:
+        result = 0
+        for v in p._data:
+            result = result * xv + v
+        out.push(result)
+    return ndarray([out.length], 'float64', out, True)
+
+def polyfit(x, y, deg):
+    x = asarray(x)
+    y = asarray(y)
+    n = x.size
+    # Build Vandermonde matrix
+    A = []
+    for i in range(n):
+        row = []
+        for j in range(deg + 1):
+            row.push(Math.pow(x._data[i], deg - j))
+        A.push(row)
+    # Solve least squares via normal equations: (A^T A) c = A^T y
+    # A^T A
+    ATA = []
+    for i in range(deg + 1):
+        ATA.push(_make_filled(deg + 1, 0, 'float64'))
+    for i in range(deg + 1):
+        for j in range(deg + 1):
+            s = 0
+            for k in range(n):
+                s += A[k][i] * A[k][j]
+            ATA[i][j] = s
+    # A^T y
+    ATy = _make_filled(deg + 1, 0, 'float64')
+    for i in range(deg + 1):
+        s = 0
+        for k in range(n):
+            s += A[k][i] * y._data[k]
+        ATy[i] = s
+    # Gaussian elimination
+    m = deg + 1
+    aug = []
+    for i in range(m):
+        row = ATA[i].slice()
+        row.push(ATy[i])
+        aug.push(row)
+    for col in range(m):
+        # Find pivot
+        pivot = col
+        for row in range(col + 1, m):
+            if Math.abs(aug[row][col]) > Math.abs(aug[pivot][col]):
+                pivot = row
+        temp = aug[col]
+        aug[col] = aug[pivot]
+        aug[pivot] = temp
+        if Math.abs(aug[col][col]) < 1e-12:
+            continue
+        for row in range(m):
+            if row is not col:
+                factor = aug[row][col] / aug[col][col]
+                for c in range(m + 1):
+                    aug[row][c] -= factor * aug[col][c]
+    result = []
+    for i in range(m):
+        result.push(aug[i][m] / aug[i][i])
+    return ndarray([result.length], 'float64', result, True)
+
+# -------------------------------------------------------
+# numpy.random sub-module
+# -------------------------------------------------------
+_np_rand_state = {
+    'key': [],
+    'key_i': 0,
+    'key_j': 0
+}
+
+_np_rand_get_byte = def():
+    _np_rand_state.key_i = (_np_rand_state.key_i + 1) % 256
+    _np_rand_state.key_j = (_np_rand_state.key_j + _np_rand_state.key[_np_rand_state.key_i]) % 256
+    _np_rand_state.key[_np_rand_state.key_i], _np_rand_state.key[_np_rand_state.key_j] = \
+        _np_rand_state.key[_np_rand_state.key_j], _np_rand_state.key[_np_rand_state.key_i]
+    return _np_rand_state.key[(_np_rand_state.key[_np_rand_state.key_i] + \
+        _np_rand_state.key[_np_rand_state.key_j]) % 256]
+
+def _np_rand_uniform():
+    n = 0
+    m = 1
+    for i in range(8):
+        n += _np_rand_get_byte() * m
+        m *= 256
+    return v'n / 0x10000000000000000'
+
+def _np_rand_init(x):
+    _np_rand_state.key_i = _np_rand_state.key_j = 0
+    for i in range(256):
+        _np_rand_state.key[i] = i
+    j = 0
+    for i in range(256):
+        j = (j + _np_rand_state.key[i] + x.charCodeAt(i % x.length)) % 256
+        _np_rand_state.key[i], _np_rand_state.key[j] = _np_rand_state.key[j], _np_rand_state.key[i]
+
+_np_rand_init(str(Date().getTime()))
+
+class _NumpyRandom:
+    def seed(self, seed_val):
+        s = seed_val
+        if jstype(s) is 'number':
+            s = str(s)
+        elif jstype(s) is not 'string':
+            s = str(s)
+        _np_rand_init(s)
+
+    def rand(self, *shape):
+        if shape.length is 0:
+            return _np_rand_uniform()
+        shp = list(shape)
+        sz = _compute_size(shp)
+        data = []
+        for i in range(sz):
+            data.push(_np_rand_uniform())
+        return ndarray(shp, 'float64', data, True)
+
+    def randn(self, *shape):
+        if shape.length is 0:
+            u1 = _np_rand_uniform()
+            u2 = _np_rand_uniform()
+            if u1 <= 0:
+                u1 = 1e-300
+            return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2)
+        shp = list(shape)
+        sz = _compute_size(shp)
+        data = []
+        for i in range(sz):
+            u1 = _np_rand_uniform()
+            u2 = _np_rand_uniform()
+            if u1 <= 0:
+                u1 = 1e-300
+            data.push(Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2))
+        return ndarray(shp, 'float64', data, True)
+
+    def randint(self, low, high=None, size=None):
+        if high is None:
+            high = low
+            low = 0
+        def _one():
+            return low + Math.floor(_np_rand_uniform() * (high - low))
+        if size is None:
+            return _one()
+        if jstype(size) is 'number':
+            size = [int(size)]
+        sz = _compute_size(size)
+        data = []
+        for i in range(sz):
+            data.push(_one())
+        return ndarray(size, 'int32', data, True)
+
+    def random_sample(self, size=None):
+        return self.rand(size) if size is not None else _np_rand_uniform()
+
+    def choice(self, a, size=None, replace=True):
+        if jstype(a) is 'number':
+            a = arange(a)
+        else:
+            a = asarray(a)
+        n = a.size
+        def _one():
+            idx = Math.floor(_np_rand_uniform() * n)
+            return a._data[idx]
+        if size is None:
+            return _one()
+        if jstype(size) is 'number':
+            size = [int(size)]
+        sz = _compute_size(size)
+        data = []
+        for i in range(sz):
+            data.push(_one())
+        return ndarray(size, a.dtype, data, True)
+
+    def uniform(self, low=0.0, high=1.0, size=None):
+        def _one():
+            return low + _np_rand_uniform() * (high - low)
+        if size is None:
+            return _one()
+        if jstype(size) is 'number':
+            size = [int(size)]
+        sz = _compute_size(size)
+        data = []
+        for i in range(sz):
+            data.push(_one())
+        return ndarray(size, 'float64', data, True)
+
+    def normal(self, loc=0.0, scale=1.0, size=None):
+        def _one():
+            u1 = _np_rand_uniform()
+            u2 = _np_rand_uniform()
+            if u1 <= 0:
+                u1 = 1e-300
+            z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2)
+            return loc + scale * z
+        if size is None:
+            return _one()
+        if jstype(size) is 'number':
+            size = [int(size)]
+        sz = _compute_size(size)
+        data = []
+        for i in range(sz):
+            data.push(_one())
+        return ndarray(size, 'float64', data, True)
+
+    def permutation(self, x):
+        if jstype(x) is 'number':
+            a = arange(x)
+        else:
+            a = asarray(x).ravel()
+        data = a._data.slice()
+        n = data.length
+        for i in range(n - 1, 0, -1):
+            j = Math.floor(_np_rand_uniform() * (i + 1))
+            temp = data[i]
+            data[i] = data[j]
+            data[j] = temp
+        return ndarray([n], a.dtype, data, True)
+
+random = _NumpyRandom()
+
+# -------------------------------------------------------
+# numpy.linalg sub-module
+# -------------------------------------------------------
+class _NumpyLinAlg:
+    def inv(self, a):
+        a = asarray(a)
+        n = a.shape[0]
+        # Gauss-Jordan elimination with identity augmented
+        aug = []
+        for i in range(n):
+            row = []
+            for j in range(n):
+                row.push(a._data[i * n + j])
+            for j in range(n):
+                row.push(1 if i is j else 0)
+            aug.push(row)
+        for col in range(n):
+            # Find pivot
+            pivot = col
+            for row in range(col + 1, n):
+                if Math.abs(aug[row][col]) > Math.abs(aug[pivot][col]):
+                    pivot = row
+            temp = aug[col]
+            aug[col] = aug[pivot]
+            aug[pivot] = temp
+            if Math.abs(aug[col][col]) < 1e-12:
+                raise ValueError("linalg.inv: singular matrix")
+            factor = aug[col][col]
+            for c in range(2 * n):
+                aug[col][c] /= factor
+            for row in range(n):
+                if row is not col:
+                    f = aug[row][col]
+                    for c in range(2 * n):
+                        aug[row][c] -= f * aug[col][c]
+        result = []
+        for i in range(n):
+            for j in range(n):
+                result.push(aug[i][n + j])
+        return ndarray([n, n], 'float64', result, True)
+
+    def solve(self, a, b):
+        a = asarray(a)
+        b = asarray(b)
+        n = a.shape[0]
+        aug = []
+        for i in range(n):
+            row = []
+            for j in range(n):
+                row.push(a._data[i * n + j])
+            row.push(b._data[i])
+            aug.push(row)
+        for col in range(n):
+            pivot = col
+            for row in range(col + 1, n):
+                if Math.abs(aug[row][col]) > Math.abs(aug[pivot][col]):
+                    pivot = row
+            temp = aug[col]
+            aug[col] = aug[pivot]
+            aug[pivot] = temp
+            if Math.abs(aug[col][col]) < 1e-12:
+                raise ValueError("linalg.solve: singular matrix")
+            factor = aug[col][col]
+            for c in range(n + 1):
+                aug[col][c] /= factor
+            for row in range(n):
+                if row is not col:
+                    f = aug[row][col]
+                    for c in range(n + 1):
+                        aug[row][c] -= f * aug[col][c]
+        result = []
+        for i in range(n):
+            result.push(aug[i][n])
+        return ndarray([n], 'float64', result, True)
+
+linalg = _NumpyLinAlg()
