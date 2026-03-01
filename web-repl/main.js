@@ -11,7 +11,7 @@
 
     function compile(code) {
         const codeWithoutVariableTypeDefinitions = code.replace(/^ *(?!def\s)([\w.-]+) *: *[\w.-]+ *[:+*\/%&|^><-]*=/gm, '$1');
-        return web_repl.compile(codeWithoutVariableTypeDefinitions);
+        return web_repl.compile(codeWithoutVariableTypeDefinitions, {omit_function_metadata: true});
     }
 
     function runjs(code) {

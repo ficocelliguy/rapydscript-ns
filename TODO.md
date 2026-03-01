@@ -3,15 +3,10 @@
 - move to parser
 - add flag
 
-### async / await
-- support aync before def
-  - add async to ast options for function
-  - re-add it to transpiled js
-- support await before expressions
-  - ???
-
 ### export
 - strip out of initial code
-- add to all root-level functions after
-- remove __module__ stuff
-- add flag
+- add to all root-level functions after (without a leading underscore)
+
+### imports
+- support an array of rapydscript files with names? compile them all at once?
+- how does the current file importer work?
