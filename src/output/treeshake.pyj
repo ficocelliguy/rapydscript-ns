@@ -1,0 +1,182 @@
+# vim:fileencoding=utf-8
+# License: BSD
+from __python__ import hash_literals
+
+from ast import (
+    AST_Function, AST_Class, AST_SimpleStatement, AST_Assign,
+    AST_SymbolRef, AST_Dot, AST_Sub, AST_Imports, TreeWalker, is_node_type
+)
+from utils import has_prop
+
+
+def get_top_level_name(stmt):
+    if is_node_type(stmt, AST_Function) or is_node_type(stmt, AST_Class):
+        if stmt.name:
+            return stmt.name.name
+        return None
+    if is_node_type(stmt, AST_SimpleStatement):
+        body = stmt.body
+        if is_node_type(body, AST_Assign):
+            lhs = body.left
+            if is_node_type(lhs, AST_SymbolRef):
+                return lhs.name
+    return None
+
+
+def collect_refs_in_node(stmt, top_level_set, refs):
+    def visit_fn(node, descend):
+        if is_node_type(node, AST_SymbolRef):
+            if has_prop(top_level_set, node.name):
+                refs[node.name] = True
+    stmt.walk(TreeWalker(visit_fn))
+
+
+def compute_transitive_closure(body, direct_names, nonlocalvars):
+    nonlocal_set = {}
+    if nonlocalvars:
+        for nv in nonlocalvars:
+            nonlocal_set[nv] = True
+
+    name_map = {}
+    unnamed_stmts = []
+    for stmt in body:
+        name = get_top_level_name(stmt)
+        if name is not None:
+            name_map[name] = stmt
+        else:
+            unnamed_stmts.push(stmt)
+
+    top_level_set = {}
+    for name in Object.keys(name_map):
+        top_level_set[name] = True
+
+    needed = {}
+    queue = []
+
+    # Always include top-level assignments to nonlocal vars — they affect the
+    # global JavaScript scope and must never be filtered out.
+    for name in Object.keys(name_map):
+        if has_prop(nonlocal_set, name):
+            needed[name] = True
+            queue.push(name)
+
+    # Add directly imported names
+    for name in Object.keys(direct_names):
+        if not has_prop(needed, name):
+            needed[name] = True
+            queue.push(name)
+
+    # Unnamed statements (imports, if-blocks, bare expressions) are always
+    # included in output, so their references to named top-level items must
+    # also be included transitively.
+    always_refs = {}
+    for stmt in unnamed_stmts:
+        collect_refs_in_node(stmt, top_level_set, always_refs)
+    for ref_name in Object.keys(always_refs):
+        if not has_prop(needed, ref_name):
+            needed[ref_name] = True
+            queue.push(ref_name)
+
+    while queue.length > 0:
+        current = queue.shift()
+        if not has_prop(name_map, current):
+            continue
+        refs = {}
+        collect_refs_in_node(name_map[current], top_level_set, refs)
+        for ref_name in Object.keys(refs):
+            if not has_prop(needed, ref_name):
+                needed[ref_name] = True
+                queue.push(ref_name)
+
+    return needed
+
+
+def check_module_attr_access(main_body, info, alias_set):
+    def visit_fn(node, descend):
+        if is_node_type(node, AST_Dot):
+            expr = node.expression
+            if is_node_type(expr, AST_SymbolRef) and has_prop(alias_set, expr.name):
+                info.direct_names[node.property] = True
+                return True
+        if is_node_type(node, AST_Sub):
+            expr = node.expression
+            if is_node_type(expr, AST_SymbolRef) and has_prop(alias_set, expr.name):
+                info.can_tree_shake = False
+    for stmt in main_body:
+        stmt.walk(TreeWalker(visit_fn))
+
+
+def analyze_imports(main_body):
+    result = {}
+
+    # First pass: walk the entire AST recursively to collect all from-imports
+    # (including those nested inside functions or other scopes).
+    def visit_from_imports(node, descend):
+        if is_node_type(node, AST_Imports):
+            for imp in node.imports:
+                if imp.argnames:
+                    key = imp.key
+                    if not has_prop(result, key):
+                        result[key] = {'direct_names': {}, 'can_tree_shake': True}
+                    for argname in imp.argnames:
+                        result[key].direct_names[argname.name] = True
+    for stmt in main_body:
+        stmt.walk(TreeWalker(visit_from_imports))
+
+    # Second pass: handle top-level plain imports (import X as Y, import X).
+    # Attribute tracking via check_module_attr_access applies to main_body scope.
+    for stmt in main_body:
+        if not is_node_type(stmt, AST_Imports):
+            continue
+        for imp in stmt.imports:
+            if imp.argnames:
+                continue  # already handled in first pass
+            key = imp.key
+            if not has_prop(result, key):
+                result[key] = {'direct_names': {}, 'can_tree_shake': True}
+            info = result[key]
+            if imp.alias:
+                alias_set = {}
+                alias_set[imp.alias.name] = True
+                check_module_attr_access(main_body, info, alias_set)
+            else:
+                parts = key.split('.')
+                if parts.length > 1:
+                    # import X.Y with no alias: user accesses via X.Y.attr which
+                    # requires two-level dot traversal — disable tree-shaking safely
+                    info.can_tree_shake = False
+                else:
+                    alias_set = {}
+                    alias_set[parts[0]] = True
+                    check_module_attr_access(main_body, info, alias_set)
+
+    return result
+
+
+def tree_shake(ast, context):
+    import_infos = analyze_imports(ast.body)
+    for mod_key in Object.keys(import_infos):
+        info = import_infos[mod_key]
+        if not info.can_tree_shake:
+            continue
+        if not has_prop(ast.imports, mod_key):
+            continue
+        mod = ast.imports[mod_key]
+        # If body is missing (cached module), re-parse to get it
+        if not mod.body and mod.src_code:
+            parsed = context.parse(mod.src_code, {
+                'filename': mod.filename,
+                'module_id': mod_key,
+                'libdir': context.libdir,
+                'import_dirs': context.import_dirs or [],
+                'discard_asserts': context.discard_asserts,
+                'for_linting': True,
+            })
+            mod.body = parsed.body
+            mod.localvars = parsed.localvars
+            if not mod.nonlocalvars:
+                mod.nonlocalvars = parsed.nonlocalvars
+        if not mod.body:
+            continue
+        needed = compute_transitive_closure(mod.body, info.direct_names, mod.nonlocalvars)
+        mod.needed_names = needed
