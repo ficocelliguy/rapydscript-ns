@@ -754,7 +754,8 @@ class AST_Splice(AST_PropAccess):
         return visitor._visit(self, def():
             self.expression._walk(visitor)
             self.property._walk(visitor)
-            self.property2._walk(visitor)
+            if self.property2:
+                self.property2._walk(visitor)
         )
 
 class AST_Unary(AST_Node):

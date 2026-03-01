@@ -16,3 +16,9 @@
 - itertools 
 - collections
 - functools ?
+
+- allow var etc as property name
+- revert numpy variance method to be var
+
+- debug slow tokenization
+       

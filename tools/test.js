@@ -53,6 +53,14 @@ module.exports = function(argv, base_path, src_path, lib_path) {
                 basedir: test_dir,
                 libdir: path.join(src_path, 'lib'),
             });
+            if (ast.imports && Object.keys(ast.imports).length) {
+                RapydScript.tree_shake(ast, {
+                    parse: RapydScript.parse,
+                    import_dirs: [],
+                    basedir: test_dir,
+                    libdir: path.join(src_path, 'lib'),
+                });
+            }
         } catch(e) {
             failures.push(file);
             failed = true;

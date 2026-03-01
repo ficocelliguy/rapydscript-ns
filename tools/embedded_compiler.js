@@ -36,6 +36,15 @@ module.exports = function(compiler, baselib, runjs, name) {
                 'scoped_flags': scoped_flags,
                 'discard_asserts': opts.discard_asserts,
             });
+            if (opts.tree_shake && compiler.tree_shake &&
+                    this.toplevel.imports && Object.keys(this.toplevel.imports).length) {
+                compiler.tree_shake(this.toplevel, {
+                    parse: compiler.parse,
+                    import_dirs: [],
+                    basedir: undefined,
+                    libdir: undefined,
+                });
+            }
             var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, opts.omit_function_metadata);
             if (classes) {
                 var exports = {};

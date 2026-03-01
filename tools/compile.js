@@ -114,6 +114,19 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
             }
         });
 
+        if (TOPLEVEL.imports && Object.keys(TOPLEVEL.imports).length) {
+            time_it("treeshake", function() {
+                RapydScript.tree_shake(TOPLEVEL, {
+                    parse: RapydScript.parse,
+                    import_dirs: utils.get_import_dirs(argv.import_path),
+                    basedir: (files[0] !== '<stdin>') ? path.dirname(files[0]) : undefined,
+                    libdir: path.join(src_path, 'lib'),
+                    discard_asserts: argv.discard_asserts,
+                    module_cache_dir: cache_dir,
+                });
+            });
+        }
+
         try {
             output = new RapydScript.OutputStream(OUTPUT_OPTIONS);
         } catch(ex) {

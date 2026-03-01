@@ -9,6 +9,7 @@ from tokenizer import ALL_KEYWORDS, IDENTIFIER_PAT, tokenizer
 from parse import parse, NATIVE_CLASSES, compile_time_decorators
 from output.stream import OutputStream
 from output.codegen import generate_code
+from output.treeshake import tree_shake
 
 generate_code()  # create the print methods on the AST nodes
 
@@ -27,6 +28,7 @@ if jstype(exports) is 'object':
     exports.ImportError = ImportError
     exports.SyntaxError = SyntaxError
     exports.tokenizer = tokenizer
+    exports.tree_shake = tree_shake
     # Magic! Export all the AST_* nodes
     ast = ρσ_modules['ast']
     for ast_node in ast:

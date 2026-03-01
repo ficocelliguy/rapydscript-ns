@@ -9,7 +9,9 @@ from output.utils import create_doctring
 from output.comments import print_comments, output_comments
 from output.functions import set_module_name
 from parse import get_compiler_version
-from utils import cache_file_name
+from utils import cache_file_name, has_prop
+from ast import (AST_Function, AST_Class, AST_SimpleStatement, AST_Assign,
+                 AST_SymbolRef, is_node_type)
 
 
 def write_imports(module, output):
@@ -176,13 +178,46 @@ def print_top_level(self, output):
             output_comments(self.comments_after, output)
     set_module_name()
 
+def get_top_level_name(stmt):
+    if is_node_type(stmt, AST_Function) or is_node_type(stmt, AST_Class):
+        if stmt.name:
+            return stmt.name.name
+        return None
+    if is_node_type(stmt, AST_SimpleStatement):
+        body = stmt.body
+        if is_node_type(body, AST_Assign):
+            lhs = body.left
+            if is_node_type(lhs, AST_SymbolRef):
+                return lhs.name
+    return None
+
+
+def filter_body_for_tree_shaking(body, needed):
+    result = []
+    for stmt in body:
+        name = get_top_level_name(stmt)
+        if name is None or has_prop(needed, name):
+            result.push(stmt)
+    return result
+
+
+def filter_exports_for_tree_shaking(exports, needed):
+    result = []
+    for sym in exports:
+        if has_prop(needed, sym.name):
+            result.push(sym)
+    return result
+
+
 def print_module(self, output):
     set_module_name(self.module_id)
 
     def output_module(output):
+        body = filter_body_for_tree_shaking(self.body, self.needed_names) if self.needed_names else self.body
+        exports = filter_exports_for_tree_shaking(self.exports, self.needed_names) if self.needed_names else self.exports
         declare_vars(self.localvars, output)
-        display_body(self.body, True, output)
-        declare_exports(self.module_id, self.exports, output, self.docstrings)
+        display_body(body, True, output)
+        declare_exports(self.module_id, exports, output, self.docstrings)
 
     output.newline()
     output.indent()
@@ -201,11 +236,11 @@ def print_module(self, output):
             def output_key(beautify, keep_docstrings, js_version):
                 return 'beautify:' + beautify + ' keep_docstrings:' + keep_docstrings + ' js_version:' + js_version
             okey = output_key(output.options.beautify, output.options.keep_docstrings, output.options.js_version)
-            if self.is_cached and okey in self.outputs:
+            if self.is_cached and okey in self.outputs and not self.needed_names:
                 output.print(self.outputs[okey])
             else:
                 output_module(output)
-                if self.srchash and self.filename:
+                if self.srchash and self.filename and not self.needed_names:
                     cached = {
                         'version':get_compiler_version(), 'signature':self.srchash, 'classes': {}, 'baselib':self.baselib,
                         'nonlocalvars':self.nonlocalvars, 'imported_module_ids':self.imported_module_ids, 'exports':[],

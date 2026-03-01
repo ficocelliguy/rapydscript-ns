@@ -11,7 +11,7 @@
 
     function compile(code) {
         const codeWithoutVariableTypeDefinitions = code.replace(/^ *(?!def\s)([\w.-]+) *: *[\w.-]+ *[:+*\/%&|^><-]*=/gm, '$1');
-        return web_repl.compile(codeWithoutVariableTypeDefinitions, {omit_function_metadata: true});
+        return web_repl.compile(codeWithoutVariableTypeDefinitions, {omit_function_metadata: true, tree_shake: false});
     }
 
     function runjs(code) {
@@ -43,7 +43,7 @@
         code.setAttribute('class', 'language-javascript');
         output.appendChild(code);
         output.appendChild(document.createElement('hr'));
-        Prism.highlightElement(code);
+        //Prism.highlightElement(code);
         output.lastChild.scrollIntoView();
     }
 
