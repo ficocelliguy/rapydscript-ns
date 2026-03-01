@@ -11,6 +11,7 @@
   "main": "tools/compiler.js",
   "scripts": {
     "test": "node bin/rapydscript self --complete --test",
+    "test:unit": "node test/unit/index.js",
     "start": "node bin/rapydscript",
     "build-self": "node bin/rapydscript self --complete",
     "build": "rm -rf **/*pyj-cached dev && node bin/rapydscript self --complete && node bin/web-repl-export web-repl"
