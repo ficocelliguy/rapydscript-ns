@@ -43,7 +43,7 @@
         code.setAttribute('class', 'language-javascript');
         output.appendChild(code);
         output.appendChild(document.createElement('hr'));
-        //Prism.highlightElement(code);
+        Prism.highlightElement(code);
         output.lastChild.scrollIntoView();
     }
 
