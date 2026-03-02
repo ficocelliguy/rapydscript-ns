@@ -336,6 +336,13 @@ should not specify the -m option to omit the baselib, or
 execution will fail.
 */});
 
+opt("module", '', 'bool', false, function(){/*
+Output the compiled JavaScript as an ES module. Adds
+the export keyword before top-level function and const
+declarations, and removes the private scope wrapper
+(implies --bare).
+*/});
+
 create_group('repl', '', function(){/*
 Run a Read-Eval-Print-Loop (REPL). This allows
 you to type and run RapydScript at a live

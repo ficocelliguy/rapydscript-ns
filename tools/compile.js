@@ -48,7 +48,7 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
     var cache_dir = argv.cache_dir ? process_cache_dir(argv.cache_dir) : '';
     var OUTPUT_OPTIONS = {
         beautify: !argv.uglify,
-        private_scope: !argv.bare,
+        private_scope: !argv.bare && !argv.module,
         omit_baselib: argv.omit_baselib,
         js_version: parseInt(argv.js_version),
         keep_docstrings: argv.keep_docstrings,
@@ -142,6 +142,11 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
         });
 
         output = output.get();
+
+        if (argv.module) {
+            output = output.replace(/^(function\s)/gm, 'export $1')
+                           .replace(/^(const\s)/gm, 'export $1');
+        }
 
         write_output(output);
 
