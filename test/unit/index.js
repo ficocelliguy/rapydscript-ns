@@ -27,7 +27,8 @@ if (!utils.path_exists(path.join(compiler_dir, "compiler.js"))) {
     compiler_dir = path.join(BASE_PATH, "release");
 }
 
-var RapydScript = require("../../tools/compiler").create_compiler();
+var compiler_module = require("../../tools/compiler");
+var RapydScript = compiler_module.create_compiler();
 var baselib     = fs.readFileSync(
     path.join(compiler_dir, "baselib-plain-pretty.js"), "utf-8"
 );
@@ -77,6 +78,29 @@ function compile(src) {
     ast.print(output);
     var js = output.toString();
     return js;
+}
+
+function compile_virtual(src, virtual_files) {
+    compiler_module.set_virtual_files(virtual_files);
+    try {
+        var ast = RapydScript.parse(src, {
+            filename    : "<unit-test>",
+            toplevel    : null,
+            basedir     : BASE_PATH,
+            libdir      : LIB_PATH,
+            import_dirs : ['__virtual__'],
+        });
+        var output = new RapydScript.OutputStream({
+            baselib_plain : baselib,
+            beautify      : true,
+            js_version    : 6,
+            private_scope : false,
+        });
+        ast.print(output);
+        return output.toString();
+    } finally {
+        compiler_module.clear_virtual_files();
+    }
 }
 
 function run_js(js) {
@@ -473,7 +497,54 @@ assrt.equal(fib(15), 610)
         // file to preserve trailing whitespace on the blank line between the two
         // function definitions (line with 8 spaces that a template literal would drop).
         js_checks: [fs.readFileSync(path.join(__dirname, "fixtures", "fibonacci_expected.js"), "utf-8")],
-    }
+    },
+
+    // ── Virtual file system ───────────────────────────────────────────────
+
+    {
+        name: "virtual_fs_import",
+        description: "from mymodule import square works when mymodule is a virtual file",
+        src: [
+            "# globals: assrt",
+            "from mymodule import square",
+            "assrt.equal(square(4), 16)",
+            "assrt.equal(square(7), 49)",
+        ].join("\n"),
+        virtual_files: {
+            mymodule: [
+                "def square(n):",
+                "    return n * n",
+            ].join("\n"),
+        },
+        js_checks: ["function square(n)"],
+    },
+
+    {
+        name: "virtual_fs_multi_import",
+        description: "imports from two different virtual modules both work",
+        src: [
+            "# globals: assrt",
+            "from shapes import Circle",
+            "from mathutils import double",
+            "c = Circle(5)",
+            "assrt.equal(c.area(), 78)",
+            "assrt.equal(double(6), 12)",
+        ].join("\n"),
+        virtual_files: {
+            shapes: [
+                "class Circle:",
+                "    def __init__(self, r):",
+                "        self.r = r",
+                "    def area(self):",
+                "        return int(3.14159 * self.r * self.r)",
+            ].join("\n"),
+            mathutils: [
+                "def double(x):",
+                "    return x * 2",
+            ].join("\n"),
+        },
+        js_checks: ["Circle.prototype", "function double(x)"],
+    },
 
 ];
 
@@ -496,7 +567,7 @@ function run_tests(filter) {
 
         // 1 – compile RapydScript → JS
         try {
-            js = compile(test.src);
+            js = test.virtual_files ? compile_virtual(test.src, test.virtual_files) : compile(test.src);
         } catch (e) {
             failures.push(test.name);
             console.log(colored("FAIL  " + test.name, "red") +

@@ -148,6 +148,27 @@ function vrequire(name, base) {
 var UglifyJS = null, regenerator = null;
 var crypto = null, fs = require('fs');
 
+var current_virtual_files = null;
+
+function readfile_wrapper(name, encoding) {
+    if (current_virtual_files && name.indexOf('__virtual__/') === 0) {
+        var rel = name.slice('__virtual__/'.length);
+        if (rel.slice(-11) === '.pyj-cached') rel = rel.slice(0, -11);
+        else if (rel.slice(-4) === '.pyj') rel = rel.slice(0, -4);
+        if (rel.slice(-9) === '/__init__') rel = rel.slice(0, -9);
+        if (Object.prototype.hasOwnProperty.call(current_virtual_files, rel)) {
+            return current_virtual_files[rel];
+        }
+    }
+    return fs.readFileSync(name, encoding);
+}
+
+function writefile_wrapper(name, content) {
+    // Silently discard cache writes for virtual files; __virtual__ is not a real directory.
+    if (current_virtual_files && name.indexOf('__virtual__/') === 0) return;
+    return fs.writeFileSync(name, content);
+}
+
 function uglify(x) {
     if (!UglifyJS) UglifyJS = vrequire("uglify-js");
     ans = UglifyJS.minify(x);
@@ -202,7 +223,7 @@ function create_compiler() {
     var compilerjs = data['compiler.js'];
     var module = {'id':'compiler', 'exports':{}};
     var wrapped = '(function(module, exports, readfile, writefile, sha1sum, regenerate) {' + data['compiler.js'] + ';\n})';
-    vm.runInThisContext(wrapped, {'filename': 'compiler.js'})(module, module.exports, fs.readFileSync, fs.writeFileSync, sha1sum, regenerate);
+    vm.runInThisContext(wrapped, {'filename': 'compiler.js'})(module, module.exports, readfile_wrapper, writefile_wrapper, sha1sum, regenerate);
     return module.exports;
 }
 
@@ -211,21 +232,33 @@ var RapydScript = null;
 function compile(code, filename, options) {
     if (!RapydScript) RapydScript = create_compiler();
     options = options || {};
-    var ast = RapydScript.parse(code, {
-        filename: filename || '<eval>',
-        basedir: options.basedir || dirname(filename || ''),
-        libdir: options.libdir,
-    });
-    var out_ops = {
-        beautify: (options.beautify === undefined ? true : options.beautify),
-        private_scope: !options.bare,
-        omit_baselib: !!options.omit_baselib,
-        js_version: options.js_version || 5,
-    };
-    if (!out_ops.omit_baselib) out_ops.baselib_plain = data['baselib-plain-' + (out_ops.beautify ? 'pretty' : 'ugly') + '.js'];
-    var out = new RapydScript.OutputStream(out_ops);
-    ast.print(out);
-    return out.get();
+    var vf = options.virtual_files || null;
+    var prev_virtual_files = current_virtual_files;
+    var import_dirs = options.import_dirs || [];
+    if (vf) {
+        current_virtual_files = vf;
+        import_dirs = ['__virtual__'].concat(import_dirs);
+    }
+    try {
+        var ast = RapydScript.parse(code, {
+            filename: filename || '<eval>',
+            basedir: options.basedir || dirname(filename || ''),
+            libdir: options.libdir,
+            import_dirs: import_dirs,
+        });
+        var out_ops = {
+            beautify: (options.beautify === undefined ? true : options.beautify),
+            private_scope: !options.bare,
+            omit_baselib: !!options.omit_baselib,
+            js_version: options.js_version || 5,
+        };
+        if (!out_ops.omit_baselib) out_ops.baselib_plain = data['baselib-plain-' + (out_ops.beautify ? 'pretty' : 'ugly') + '.js'];
+        var out = new RapydScript.OutputStream(out_ops);
+        ast.print(out);
+        return out.get();
+    } finally {
+        current_virtual_files = prev_virtual_files;
+    }
 }
 
 function create_embedded_compiler(runjs) {

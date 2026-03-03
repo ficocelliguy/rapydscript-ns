@@ -22,5 +22,4 @@
 
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 
-- debug slow tokenization - move Prism.highlightElement to a webworker? fix slow array method use?
        

@@ -60,12 +60,34 @@ function regenerate(code, beautify) {
     return ans;
 }
 
+var _current_virtual_files = null;
+
+function virtual_readfile(name, encoding) {
+    if (_current_virtual_files && name.indexOf('__virtual__/') === 0) {
+        var rel = name.slice('__virtual__/'.length);
+        if (rel.slice(-11) === '.pyj-cached') rel = rel.slice(0, -11);
+        else if (rel.slice(-4) === '.pyj') rel = rel.slice(0, -4);
+        if (rel.slice(-9) === '/__init__') rel = rel.slice(0, -9);
+        if (Object.prototype.hasOwnProperty.call(_current_virtual_files, rel)) {
+            return _current_virtual_files[rel];
+        }
+    }
+    return fs.readFileSync(name, encoding);
+}
+
+function virtual_writefile(name, content) {
+    // Silently discard cache writes for virtual files; __virtual__ is not a real
+    // directory, and the compiled `except Error` guard fails across vm contexts.
+    if (name.indexOf('__virtual__/') === 0) return;
+    return fs.writeFileSync(name, content);
+}
+
 function create_compiler() {
     var compiler_exports = {};
     var compiler_context = vm.createContext({
         console       : console,
-        readfile      : fs.readFileSync,
-        writefile     : fs.writeFileSync,
+        readfile      : virtual_readfile,
+        writefile     : virtual_writefile,
         sha1sum       : sha1sum,
         require       : require,
         regenerate    : regenerate,
@@ -82,3 +104,5 @@ function create_compiler() {
 }
 
 exports.create_compiler = create_compiler;
+exports.set_virtual_files = function(vf) { _current_virtual_files = vf; };
+exports.clear_virtual_files = function() { _current_virtual_files = null; };

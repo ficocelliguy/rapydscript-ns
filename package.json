@@ -10,7 +10,7 @@
   ],
   "main": "tools/compiler.js",
   "scripts": {
-    "test": "node bin/rapydscript self --complete --test",
+    "test": "node bin/rapydscript self --complete --test && node test/unit/index.js",
     "test:unit": "node test/unit/index.js",
     "start": "node bin/rapydscript",
     "build-self": "node bin/rapydscript self --complete",
