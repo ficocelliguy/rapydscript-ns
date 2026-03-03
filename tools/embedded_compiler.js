@@ -48,7 +48,8 @@ module.exports = function(compiler, baselib, runjs, name) {
             var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, opts.omit_function_metadata);
             if (opts.module) {
                 ans = ans.replace(/^(function\s)/gm, 'export $1')
-                         .replace(/^(const\s)/gm, 'export $1');
+                         .replace(/^(async function\s)/gm, 'export $1')
+                         .replace(/^(let\s)/gm, 'export $1');
             }
             if (classes) {
                 var exports = {};

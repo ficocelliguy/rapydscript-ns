@@ -32,7 +32,7 @@ var builtin_modules = {
         },
 
         'runInContext': function run_in_context(code, ctx) {
-            return ctx.eval(code);
+            return ctx.eval(code.replace(/^export ((?:async )?function |let )/gm, '$1'));
         },
 
         'runInThisContext': eval,

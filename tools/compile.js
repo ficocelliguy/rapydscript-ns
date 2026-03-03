@@ -145,7 +145,8 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
 
         if (argv.module) {
             output = output.replace(/^(function\s)/gm, 'export $1')
-                           .replace(/^(const\s)/gm, 'export $1');
+                           .replace(/^(async function\s)/gm, 'export $1')
+                           .replace(/^(let\s)/gm, 'export $1');
         }
 
         write_output(output);

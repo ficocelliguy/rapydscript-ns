@@ -16,6 +16,8 @@ var colored = utils.safe_colored;
 var RapydScript = (typeof create_rapydscript_compiler === 'function') ? create_rapydscript_compiler() : require('./compiler').create_compiler();
 var has_prop = Object.prototype.hasOwnProperty.call.bind(Object.prototype.hasOwnProperty);
 
+function strip_exports(js) { return js.replace(/^export ((?:async )?function |let )/gm, '$1'); }
+
 function create_ctx(baselib, show_js, console) {
     var ctx = vm.createContext({'console':console, 'show_js': !!show_js, 'RapydScript':RapydScript, 'require':require});
 	vm.runInContext(baselib, ctx, {'filename':'baselib-plain-pretty.js'});
@@ -131,7 +133,7 @@ module.exports = function(options) {
         try {
             // Despite what the docs say node does not actually output any errors by itself
             // so, in case this bug is fixed later, we turn it off explicitly.
-            result = vm.runInContext(js, ctx, {'filename':'<repl>', 'displayErrors':false});
+            result = vm.runInContext(strip_exports(js), ctx, {'filename':'<repl>', 'displayErrors':false});
         } catch(e) {
             if (e.stack) options.console.error(e.stack);
             else options.console.error(e.toString());

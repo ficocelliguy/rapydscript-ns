@@ -12,7 +12,8 @@ module.exports = function(compiler, baselib) {
     var ctx = vm.createContext();
     var LINE_CONTINUATION_CHARS = ':\\';
     var find_completions = null;
-    var streaming_compiler = embedded_compiler(compiler, baselib, function(js) { return vm.runInContext(js, ctx); }, '__repl__');
+    function strip_exports(js) { return js.replace(/^export ((?:async )?function |let )/gm, '$1'); }
+    var streaming_compiler = embedded_compiler(compiler, baselib, function(js) { return vm.runInContext(strip_exports(js), ctx); }, '__repl__');
 
     return {
         'in_block_mode': false,
@@ -65,7 +66,7 @@ module.exports = function(compiler, baselib) {
         },
 
         'runjs': function runjs(code) {
-            var ans = vm.runInContext(code, ctx);
+            var ans = vm.runInContext(strip_exports(code), ctx);
             if (ans !== undefined || ans === null) {
                 ctx.ρσ_repl_val = ans;
                 var q = vm.runInContext('ρσ_repr(ρσ_repl_val)', ctx);
