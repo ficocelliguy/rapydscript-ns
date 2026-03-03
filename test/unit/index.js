@@ -72,9 +72,11 @@ function compile(src) {
         baselib_plain : baselib,
         beautify      : true,
         js_version    : 6,
+        private_scope : false,
     });
     ast.print(output);
-    return output.toString();
+    var js = output.toString();
+    return js;
 }
 
 function run_js(js) {
@@ -444,6 +446,35 @@ var TESTS = [
         js_checks: ["typeof undefined", "arr.length", "Math.max(4, 7)"],
     },
 
+    // ── Example scripts ─────────────────────────────────────────────
+
+    {
+        name: "fibonacci",
+        description: "Fibonacci function with recursion and memoization",
+        src: `# globals: assrt
+def memoize(f):
+    memo = {}
+    return def(x):
+        if x not in memo: memo[x] = f(x)
+        return memo[x]
+
+@memoize
+def fib(n):
+    if n == 0: return 0
+    elif n == 1: return 1
+    else: return fib(n-1) + fib(n-2)
+
+assrt.equal(fib(0), 0)
+assrt.equal(fib(1), 1)
+assrt.equal(fib(10), 55)
+assrt.equal(fib(15), 610)
+`,
+        // Full exact expected JS for the user-code section, stored in a fixture
+        // file to preserve trailing whitespace on the blank line between the two
+        // function definitions (line with 8 spaces that a template literal would drop).
+        js_checks: [fs.readFileSync(path.join(__dirname, "fixtures", "fibonacci_expected.js"), "utf-8")],
+    }
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -478,6 +509,7 @@ function run_tests(filter) {
             check_js_patterns(test.name, js, test.js_checks);
         } catch (e) {
             failures.push(test.name);
+            console.debug("Emitted JS:\n" + js + "\n");
             console.log(colored("FAIL  " + test.name, "red") +
                         " [JS pattern mismatch]\n      " + e.message + "\n");
             return;
