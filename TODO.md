@@ -22,7 +22,7 @@
 
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 
-
+- print should console.log , not call printer dialog
 
 
 Python Feature Gap Report: RapydScript-NS
