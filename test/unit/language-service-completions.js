@@ -1,0 +1,458 @@
+/*
+ * test/unit/language-service-completions.js
+ *
+ * Unit tests for src/monaco-language-service/completions.js (Phase 3).
+ *
+ * Usage:
+ *   node test/unit/language-service-completions.js              # run all tests
+ *   node test/unit/language-service-completions.js <test-name>  # run a single test by name
+ */
+"use strict";
+
+var assert          = require("assert");
+var path            = require("path");
+var url             = require("url");
+var compiler_module = require("../../tools/compiler");
+var utils           = require("../../tools/utils");
+var colored         = utils.safe_colored;
+
+// ---------------------------------------------------------------------------
+// Mock Monaco CompletionItemKind  (numeric values match Monaco's spec)
+// ---------------------------------------------------------------------------
+
+var MockKind = {
+    Method:    0,
+    Function:  1,
+    Class:     5,
+    Variable:  6,
+    Module:    8,
+};
+
+// Mock Monaco position object
+function pos(line, col) { return { lineNumber: line, column: col }; }
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+/** Extract suggestion labels from a CompletionList */
+function labels(list) {
+    return list.suggestions.map(function (s) { return s.label; });
+}
+
+/** Assert that list.suggestions contains an item with the given label */
+function assert_has(list, label, msg) {
+    var found = list.suggestions.some(function (s) { return s.label === label; });
+    assert.ok(found, (msg || "") + ": expected label '" + label + "' in " + JSON.stringify(labels(list)));
+}
+
+/** Assert that list.suggestions does NOT contain an item with the given label */
+function assert_missing(list, label, msg) {
+    var found = list.suggestions.some(function (s) { return s.label === label; });
+    assert.ok(!found, (msg || "") + ": did not expect label '" + label + "' in " + JSON.stringify(labels(list)));
+}
+
+/** Find a suggestion by label, or null */
+function find_item(list, label) {
+    return list.suggestions.find(function (s) { return s.label === label; }) || null;
+}
+
+// ---------------------------------------------------------------------------
+// Test definitions
+// ---------------------------------------------------------------------------
+
+function make_tests(CompletionEngine, detect_context, SourceAnalyzer, RS) {
+
+    function make_engine(virtual_files, extra_builtins) {
+        var analyzer = new SourceAnalyzer(RS);
+        return new CompletionEngine(analyzer, {
+            virtualFiles: virtual_files || {},
+            builtinNames: extra_builtins || ['print', 'len', 'range'],
+        });
+    }
+
+    var TESTS = [
+
+        // ── detect_context ────────────────────────────────────────────────
+
+        {
+            name: "ctx_identifier",
+            description: "detect_context returns identifier type for plain word prefix",
+            run: function () {
+                var ctx = detect_context("pri");
+                assert.strictEqual(ctx.type, 'identifier');
+                assert.strictEqual(ctx.prefix, 'pri');
+            },
+        },
+
+        {
+            name: "ctx_dot",
+            description: "detect_context returns dot type for 'obj.'",
+            run: function () {
+                var ctx = detect_context("my_obj.me");
+                assert.strictEqual(ctx.type, 'dot');
+                assert.strictEqual(ctx.objectName, 'my_obj');
+                assert.strictEqual(ctx.prefix, 'me');
+            },
+        },
+
+        {
+            name: "ctx_dot_empty_prefix",
+            description: "detect_context handles 'obj.' with no attribute prefix",
+            run: function () {
+                var ctx = detect_context("dog.");
+                assert.strictEqual(ctx.type, 'dot');
+                assert.strictEqual(ctx.objectName, 'dog');
+                assert.strictEqual(ctx.prefix, '');
+            },
+        },
+
+        {
+            name: "ctx_from_import",
+            description: "detect_context returns from_import for 'from mod import p'",
+            run: function () {
+                var ctx = detect_context("from mymod import fo");
+                assert.strictEqual(ctx.type, 'from_import');
+                assert.strictEqual(ctx.moduleName, 'mymod');
+                assert.strictEqual(ctx.prefix, 'fo');
+            },
+        },
+
+        {
+            name: "ctx_import",
+            description: "detect_context returns import for 'import p'",
+            run: function () {
+                var ctx = detect_context("import my");
+                assert.strictEqual(ctx.type, 'import');
+                assert.strictEqual(ctx.prefix, 'my');
+            },
+        },
+
+        // ── Scope completions ─────────────────────────────────────────────
+
+        {
+            name: "scope_local_vars",
+            description: "Local variable and function names appear in scope completions",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "my_var = 42",
+                    "def my_func():",
+                    "    return my_var",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(3, 1), "", MockKind);
+                assert_has(list, 'my_var',  'local variable');
+                assert_has(list, 'my_func', 'function name');
+            },
+        },
+
+        {
+            name: "scope_prefix_filter",
+            description: "Prefix filtering narrows results to matching symbols",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "alpha = 1",
+                    "beta = 2",
+                    "alpha_two = 3",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(3, 4), "alp", MockKind);
+                assert_has(list,    'alpha',     'alpha matches');
+                assert_has(list,    'alpha_two', 'alpha_two matches');
+                assert_missing(list,'beta',      'beta does not match alp');
+            },
+        },
+
+        {
+            name: "scope_builtins_included",
+            description: "Built-in names appear in scope completions",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range']);
+                var scopeMap = new (require(path.join(__dirname, '../../src/monaco-language-service/scope.js')).ScopeMap)();
+                var list = engine.getCompletions(scopeMap, pos(1, 1), "", MockKind);
+                assert_has(list, 'print', 'print builtin');
+                assert_has(list, 'len',   'len builtin');
+            },
+        },
+
+        {
+            name: "scope_sort_local_before_builtin",
+            description: "Local variables sort before builtins",
+            run: function () {
+                var engine = make_engine({}, ['print']);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("x = 1\nprint(x)", {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "", MockKind);
+                var x_item     = find_item(list, 'x');
+                var print_item = find_item(list, 'print');
+                assert.ok(x_item,     'x should be in list');
+                assert.ok(print_item, 'print should be in list');
+                // Module-level symbols start with '1_', builtins '2_'
+                assert.ok(x_item.sortText < print_item.sortText,
+                    'x should sort before print: ' + x_item.sortText + ' vs ' + print_item.sortText);
+            },
+        },
+
+        {
+            name: "scope_null_scopemap_safe",
+            description: "getCompletions handles null ScopeMap without throwing",
+            run: function () {
+                var engine = make_engine();
+                var list   = engine.getCompletions(null, pos(1, 1), "", MockKind);
+                assert.ok(Array.isArray(list.suggestions), 'suggestions should be an array');
+            },
+        },
+
+        // ── Item structure ────────────────────────────────────────────────
+
+        {
+            name: "item_range_set",
+            description: "Completion items have a valid range covering the prefix",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("my_var = 1", {});
+
+                // Cursor at col 6, prefix 'my_va' (5 chars)
+                var list = engine.getCompletions(scopeMap, pos(1, 6), "my_va", MockKind);
+                var item = find_item(list, 'my_var');
+                assert.ok(item, 'my_var should be in suggestions');
+                assert.strictEqual(item.range.startColumn, 1, 'startColumn should be col - prefix.length');
+                assert.strictEqual(item.range.endColumn,   6, 'endColumn should be col');
+            },
+        },
+
+        {
+            name: "item_function_detail",
+            description: "Function completion items show parameter list in detail",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "def greet(name, *args):",
+                    "    return name",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "", MockKind);
+                var item = find_item(list, 'greet');
+                assert.ok(item, 'greet should be in list');
+                assert.ok(item.detail.indexOf('name') !== -1, 'detail should include param name');
+                assert.ok(item.detail.indexOf('*args') !== -1, 'detail should include *args');
+            },
+        },
+
+        // ── Dot completions ───────────────────────────────────────────────
+
+        {
+            name: "dot_class_methods",
+            description: "Dot completion on a class name returns its methods",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                // Source must parse cleanly — the "Dog." prefix is passed separately.
+                // The extra line ensures the module scope extends past line 6.
+                var scopeMap = analyzer.analyze([
+                    "class Dog:",
+                    "    def bark(self):",
+                    "        return 'woof'",
+                    "    def fetch(self):",
+                    "        return 'ball'",
+                    "result = Dog",
+                    "pass",       // extra statement so col 1 of line 6 is inside module scope
+                ].join("\n"), {});
+
+                // Query at col 1 of line 6 — safely inside the module scope range
+                var list = engine.getCompletions(scopeMap, pos(6, 1), "Dog.", MockKind);
+                assert_has(list, 'bark',  'Dog.bark');
+                assert_has(list, 'fetch', 'Dog.fetch');
+            },
+        },
+
+        {
+            name: "dot_instance_inferred_class",
+            description: "Dot completion on x = ClassName() infers class members",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                // Source must parse cleanly — no trailing incomplete expression.
+                var scopeMap = analyzer.analyze([
+                    "class Cat:",
+                    "    def meow(self):",
+                    "        return 'mrrr'",
+                    "my_cat = Cat()",
+                    "x = my_cat",
+                    "pass",       // extra statement so line 5 col 1 is inside module scope
+                ].join("\n"), {});
+
+                // Query at col 1 of line 5 — safely inside the module scope
+                var list = engine.getCompletions(scopeMap, pos(5, 1), "my_cat.", MockKind);
+                assert_has(list, 'meow', 'Cat.meow via inferred_class');
+            },
+        },
+
+        {
+            name: "dot_no_class_empty",
+            description: "Dot completion on unknown object returns empty list",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("x = 1\ny = x\npass", {});
+
+                // x is a plain variable with no inferred_class; query at col 1 of line 2
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "x.", MockKind);
+                assert.strictEqual(list.suggestions.length, 0, 'unknown type → no dot suggestions');
+            },
+        },
+
+        // ── from X import completions ─────────────────────────────────────
+
+        {
+            name: "from_import_lists_exports",
+            description: "from X import shows top-level names from virtual file",
+            run: function () {
+                var vf = {
+                    mymod: [
+                        "def foo():",
+                        "    return 1",
+                        "def bar():",
+                        "    return 2",
+                        "BAZ = 42",
+                    ].join("\n"),
+                };
+                var engine = make_engine(vf);
+                var list = engine.getCompletions(null, pos(1, 22), "from mymod import ", MockKind);
+                assert_has(list, 'foo', 'foo from virtual file');
+                assert_has(list, 'bar', 'bar from virtual file');
+                assert_has(list, 'BAZ', 'BAZ from virtual file');
+            },
+        },
+
+        {
+            name: "from_import_prefix_filter",
+            description: "from X import with prefix filters results",
+            run: function () {
+                var vf = {
+                    mymod: "def foo():\n    return 1\ndef far():\n    return 2\ndef bar():\n    return 3",
+                };
+                var engine = make_engine(vf);
+                var list = engine.getCompletions(null, pos(1, 23), "from mymod import f", MockKind);
+                assert_has(list,    'foo', 'foo matches f');
+                assert_has(list,    'far', 'far matches f');
+                assert_missing(list,'bar', 'bar does not match f');
+            },
+        },
+
+        {
+            name: "from_import_unknown_module",
+            description: "from X import for unknown module returns empty list",
+            run: function () {
+                var engine = make_engine({});
+                var list = engine.getCompletions(null, pos(1, 25), "from unknown_mod import ", MockKind);
+                assert.strictEqual(list.suggestions.length, 0, 'unknown module → empty suggestions');
+            },
+        },
+
+        // ── import module name completions ────────────────────────────────
+
+        {
+            name: "import_module_names",
+            description: "import shows available virtual module names",
+            run: function () {
+                var vf = { mymod: "x = 1", othermod: "y = 2" };
+                var engine = make_engine(vf);
+                var list = engine.getCompletions(null, pos(1, 7), "import ", MockKind);
+                assert_has(list, 'mymod',    'mymod in import suggestions');
+                assert_has(list, 'othermod', 'othermod in import suggestions');
+            },
+        },
+
+        {
+            name: "import_prefix_filter",
+            description: "import with prefix filters module names",
+            run: function () {
+                var vf = { mymod: "x = 1", othermod: "y = 2" };
+                var engine = make_engine(vf);
+                var list = engine.getCompletions(null, pos(1, 9), "import my", MockKind);
+                assert_has(list,    'mymod',    'mymod matches "my"');
+                assert_missing(list,'othermod', 'othermod does not match "my"');
+            },
+        },
+
+    ];
+
+    return TESTS;
+}
+
+// ---------------------------------------------------------------------------
+// Runner
+// ---------------------------------------------------------------------------
+
+function run_tests(TESTS, filter) {
+    var tests = filter
+        ? TESTS.filter(function (t) { return t.name === filter; })
+        : TESTS;
+
+    if (tests.length === 0) {
+        console.error(colored("No test found: " + filter, "red"));
+        process.exit(1);
+    }
+
+    var failures = [];
+
+    tests.forEach(function (test) {
+        try {
+            test.run();
+            console.log(colored("PASS  " + test.name, "green") +
+                        "  –  " + test.description);
+        } catch (e) {
+            failures.push(test.name);
+            var msg = e.message || String(e);
+            console.log(colored("FAIL  " + test.name, "red") +
+                        "\n      " + msg + "\n");
+        }
+    });
+
+    console.log("");
+    if (failures.length) {
+        console.log(colored(failures.length + " test(s) failed.", "red"));
+    } else {
+        console.log(colored("All " + tests.length + " language-service-completions tests passed!", "green"));
+    }
+    process.exit(failures.length ? 1 : 0);
+}
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+var completions_path = url.pathToFileURL(
+    path.join(__dirname, "../../src/monaco-language-service/completions.js")
+).href;
+
+var analyzer_path = url.pathToFileURL(
+    path.join(__dirname, "../../src/monaco-language-service/analyzer.js")
+).href;
+
+var filter = process.argv[2] || null;
+
+Promise.all([
+    import(completions_path),
+    import(analyzer_path),
+]).then(function (mods) {
+    var completions_mod = mods[0];
+    var analyzer_mod    = mods[1];
+    var CompletionEngine = completions_mod.CompletionEngine;
+    var detect_context   = completions_mod.detect_context;
+    var SourceAnalyzer   = analyzer_mod.SourceAnalyzer;
+    var RS               = compiler_module.create_compiler();
+    var TESTS            = make_tests(CompletionEngine, detect_context, SourceAnalyzer, RS);
+    run_tests(TESTS, filter);
+}).catch(function (e) {
+    console.error(colored("Failed to load completions module:", "red"), e);
+    process.exit(1);
+});

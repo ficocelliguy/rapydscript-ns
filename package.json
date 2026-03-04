@@ -12,9 +12,13 @@
   "scripts": {
     "test": "node bin/rapydscript self --complete --test && node test/unit/index.js",
     "test:unit": "node test/unit/index.js",
+    "test:ls": "node test/unit/language-service.js",
+    "test:ls-scope": "node test/unit/language-service-scope.js",
+    "test:ls-completions": "node test/unit/language-service-completions.js",
     "start": "node bin/rapydscript",
     "build-self": "node bin/rapydscript self --complete",
-    "build": "rm -rf **/*pyj-cached dev && node bin/rapydscript self --complete && node bin/web-repl-export web-repl"
+    "build:ls": "node tools/build-language-service.js",
+    "build": "rm -rf **/*pyj-cached dev && node bin/rapydscript self --complete && node bin/web-repl-export web-repl && node tools/build-language-service.js"
   },
   "version": "0.7.22",
   "license": "BSD-2-Clause",
