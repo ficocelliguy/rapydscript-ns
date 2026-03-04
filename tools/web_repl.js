@@ -8,12 +8,12 @@
 var vm = require('vm');
 var embedded_compiler = require('tools/embedded_compiler.js');
 
-module.exports = function(compiler, baselib) {
+module.exports = function(compiler, baselib, vf_context) {
     var ctx = vm.createContext();
     var LINE_CONTINUATION_CHARS = ':\\';
     var find_completions = null;
     function strip_exports(js) { return js.replace(/^export ((?:async )?function |let )/gm, '$1'); }
-    var streaming_compiler = embedded_compiler(compiler, baselib, function(js) { return vm.runInContext(strip_exports(js), ctx); }, '__repl__');
+    var streaming_compiler = embedded_compiler(compiler, baselib, function(js) { return vm.runInContext(strip_exports(js), ctx); }, '__repl__', vf_context);
 
     return {
         'in_block_mode': false,

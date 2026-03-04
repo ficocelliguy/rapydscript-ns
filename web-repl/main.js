@@ -9,9 +9,17 @@
 
     var web_repl = null;
 
+    // Proof-of-concept virtual file import: `from greeting import hello`
+    var VIRTUAL_FILES = {
+        'greeting': [
+            'def hello(name):',
+            '    return "Hello, " + name + "!"',
+        ].join('\n')
+    };
+
     function compile(code) {
         const codeWithoutVariableTypeDefinitions = code.replace(/^ *(?!def\s)([\w.-]+) *: *[\w.-]+ *[:+*\/%&|^><-]*=/gm, '$1');
-        return web_repl.compile(codeWithoutVariableTypeDefinitions, {omit_function_metadata: false, tree_shake: false, export_main: true});
+        return web_repl.compile(codeWithoutVariableTypeDefinitions, {omit_function_metadata: false, tree_shake: false, export_main: true, virtual_files: VIRTUAL_FILES});
     }
 
     function runjs(code) {

@@ -8,7 +8,7 @@
 
 var has_prop = Object.prototype.hasOwnProperty.call.bind(Object.prototype.hasOwnProperty);
 
-module.exports = function(compiler, baselib, runjs, name) {
+module.exports = function(compiler, baselib, runjs, name, vf_context) {
     var LINE_CONTINUATION_CHARS = ':\\';
     runjs = runjs || eval;
     runjs(print_ast(compiler.parse(''), true));
@@ -29,13 +29,23 @@ module.exports = function(compiler, baselib, runjs, name) {
             opts = opts || {};
             var classes = (this.toplevel) ? this.toplevel.classes : undefined;
             var scoped_flags = (this.toplevel) ? this.toplevel.scoped_flags: undefined;
-            this.toplevel = compiler.parse(code, {
+            var vf = (opts.virtual_files && vf_context) ? opts.virtual_files : null;
+            var parse_opts = {
                 'filename': opts.filename || '<embedded>',
                 'basedir': '__stdlib__',
                 'classes': classes,
                 'scoped_flags': scoped_flags,
                 'discard_asserts': opts.discard_asserts,
-            });
+            };
+            if (vf) {
+                vf_context.set(vf);
+                parse_opts.import_dirs = ['__virtual__'];
+            }
+            try {
+                this.toplevel = compiler.parse(code, parse_opts);
+            } finally {
+                if (vf) vf_context.clear();
+            }
             if (opts.tree_shake && compiler.tree_shake &&
                     this.toplevel.imports && Object.keys(this.toplevel.imports).length) {
                 compiler.tree_shake(this.toplevel, {

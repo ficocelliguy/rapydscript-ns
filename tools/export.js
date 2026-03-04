@@ -268,7 +268,11 @@ function create_embedded_compiler(runjs) {
 
 function web_repl() {
     var repl = vrequire('tools/web_repl.js');
-    return repl(create_compiler(), data['baselib-plain-pretty.js']);
+    var vf_context = {
+        set: function(vf) { current_virtual_files = vf; },
+        clear: function() { current_virtual_files = null; }
+    };
+    return repl(create_compiler(), data['baselib-plain-pretty.js'], vf_context);
 }
 
 function init_repl(options) {
