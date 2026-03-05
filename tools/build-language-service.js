@@ -64,25 +64,39 @@ compiler_src = compiler_src.replace(/\}\)\(this\)\s*;?\s*$/, "})(_container);");
 // Augmentation code injected inside the IIFE (has access to `namespace` and
 // `create_compiler` which are private locals inside rapydscript.js).
 // The language service needs parse(), OutputStream, SyntaxError, ImportError,
-// NATIVE_CLASSES, and tree_shake — all of which live on the inner compiler
-// object returned by create_compiler(), not on the outer namespace.
-// We expose them lazily via getters so the inner compiler is only eval'd
-// on first use.
+// NATIVE_CLASSES, tree_shake, and ALL AST_* classes — all of which live on the
+// inner compiler object returned by create_compiler(), not on the outer namespace.
+// We expose them lazily: on first access the inner compiler is eval'd once and
+// ALL of its keys (including every AST_ class) are copied onto namespace.
 var augment_src = [
     "",
-    "// Expose inner compiler API (parse, OutputStream, etc.) on namespace",
-    "// for the language service. Uses lazy init to avoid eager eval cost.",
+    "// Expose inner compiler API (parse, OutputStream, AST_*, etc.) on namespace",
+    "// for the language service. Lazily initialises the inner compiler on first",
+    "// property access so the large eval() only runs when actually needed.",
     "(function() {",
     "    var _inner = null;",
-    "    function _getInner() {",
-    "        if (!_inner) _inner = create_compiler();",
-    "        return _inner;",
+    "    function _initInner() {",
+    "        if (_inner) return;",
+    "        _inner = create_compiler();",
+    "        // Copy every key from the inner compiler (including all AST_* classes)",
+    "        // directly onto namespace, skipping keys that already have lazy getters.",
+    "        var keys = Object.keys(_inner);",
+    "        for (var i = 0; i < keys.length; i++) {",
+    "            var k = keys[i];",
+    "            if (!(k in namespace)) namespace[k] = _inner[k];",
+    "        }",
     "    }",
-    "    ['parse','OutputStream','SyntaxError','ImportError','NATIVE_CLASSES','tree_shake'].forEach(function(k) {",
-    "        if (!namespace[k]) {",
+    "    // Install lazy getters for a small set of sentinel keys so that the",
+    "    // inner compiler is initialised on first use.  The getter returns",
+    "    // _inner[k] directly to avoid re-entering the getter (namespace[k]",
+    "    // would recurse because the getter is still installed).",
+    "    var LAZY_KEYS = ['parse','OutputStream','SyntaxError','ImportError','NATIVE_CLASSES','tree_shake'];",
+    "    LAZY_KEYS.forEach(function(k) {",
+    "        if (!(k in namespace)) {",
     "            Object.defineProperty(namespace, k, {",
-    "                get: function() { return _getInner()[k]; },",
-    "                configurable: true",
+    "                get: function() { _initInner(); return _inner[k]; },",
+    "                configurable: true,",
+    "                enumerable:   false,",
     "            });",
     "        }",
     "    });",
