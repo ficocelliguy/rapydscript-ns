@@ -52,7 +52,7 @@ var PUBLIC_EXPORTS = ["registerRapydScript"];
 // the global.  In strict ES modules `this` is undefined, so we wrap it in an
 // IIFE that passes a plain object and captures the result as _RS_COMPILER.
 
-var compiler_src = fs.readFileSync(COMPILER_JS, "utf8");
+var compiler_src = fs.readFileSync(COMPILER_JS, "utf8").replace(/\r\n/g, "\n");
 
 // Strip leading vim modeline comment (first line).
 compiler_src = compiler_src.replace(/^\/\/[^\n]*\n/, "");
@@ -131,7 +131,7 @@ var chunks = [
 ];
 
 FILES.forEach(function (file) {
-    var src = fs.readFileSync(path.join(SRC_DIR, file), "utf8");
+    var src = fs.readFileSync(path.join(SRC_DIR, file), "utf8").replace(/\r\n/g, "\n");
 
     var processed = src
         // 1. Remove import lines (all resolved by concatenation order).

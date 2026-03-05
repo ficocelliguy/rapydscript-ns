@@ -495,6 +495,136 @@ function make_tests(SourceAnalyzer, RS) {
             },
         },
 
+        // ── inferred_class from literal assignments ───────────────────────
+
+        {
+            name: "inferred_class_list_literal",
+            description: "myArr = [] sets inferred_class to 'list'",
+            run: function () {
+                var m = analyze("myArr = []\npass");
+                var sym = find(m.getAllSymbols(), "myArr");
+                assert.ok(sym, "Expected 'myArr' symbol");
+                assert.strictEqual(sym.inferred_class, "list");
+            },
+        },
+
+        {
+            name: "inferred_class_dict_literal",
+            description: "myObj = {} sets inferred_class to 'dict'",
+            run: function () {
+                var m = analyze("myObj = {}\npass");
+                var sym = find(m.getAllSymbols(), "myObj");
+                assert.ok(sym, "Expected 'myObj' symbol");
+                assert.strictEqual(sym.inferred_class, "dict");
+            },
+        },
+
+        {
+            name: "inferred_class_str_literal",
+            description: "myStr = 'hello' sets inferred_class to 'str'",
+            run: function () {
+                var m = analyze("myStr = 'hello'\npass");
+                var sym = find(m.getAllSymbols(), "myStr");
+                assert.ok(sym, "Expected 'myStr' symbol");
+                assert.strictEqual(sym.inferred_class, "str");
+            },
+        },
+
+        {
+            name: "inferred_class_number_literal",
+            description: "myNum = 42 sets inferred_class to 'number'",
+            run: function () {
+                var m = analyze("myNum = 42\npass");
+                var sym = find(m.getAllSymbols(), "myNum");
+                assert.ok(sym, "Expected 'myNum' symbol");
+                assert.strictEqual(sym.inferred_class, "number");
+            },
+        },
+
+        {
+            name: "inferred_class_constructor_call",
+            description: "x = Foo() sets inferred_class to 'Foo'",
+            run: function () {
+                var m = analyze("class Foo:\n    pass\nx = Foo()\npass");
+                var sym = find(m.getAllSymbols(), "x");
+                assert.ok(sym, "Expected 'x' symbol");
+                assert.strictEqual(sym.inferred_class, "Foo");
+            },
+        },
+
+        {
+            name: "inferred_class_function_local_list",
+            description: "Inside a function, myArr = [] sets inferred_class to 'list'",
+            run: function () {
+                var m = analyze([
+                    "def main():",
+                    "    myArr = []",
+                    "    return myArr",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "myArr");
+                assert.ok(sym, "Expected 'myArr' symbol in function scope");
+                assert.strictEqual(sym.inferred_class, "list",
+                    "Expected inferred_class='list', got: " + sym.inferred_class);
+            },
+        },
+
+        {
+            name: "inferred_class_function_local_dict",
+            description: "Inside a function, myObj = {} sets inferred_class to 'dict'",
+            run: function () {
+                var m = analyze([
+                    "def main():",
+                    "    myObj = {}",
+                    "    return myObj",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "myObj");
+                assert.ok(sym, "Expected 'myObj' symbol in function scope");
+                assert.strictEqual(sym.inferred_class, "dict");
+            },
+        },
+
+        {
+            name: "inferred_class_function_local_str",
+            description: "Inside a function, myStr = 'x' sets inferred_class to 'str'",
+            run: function () {
+                var m = analyze([
+                    "def main():",
+                    "    myStr = 'hello'",
+                    "    return myStr",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "myStr");
+                assert.ok(sym, "Expected 'myStr' symbol in function scope");
+                assert.strictEqual(sym.inferred_class, "str");
+            },
+        },
+
+        {
+            name: "inferred_class_async_function_local",
+            description: "Inside async def, list literal sets inferred_class to 'list'",
+            run: function () {
+                var m = analyze([
+                    "async def main():",
+                    "    myArr = []",
+                    "    return myArr",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "myArr");
+                assert.ok(sym, "Expected 'myArr' symbol in async function scope");
+                assert.strictEqual(sym.inferred_class, "list");
+            },
+        },
+
+        {
+            name: "inferred_class_no_inference_for_variable_rhs",
+            description: "x = some_var does not set inferred_class (unknown rhs)",
+            run: function () {
+                var m = analyze("some_var = 1\nx = some_var\npass");
+                var sym = find(m.getAllSymbols(), "x");
+                assert.ok(sym, "Expected 'x' symbol");
+                assert.ok(!sym.inferred_class,
+                    "Expected no inferred_class for variable assignment, got: " + sym.inferred_class);
+            },
+        },
+
         // ── Virtual file imports ──────────────────────────────────────────
 
         {

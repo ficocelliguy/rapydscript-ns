@@ -175,6 +175,108 @@ function make_tests(BuiltinsRegistry, BuiltinInfo, HoverEngine, SignatureHelpEng
             },
         },
 
+        // ── BuiltinsRegistry: getTypeMembers ─────────────────────────────
+
+        {
+            name: "getTypeMembers_list_returns_map",
+            description: "getTypeMembers('list') returns a Map with list members",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var members = reg.getTypeMembers('list');
+                assert.ok(members, 'getTypeMembers(list) should not return null');
+                assert.ok(typeof members.get === 'function', 'should be a Map');
+                assert.ok(members.has('length'), 'list should have length');
+                assert.ok(members.has('append'), 'list should have append');
+                assert.ok(members.has('push'),   'list should have push');
+                assert.ok(members.has('map'),    'list should have map');
+                assert.ok(members.has('filter'), 'list should have filter');
+                assert.ok(members.has('slice'),  'list should have slice');
+            },
+        },
+
+        {
+            name: "getTypeMembers_list_length_is_property",
+            description: "list.length is a 'property' member, not a method",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var members = reg.getTypeMembers('list');
+                var length_member = members.get('length');
+                assert.ok(length_member, 'length member should exist');
+                assert.strictEqual(length_member.kind, 'property');
+                assert.strictEqual(length_member.return_type, 'int');
+            },
+        },
+
+        {
+            name: "getTypeMembers_list_append_is_method",
+            description: "list.append is a 'method' member with a param",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var members = reg.getTypeMembers('list');
+                var append = members.get('append');
+                assert.ok(append, 'append member should exist');
+                assert.strictEqual(append.kind, 'method');
+                assert.ok(Array.isArray(append.params) && append.params.length >= 1,
+                    'append should have at least one param');
+            },
+        },
+
+        {
+            name: "getTypeMembers_str_returns_map",
+            description: "getTypeMembers('str') returns a Map with string members",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var members = reg.getTypeMembers('str');
+                assert.ok(members, 'getTypeMembers(str) should not return null');
+                assert.ok(members.has('length'),     'str should have length');
+                assert.ok(members.has('upper'),      'str should have upper');
+                assert.ok(members.has('lower'),      'str should have lower');
+                assert.ok(members.has('split'),      'str should have split');
+                assert.ok(members.has('strip'),      'str should have strip');
+                assert.ok(members.has('startswith'), 'str should have startswith');
+                assert.ok(members.has('endswith'),   'str should have endswith');
+            },
+        },
+
+        {
+            name: "getTypeMembers_dict_returns_map",
+            description: "getTypeMembers('dict') returns a Map with dict members",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var members = reg.getTypeMembers('dict');
+                assert.ok(members, 'getTypeMembers(dict) should not return null');
+                assert.ok(members.has('keys'),   'dict should have keys');
+                assert.ok(members.has('values'), 'dict should have values');
+                assert.ok(members.has('items'),  'dict should have items');
+                assert.ok(members.has('get'),    'dict should have get');
+                assert.ok(members.has('update'), 'dict should have update');
+                assert.ok(members.has('pop'),    'dict should have pop');
+            },
+        },
+
+        {
+            name: "getTypeMembers_number_returns_map",
+            description: "getTypeMembers('number') returns a Map with number members",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var members = reg.getTypeMembers('number');
+                assert.ok(members, 'getTypeMembers(number) should not return null');
+                assert.ok(members.has('toFixed'),     'number should have toFixed');
+                assert.ok(members.has('toString'),    'number should have toString');
+                assert.ok(members.has('toPrecision'), 'number should have toPrecision');
+            },
+        },
+
+        {
+            name: "getTypeMembers_unknown_returns_null",
+            description: "getTypeMembers() returns null for an unknown type name",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                assert.strictEqual(reg.getTypeMembers('totally_unknown'), null);
+                assert.strictEqual(reg.getTypeMembers(''),                null);
+            },
+        },
+
         // ── BuiltinsRegistry: getSignatureInfo ────────────────────────────
 
         {

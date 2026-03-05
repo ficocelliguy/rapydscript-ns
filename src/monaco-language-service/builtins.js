@@ -303,6 +303,117 @@ const STUBS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Built-in type member stubs
+// Each entry is compatible with _dts_member_to_item in completions.js:
+//   { name, kind ('method'|'property'), params?, return_type?, doc? }
+// ---------------------------------------------------------------------------
+
+function m(name, kind, params, return_type, doc) {
+    return { name, kind, params: params || null, return_type: return_type || null, doc: doc || null };
+}
+function mp(label, type) { return { name: label, type, optional: false, rest: false }; }
+
+const TYPE_MEMBERS = {
+    list: new Map([
+        // JS array property
+        ['length',      m('length',      'property', null,                       'int',  'The number of elements in the array.')],
+        // Python-compat methods
+        ['append',      m('append',      'method',   [mp('item', 'any')],        'None', 'Append item to the end of the list.')],
+        ['extend',      m('extend',      'method',   [mp('iterable', 'any')],    'None', 'Extend the list by appending all items from the iterable.')],
+        ['insert',      m('insert',      'method',   [mp('index', 'int'), mp('item', 'any')], 'None', 'Insert item before index.')],
+        ['remove',      m('remove',      'method',   [mp('item', 'any')],        'None', 'Remove the first occurrence of item.')],
+        ['pop',         m('pop',         'method',   [mp('index', 'int')],       'any',  'Remove and return item at index (default last).')],
+        ['index',       m('index',       'method',   [mp('item', 'any')],        'int',  'Return first index of item.')],
+        ['count',       m('count',       'method',   [mp('item', 'any')],        'int',  'Return number of occurrences of item.')],
+        ['sort',        m('sort',        'method',   [],                         'None', 'Sort the list in place.')],
+        ['reverse',     m('reverse',     'method',   [],                         'None', 'Reverse the list in place.')],
+        ['copy',        m('copy',        'method',   [],                         'list', 'Return a shallow copy of the list.')],
+        ['clear',       m('clear',       'method',   [],                         'None', 'Remove all items from the list.')],
+        // JS array methods
+        ['push',        m('push',        'method',   [mp('...items', 'any')],    'int',  'Append one or more elements and return the new length.')],
+        ['slice',       m('slice',       'method',   [mp('start', 'int'), mp('end', 'int')], 'list', 'Return a shallow slice of the array.')],
+        ['splice',      m('splice',      'method',   [mp('start', 'int'), mp('deleteCount', 'int')], 'list', 'Change contents by removing or inserting elements.')],
+        ['concat',      m('concat',      'method',   [mp('...arrays', 'any')],   'list', 'Merge two or more arrays.')],
+        ['join',        m('join',        'method',   [mp('separator', 'str')],   'str',  'Join all elements into a string.')],
+        ['indexOf',     m('indexOf',     'method',   [mp('item', 'any')],        'int',  'Return first index of item, or -1 if not found.')],
+        ['lastIndexOf', m('lastIndexOf', 'method',   [mp('item', 'any')],        'int',  'Return last index of item, or -1 if not found.')],
+        ['includes',    m('includes',    'method',   [mp('item', 'any')],        'bool', 'Return true if item is in the array.')],
+        ['forEach',     m('forEach',     'method',   [mp('callback', 'function')], 'None', 'Execute callback for each element.')],
+        ['map',         m('map',         'method',   [mp('callback', 'function')], 'list', 'Create a new array with the results of calling callback.')],
+        ['filter',      m('filter',      'method',   [mp('callback', 'function')], 'list', 'Create a new array with elements that pass the callback test.')],
+        ['reduce',      m('reduce',      'method',   [mp('callback', 'function'), mp('initial', 'any')], 'any', 'Reduce array to a single value.')],
+        ['find',        m('find',        'method',   [mp('callback', 'function')], 'any', 'Return first element satisfying callback, or undefined.')],
+        ['findIndex',   m('findIndex',   'method',   [mp('callback', 'function')], 'int', 'Return index of first element satisfying callback, or -1.')],
+        ['every',       m('every',       'method',   [mp('callback', 'function')], 'bool', 'Return true if all elements satisfy callback.')],
+        ['some',        m('some',        'method',   [mp('callback', 'function')], 'bool', 'Return true if at least one element satisfies callback.')],
+        ['flat',        m('flat',        'method',   [mp('depth', 'int')],       'list', 'Create a new array with sub-arrays flattened.')],
+        ['fill',        m('fill',        'method',   [mp('value', 'any'), mp('start', 'int'), mp('end', 'int')], 'list', 'Fill elements with a static value.')],
+        ['shift',       m('shift',       'method',   [],                         'any',  'Remove and return the first element.')],
+        ['unshift',     m('unshift',     'method',   [mp('...items', 'any')],    'int',  'Prepend elements and return the new length.')],
+    ]),
+
+    str: new Map([
+        // JS string property
+        ['length',      m('length',      'property', null,                       'int',  'The number of characters in the string.')],
+        // Python-compat methods
+        ['upper',       m('upper',       'method',   [],                         'str',  'Return an upper-case copy of the string.')],
+        ['lower',       m('lower',       'method',   [],                         'str',  'Return a lower-case copy of the string.')],
+        ['strip',       m('strip',       'method',   [mp('chars', 'str')],       'str',  'Return a copy with leading and trailing whitespace removed.')],
+        ['lstrip',      m('lstrip',      'method',   [mp('chars', 'str')],       'str',  'Return a copy with leading whitespace removed.')],
+        ['rstrip',      m('rstrip',      'method',   [mp('chars', 'str')],       'str',  'Return a copy with trailing whitespace removed.')],
+        ['split',       m('split',       'method',   [mp('sep', 'str'), mp('maxsplit', 'int')], 'list', 'Return a list of words split on sep.')],
+        ['find',        m('find',        'method',   [mp('sub', 'str')],         'int',  'Return the lowest index of sub, or -1 if not found.')],
+        ['replace',     m('replace',     'method',   [mp('old', 'str'), mp('new', 'str')], 'str', 'Return a copy with all occurrences of old replaced by new.')],
+        ['startswith',  m('startswith',  'method',   [mp('prefix', 'str')],      'bool', 'Return True if the string starts with prefix.')],
+        ['endswith',    m('endswith',    'method',   [mp('suffix', 'str')],      'bool', 'Return True if the string ends with suffix.')],
+        ['format',      m('format',      'method',   [mp('*args', 'any')],       'str',  'Return a formatted version of the string.')],
+        ['encode',      m('encode',      'method',   [mp('encoding', 'str')],    'bytes', 'Encode the string.')],
+        ['join',        m('join',        'method',   [mp('iterable', 'any')],    'str',  'Join iterable elements with this string as separator.')],
+        // JS string methods
+        ['toUpperCase', m('toUpperCase', 'method',   [],                         'str',  'Return an upper-case copy of the string.')],
+        ['toLowerCase', m('toLowerCase', 'method',   [],                         'str',  'Return a lower-case copy of the string.')],
+        ['trim',        m('trim',        'method',   [],                         'str',  'Return a copy with leading and trailing whitespace removed.')],
+        ['trimStart',   m('trimStart',   'method',   [],                         'str',  'Return a copy with leading whitespace removed.')],
+        ['trimEnd',     m('trimEnd',     'method',   [],                         'str',  'Return a copy with trailing whitespace removed.')],
+        ['includes',    m('includes',    'method',   [mp('sub', 'str')],         'bool', 'Return true if sub is found anywhere in the string.')],
+        ['startsWith',  m('startsWith',  'method',   [mp('prefix', 'str')],      'bool', 'Return true if the string starts with prefix.')],
+        ['endsWith',    m('endsWith',    'method',   [mp('suffix', 'str')],      'bool', 'Return true if the string ends with suffix.')],
+        ['indexOf',     m('indexOf',     'method',   [mp('sub', 'str')],         'int',  'Return first index of sub, or -1.')],
+        ['lastIndexOf', m('lastIndexOf', 'method',   [mp('sub', 'str')],         'int',  'Return last index of sub, or -1.')],
+        ['slice',       m('slice',       'method',   [mp('start', 'int'), mp('end', 'int')], 'str', 'Extract a section of the string.')],
+        ['substring',   m('substring',   'method',   [mp('start', 'int'), mp('end', 'int')], 'str', 'Return characters between start and end.')],
+        ['charAt',      m('charAt',      'method',   [mp('index', 'int')],       'str',  'Return character at the given index.')],
+        ['charCodeAt',  m('charCodeAt',  'method',   [mp('index', 'int')],       'int',  'Return UTF-16 code of character at index.')],
+        ['repeat',      m('repeat',      'method',   [mp('count', 'int')],       'str',  'Return the string repeated count times.')],
+        ['padStart',    m('padStart',    'method',   [mp('length', 'int'), mp('pad', 'str')], 'str', 'Pad start of string to target length.')],
+        ['padEnd',      m('padEnd',      'method',   [mp('length', 'int'), mp('pad', 'str')], 'str', 'Pad end of string to target length.')],
+        ['match',       m('match',       'method',   [mp('regex', 'str')],       'list', 'Match string against a regular expression.')],
+        ['replaceAll',  m('replaceAll',  'method',   [mp('old', 'str'), mp('new', 'str')], 'str', 'Return a copy with all occurrences replaced.')],
+    ]),
+
+    dict: new Map([
+        // Python-compat methods
+        ['keys',       m('keys',       'method', [],                             'list', 'Return a view of the dictionary keys.')],
+        ['values',     m('values',     'method', [],                             'list', 'Return a view of the dictionary values.')],
+        ['items',      m('items',      'method', [],                             'list', 'Return a view of the (key, value) pairs.')],
+        ['get',        m('get',        'method', [mp('key', 'any'), mp('default', 'any')], 'any', 'Return value for key, or default if not found.')],
+        ['update',     m('update',     'method', [mp('other', 'dict')],          'None', 'Update the dictionary with key-value pairs from other.')],
+        ['pop',        m('pop',        'method', [mp('key', 'any'), mp('default', 'any')], 'any', 'Remove and return value for key.')],
+        ['clear',      m('clear',      'method', [],                             'None', 'Remove all items from the dictionary.')],
+        ['copy',       m('copy',       'method', [],                             'dict', 'Return a shallow copy of the dictionary.')],
+        ['setdefault', m('setdefault', 'method', [mp('key', 'any'), mp('default', 'any')], 'any', 'Return value for key; if missing, insert key with default.')],
+        ['has_key',    m('has_key',    'method', [mp('key', 'any')],             'bool', 'Return True if key is in the dictionary.')],
+    ]),
+
+    number: new Map([
+        ['toFixed',       m('toFixed',       'method', [mp('digits', 'int')],   'str',  'Format number to fixed decimal places.')],
+        ['toPrecision',   m('toPrecision',   'method', [mp('precision', 'int')], 'str', 'Format number to specified precision.')],
+        ['toString',      m('toString',      'method', [mp('radix', 'int')],    'str',  'Convert number to string in given base.')],
+        ['toExponential', m('toExponential', 'method', [mp('digits', 'int')],   'str',  'Format number in exponential notation.')],
+    ]),
+};
+
+// ---------------------------------------------------------------------------
 // BuiltinsRegistry
 // ---------------------------------------------------------------------------
 
@@ -329,6 +440,16 @@ export class BuiltinsRegistry {
      */
     getNames() {
         return Array.from(this._stubs.keys());
+    }
+
+    /**
+     * Return the Map of member stubs for a built-in type, or null.
+     * Each value is compatible with _dts_member_to_item in completions.js.
+     * @param {string} type_name  e.g. 'list', 'str', 'dict', 'number'
+     * @returns {Map|null}
+     */
+    getTypeMembers(type_name) {
+        return TYPE_MEMBERS[type_name] || null;
     }
 
     /**

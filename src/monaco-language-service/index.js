@@ -129,6 +129,16 @@ class RapydScriptLanguageService {
         const existing = monaco.languages.getLanguages().find(l => l.id === LANGUAGE_ID);
         if (!existing) monaco.languages.register({ id: LANGUAGE_ID });
 
+        // Apply Python syntax highlighting — RapydScript is syntactically Python-like
+        // enough that Monaco's built-in Python tokenizer gives correct coloring.
+        const pythonLang = monaco.languages.getLanguages().find(l => l.id === 'python');
+        if (pythonLang && pythonLang.loader) {
+            pythonLang.loader().then(function(mod) {
+                monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, mod.language);
+                monaco.languages.setLanguageConfiguration(LANGUAGE_ID, mod.conf);
+            });
+        }
+
         // Attach to all currently open rapydscript models
         monaco.editor.getModels().forEach(model => this._maybeAttach(model));
 

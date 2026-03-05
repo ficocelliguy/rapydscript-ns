@@ -297,14 +297,25 @@ export class CompletionEngine {
         const items = [];
         const seen  = new Set();
         let scope_matched = false;
+        let obj_sym = null;
 
         // 1. ScopeMap lookup — user-defined classes and inferred instances.
         if (scopeMap) {
-            const obj_sym = scopeMap.getSymbol(
+            obj_sym = scopeMap.getSymbol(
                 ctx.objectName,
                 position.lineNumber,
                 position.column
             );
+            // Fallback: the cursor may be past the end of all parsed scope ranges
+            // (e.g. the user is typing on a new line that isn't in the last debounced
+            // parse yet).  Search all frames innermost-first so we still find the symbol.
+            if (!obj_sym) {
+                const all = scopeMap.frames.slice().sort((a, b) => b.depth - a.depth);
+                for (const frame of all) {
+                    const sym = frame.getSymbol(ctx.objectName);
+                    if (sym) { obj_sym = sym; break; }
+                }
+            }
 
             let class_name = null;
             if (obj_sym) {
@@ -326,6 +337,23 @@ export class CompletionEngine {
                                     items.push(symbol_to_item(sym, range, monacoKind, '0'));
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1.5. Built-in type members — list, str, dict, number.
+        //      Used when inferred_class names a built-in type, not a user class.
+        if (!scope_matched && this._builtins && obj_sym && obj_sym.inferred_class) {
+            const members = this._builtins.getTypeMembers(obj_sym.inferred_class);
+            if (members) {
+                scope_matched = true;
+                for (const [name, member] of members) {
+                    if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                        if (!seen.has(name)) {
+                            seen.add(name);
+                            items.push(_dts_member_to_item(member, range, monacoKind));
                         }
                     }
                 }

@@ -63,12 +63,17 @@ function find_item(list, label) {
 
 function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistry, RS) {
 
-    function make_engine(virtual_files, extra_builtins, dts_registry) {
+    function make_engine(virtual_files, extra_builtins, dts_registry, builtins_mod) {
         var analyzer = new SourceAnalyzer(RS);
+        var builtins_registry = null;
+        if (builtins_mod) {
+            builtins_registry = new builtins_mod.BuiltinsRegistry();
+        }
         return new CompletionEngine(analyzer, {
-            virtualFiles: virtual_files || {},
-            builtinNames: extra_builtins || ['print', 'len', 'range'],
-            dtsRegistry:  dts_registry  || null,
+            virtualFiles:     virtual_files    || {},
+            builtinNames:     extra_builtins   || ['print', 'len', 'range'],
+            dtsRegistry:      dts_registry     || null,
+            builtinsRegistry: builtins_registry,
         });
     }
 
@@ -474,6 +479,170 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 var list = engine.getCompletions(null, pos(1, 5), "Math.", MockKind);
                 assert.strictEqual(list.suggestions.length, 0,
                     'no DTS registry → no Math members');
+            },
+        },
+
+        // ── Built-in type dot completions ─────────────────────────────────
+
+        {
+            name: "dot_list_literal_members",
+            description: "Dot completion on myArr = [] shows list members (length, append, push…)",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "myArr = []",
+                    "pass",
+                ].join("\n"), {});
+
+                // Query on line 2 — position-based lookup finds myArr in module scope
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "myArr.", MockKind);
+                assert_has(list, 'length', 'list.length property');
+                assert_has(list, 'append', 'list.append method');
+                assert_has(list, 'push',   'list.push method');
+                assert_has(list, 'map',    'list.map method');
+                assert_has(list, 'filter', 'list.filter method');
+            },
+        },
+
+        {
+            name: "dot_str_literal_members",
+            description: "Dot completion on myStr = 'x' shows str members (length, upper, split…)",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "myStr = 'hello'",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "myStr.", MockKind);
+                assert_has(list, 'length',      'str.length property');
+                assert_has(list, 'upper',        'str.upper method');
+                assert_has(list, 'split',        'str.split method');
+                assert_has(list, 'startswith',   'str.startswith method');
+            },
+        },
+
+        {
+            name: "dot_dict_literal_members",
+            description: "Dot completion on myObj = {} shows dict members (keys, values, get…)",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "myObj = {}",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "myObj.", MockKind);
+                assert_has(list, 'keys',   'dict.keys method');
+                assert_has(list, 'values', 'dict.values method');
+                assert_has(list, 'get',    'dict.get method');
+                assert_has(list, 'update', 'dict.update method');
+            },
+        },
+
+        {
+            name: "dot_builtin_type_prefix_filter",
+            description: "Prefix filter narrows built-in type members (myArr.le → length only)",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("myArr = []\npass", {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 3), "myArr.le", MockKind);
+                assert_has(list,    'length',  'length matches le');
+                assert_missing(list,'append',  'append does not match le');
+                assert_missing(list,'push',    'push does not match le');
+            },
+        },
+
+        {
+            name: "dot_builtin_type_wins_over_dts",
+            description: "Built-in type members take precedence over DTS when inferred_class is set",
+            run: function () {
+                // DTS has a 'myArr' namespace; but myArr is a list literal so type members win
+                var reg = new DtsRegistry();
+                reg.addDts("lib", "declare namespace myArr { function dts_only(): void; }");
+                var engine = make_engine({}, [], reg,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("myArr = []\npass", {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "myArr.", MockKind);
+                assert_has(list,    'length',   'list.length present');
+                assert_missing(list,'dts_only', 'DTS member absent when inferred_class matches');
+            },
+        },
+
+        // ── Function-local variable dot completions (scope fallback) ──────
+
+        {
+            name: "dot_function_local_list",
+            description: "Dot completion on function-local myArr = [] shows list members",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                // Parse includes the dot-access line so the function range covers it.
+                var scopeMap = analyzer.analyze([
+                    "def main():",
+                    "    myArr = []",
+                    "    x = myArr",
+                ].join("\n"), {});
+
+                // Query on line 3 (inside the function) — the function scope must be found
+                var list = engine.getCompletions(scopeMap, pos(3, 5), "myArr.", MockKind);
+                assert_has(list, 'length', 'list.length in function scope');
+                assert_has(list, 'append', 'list.append in function scope');
+                assert_has(list, 'push',   'list.push in function scope');
+            },
+        },
+
+        {
+            name: "dot_function_local_scope_fallback",
+            description: "Dot completion works when cursor is past the last parsed scope boundary",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                // Simulate the debounce scenario: the scopeMap was built from code that
+                // ends at line 2, but completions are requested at line 3 (new line).
+                var scopeMap = analyzer.analyze([
+                    "def main():",
+                    "    myArr = []",
+                ].join("\n"), {});
+
+                // Line 3 col 7 is past the end of any parsed scope range.
+                // The fallback all-frames search must still find myArr.
+                var list = engine.getCompletions(scopeMap, pos(3, 7), "myArr.", MockKind);
+                assert_has(list, 'length', 'list.length via scope fallback');
+                assert_has(list, 'append', 'list.append via scope fallback');
+            },
+        },
+
+        {
+            name: "dot_function_local_str_fallback",
+            description: "Scope fallback finds str type for function-local string variable",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "async def main():",
+                    "    myStr = 'hello'",
+                ].join("\n"), {});
+
+                // Cursor past end of parsed scopes
+                var list = engine.getCompletions(scopeMap, pos(3, 7), "myStr.", MockKind);
+                assert_has(list, 'length', 'str.length via scope fallback');
+                assert_has(list, 'upper',  'str.upper via scope fallback');
+                assert_has(list, 'split',  'str.split via scope fallback');
             },
         },
 

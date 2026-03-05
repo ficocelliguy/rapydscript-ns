@@ -240,23 +240,40 @@ class ScopeBuilder {
             }
 
         } else if (node instanceof RS.AST_Assign && node.operator === '=') {
-            // Simple assignment: add left-hand symbol if new to this scope.
+            // Simple assignment: add left-hand symbol if new to this scope,
+            // or update inferred_class on an existing symbol (hoisted var declarations
+            // inside functions are added by AST_VarDef without type info; the
+            // assignment provides the type).
             if (node.left instanceof RS.AST_SymbolRef) {
                 const name  = node.left.name;
                 const scope = this._current_scope();
-                if (scope && !scope.getSymbol(name)) {
-                    // Detect `x = ClassName(...)` to record the inferred type.
+                if (scope) {
+                    // Detect the RHS type regardless of whether the symbol exists.
                     let inferred_class = null;
                     if (node.right instanceof RS.AST_BaseCall &&
                         node.right.expression instanceof RS.AST_SymbolRef) {
                         inferred_class = node.right.expression.name;
+                    } else if (node.right instanceof RS.AST_Array) {
+                        inferred_class = 'list';
+                    } else if (node.right instanceof RS.AST_Object) {
+                        inferred_class = 'dict';
+                    } else if (node.right instanceof RS.AST_String) {
+                        inferred_class = 'str';
+                    } else if (node.right instanceof RS.AST_Number) {
+                        inferred_class = 'number';
                     }
-                    this._add_symbol({
-                        name,
-                        kind:           'variable',
-                        defined_at:     pos_from_token(node.left.start),
-                        inferred_class,
-                    });
+                    const existing = scope.getSymbol(name);
+                    if (!existing) {
+                        this._add_symbol({
+                            name,
+                            kind:           'variable',
+                            defined_at:     pos_from_token(node.left.start),
+                            inferred_class,
+                        });
+                    } else if (inferred_class && !existing.inferred_class) {
+                        // Update the hoisted-but-untyped symbol with the inferred type.
+                        existing.inferred_class = inferred_class;
+                    }
                 }
             }
 
