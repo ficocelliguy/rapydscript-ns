@@ -114,6 +114,28 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
         },
 
         {
+            name: "ctx_dot_multi_level",
+            description: "detect_context captures multi-level path like 'ns.hacknet.'",
+            run: function () {
+                var ctx = detect_context("ns.hacknet.");
+                assert.strictEqual(ctx.type, 'dot');
+                assert.strictEqual(ctx.objectName, 'ns.hacknet');
+                assert.strictEqual(ctx.prefix, '');
+            },
+        },
+
+        {
+            name: "ctx_dot_multi_level_with_prefix",
+            description: "detect_context captures multi-level path with partial attribute",
+            run: function () {
+                var ctx = detect_context("ns.hacknet.pur");
+                assert.strictEqual(ctx.type, 'dot');
+                assert.strictEqual(ctx.objectName, 'ns.hacknet');
+                assert.strictEqual(ctx.prefix, 'pur');
+            },
+        },
+
+        {
             name: "ctx_from_import",
             description: "detect_context returns from_import for 'from mod import p'",
             run: function () {
@@ -643,6 +665,67 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 assert_has(list, 'length', 'str.length via scope fallback');
                 assert_has(list, 'upper',  'str.upper via scope fallback');
                 assert_has(list, 'split',  'str.split via scope fallback');
+            },
+        },
+
+        {
+            name: "dot_dts_multi_level",
+            description: "Multi-level dot completion resolves type chain (e.g. ns.sub.member)",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface Hacknet {",
+                    "    purchaseNode(): number;",
+                    "    getNodeStats(index: number): object;",
+                    "}",
+                    "interface NS {",
+                    "    readonly hacknet: Hacknet;",
+                    "    hack(host: string): Promise<number>;",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                // ns.hacknet. → should show Hacknet members
+                var list = engine.getCompletions(null, pos(1, 12), "ns.hacknet.", MockKind);
+                assert_has(list, 'purchaseNode', 'ns.hacknet.purchaseNode from DTS chain');
+                assert_has(list, 'getNodeStats', 'ns.hacknet.getNodeStats from DTS chain');
+                assert_missing(list, 'hack', 'NS.hack not in Hacknet');
+            },
+        },
+
+        {
+            name: "dot_dts_multi_level_prefix_filter",
+            description: "Multi-level dot completion respects prefix filter",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface Hacknet {",
+                    "    purchaseNode(): number;",
+                    "    purchaseUpgrade(index: number): boolean;",
+                    "    getNodeStats(index: number): object;",
+                    "}",
+                    "interface NS {",
+                    "    readonly hacknet: Hacknet;",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var list = engine.getCompletions(null, pos(1, 15), "ns.hacknet.pur", MockKind);
+                assert_has(list,    'purchaseNode',    'purchaseNode matches pur');
+                assert_has(list,    'purchaseUpgrade', 'purchaseUpgrade matches pur');
+                assert_missing(list,'getNodeStats',    'getNodeStats does not match pur');
+            },
+        },
+
+        {
+            name: "dot_dts_multi_level_unknown_path",
+            description: "Multi-level dot on unknown path returns empty list",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", "declare var ns: NS;");
+                var engine = make_engine({}, [], reg);
+                var list = engine.getCompletions(null, pos(1, 14), "ns.unknown.", MockKind);
+                assert.strictEqual(list.suggestions.length, 0, 'unknown member path → empty');
             },
         },
 

@@ -94,6 +94,9 @@ class RapydScriptLanguageService {
         this._diagnostics = new Diagnostics(compiler, options.extraBuiltins);
         this._analyzer    = new SourceAnalyzer(compiler);
 
+        // Preserve extra builtin names so they survive addDts() rebuilds
+        this._extraBuiltinNames = options.extraBuiltins ? Object.keys(options.extraBuiltins) : [];
+
         // DTS registry — load any files supplied at construction time
         this._dts = new DtsRegistry();
         if (options.dtsFiles) {
@@ -105,7 +108,7 @@ class RapydScriptLanguageService {
 
         // Merge BASE_BUILTINS + extra globals + DTS globals for completions
         const builtin_names = BASE_BUILTINS
-            .concat(options.extraBuiltins ? Object.keys(options.extraBuiltins) : [])
+            .concat(this._extraBuiltinNames)
             .concat(this._dts.getGlobalNames());
 
         this._completions    = new CompletionEngine(this._analyzer, {
@@ -278,8 +281,8 @@ class RapydScriptLanguageService {
         const new_names = this._dts.getGlobalNames();
         // Suppress undef warnings for newly added globals
         this._diagnostics.addGlobals(new_names);
-        // Rebuild builtin list so completions include new DTS names
-        const builtin_names = BASE_BUILTINS.concat(new_names);
+        // Rebuild builtin list so completions include new DTS names (preserve extraBuiltins)
+        const builtin_names = BASE_BUILTINS.concat(this._extraBuiltinNames).concat(new_names);
         this._completions = new CompletionEngine(this._analyzer, {
             virtualFiles:    this._virtualFiles,
             builtinNames:    builtin_names,

@@ -25,8 +25,8 @@ import { SourceAnalyzer } from './analyzer.js';
  * @returns {{ type: string, objectName?: string, moduleName?: string, prefix: string }}
  */
 export function detect_context(linePrefix) {
-    // `obj.attr` — dot access
-    const dot_match = linePrefix.match(/(\w+)\.([\w]*)$/);
+    // `obj.attr` or `obj.sub.attr` — dot access (captures multi-level path)
+    const dot_match = linePrefix.match(/([\w.]+)\.([\w]*)$/);
     if (dot_match) {
         return { type: 'dot', objectName: dot_match[1], prefix: dot_match[2] };
     }
@@ -298,6 +298,37 @@ export class CompletionEngine {
         const seen  = new Set();
         let scope_matched = false;
         let obj_sym = null;
+
+        // 0. Multi-level path (e.g. 'ns.hacknet') — resolve via DTS type chain only.
+        if (ctx.objectName.includes('.') && this._dts) {
+            const parts = ctx.objectName.split('.');
+            // Resolve root symbol
+            let ti = this._dts.getGlobal(parts[0]);
+            // Follow first var → type reference (e.g. var ns: NS → NS interface)
+            if (ti && !ti.members && ti.return_type) {
+                ti = this._dts.getGlobal(ti.return_type);
+            }
+            // Walk remaining path segments through member types
+            for (let i = 1; i < parts.length && ti; i++) {
+                const member = ti.members ? ti.members.get(parts[i]) : null;
+                if (!member) { ti = null; break; }
+                if (member.members) {
+                    ti = member;
+                } else if (member.return_type) {
+                    ti = this._dts.getGlobal(member.return_type);
+                } else {
+                    ti = null;
+                }
+            }
+            if (ti && ti.members) {
+                for (const [name, member] of ti.members) {
+                    if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                        items.push(_dts_member_to_item(member, range, monacoKind));
+                    }
+                }
+            }
+            return items;
+        }
 
         // 1. ScopeMap lookup — user-defined classes and inferred instances.
         if (scopeMap) {
