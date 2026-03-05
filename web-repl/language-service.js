@@ -441,6 +441,24 @@ if (typeof exports === 'object') {
     if (typeof rs_commit_sha === 'string') exports.rs_commit_sha = rs_commit_sha;
 }
 external_namespace.RapydScript = namespace;
+
+// Expose inner compiler API (parse, OutputStream, etc.) on namespace
+// for the language service. Uses lazy init to avoid eager eval cost.
+(function() {
+    var _inner = null;
+    function _getInner() {
+        if (!_inner) _inner = create_compiler();
+        return _inner;
+    }
+    ['parse','OutputStream','SyntaxError','ImportError','NATIVE_CLASSES','tree_shake'].forEach(function(k) {
+        if (!namespace[k]) {
+            Object.defineProperty(namespace, k, {
+                get: function() { return _getInner()[k]; },
+                configurable: true
+            });
+        }
+    });
+})();
 })(_container);
     return _container.RapydScript;
 })();

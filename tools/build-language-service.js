@@ -61,6 +61,38 @@ compiler_src = compiler_src.replace(/^\/\/[^\n]*\n/, "");
 // captured into our container object instead of being attached to the global.
 compiler_src = compiler_src.replace(/\}\)\(this\)\s*;?\s*$/, "})(_container);");
 
+// Augmentation code injected inside the IIFE (has access to `namespace` and
+// `create_compiler` which are private locals inside rapydscript.js).
+// The language service needs parse(), OutputStream, SyntaxError, ImportError,
+// NATIVE_CLASSES, and tree_shake — all of which live on the inner compiler
+// object returned by create_compiler(), not on the outer namespace.
+// We expose them lazily via getters so the inner compiler is only eval'd
+// on first use.
+var augment_src = [
+    "",
+    "// Expose inner compiler API (parse, OutputStream, etc.) on namespace",
+    "// for the language service. Uses lazy init to avoid eager eval cost.",
+    "(function() {",
+    "    var _inner = null;",
+    "    function _getInner() {",
+    "        if (!_inner) _inner = create_compiler();",
+    "        return _inner;",
+    "    }",
+    "    ['parse','OutputStream','SyntaxError','ImportError','NATIVE_CLASSES','tree_shake'].forEach(function(k) {",
+    "        if (!namespace[k]) {",
+    "            Object.defineProperty(namespace, k, {",
+    "                get: function() { return _getInner()[k]; },",
+    "                configurable: true",
+    "            });",
+    "        }",
+    "    });",
+    "})();",
+    "",
+].join("\n");
+
+// Inject augmentation just before the closing })(_container);
+compiler_src = compiler_src.replace(/\}\)\(_container\)\s*;?\s*$/, augment_src + "})(_container);");
+
 var compiler_chunk = [
     "// ── rapydscript.js (embedded compiler) " + "─".repeat(29),
     "",
