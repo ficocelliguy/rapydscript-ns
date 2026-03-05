@@ -55,6 +55,7 @@ backwards compatible) features. For more on the forking, [see the bottom of this
     - [Embedding the RapydScript compiler in your webpage](#embedding-the-rapydscript-compiler-in-your-webpage)
 - [Internationalization](#internationalization)
 - [Gotchas](#gotchas)
+- [Monaco Language Service](#monaco-language-service)
 - [Reasons for the fork](#reasons-for-the-fork)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -1630,6 +1631,162 @@ below:
 - The {"a":b} syntax is used to create JavaScript hashes. These do not behave
   like python dictionaries. To create python like dictionary objects, you
   should use a scoped flag. See the section on dictionaries above for details.
+
+
+Monaco Language Service
+-----------------------
+
+The `src/monaco-language-service/` directory contains a browser-native language
+service for [Monaco Editor](https://microsoft.github.io/monaco-editor/) (the
+editor that powers VS Code). Once registered it provides:
+
+- **Diagnostics** — syntax errors and lint warnings underlined as you type
+- **Completions** — Ctrl+Space completions for local variables, functions,
+  classes, module imports, built-in functions, and dot-access on user-defined
+  and `.d.ts`-typed objects
+- **Signature help** — parameter hints triggered by `(` and `,`
+- **Hover** — type signature and documentation popup on hover
+- **Built-in stubs** — signatures and docs for Python and JavaScript built-ins
+  (`len`, `range`, `print`, `sorted`, `setTimeout`, …)
+- **TypeScript declaration support** — load `.d.ts` files to register external
+  globals for completions and hover (e.g. DOM APIs, third-party libraries)
+
+### Building the bundle
+
+The service is distributed as a single self-contained file.  Build it with:
+
+```bash
+npm run build:ls
+# or with a custom output path:
+node tools/build-language-service.js --out path/to/language-service.js
+```
+
+The output is written to `web-repl/language-service.js` by default.
+
+### Basic setup
+
+Load the compiler bundle and the language-service bundle, then call
+`registerRapydScript` after Monaco is initialised:
+
+```html
+<script src="rapydscript.js"></script>
+<script src="language-service.js"></script>
+<script>
+  require(['vs/editor/editor.main'], function () {
+    var editor  = monaco.editor.create(document.getElementById('container'), {
+      language: 'rapydscript',
+    });
+    var service = registerRapydScript(monaco, {
+      compiler: window.RapydScript,
+    });
+  });
+</script>
+```
+
+`registerRapydScript(monaco, options)` registers all Monaco providers and
+returns a service handle.  Call `service.dispose()` to remove all providers
+when the editor is torn down.
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `compiler` | object | — | **Required.** The `window.RapydScript` compiler bundle. |
+| `parseDelay` | number | `300` | Debounce delay (ms) before re-checking after an edit. |
+| `virtualFiles` | `{name: source}` | `{}` | Virtual modules available to `import` statements. |
+| `dtsFiles` | `[{name, content}]` | `[]` | TypeScript `.d.ts` files loaded at startup. |
+| `loadDts` | `(name) => Promise<string>` | — | Async callback for lazy-loading `.d.ts` content on demand. |
+| `extraBuiltins` | `{name: true}` | `{}` | Extra global names that suppress undefined-symbol warnings. |
+
+### Runtime API
+
+```js
+// Add or replace virtual modules (triggers a re-check of all open models)
+service.setVirtualFiles({ mymod: 'def helper(): pass' });
+
+// Remove a virtual module
+service.removeVirtualFile('mymod');
+
+// Register a .d.ts string at runtime (updates completions, hover, and diagnostics)
+service.addDts('lib.dom', dtsText);
+
+// Lazily fetch and register a .d.ts file via the loadDts callback
+service.loadDts('lib.dom').then(function () { console.log('DOM types loaded'); });
+
+// Suppress undefined-symbol warnings for additional global names
+service.addGlobals(['myFrameworkGlobal', '$']);
+
+// Tear down all Monaco providers and event listeners
+service.dispose();
+```
+
+### TypeScript declaration files
+
+Pass `.d.ts` content to register external globals for completions and hover.
+Supported syntax: `declare var/let/const`, `declare function`,
+`declare class`, `interface`, `declare namespace`, and `type` aliases.
+
+```js
+var service = registerRapydScript(monaco, {
+  compiler: window.RapydScript,
+  dtsFiles: [
+    {
+      name: 'lib.myapi',
+      content: [
+        'declare namespace MyAPI {',
+        '    function fetch(url: string): Promise<any>;',
+        '    const version: string;',
+        '}',
+        'declare var myGlobal: string;',
+      ].join('\n'),
+    },
+  ],
+});
+```
+
+For large declaration files (e.g. the full DOM lib), use `loadDts` to
+fetch them on demand rather than inlining them at startup:
+
+```js
+var service = registerRapydScript(monaco, {
+  compiler: window.RapydScript,
+  loadDts: function (name) {
+    return fetch('/dts/' + name + '.d.ts').then(function (r) { return r.text(); });
+  },
+});
+
+// Trigger loading whenever needed:
+service.loadDts('lib.dom');
+service.loadDts('lib.es2020');
+```
+
+### Virtual modules
+
+Virtual modules let the editor resolve `import` statements without a server.
+The completion provider uses them to suggest exported names in
+`from X import …` completions.
+
+```js
+var service = registerRapydScript(monaco, {
+  compiler: window.RapydScript,
+  virtualFiles: {
+    utils: 'def format_date(d): pass\ndef clamp(x, lo, hi): pass',
+    models: 'class User:\n    def __init__(self, name): self.name = name',
+  },
+});
+
+// Live-update a module as the user edits it in another tab:
+service.setVirtualFiles({ utils: updatedSource });
+```
+
+### Running the tests
+
+```bash
+npm run test:ls
+```
+
+This runs all seven language-service test suites (diagnostics, scope analysis,
+completions, signature help, hover, DTS registry, and built-in stubs).
 
 
 Reasons for the fork
