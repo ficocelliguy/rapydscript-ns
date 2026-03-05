@@ -115,7 +115,7 @@ function symbol_to_item(sym, range, monacoKind, sortPrefix) {
 }
 
 /**
- * Build a simple completion item from a plain name string (e.g. a builtin).
+ * Build a simple completion item from a plain name string (e.g. a builtin with no stub).
  * @param {string} name
  * @param {object} range
  * @param {object} monacoKind
@@ -131,6 +131,76 @@ function name_to_item(name, range, monacoKind) {
     };
 }
 
+/**
+ * Build a Monaco CompletionItem from a BuiltinInfo stub (richer than name_to_item).
+ * @param {import('./builtins.js').BuiltinInfo} stub
+ * @param {object} range
+ * @param {object} monacoKind
+ * @returns {object}
+ */
+function _builtin_to_item(stub, range, monacoKind) {
+    const kind = stub.kind === 'function' ? monacoKind.Function :
+                 stub.kind === 'class'    ? monacoKind.Class    : monacoKind.Variable;
+    let detail = stub.kind;
+    if (stub.params) {
+        const ps = stub.params.map(function (p) {
+            let s = p.label;
+            if (p.type && p.type !== 'any') s += ': ' + p.type;
+            return s;
+        }).join(', ');
+        detail = '(' + ps + ')';
+        if (stub.return_type && stub.return_type !== 'None') {
+            detail += ' → ' + stub.return_type;
+        }
+    } else if (stub.return_type) {
+        detail = stub.return_type;
+    }
+    return {
+        label:         stub.name,
+        kind,
+        detail,
+        documentation: stub.doc || undefined,
+        sortText:      '2_' + stub.name,
+        insertText:    stub.name,
+        range,
+    };
+}
+
+/**
+ * Build a Monaco CompletionItem from a DTS TypeInfo member (method or property).
+ * @param {import('./dts.js').TypeInfo} member
+ * @param {object} range
+ * @param {object} monacoKind
+ * @returns {object}
+ */
+function _dts_member_to_item(member, range, monacoKind) {
+    const kind = member.kind === 'method' ? monacoKind.Method : monacoKind.Property;
+    let detail = member.kind;
+    if (member.kind === 'method' && member.params) {
+        const ps = member.params.map(function (p) {
+            let s = p.rest ? '...' : '';
+            s += p.name;
+            if (p.optional) s += '?';
+            return s;
+        }).join(', ');
+        detail = '(' + ps + ')';
+        if (member.return_type && member.return_type !== 'void') {
+            detail += ': ' + member.return_type;
+        }
+    } else if (member.return_type) {
+        detail = member.return_type;
+    }
+    return {
+        label:         member.name,
+        kind,
+        detail,
+        documentation: member.doc || undefined,
+        sortText:      '0_' + member.name,
+        insertText:    member.name,
+        range,
+    };
+}
+
 // ---------------------------------------------------------------------------
 // CompletionEngine
 // ---------------------------------------------------------------------------
@@ -141,11 +211,15 @@ export class CompletionEngine {
      * @param {object} opts
      * @param {object} [opts.virtualFiles]   module-name → source
      * @param {string[]} [opts.builtinNames] names always available (BASE_BUILTINS + extras)
+     * @param {import('./dts.js').DtsRegistry|null}      [opts.dtsRegistry]      DTS globals for dot completion
+     * @param {import('./builtins.js').BuiltinsRegistry|null} [opts.builtinsRegistry] stubs for rich builtin items
      */
     constructor(analyzer, opts) {
         this._analyzer     = analyzer;
-        this._virtualFiles = opts.virtualFiles || {};
-        this._builtinNames = opts.builtinNames || [];
+        this._virtualFiles = opts.virtualFiles    || {};
+        this._builtinNames = opts.builtinNames    || [];
+        this._dts          = opts.dtsRegistry     || null;
+        this._builtins     = opts.builtinsRegistry || null;
     }
 
     /**
@@ -201,11 +275,15 @@ export class CompletionEngine {
             }
         }
 
-        // Builtins (lowest priority)
+        // Builtins (lowest priority) — use rich stub item when available
         for (const name of this._builtinNames) {
             if (!seen.has(name) && (!ctx.prefix || name.startsWith(ctx.prefix))) {
                 seen.add(name);
-                items.push(name_to_item(name, range, monacoKind));
+                const stub = this._builtins ? this._builtins.get(name) : null;
+                items.push(stub
+                    ? _builtin_to_item(stub, range, monacoKind)
+                    : name_to_item(name, range, monacoKind)
+                );
             }
         }
 
@@ -218,35 +296,56 @@ export class CompletionEngine {
         const range = word_range(position, ctx.prefix);
         const items = [];
         const seen  = new Set();
+        let scope_matched = false;
 
-        if (!scopeMap) return items;
+        // 1. ScopeMap lookup — user-defined classes and inferred instances.
+        if (scopeMap) {
+            const obj_sym = scopeMap.getSymbol(
+                ctx.objectName,
+                position.lineNumber,
+                position.column
+            );
 
-        // Resolve the object: direct class name, or instance with inferred_class.
-        const obj_sym = scopeMap.getSymbol(
-            ctx.objectName,
-            position.lineNumber,
-            position.column
-        );
+            let class_name = null;
+            if (obj_sym) {
+                if (obj_sym.kind === 'class') {
+                    class_name = obj_sym.name;
+                } else if (obj_sym.inferred_class) {
+                    class_name = obj_sym.inferred_class;
+                }
+            }
 
-        let class_name = null;
-        if (obj_sym) {
-            if (obj_sym.kind === 'class') {
-                class_name = obj_sym.name;
-            } else if (obj_sym.inferred_class) {
-                class_name = obj_sym.inferred_class;
+            if (class_name) {
+                for (const frame of scopeMap.frames) {
+                    if (frame.kind === 'class' && frame.name === class_name) {
+                        scope_matched = true;
+                        for (const [name, sym] of frame.symbols) {
+                            if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                                if (!seen.has(name)) {
+                                    seen.add(name);
+                                    items.push(symbol_to_item(sym, range, monacoKind, '0'));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        if (class_name) {
-            // Find the class frame in the ScopeMap and emit its symbols.
-            for (const frame of scopeMap.frames) {
-                if (frame.kind === 'class' && frame.name === class_name) {
-                    for (const [name, sym] of frame.symbols) {
-                        if (!ctx.prefix || name.startsWith(ctx.prefix)) {
-                            if (!seen.has(name)) {
-                                seen.add(name);
-                                items.push(symbol_to_item(sym, range, monacoKind, '0'));
-                            }
+        // 2. DTS registry fallback — namespaces / interfaces / classes from .d.ts.
+        //    Skipped when ScopeMap already matched a class (ScopeMap wins).
+        if (!scope_matched && this._dts) {
+            let ti = this._dts.getGlobal(ctx.objectName);
+            // Follow type reference: `var console: Console` → look up `Console`
+            if (ti && !ti.members && ti.return_type) {
+                ti = this._dts.getGlobal(ti.return_type);
+            }
+            if (ti && ti.members) {
+                for (const [name, member] of ti.members) {
+                    if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                        if (!seen.has(name)) {
+                            seen.add(name);
+                            items.push(_dts_member_to_item(member, range, monacoKind));
                         }
                     }
                 }

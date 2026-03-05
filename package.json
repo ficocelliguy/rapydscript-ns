@@ -10,11 +10,9 @@
   ],
   "main": "tools/compiler.js",
   "scripts": {
-    "test": "node bin/rapydscript self --complete --test && node test/unit/index.js",
+    "test": "node bin/rapydscript self --complete --test && npm run test:unit && npm run test:ls",
     "test:unit": "node test/unit/index.js",
-    "test:ls": "node test/unit/language-service.js",
-    "test:ls-scope": "node test/unit/language-service-scope.js",
-    "test:ls-completions": "node test/unit/language-service-completions.js",
+    "test:ls": "node test/unit/run-language-service.js",
     "start": "node bin/rapydscript",
     "build-self": "node bin/rapydscript self --complete",
     "build:ls": "node tools/build-language-service.js",

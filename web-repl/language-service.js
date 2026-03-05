@@ -1241,7 +1241,7 @@ function symbol_to_item(sym, range, monacoKind, sortPrefix) {
 }
 
 /**
- * Build a simple completion item from a plain name string (e.g. a builtin).
+ * Build a simple completion item from a plain name string (e.g. a builtin with no stub).
  * @param {string} name
  * @param {object} range
  * @param {object} monacoKind
@@ -1257,6 +1257,76 @@ function name_to_item(name, range, monacoKind) {
     };
 }
 
+/**
+ * Build a Monaco CompletionItem from a BuiltinInfo stub (richer than name_to_item).
+ * @param {import('./builtins.js').BuiltinInfo} stub
+ * @param {object} range
+ * @param {object} monacoKind
+ * @returns {object}
+ */
+function _builtin_to_item(stub, range, monacoKind) {
+    const kind = stub.kind === 'function' ? monacoKind.Function :
+                 stub.kind === 'class'    ? monacoKind.Class    : monacoKind.Variable;
+    let detail = stub.kind;
+    if (stub.params) {
+        const ps = stub.params.map(function (p) {
+            let s = p.label;
+            if (p.type && p.type !== 'any') s += ': ' + p.type;
+            return s;
+        }).join(', ');
+        detail = '(' + ps + ')';
+        if (stub.return_type && stub.return_type !== 'None') {
+            detail += ' → ' + stub.return_type;
+        }
+    } else if (stub.return_type) {
+        detail = stub.return_type;
+    }
+    return {
+        label:         stub.name,
+        kind,
+        detail,
+        documentation: stub.doc || undefined,
+        sortText:      '2_' + stub.name,
+        insertText:    stub.name,
+        range,
+    };
+}
+
+/**
+ * Build a Monaco CompletionItem from a DTS TypeInfo member (method or property).
+ * @param {import('./dts.js').TypeInfo} member
+ * @param {object} range
+ * @param {object} monacoKind
+ * @returns {object}
+ */
+function _dts_member_to_item(member, range, monacoKind) {
+    const kind = member.kind === 'method' ? monacoKind.Method : monacoKind.Property;
+    let detail = member.kind;
+    if (member.kind === 'method' && member.params) {
+        const ps = member.params.map(function (p) {
+            let s = p.rest ? '...' : '';
+            s += p.name;
+            if (p.optional) s += '?';
+            return s;
+        }).join(', ');
+        detail = '(' + ps + ')';
+        if (member.return_type && member.return_type !== 'void') {
+            detail += ': ' + member.return_type;
+        }
+    } else if (member.return_type) {
+        detail = member.return_type;
+    }
+    return {
+        label:         member.name,
+        kind,
+        detail,
+        documentation: member.doc || undefined,
+        sortText:      '0_' + member.name,
+        insertText:    member.name,
+        range,
+    };
+}
+
 // ---------------------------------------------------------------------------
 // CompletionEngine
 // ---------------------------------------------------------------------------
@@ -1267,11 +1337,15 @@ class CompletionEngine {
      * @param {object} opts
      * @param {object} [opts.virtualFiles]   module-name → source
      * @param {string[]} [opts.builtinNames] names always available (BASE_BUILTINS + extras)
+     * @param {import('./dts.js').DtsRegistry|null}      [opts.dtsRegistry]      DTS globals for dot completion
+     * @param {import('./builtins.js').BuiltinsRegistry|null} [opts.builtinsRegistry] stubs for rich builtin items
      */
     constructor(analyzer, opts) {
         this._analyzer     = analyzer;
-        this._virtualFiles = opts.virtualFiles || {};
-        this._builtinNames = opts.builtinNames || [];
+        this._virtualFiles = opts.virtualFiles    || {};
+        this._builtinNames = opts.builtinNames    || [];
+        this._dts          = opts.dtsRegistry     || null;
+        this._builtins     = opts.builtinsRegistry || null;
     }
 
     /**
@@ -1327,11 +1401,15 @@ class CompletionEngine {
             }
         }
 
-        // Builtins (lowest priority)
+        // Builtins (lowest priority) — use rich stub item when available
         for (const name of this._builtinNames) {
             if (!seen.has(name) && (!ctx.prefix || name.startsWith(ctx.prefix))) {
                 seen.add(name);
-                items.push(name_to_item(name, range, monacoKind));
+                const stub = this._builtins ? this._builtins.get(name) : null;
+                items.push(stub
+                    ? _builtin_to_item(stub, range, monacoKind)
+                    : name_to_item(name, range, monacoKind)
+                );
             }
         }
 
@@ -1344,35 +1422,56 @@ class CompletionEngine {
         const range = word_range(position, ctx.prefix);
         const items = [];
         const seen  = new Set();
+        let scope_matched = false;
 
-        if (!scopeMap) return items;
+        // 1. ScopeMap lookup — user-defined classes and inferred instances.
+        if (scopeMap) {
+            const obj_sym = scopeMap.getSymbol(
+                ctx.objectName,
+                position.lineNumber,
+                position.column
+            );
 
-        // Resolve the object: direct class name, or instance with inferred_class.
-        const obj_sym = scopeMap.getSymbol(
-            ctx.objectName,
-            position.lineNumber,
-            position.column
-        );
+            let class_name = null;
+            if (obj_sym) {
+                if (obj_sym.kind === 'class') {
+                    class_name = obj_sym.name;
+                } else if (obj_sym.inferred_class) {
+                    class_name = obj_sym.inferred_class;
+                }
+            }
 
-        let class_name = null;
-        if (obj_sym) {
-            if (obj_sym.kind === 'class') {
-                class_name = obj_sym.name;
-            } else if (obj_sym.inferred_class) {
-                class_name = obj_sym.inferred_class;
+            if (class_name) {
+                for (const frame of scopeMap.frames) {
+                    if (frame.kind === 'class' && frame.name === class_name) {
+                        scope_matched = true;
+                        for (const [name, sym] of frame.symbols) {
+                            if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                                if (!seen.has(name)) {
+                                    seen.add(name);
+                                    items.push(symbol_to_item(sym, range, monacoKind, '0'));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        if (class_name) {
-            // Find the class frame in the ScopeMap and emit its symbols.
-            for (const frame of scopeMap.frames) {
-                if (frame.kind === 'class' && frame.name === class_name) {
-                    for (const [name, sym] of frame.symbols) {
-                        if (!ctx.prefix || name.startsWith(ctx.prefix)) {
-                            if (!seen.has(name)) {
-                                seen.add(name);
-                                items.push(symbol_to_item(sym, range, monacoKind, '0'));
-                            }
+        // 2. DTS registry fallback — namespaces / interfaces / classes from .d.ts.
+        //    Skipped when ScopeMap already matched a class (ScopeMap wins).
+        if (!scope_matched && this._dts) {
+            let ti = this._dts.getGlobal(ctx.objectName);
+            // Follow type reference: `var console: Console` → look up `Console`
+            if (ti && !ti.members && ti.return_type) {
+                ti = this._dts.getGlobal(ti.return_type);
+            }
+            if (ti && ti.members) {
+                for (const [name, member] of ti.members) {
+                    if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                        if (!seen.has(name)) {
+                            seen.add(name);
+                            items.push(_dts_member_to_item(member, range, monacoKind));
                         }
                     }
                 }
@@ -1432,6 +1531,1138 @@ class CompletionEngine {
             }
         }
         return items;
+    }
+}
+
+
+// ── signature.js ────────────────────────────────────────────────────────
+
+// signature.js — Signature help provider for the RapydScript language service.
+//
+// Usage:
+//   import { SignatureHelpEngine, detect_call_context } from './signature.js';
+//   const engine = new SignatureHelpEngine();
+//   const help   = engine.getSignatureHelp(scopeMap, position, linePrefix);
+
+// ---------------------------------------------------------------------------
+// Context detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Walk backwards through linePrefix to find the nearest unclosed `(`.
+ * Returns the callee name and which argument position the cursor is in,
+ * or null if the cursor is not inside a call.
+ *
+ * @param {string} linePrefix  text from column 1 up to (but not including) the cursor
+ * @returns {{ callee: string, activeParameter: number }|null}
+ */
+function detect_call_context(linePrefix) {
+    let depth = 0;
+    let paren_pos = -1;
+
+    // Scan backwards to find the outermost unclosed '('
+    for (let i = linePrefix.length - 1; i >= 0; i--) {
+        const ch = linePrefix[i];
+        if (ch === ')') {
+            depth++;
+        } else if (ch === '(') {
+            if (depth === 0) {
+                paren_pos = i;
+                break;
+            }
+            depth--;
+        }
+    }
+
+    if (paren_pos < 0) return null;  // not inside a call
+
+    // Extract the callee: identifier immediately before the '('
+    const before_paren = linePrefix.slice(0, paren_pos).trimEnd();
+    const callee_match = before_paren.match(/(\w+)$/);
+    if (!callee_match) return null;
+
+    // Count commas at depth 0 between the '(' and the cursor
+    let active_param = 0;
+    let inner_depth  = 0;
+    for (let j = paren_pos + 1; j < linePrefix.length; j++) {
+        const ch = linePrefix[j];
+        if (ch === '(' || ch === '[') {
+            inner_depth++;
+        } else if (ch === ')' || ch === ']') {
+            inner_depth--;
+        } else if (ch === ',' && inner_depth === 0) {
+            active_param++;
+        }
+    }
+
+    return { callee: callee_match[1], activeParameter: active_param };
+}
+
+// ---------------------------------------------------------------------------
+// SignatureHelpEngine
+// ---------------------------------------------------------------------------
+
+class SignatureHelpEngine {
+
+    /**
+     * @param {import('./builtins.js').BuiltinsRegistry|null} [builtinsRegistry]
+     *   Optional built-in stubs; used as fallback when the callee is not in ScopeMap.
+     */
+    constructor(builtinsRegistry) {
+        this._builtins = builtinsRegistry || null;
+    }
+
+    /**
+     * Return a Monaco ISignatureHelpResult for the cursor position, or null
+     * if the cursor is not inside a known function call.
+     *
+     * Priority: ScopeMap (user-defined) → built-in stubs.
+     *
+     * @param {import('./scope.js').ScopeMap|null} scopeMap
+     * @param {{lineNumber:number,column:number}} position  1-indexed Monaco position
+     * @param {string} linePrefix  text on the current line up to the cursor
+     * @returns {{ value: object, dispose: function }|null}
+     */
+    getSignatureHelp(scopeMap, position, linePrefix) {
+        const ctx = detect_call_context(linePrefix);
+        if (!ctx) return null;
+
+        // 1. User-defined function from ScopeMap
+        if (scopeMap) {
+            const sym = scopeMap.getSymbol(ctx.callee, position.lineNumber, position.column);
+            if (sym && sym.params && sym.params.length > 0) {
+                const param_labels = sym.params.map(function (p) {
+                    if (p.is_kwargs) return '**' + p.name;
+                    if (p.is_rest)   return '*'  + p.name;
+                    return p.name;
+                });
+
+                let active = ctx.activeParameter;
+                if (active > param_labels.length - 1) active = param_labels.length - 1;
+
+                return {
+                    value: {
+                        signatures: [{
+                            label:         ctx.callee + '(' + param_labels.join(', ') + ')',
+                            documentation: sym.doc || undefined,
+                            parameters:    param_labels.map(function (l) { return { label: l }; }),
+                        }],
+                        activeSignature: 0,
+                        activeParameter: active,
+                    },
+                    dispose: function () {},
+                };
+            }
+        }
+
+        // 2. Built-in stubs
+        if (this._builtins) {
+            const info = this._builtins.getSignatureInfo(ctx.callee);
+            if (info) {
+                let active = ctx.activeParameter;
+                if (active > info.params.length - 1) active = info.params.length - 1;
+
+                return {
+                    value: {
+                        signatures: [{
+                            label:         info.label,
+                            documentation: info.doc || undefined,
+                            parameters:    info.params,
+                        }],
+                        activeSignature: 0,
+                        activeParameter: active,
+                    },
+                    dispose: function () {},
+                };
+            }
+        }
+
+        return null;
+    }
+}
+
+
+// ── dts.js ──────────────────────────────────────────────────────────────
+
+// dts.js — Minimal .d.ts parser and type registry for the RapydScript language service.
+//
+// Parses a useful subset of TypeScript declaration syntax:
+//   declare var / let / const name: Type;
+//   declare function name(params): ReturnType;
+//   declare class Name { ... }
+//   interface Name { ... }
+//   declare namespace Name { ... }
+//   type Alias = Type;
+//
+// Usage:
+//   import { DtsRegistry } from './dts.js';
+//   const reg = new DtsRegistry();
+//   reg.addDts('lib.dom', dtsText);
+//   reg.getGlobalNames();          // string[]
+//   reg.getGlobal('alert');        // TypeInfo | null
+//   reg.getHoverMarkdown('alert'); // string  | null
+
+// ---------------------------------------------------------------------------
+// TypeInfo
+// ---------------------------------------------------------------------------
+
+class TypeInfo {
+    /**
+     * @param {object} opts
+     * @param {string}   opts.name
+     * @param {string}   opts.kind  'var'|'function'|'class'|'interface'|'namespace'|'method'|'property'
+     * @param {Array|null}  [opts.params]       [{name,type,optional,rest}]
+     * @param {string|null} [opts.return_type]
+     * @param {Map|null}    [opts.members]      Map<string, TypeInfo>
+     * @param {string|null} [opts.doc]
+     * @param {string}      [opts.source]       'dts'
+     */
+    constructor(opts) {
+        this.name        = opts.name;
+        this.kind        = opts.kind;
+        this.params      = opts.params      || null;
+        this.return_type = opts.return_type || null;
+        this.members     = opts.members     || null;
+        this.doc         = opts.doc         || null;
+        this.source      = opts.source      || 'dts';
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Low-level helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Find the index of the closing parenthesis that matches the opening one at
+ * `start` in `str`.  Returns -1 if not found.
+ */
+function find_close_paren(str, start) {
+    let depth = 0;
+    for (let i = start; i < str.length; i++) {
+        if (str[i] === '(')      depth++;
+        else if (str[i] === ')') { depth--; if (depth === 0) return i; }
+    }
+    return -1;
+}
+
+/**
+ * Split a parameter list string on commas at depth 0, respecting
+ * generic brackets `<>`, parens `()`, and square brackets `[]`.
+ */
+function split_params(s) {
+    const parts = [];
+    let depth = 0;
+    let cur   = '';
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (ch === '<' || ch === '(' || ch === '[' || ch === '{') depth++;
+        else if (ch === '>' || ch === ')' || ch === ']' || ch === '}') depth--;
+        else if (ch === ',' && depth === 0) {
+            parts.push(cur.trim());
+            cur = '';
+            continue;
+        }
+        cur += ch;
+    }
+    if (cur.trim()) parts.push(cur.trim());
+    return parts;
+}
+
+/**
+ * Parse a single parameter token like `name: Type`, `name?: Type`,
+ * `...name: Type[]` into `{name, type, optional, rest}`.
+ */
+function parse_one_param(s) {
+    const rest = s.startsWith('...');
+    if (rest) s = s.slice(3);
+
+    const colon = s.indexOf(':');
+    let name, type;
+    if (colon !== -1) {
+        name = s.slice(0, colon).replace(/\?$/, '').trim();
+        type = s.slice(colon + 1).trim();
+    } else {
+        name = s.replace(/\?$/, '').trim();
+        type = 'any';
+    }
+    const optional = colon !== -1
+        ? s.slice(0, colon).trimEnd().endsWith('?')
+        : s.trimEnd().endsWith('?');
+
+    return { name, type, optional, rest };
+}
+
+/**
+ * Parse a `(...)` parameter section from a declaration string.
+ * `decl` is the portion of text starting with `(`.
+ * Returns `{ params, rest }` where `rest` is the text after the closing `)`.
+ */
+function parse_params_from(decl) {
+    if (!decl.startsWith('(')) return { params: [], rest: decl };
+    const close = find_close_paren(decl, 0);
+    if (close < 0) return { params: [], rest: '' };
+    const inner  = decl.slice(1, close);
+    const rest   = decl.slice(close + 1);
+    const params = inner.trim()
+        ? split_params(inner).map(parse_one_param)
+        : [];
+    return { params, rest };
+}
+
+/**
+ * Extract the return type from text like `: ReturnType;` or `): ReturnType {`.
+ * Returns null if no type annotation is found.
+ */
+function parse_return_type(s) {
+    const m = s.match(/^\s*:\s*(.+?)(?:\s*[;{]|$)/);
+    return m ? m[1].trim() : null;
+}
+
+/**
+ * Collect lines from a `/**...* /` block and return the trimmed doc text.
+ */
+function extract_jsdoc(lines) {
+    const text = lines
+        .map(l => l
+            .replace(/^\s*\/\*\*?\s?/, '')
+            .replace(/\*\/$/, '')
+            .replace(/^\s*\*\s?/, '')
+            .trim()
+        )
+        .filter(l => l.length > 0)
+        .join(' ');
+    return text || null;
+}
+
+// ---------------------------------------------------------------------------
+// Block body collector
+// ---------------------------------------------------------------------------
+
+/**
+ * Starting at line index `i`, collect all text up to and including the
+ * matching closing `}`, tracking brace depth.
+ * Returns `{ body, next_i }`.
+ */
+function collect_block(lines, i) {
+    const body_lines = [];
+    let depth = 0;
+    while (i < lines.length) {
+        const l = lines[i];
+        for (const ch of l) {
+            if (ch === '{') depth++;
+            else if (ch === '}') depth--;
+        }
+        body_lines.push(l);
+        i++;
+        if (depth === 0 && body_lines.length > 0) break;
+    }
+    const joined = body_lines.join('\n');
+    const open   = joined.indexOf('{');
+    const close  = joined.lastIndexOf('}');
+    const inner  = (open >= 0 && close > open) ? joined.slice(open + 1, close) : '';
+    return { inner, next_i: i };
+}
+
+// ---------------------------------------------------------------------------
+// Member parser (inside class / interface / namespace bodies)
+// ---------------------------------------------------------------------------
+
+function parse_members(text) {
+    const members = new Map();
+    const lines   = text.split('\n');
+    let jsdoc_lines = [];
+    let i = 0;
+
+    while (i < lines.length) {
+        const raw  = lines[i];
+        const line = raw.trim();
+
+        // JSDoc block
+        if (line.startsWith('/**') || (line.startsWith('/*') && !line.startsWith('*/'))  ) {
+            jsdoc_lines = [line];
+            // If the block isn't closed on this line, keep reading
+            if (!line.includes('*/')) {
+                i++;
+                while (i < lines.length && !lines[i].includes('*/')) {
+                    jsdoc_lines.push(lines[i].trim());
+                    i++;
+                }
+                if (i < lines.length) { jsdoc_lines.push(lines[i].trim()); i++; }
+            } else {
+                i++;
+            }
+            continue;
+        }
+
+        if (line.startsWith('//') || !line) {
+            if (!line) jsdoc_lines = [];
+            i++;
+            continue;
+        }
+
+        const doc = extract_jsdoc(jsdoc_lines);
+        jsdoc_lines = [];
+
+        // Strip access modifiers and declaration keywords
+        let l = line.replace(
+            /^(?:static\s+|readonly\s+|abstract\s+|override\s+|protected\s+|private\s+|public\s+)*/,
+            ''
+        ).trim();
+        // Inside namespaces, members can be prefixed with function/const/let/var
+        const fn_kw = l.match(/^function\s+/);
+        if (fn_kw) l = l.slice(fn_kw[0].length).trim();
+        const var_kw = l.match(/^(?:const|let|var)\s+/);
+        if (var_kw) l = l.slice(var_kw[0].length).trim();
+
+        // Skip index signatures [key: Type]: Type
+        if (l.startsWith('[')) { i++; continue; }
+
+        // Skip nested blocks (e.g. nested namespace)
+        if (/^(?:class|interface|namespace|module)\s/.test(l)) { i++; continue; }
+
+        // method(...): ReturnType; or method(...) {
+        const paren_idx = l.indexOf('(');
+        if (paren_idx > 0) {
+            const name = l.slice(0, paren_idx).replace(/[?<].*$/, '').trim();
+            if (name && /^\w+$/.test(name) && name !== 'constructor') {
+                const after_name = l.slice(paren_idx);
+                const { params, rest } = parse_params_from(after_name);
+                const return_type = parse_return_type(rest);
+                members.set(name, new TypeInfo({
+                    name,
+                    kind:  'method',
+                    params,
+                    return_type,
+                    doc,
+                }));
+            }
+            i++;
+            continue;
+        }
+
+        // property: Type;
+        const prop_m = l.match(/^(\w+)\??\s*:\s*(.+?)\s*[;,]?$/);
+        if (prop_m) {
+            members.set(prop_m[1], new TypeInfo({
+                name:        prop_m[1],
+                kind:        'property',
+                return_type: prop_m[2],
+                doc,
+            }));
+            i++;
+            continue;
+        }
+
+        i++;
+    }
+
+    return members;
+}
+
+// ---------------------------------------------------------------------------
+// Top-level parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a .d.ts file and return an array of TypeInfo objects (top-level only).
+ * @param {string} text
+ * @returns {TypeInfo[]}
+ */
+function parse_dts(text) {
+    const lines   = text.split('\n');
+    const results = [];
+    let jsdoc_lines = [];
+    let i = 0;
+
+    while (i < lines.length) {
+        const raw  = lines[i];
+        const line = raw.trim();
+
+        // Accumulate JSDoc
+        if (line.startsWith('/**') || (line.startsWith('/*') && !line.startsWith('*/'))) {
+            jsdoc_lines = [line];
+            if (!line.includes('*/')) {
+                i++;
+                while (i < lines.length && !lines[i].includes('*/')) {
+                    jsdoc_lines.push(lines[i].trim());
+                    i++;
+                }
+                if (i < lines.length) { jsdoc_lines.push(lines[i].trim()); i++; }
+            } else {
+                i++;
+            }
+            continue;
+        }
+
+        if (line.startsWith('//') || !line) {
+            if (!line) jsdoc_lines = [];
+            i++;
+            continue;
+        }
+
+        const doc = extract_jsdoc(jsdoc_lines);
+        jsdoc_lines = [];
+
+        // Strip `export` and `declare` prefixes
+        let l = line
+            .replace(/^export\s+default\s+/, '')
+            .replace(/^export\s+/, '')
+            .replace(/^declare\s+/, '')
+            .trim();
+
+        // ── var / let / const ──────────────────────────────────────────────
+        const var_m = l.match(/^(?:var|let|const)\s+(\w+)\s*(?::\s*(.+?))?\s*[;=]/);
+        if (var_m) {
+            results.push(new TypeInfo({
+                name:        var_m[1],
+                kind:        'var',
+                return_type: var_m[2] ? var_m[2].trim() : null,
+                doc,
+            }));
+            i++;
+            continue;
+        }
+
+        // ── function ───────────────────────────────────────────────────────
+        const fn_paren = l.indexOf('(');
+        const fn_m     = fn_paren > 0 && l.match(/^function\s+(\w+)/);
+        if (fn_m) {
+            const name        = fn_m[1];
+            const after_name  = l.slice(l.indexOf('('));
+            const { params, rest } = parse_params_from(after_name);
+            const return_type = parse_return_type(rest);
+            results.push(new TypeInfo({ name, kind: 'function', params, return_type, doc }));
+            i++;
+            continue;
+        }
+
+        // ── class / interface / abstract class / namespace / module ────────
+        const block_m = l.match(/^(abstract\s+class|class|interface|namespace|module)\s+(\w+)/);
+        if (block_m) {
+            const kind_raw = block_m[1].replace('abstract ', '').trim();
+            const kind     = (kind_raw === 'module') ? 'namespace' : kind_raw;
+            const name     = block_m[2];
+
+            if (l.includes('{')) {
+                // Block opens on this line — collect to matching '}'
+                const { inner, next_i } = collect_block(lines, i);
+                const members = parse_members(inner);
+                results.push(new TypeInfo({ name, kind, members, doc }));
+                i = next_i;
+            } else {
+                // Declaration without body (e.g. `declare class Foo;`)
+                results.push(new TypeInfo({ name, kind, doc }));
+                i++;
+            }
+            continue;
+        }
+
+        // ── type alias (no body extracted — just register the name) ────────
+        const type_m = l.match(/^type\s+(\w+)\s*(?:<[^>]*>)?\s*=/);
+        if (type_m) {
+            results.push(new TypeInfo({ name: type_m[1], kind: 'var', doc }));
+            i++;
+            continue;
+        }
+
+        i++;
+        jsdoc_lines = [];
+    }
+
+    return results;
+}
+
+// ---------------------------------------------------------------------------
+// DtsRegistry
+// ---------------------------------------------------------------------------
+
+class DtsRegistry {
+    constructor() {
+        this._globals = new Map();  // name → TypeInfo
+    }
+
+    /**
+     * Parse and register a .d.ts file.  Calling this multiple times merges
+     * all declarations into the same global namespace.
+     * @param {string} _name   a label for this file (reserved for future dedup)
+     * @param {string} text    the .d.ts source text
+     */
+    addDts(_name, text) {
+        const types = parse_dts(text);
+        for (const ti of types) {
+            this._globals.set(ti.name, ti);
+        }
+    }
+
+    /**
+     * Return all registered global symbol names.
+     * @returns {string[]}
+     */
+    getGlobalNames() {
+        return Array.from(this._globals.keys());
+    }
+
+    /**
+     * Return the TypeInfo for a name, or null.
+     * @param {string} name
+     * @returns {TypeInfo|null}
+     */
+    getGlobal(name) {
+        return this._globals.get(name) || null;
+    }
+
+    /**
+     * Return a Monaco hover markdown string for a name, or null.
+     * @param {string} name
+     * @returns {string|null}
+     */
+    getHoverMarkdown(name) {
+        const ti = this.getGlobal(name);
+        return ti ? build_dts_hover(ti) : null;
+    }
+
+    /**
+     * Return completion-style member names for a type (used for dot-completion
+     * on .d.ts-typed variables when Phase 6 type inference is wired up).
+     * @param {string} name
+     * @returns {string[]}
+     */
+    getMemberNames(name) {
+        const ti = this.getGlobal(name);
+        if (!ti || !ti.members) return [];
+        return Array.from(ti.members.keys());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DTS hover rendering
+// ---------------------------------------------------------------------------
+
+function build_dts_sig(ti) {
+    if (ti.kind === 'function' || ti.kind === 'method') {
+        const param_str = ti.params
+            ? ti.params.map(function (p) {
+                let s = p.rest ? '...' : '';
+                s += p.name;
+                if (p.optional) s += '?';
+                if (p.type && p.type !== 'any') s += ': ' + p.type;
+                return s;
+            }).join(', ')
+            : '';
+        let sig = '(' + ti.kind + ') ' + ti.name + '(' + param_str + ')';
+        if (ti.return_type && ti.return_type !== 'void') sig += ': ' + ti.return_type;
+        return sig;
+    }
+    if (ti.kind === 'property' || ti.kind === 'var') {
+        let sig = '(' + ti.kind + ') ' + ti.name;
+        if (ti.return_type) sig += ': ' + ti.return_type;
+        return sig;
+    }
+    return '(' + ti.kind + ') ' + ti.name;
+}
+
+function build_dts_hover(ti) {
+    const sig = build_dts_sig(ti);
+    let md = '```typescript\n' + sig + '\n```';
+    if (ti.doc) md += '\n\n' + ti.doc;
+    return md;
+}
+
+
+// ── builtins.js ─────────────────────────────────────────────────────────
+
+// builtins.js — Typed stubs for RapydScript / Python built-in functions.
+//
+// Provides hover docs, signature help, and richer completion detail for
+// functions that are always available in RapydScript without any import.
+//
+// Public API:
+//   import { BuiltinsRegistry } from './builtins.js';
+//   const reg = new BuiltinsRegistry();
+//   reg.get('len');              // BuiltinInfo | null
+//   reg.getNames();              // string[]
+//   reg.getHoverMarkdown('len'); // string | null
+//   reg.getSignatureInfo('len'); // SignatureInfo | null
+
+// ---------------------------------------------------------------------------
+// BuiltinInfo
+// ---------------------------------------------------------------------------
+
+/**
+ * Descriptor for a single built-in symbol.
+ *
+ * @typedef {{ label: string, type?: string, optional?: boolean, rest?: boolean }} BParam
+ */
+class BuiltinInfo {
+    /**
+     * @param {object} opts
+     * @param {string}   opts.name
+     * @param {string}   [opts.kind='function']   'function' | 'class' | 'var'
+     * @param {BParam[]|null} [opts.params]
+     * @param {string|null}   [opts.return_type]
+     * @param {string|null}   [opts.doc]
+     */
+    constructor(opts) {
+        this.name        = opts.name;
+        this.kind        = opts.kind        || 'function';
+        this.params      = opts.params      || null;
+        this.return_type = opts.return_type || null;
+        this.doc         = opts.doc         || null;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stub definitions
+// ---------------------------------------------------------------------------
+
+/** Shorthand for building a param descriptor. */
+function p(label, opts) {
+    return Object.assign({ label }, opts || {});
+}
+
+const STUBS = [
+    // ── Python built-ins ──────────────────────────────────────────────────
+    new BuiltinInfo({ name: 'abs',
+        params: [p('x', { type: 'number' })],
+        return_type: 'number',
+        doc: 'Return the absolute value of x.' }),
+
+    new BuiltinInfo({ name: 'all',
+        params: [p('iterable')],
+        return_type: 'bool',
+        doc: 'Return True if all elements of the iterable are true (or if the iterable is empty).' }),
+
+    new BuiltinInfo({ name: 'any',
+        params: [p('iterable')],
+        return_type: 'bool',
+        doc: 'Return True if any element of the iterable is true.' }),
+
+    new BuiltinInfo({ name: 'bool', kind: 'class',
+        params: [p('x', { optional: true })],
+        return_type: 'bool',
+        doc: 'Return a Boolean value. x is converted using the standard truth-testing procedure.' }),
+
+    new BuiltinInfo({ name: 'callable',
+        params: [p('obj')],
+        return_type: 'bool',
+        doc: 'Return True if the object appears callable.' }),
+
+    new BuiltinInfo({ name: 'chr',
+        params: [p('i', { type: 'int' })],
+        return_type: 'str',
+        doc: 'Return the string representing a character at Unicode code point i.' }),
+
+    new BuiltinInfo({ name: 'dict', kind: 'class',
+        params: [p('**kwargs', { rest: true })],
+        return_type: 'dict',
+        doc: 'Create a new dictionary.' }),
+
+    new BuiltinInfo({ name: 'dir',
+        params: [p('obj', { optional: true })],
+        return_type: 'list',
+        doc: 'Without argument, return the list of names in the current local scope. With argument, return a list of attributes of that object.' }),
+
+    new BuiltinInfo({ name: 'divmod',
+        params: [p('a', { type: 'number' }), p('b', { type: 'number' })],
+        return_type: '[int, int]',
+        doc: 'Return (a // b, a % b) as a pair.' }),
+
+    new BuiltinInfo({ name: 'enumerate',
+        params: [p('iterable'), p('start', { type: 'int', optional: true })],
+        return_type: 'iterable',
+        doc: 'Return an enumerate object yielding (index, value) pairs.' }),
+
+    new BuiltinInfo({ name: 'filter',
+        params: [p('function'), p('iterable')],
+        return_type: 'iterable',
+        doc: 'Return an iterator of elements from iterable for which function returns true.' }),
+
+    new BuiltinInfo({ name: 'float', kind: 'class',
+        params: [p('x', { optional: true })],
+        return_type: 'float',
+        doc: 'Return a floating-point number from x.' }),
+
+    new BuiltinInfo({ name: 'getattr',
+        params: [p('obj'), p('name', { type: 'str' }), p('default', { optional: true })],
+        return_type: 'any',
+        doc: 'Return the value of the named attribute of obj. If not found, return default (or raise AttributeError).' }),
+
+    new BuiltinInfo({ name: 'hasattr',
+        params: [p('obj'), p('name', { type: 'str' })],
+        return_type: 'bool',
+        doc: 'Return True if obj has an attribute with the given name.' }),
+
+    new BuiltinInfo({ name: 'hex',
+        params: [p('x', { type: 'int' })],
+        return_type: 'str',
+        doc: 'Return the hexadecimal representation of an integer.' }),
+
+    new BuiltinInfo({ name: 'id',
+        params: [p('obj')],
+        return_type: 'int',
+        doc: 'Return the identity of an object.' }),
+
+    new BuiltinInfo({ name: 'int', kind: 'class',
+        params: [p('x', { optional: true }), p('base', { type: 'int', optional: true })],
+        return_type: 'int',
+        doc: 'Return an integer from x, optionally in the given base.' }),
+
+    new BuiltinInfo({ name: 'isinstance',
+        params: [p('obj'), p('classinfo')],
+        return_type: 'bool',
+        doc: 'Return True if obj is an instance of classinfo (or a subclass thereof).' }),
+
+    new BuiltinInfo({ name: 'iter',
+        params: [p('obj')],
+        return_type: 'iterator',
+        doc: 'Return an iterator object for obj.' }),
+
+    new BuiltinInfo({ name: 'len',
+        params: [p('s')],
+        return_type: 'int',
+        doc: 'Return the number of items in a container.' }),
+
+    new BuiltinInfo({ name: 'list', kind: 'class',
+        params: [p('iterable', { optional: true })],
+        return_type: 'list',
+        doc: 'Create a list from an iterable, or an empty list.' }),
+
+    new BuiltinInfo({ name: 'map',
+        params: [p('function'), p('iterable'), p('*iterables', { rest: true })],
+        return_type: 'iterable',
+        doc: 'Return an iterator applying function to each item of iterable.' }),
+
+    new BuiltinInfo({ name: 'max',
+        params: [p('iterable'), p('*args', { rest: true })],
+        return_type: 'any',
+        doc: 'Return the largest item in an iterable or the largest of two or more arguments.' }),
+
+    new BuiltinInfo({ name: 'min',
+        params: [p('iterable'), p('*args', { rest: true })],
+        return_type: 'any',
+        doc: 'Return the smallest item in an iterable or the smallest of two or more arguments.' }),
+
+    new BuiltinInfo({ name: 'ord',
+        params: [p('c', { type: 'str' })],
+        return_type: 'int',
+        doc: 'Return the Unicode code point integer for a one-character string.' }),
+
+    new BuiltinInfo({ name: 'pow',
+        params: [p('base', { type: 'number' }), p('exp', { type: 'number' }), p('mod', { optional: true })],
+        return_type: 'number',
+        doc: 'Return base raised to the power exp, optionally modulo mod.' }),
+
+    new BuiltinInfo({ name: 'print',
+        params: [p('*args', { rest: true })],
+        return_type: 'None',
+        doc: 'Print objects to the console, separated by sep and followed by end.' }),
+
+    new BuiltinInfo({ name: 'range',
+        params: [p('start_or_stop', { type: 'int' }), p('stop', { type: 'int', optional: true }), p('step', { type: 'int', optional: true })],
+        return_type: 'range',
+        doc: 'Return a sequence of numbers. range(stop) counts from 0. range(start, stop[, step]) counts from start.' }),
+
+    new BuiltinInfo({ name: 'repr',
+        params: [p('obj')],
+        return_type: 'str',
+        doc: 'Return a string containing a printable representation of obj.' }),
+
+    new BuiltinInfo({ name: 'reversed',
+        params: [p('seq')],
+        return_type: 'iterator',
+        doc: 'Return a reverse iterator over a sequence.' }),
+
+    new BuiltinInfo({ name: 'round',
+        params: [p('number', { type: 'number' }), p('ndigits', { type: 'int', optional: true })],
+        return_type: 'number',
+        doc: 'Round number to ndigits decimal places (default 0).' }),
+
+    new BuiltinInfo({ name: 'set', kind: 'class',
+        params: [p('iterable', { optional: true })],
+        return_type: 'set',
+        doc: 'Create a new set, optionally populated from an iterable.' }),
+
+    new BuiltinInfo({ name: 'setattr',
+        params: [p('obj'), p('name', { type: 'str' }), p('value')],
+        return_type: 'None',
+        doc: 'Set the named attribute on obj to value.' }),
+
+    new BuiltinInfo({ name: 'sorted',
+        params: [p('iterable'), p('key', { optional: true }), p('reverse', { type: 'bool', optional: true })],
+        return_type: 'list',
+        doc: 'Return a new sorted list from the items in iterable.' }),
+
+    new BuiltinInfo({ name: 'str', kind: 'class',
+        params: [p('obj', { optional: true })],
+        return_type: 'str',
+        doc: 'Return a string version of obj.' }),
+
+    new BuiltinInfo({ name: 'sum',
+        params: [p('iterable'), p('start', { optional: true })],
+        return_type: 'number',
+        doc: 'Sum the items of iterable, optionally starting from start (default 0).' }),
+
+    new BuiltinInfo({ name: 'type',
+        params: [p('obj')],
+        return_type: 'type',
+        doc: 'Return the type of an object.' }),
+
+    new BuiltinInfo({ name: 'zip',
+        params: [p('*iterables', { rest: true })],
+        return_type: 'iterable',
+        doc: 'Return an iterator of tuples, where each tuple groups the i-th element from each iterable.' }),
+
+    // ── RapydScript-specific ──────────────────────────────────────────────
+    new BuiltinInfo({ name: 'jstype',
+        params: [p('x')],
+        return_type: 'str',
+        doc: 'Return the JavaScript typeof string for x (e.g. "number", "string", "object").' }),
+
+    new BuiltinInfo({ name: 'repr',
+        params: [p('obj')],
+        return_type: 'str',
+        doc: 'Return a developer-friendly string representation of obj.' }),
+
+    // ── JS globals ────────────────────────────────────────────────────────
+    new BuiltinInfo({ name: 'parseInt',
+        params: [p('string', { type: 'str' }), p('radix', { type: 'int', optional: true })],
+        return_type: 'int',
+        doc: 'Parse a string and return an integer. Specify radix for the base (e.g. 16 for hex).' }),
+
+    new BuiltinInfo({ name: 'parseFloat',
+        params: [p('string', { type: 'str' })],
+        return_type: 'float',
+        doc: 'Parse a string and return a floating-point number.' }),
+
+    new BuiltinInfo({ name: 'isNaN',
+        params: [p('value')],
+        return_type: 'bool',
+        doc: 'Return True if value is NaN (Not a Number).' }),
+
+    new BuiltinInfo({ name: 'isFinite',
+        params: [p('value')],
+        return_type: 'bool',
+        doc: 'Return True if value is a finite number.' }),
+
+    new BuiltinInfo({ name: 'setTimeout',
+        params: [p('callback'), p('delay', { type: 'number' }), p('*args', { rest: true })],
+        return_type: 'int',
+        doc: 'Call callback after delay milliseconds. Returns a timeout ID.' }),
+
+    new BuiltinInfo({ name: 'setInterval',
+        params: [p('callback'), p('delay', { type: 'number' })],
+        return_type: 'int',
+        doc: 'Call callback repeatedly at every delay milliseconds. Returns an interval ID.' }),
+
+    new BuiltinInfo({ name: 'clearTimeout',
+        params: [p('id', { type: 'int' })],
+        return_type: 'None',
+        doc: 'Cancel a timeout set with setTimeout.' }),
+
+    new BuiltinInfo({ name: 'clearInterval',
+        params: [p('id', { type: 'int' })],
+        return_type: 'None',
+        doc: 'Cancel an interval set with setInterval.' }),
+
+    new BuiltinInfo({ name: 'encodeURIComponent',
+        params: [p('str', { type: 'str' })],
+        return_type: 'str',
+        doc: 'Encode a URI component by escaping special characters.' }),
+
+    new BuiltinInfo({ name: 'decodeURIComponent',
+        params: [p('str', { type: 'str' })],
+        return_type: 'str',
+        doc: 'Decode a URI component previously encoded with encodeURIComponent.' }),
+];
+
+// ---------------------------------------------------------------------------
+// BuiltinsRegistry
+// ---------------------------------------------------------------------------
+
+class BuiltinsRegistry {
+    constructor() {
+        this._stubs = new Map();
+        for (const stub of STUBS) {
+            this._stubs.set(stub.name, stub);
+        }
+    }
+
+    /**
+     * Return the BuiltinInfo for name, or null.
+     * @param {string} name
+     * @returns {BuiltinInfo|null}
+     */
+    get(name) {
+        return this._stubs.get(name) || null;
+    }
+
+    /**
+     * Return all registered stub names.
+     * @returns {string[]}
+     */
+    getNames() {
+        return Array.from(this._stubs.keys());
+    }
+
+    /**
+     * Return hover markdown for a built-in, or null.
+     * @param {string} name
+     * @returns {string|null}
+     */
+    getHoverMarkdown(name) {
+        const stub = this.get(name);
+        if (!stub) return null;
+        const sig = _build_sig(stub);
+        let md = '```python\n' + sig + '\n```';
+        if (stub.doc) md += '\n\n' + stub.doc;
+        return md;
+    }
+
+    /**
+     * Return Monaco-compatible signature info for a built-in, or null.
+     * @param {string} name
+     * @returns {{ label: string, params: {label: string}[], doc: string|null }|null}
+     */
+    getSignatureInfo(name) {
+        const stub = this.get(name);
+        if (!stub || !stub.params) return null;
+        const param_strs = stub.params.map(_param_label);
+        const label = stub.name + '(' + param_strs.join(', ') + ')';
+        return {
+            label,
+            params: param_strs.map(function (s) { return { label: s }; }),
+            doc:    stub.doc,
+        };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rendering helpers
+// ---------------------------------------------------------------------------
+
+function _param_label(p) {
+    let s = p.label;
+    if (p.type && p.type !== 'any') s += ': ' + p.type;
+    if (p.optional) s += '?';
+    return s;
+}
+
+function _build_sig(stub) {
+    const ps = stub.params ? stub.params.map(_param_label).join(', ') : '';
+    let sig = stub.name + '(' + ps + ')';
+    if (stub.return_type && stub.return_type !== 'None') sig += ' → ' + stub.return_type;
+    return sig;
+}
+
+
+// ── hover.js ────────────────────────────────────────────────────────────
+
+// hover.js — Hover provider for the RapydScript language service.
+//
+// Usage:
+//   import { HoverEngine } from './hover.js';
+//   const engine = new HoverEngine();
+//   const hover  = engine.getHover(scopeMap, position, word);
+
+// ---------------------------------------------------------------------------
+// Rendering helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a one-line signature string for a symbol.
+ * Examples:
+ *   (function) add(x, y)
+ *   (class) Dog
+ *   (variable) my_var
+ *   (import) math
+ *
+ * @param {import('./scope.js').SymbolInfo} sym
+ * @returns {string}
+ */
+function build_signature(sym) {
+    const kind_label = '(' + sym.kind + ') ';
+
+    if ((sym.kind === 'function' || sym.kind === 'method') && sym.params) {
+        const param_str = sym.params.map(function (p) {
+            if (p.is_kwargs) return '**' + p.name;
+            if (p.is_rest)   return '*'  + p.name;
+            return p.name;
+        }).join(', ');
+        return kind_label + sym.name + '(' + param_str + ')';
+    }
+
+    return kind_label + sym.name;
+}
+
+/**
+ * Build the full markdown hover string for a symbol.
+ * Returns a fenced code block for the signature, plus the docstring if present.
+ *
+ * @param {import('./scope.js').SymbolInfo} sym
+ * @returns {string}
+ */
+function build_hover_markdown(sym) {
+    const sig = build_signature(sym);
+
+    // Use a code block so Monaco renders it with syntax highlighting
+    let md = '```\n' + sig + '\n```';
+
+    if (sym.doc) {
+        md += '\n\n' + sym.doc;
+    }
+
+    return md;
+}
+
+// ---------------------------------------------------------------------------
+// HoverEngine
+// ---------------------------------------------------------------------------
+
+class HoverEngine {
+
+    /**
+     * @param {import('./dts.js').DtsRegistry|null}      [dtsRegistry]
+     * @param {import('./builtins.js').BuiltinsRegistry|null} [builtinsRegistry]
+     */
+    constructor(dtsRegistry, builtinsRegistry) {
+        this._dts     = dtsRegistry      || null;
+        this._builtins = builtinsRegistry || null;
+    }
+
+    /**
+     * Return a Monaco IHover for the word under the cursor.
+     * Priority: ScopeMap (user-defined) → DTS (.d.ts globals) → builtins.
+     * Returns null if the word is not found in any source.
+     *
+     * @param {import('./scope.js').ScopeMap|null} scopeMap
+     * @param {{lineNumber:number,column:number}} position  1-indexed Monaco position
+     * @param {string|null} word  the identifier under the cursor (from model.getWordAtPosition)
+     * @returns {{ contents: {value:string}[], range?: object }|null}
+     */
+    getHover(scopeMap, position, word) {
+        if (!word) return null;
+
+        // 1. ScopeMap lookup (user-defined symbols)
+        if (scopeMap) {
+            const sym = scopeMap.getSymbol(word, position.lineNumber, position.column);
+            if (sym) {
+                return { contents: [{ value: build_hover_markdown(sym) }] };
+            }
+        }
+
+        // 2. DTS registry (.d.ts globals)
+        if (this._dts) {
+            const md = this._dts.getHoverMarkdown(word);
+            if (md) return { contents: [{ value: md }] };
+        }
+
+        // 3. Built-in stubs
+        if (this._builtins) {
+            const md = this._builtins.getHoverMarkdown(word);
+            if (md) return { contents: [{ value: md }] };
+        }
+
+        return null;
     }
 }
 
@@ -1527,14 +2758,36 @@ class RapydScriptLanguageService {
         this._diagnostics = new Diagnostics(compiler, options.extraBuiltins);
         this._analyzer    = new SourceAnalyzer(compiler);
 
-        // Merge BASE_BUILTINS with any extra globals for completions
-        const builtin_names = BASE_BUILTINS.concat(
-            options.extraBuiltins ? Object.keys(options.extraBuiltins) : []
-        );
-        this._completions = new CompletionEngine(this._analyzer, {
-            virtualFiles: this._virtualFiles,
-            builtinNames: builtin_names,
+        // DTS registry — load any files supplied at construction time
+        this._dts = new DtsRegistry();
+        if (options.dtsFiles) {
+            options.dtsFiles.forEach(f => this._dts.addDts(f.name, f.content));
+        }
+
+        // Built-in stubs registry (always present)
+        this._builtins = new BuiltinsRegistry();
+
+        // Merge BASE_BUILTINS + extra globals + DTS globals for completions
+        const builtin_names = BASE_BUILTINS
+            .concat(options.extraBuiltins ? Object.keys(options.extraBuiltins) : [])
+            .concat(this._dts.getGlobalNames());
+
+        this._completions    = new CompletionEngine(this._analyzer, {
+            virtualFiles:    this._virtualFiles,
+            builtinNames:    builtin_names,
+            dtsRegistry:     this._dts,
+            builtinsRegistry: this._builtins,
         });
+        this._signature_help = new SignatureHelpEngine(this._builtins);
+        this._hover          = new HoverEngine(this._dts, this._builtins);
+
+        // Suppress diagnostics warnings for DTS globals
+        if (this._dts.getGlobalNames().length) {
+            this._diagnostics.addGlobals(this._dts.getGlobalNames());
+        }
+
+        // Store loadDts callback for lazy loading
+        this._loadDts = options.loadDts || null;
 
         // Register language id if not already registered
         const existing = monaco.languages.getLanguages().find(l => l.id === LANGUAGE_ID);
@@ -1570,6 +2823,40 @@ class RapydScriptLanguageService {
                         line_prefix,
                         monaco.languages.CompletionItemKind
                     );
+                },
+            })
+        );
+
+        // Register signature help provider
+        this._disposables.push(
+            monaco.languages.registerSignatureHelpProvider(LANGUAGE_ID, {
+                signatureHelpTriggerCharacters:   ['(', ','],
+                signatureHelpRetriggerCharacters: [','],
+                provideSignatureHelp(model, position) {
+                    if (model.getLanguageId() !== LANGUAGE_ID) return null;
+                    const state = self._modelStates.get(model);
+                    const scopeMap = state ? state._scopeMap : null;
+                    const line_content = model.getLineContent(position.lineNumber);
+                    const line_prefix  = line_content.substring(0, position.column - 1);
+                    return self._signature_help.getSignatureHelp(
+                        scopeMap,
+                        position,
+                        line_prefix
+                    );
+                },
+            })
+        );
+
+        // Register hover provider
+        this._disposables.push(
+            monaco.languages.registerHoverProvider(LANGUAGE_ID, {
+                provideHover(model, position) {
+                    if (model.getLanguageId() !== LANGUAGE_ID) return null;
+                    const state   = self._modelStates.get(model);
+                    const scopeMap = state ? state._scopeMap : null;
+                    const word_info = model.getWordAtPosition(position);
+                    const word = word_info ? word_info.word : null;
+                    return self._hover.getHover(scopeMap, position, word);
                 },
             })
         );
@@ -1640,10 +2927,43 @@ class RapydScriptLanguageService {
      * @param {string} _name
      * @param {string} _dtsText
      */
-    // eslint-disable-next-line no-unused-vars
-    addDts(_name, _dtsText) {
-        // Phase 6 will implement this.
-        console.warn('RapydScript language service: addDts() not yet implemented (Phase 6).');
+    addDts(name, dtsText) {
+        this._dts.addDts(name, dtsText);
+        const new_names = this._dts.getGlobalNames();
+        // Suppress undef warnings for newly added globals
+        this._diagnostics.addGlobals(new_names);
+        // Rebuild builtin list so completions include new DTS names
+        const builtin_names = BASE_BUILTINS.concat(new_names);
+        this._completions = new CompletionEngine(this._analyzer, {
+            virtualFiles:    this._virtualFiles,
+            builtinNames:    builtin_names,
+            dtsRegistry:     this._dts,
+            builtinsRegistry: this._builtins,
+        });
+        // Re-run diagnostics on all open models
+        this._modelStates.forEach(state => state._schedule(0));
+    }
+
+    /**
+     * Asynchronously fetch a .d.ts file using the `loadDts` callback supplied
+     * in options, then register it with addDts().
+     *
+     * Requires `options.loadDts` to have been provided at construction time.
+     * Returns a Promise that resolves when the file has been parsed and registered.
+     *
+     * @param {string} name  identifier passed to the loadDts callback
+     * @returns {Promise<void>}
+     */
+    loadDts(name) {
+        if (!this._loadDts) {
+            return Promise.reject(
+                new Error('registerRapydScript: options.loadDts was not provided')
+            );
+        }
+        const self = this;
+        return Promise.resolve(this._loadDts(name)).then(function (text) {
+            self.addDts(name, text);
+        });
     }
 
     /**

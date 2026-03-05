@@ -61,13 +61,14 @@ function find_item(list, label) {
 // Test definitions
 // ---------------------------------------------------------------------------
 
-function make_tests(CompletionEngine, detect_context, SourceAnalyzer, RS) {
+function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistry, RS) {
 
-    function make_engine(virtual_files, extra_builtins) {
+    function make_engine(virtual_files, extra_builtins, dts_registry) {
         var analyzer = new SourceAnalyzer(RS);
         return new CompletionEngine(analyzer, {
             virtualFiles: virtual_files || {},
             builtinNames: extra_builtins || ['print', 'len', 'range'],
+            dtsRegistry:  dts_registry  || null,
         });
     }
 
@@ -383,6 +384,125 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, RS) {
             },
         },
 
+        // ── DTS dot completions ───────────────────────────────────────────
+
+        {
+            name: "dot_dts_namespace_members",
+            description: "Dot completion on a DTS namespace returns its members",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "declare namespace Math {",
+                    "    function abs(x: number): number;",
+                    "    function sqrt(x: number): number;",
+                    "    const PI: number;",
+                    "}",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                // null scopeMap — Math is a pure DTS global
+                var list = engine.getCompletions(null, pos(1, 5), "Math.", MockKind);
+                assert_has(list, 'abs',  'Math.abs from DTS');
+                assert_has(list, 'sqrt', 'Math.sqrt from DTS');
+                assert_has(list, 'PI',   'Math.PI from DTS');
+            },
+        },
+
+        {
+            name: "dot_dts_interface_members",
+            description: "Dot completion on a DTS interface returns its members",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface Console {",
+                    "    log(...data: any[]): void;",
+                    "    error(message?: any): void;",
+                    "    warn(message?: any): void;",
+                    "}",
+                    "declare var console: Console;",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var list = engine.getCompletions(null, pos(1, 8), "console.", MockKind);
+                assert_has(list, 'log',   'console.log from DTS');
+                assert_has(list, 'error', 'console.error from DTS');
+                assert_has(list, 'warn',  'console.warn from DTS');
+            },
+        },
+
+        {
+            name: "dot_dts_prefix_filter",
+            description: "DTS dot completion respects prefix filter",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "declare namespace Math {",
+                    "    function abs(x: number): number;",
+                    "    function sqrt(x: number): number;",
+                    "    function sin(x: number): number;",
+                    "}",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var list = engine.getCompletions(null, pos(1, 6), "Math.s", MockKind);
+                assert_has(list,    'sqrt', 'sqrt matches s');
+                assert_has(list,    'sin',  'sin matches s');
+                assert_missing(list,'abs',  'abs does not match s');
+            },
+        },
+
+        {
+            name: "dot_dts_method_item_structure",
+            description: "DTS method completion item has method kind and detail",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "declare namespace JSON {",
+                    "    function stringify(value: any): string;",
+                    "}",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var list = engine.getCompletions(null, pos(1, 5), "JSON.", MockKind);
+                var item = find_item(list, 'stringify');
+                assert.ok(item, 'stringify should be in suggestions');
+                assert.strictEqual(item.kind, MockKind.Method, 'should have Method kind');
+            },
+        },
+
+        {
+            name: "dot_dts_no_registry",
+            description: "Dot completion without DTS registry still works (empty for unknown)",
+            run: function () {
+                var engine = make_engine({}, [], null);
+                var list = engine.getCompletions(null, pos(1, 5), "Math.", MockKind);
+                assert.strictEqual(list.suggestions.length, 0,
+                    'no DTS registry → no Math members');
+            },
+        },
+
+        {
+            name: "dot_scopemap_wins_over_dts",
+            description: "ScopeMap class members take precedence over DTS for same name",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "declare namespace MyClass {",
+                    "    function dts_only(): void;",
+                    "}",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "class MyClass:",
+                    "    def user_method(self):",
+                    "        return 1",
+                    "x = MyClass",
+                    "pass",
+                ].join("\n"), {});
+                // Query at line 5 (pass) — MyClass is in module scope
+                var list = engine.getCompletions(scopeMap, pos(5, 1), "MyClass.", MockKind);
+                assert_has(list,    'user_method', 'ScopeMap method present');
+                assert_missing(list,'dts_only',    'DTS member absent when ScopeMap matches');
+            },
+        },
+
     ];
 
     return TESTS;
@@ -438,19 +558,23 @@ var analyzer_path = url.pathToFileURL(
     path.join(__dirname, "../../src/monaco-language-service/analyzer.js")
 ).href;
 
+var dts_path = url.pathToFileURL(
+    path.join(__dirname, "../../src/monaco-language-service/dts.js")
+).href;
+
 var filter = process.argv[2] || null;
 
 Promise.all([
     import(completions_path),
     import(analyzer_path),
+    import(dts_path),
 ]).then(function (mods) {
-    var completions_mod = mods[0];
-    var analyzer_mod    = mods[1];
-    var CompletionEngine = completions_mod.CompletionEngine;
-    var detect_context   = completions_mod.detect_context;
-    var SourceAnalyzer   = analyzer_mod.SourceAnalyzer;
+    var CompletionEngine = mods[0].CompletionEngine;
+    var detect_context   = mods[0].detect_context;
+    var SourceAnalyzer   = mods[1].SourceAnalyzer;
+    var DtsRegistry      = mods[2].DtsRegistry;
     var RS               = compiler_module.create_compiler();
-    var TESTS            = make_tests(CompletionEngine, detect_context, SourceAnalyzer, RS);
+    var TESTS            = make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistry, RS);
     run_tests(TESTS, filter);
 }).catch(function (e) {
     console.error(colored("Failed to load completions module:", "red"), e);

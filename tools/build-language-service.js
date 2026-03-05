@@ -32,7 +32,11 @@ var FILES = [
     "diagnostics.js",  // no internal deps
     "analyzer.js",     // imports from scope.js
     "completions.js",  // imports from analyzer.js
-    "index.js",        // imports from diagnostics.js, analyzer.js, completions.js
+    "signature.js",    // no internal deps
+    "dts.js",          // no internal deps
+    "builtins.js",     // no internal deps
+    "hover.js",        // imports from dts.js, builtins.js (type refs only)
+    "index.js",        // imports from all above
 ];
 
 // ── Public exports ────────────────────────────────────────────────────────────

@@ -18,6 +18,10 @@
 import { Diagnostics, BASE_BUILTINS } from './diagnostics.js';
 import { SourceAnalyzer }             from './analyzer.js';
 import { CompletionEngine }           from './completions.js';
+import { SignatureHelpEngine }        from './signature.js';
+import { HoverEngine }               from './hover.js';
+import { DtsRegistry }               from './dts.js';
+import { BuiltinsRegistry }          from './builtins.js';
 
 const LANGUAGE_ID = 'rapydscript';
 
@@ -90,14 +94,36 @@ class RapydScriptLanguageService {
         this._diagnostics = new Diagnostics(compiler, options.extraBuiltins);
         this._analyzer    = new SourceAnalyzer(compiler);
 
-        // Merge BASE_BUILTINS with any extra globals for completions
-        const builtin_names = BASE_BUILTINS.concat(
-            options.extraBuiltins ? Object.keys(options.extraBuiltins) : []
-        );
-        this._completions = new CompletionEngine(this._analyzer, {
-            virtualFiles: this._virtualFiles,
-            builtinNames: builtin_names,
+        // DTS registry — load any files supplied at construction time
+        this._dts = new DtsRegistry();
+        if (options.dtsFiles) {
+            options.dtsFiles.forEach(f => this._dts.addDts(f.name, f.content));
+        }
+
+        // Built-in stubs registry (always present)
+        this._builtins = new BuiltinsRegistry();
+
+        // Merge BASE_BUILTINS + extra globals + DTS globals for completions
+        const builtin_names = BASE_BUILTINS
+            .concat(options.extraBuiltins ? Object.keys(options.extraBuiltins) : [])
+            .concat(this._dts.getGlobalNames());
+
+        this._completions    = new CompletionEngine(this._analyzer, {
+            virtualFiles:    this._virtualFiles,
+            builtinNames:    builtin_names,
+            dtsRegistry:     this._dts,
+            builtinsRegistry: this._builtins,
         });
+        this._signature_help = new SignatureHelpEngine(this._builtins);
+        this._hover          = new HoverEngine(this._dts, this._builtins);
+
+        // Suppress diagnostics warnings for DTS globals
+        if (this._dts.getGlobalNames().length) {
+            this._diagnostics.addGlobals(this._dts.getGlobalNames());
+        }
+
+        // Store loadDts callback for lazy loading
+        this._loadDts = options.loadDts || null;
 
         // Register language id if not already registered
         const existing = monaco.languages.getLanguages().find(l => l.id === LANGUAGE_ID);
@@ -133,6 +159,40 @@ class RapydScriptLanguageService {
                         line_prefix,
                         monaco.languages.CompletionItemKind
                     );
+                },
+            })
+        );
+
+        // Register signature help provider
+        this._disposables.push(
+            monaco.languages.registerSignatureHelpProvider(LANGUAGE_ID, {
+                signatureHelpTriggerCharacters:   ['(', ','],
+                signatureHelpRetriggerCharacters: [','],
+                provideSignatureHelp(model, position) {
+                    if (model.getLanguageId() !== LANGUAGE_ID) return null;
+                    const state = self._modelStates.get(model);
+                    const scopeMap = state ? state._scopeMap : null;
+                    const line_content = model.getLineContent(position.lineNumber);
+                    const line_prefix  = line_content.substring(0, position.column - 1);
+                    return self._signature_help.getSignatureHelp(
+                        scopeMap,
+                        position,
+                        line_prefix
+                    );
+                },
+            })
+        );
+
+        // Register hover provider
+        this._disposables.push(
+            monaco.languages.registerHoverProvider(LANGUAGE_ID, {
+                provideHover(model, position) {
+                    if (model.getLanguageId() !== LANGUAGE_ID) return null;
+                    const state   = self._modelStates.get(model);
+                    const scopeMap = state ? state._scopeMap : null;
+                    const word_info = model.getWordAtPosition(position);
+                    const word = word_info ? word_info.word : null;
+                    return self._hover.getHover(scopeMap, position, word);
                 },
             })
         );
@@ -203,10 +263,43 @@ class RapydScriptLanguageService {
      * @param {string} _name
      * @param {string} _dtsText
      */
-    // eslint-disable-next-line no-unused-vars
-    addDts(_name, _dtsText) {
-        // Phase 6 will implement this.
-        console.warn('RapydScript language service: addDts() not yet implemented (Phase 6).');
+    addDts(name, dtsText) {
+        this._dts.addDts(name, dtsText);
+        const new_names = this._dts.getGlobalNames();
+        // Suppress undef warnings for newly added globals
+        this._diagnostics.addGlobals(new_names);
+        // Rebuild builtin list so completions include new DTS names
+        const builtin_names = BASE_BUILTINS.concat(new_names);
+        this._completions = new CompletionEngine(this._analyzer, {
+            virtualFiles:    this._virtualFiles,
+            builtinNames:    builtin_names,
+            dtsRegistry:     this._dts,
+            builtinsRegistry: this._builtins,
+        });
+        // Re-run diagnostics on all open models
+        this._modelStates.forEach(state => state._schedule(0));
+    }
+
+    /**
+     * Asynchronously fetch a .d.ts file using the `loadDts` callback supplied
+     * in options, then register it with addDts().
+     *
+     * Requires `options.loadDts` to have been provided at construction time.
+     * Returns a Promise that resolves when the file has been parsed and registered.
+     *
+     * @param {string} name  identifier passed to the loadDts callback
+     * @returns {Promise<void>}
+     */
+    loadDts(name) {
+        if (!this._loadDts) {
+            return Promise.reject(
+                new Error('registerRapydScript: options.loadDts was not provided')
+            );
+        }
+        const self = this;
+        return Promise.resolve(this._loadDts(name)).then(function (text) {
+            self.addDts(name, text);
+        });
     }
 
     /**
