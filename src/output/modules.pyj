@@ -91,9 +91,21 @@ def declare_exports(module_id, exports, output, docstrings):
             seen[symbol.name] = True
             output.end_statement()
 
+def _inject_pythonize_strings(output):
+    str_funcs = ('capitalize strip lstrip rstrip islower isupper isspace lower upper swapcase title'
+        ' center count endswith startswith find rfind index rindex format join ljust rjust'
+        ' partition rpartition splitlines zfill').split(' ')
+    output.newline()
+    output.indent()
+    output.print('(function(){var _f=' + JSON.stringify(str_funcs) + ';for(var _i=0;_i<_f.length;_i++)String.prototype[_f[_i]]=\u03c1\u03c3_str.prototype[_f[_i]];})()')
+    output.end_statement()
+
+
 def prologue(module, output):
     # any code that should appear before the main body
     if output.options.omit_baselib:
+        if output.options.pythonize_strings:
+            _inject_pythonize_strings(output)
         return
     output.indent()
     v = const_decl(output.options.js_version)
@@ -118,6 +130,8 @@ def prologue(module, output):
         raise ValueError('The baselib is missing! Remember to set the baselib_plain field on the options for OutputStream')
     output.print(output.options.baselib_plain)
     output.end_statement()
+    if output.options.pythonize_strings:
+        _inject_pythonize_strings(output)
 
 
 def print_top_level(self, output):

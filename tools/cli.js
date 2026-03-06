@@ -343,6 +343,14 @@ declarations, and removes the private scope wrapper
 (implies --bare).
 */});
 
+opt("pythonize_strings", 'S', 'bool', false, function(){/*
+Patch String.prototype with Python-style string methods
+(strip, join, split, format, etc.) at startup, equivalent
+to calling strings() from the pythonize module. This allows
+Python-style string methods to be used directly on any
+string in RapydScript without an explicit import.
+*/});
+
 create_group('repl', '', function(){/*
 Run a Read-Eval-Print-Loop (REPL). This allows
 you to type and run RapydScript at a live

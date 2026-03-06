@@ -23,6 +23,12 @@
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 
 - print should console.log , not call printer dialog
+- 
+- variables just say (variable) on hover, not their type?
+
+- source maps!
+
+- move base library to global scope
 
 
 Python Feature Gap Report: RapydScript-NS

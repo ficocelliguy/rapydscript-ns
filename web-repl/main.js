@@ -19,7 +19,8 @@
 
     function compile(code) {
         const codeWithoutVariableTypeDefinitions = code.replace(/^ *(?!def\s)([\w.-]+) *: *[\w.-]+ *[:+*\/%&|^><-]*=/gm, '$1');
-        return web_repl.compile(codeWithoutVariableTypeDefinitions, {omit_function_metadata: false, tree_shake: false, export_main: true, virtual_files: VIRTUAL_FILES});
+        var pythonize_strings = !!(document.getElementById('pythonize_strings') || {}).checked;
+        return web_repl.compile(codeWithoutVariableTypeDefinitions, {omit_function_metadata: false, tree_shake: false, export_main: true, virtual_files: VIRTUAL_FILES, pythonize_strings: pythonize_strings});
     }
 
     function runjs(code) {

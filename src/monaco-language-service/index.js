@@ -105,6 +105,7 @@ class RapydScriptLanguageService {
 
         // Built-in stubs registry (always present)
         this._builtins = new BuiltinsRegistry();
+        if (options.pythonize_strings) this._builtins.enablePythonizeStrings();
 
         // Merge BASE_BUILTINS + extra globals + DTS globals for completions
         const builtin_names = BASE_BUILTINS

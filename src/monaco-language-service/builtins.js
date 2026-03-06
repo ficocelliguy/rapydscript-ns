@@ -413,6 +413,29 @@ const TYPE_MEMBERS = {
     ]),
 };
 
+// Extra str members added when pythonize_strings is enabled.
+// These are the methods from pythonize.strings() not already in TYPE_MEMBERS.str.
+const PYTHONIZE_STR_EXTRA_MEMBERS = new Map([
+    ['capitalize',  m('capitalize',  'method', [],                                                          'str',  'Return a copy with the first character capitalized and the rest lowercased.')],
+    ['islower',     m('islower',     'method', [],                                                          'bool', 'Return True if all cased characters are lowercase.')],
+    ['isupper',     m('isupper',     'method', [],                                                          'bool', 'Return True if all cased characters are uppercase.')],
+    ['isspace',     m('isspace',     'method', [],                                                          'bool', 'Return True if all characters in the string are whitespace.')],
+    ['swapcase',    m('swapcase',    'method', [],                                                          'str',  'Return a copy with uppercase characters converted to lowercase and vice versa.')],
+    ['title',       m('title',       'method', [],                                                          'str',  'Return a title-cased version of the string.')],
+    ['center',      m('center',      'method', [mp('width', 'int'), mp('fillchar', 'str')],                 'str',  'Return the string centered in a field of the given width.')],
+    ['count',       m('count',       'method', [mp('sub', 'str'), mp('start', 'int'), mp('end', 'int')],    'int',  'Return the number of non-overlapping occurrences of sub.')],
+    ['rfind',       m('rfind',       'method', [mp('sub', 'str'), mp('start', 'int'), mp('end', 'int')],    'int',  'Return the highest index of sub, or -1 if not found.')],
+    ['index',       m('index',       'method', [mp('sub', 'str'), mp('start', 'int'), mp('end', 'int')],    'int',  'Like find, but raise ValueError if sub is not found.')],
+    ['rindex',      m('rindex',      'method', [mp('sub', 'str'), mp('start', 'int'), mp('end', 'int')],    'int',  'Like rfind, but raise ValueError if sub is not found.')],
+    ['ljust',       m('ljust',       'method', [mp('width', 'int'), mp('fillchar', 'str')],                 'str',  'Return the string left-justified in a field of the given width.')],
+    ['rjust',       m('rjust',       'method', [mp('width', 'int'), mp('fillchar', 'str')],                 'str',  'Return the string right-justified in a field of the given width.')],
+    ['partition',   m('partition',   'method', [mp('sep', 'str')],                                         'list', 'Split at the first occurrence of sep; return a 3-element tuple.')],
+    ['rpartition',  m('rpartition',  'method', [mp('sep', 'str')],                                         'list', 'Split at the last occurrence of sep; return a 3-element tuple.')],
+    ['rsplit',      m('rsplit',      'method', [mp('sep', 'str'), mp('maxsplit', 'int')],                   'list', 'Return a list of words split on sep from the right.')],
+    ['splitlines',  m('splitlines',  'method', [mp('keepends', 'bool')],                                    'list', 'Return a list of the lines in the string, breaking at line boundaries.')],
+    ['zfill',       m('zfill',       'method', [mp('width', 'int')],                                       'str',  'Pad the string on the left with zeros to fill a field of the given width.')],
+]);
+
 // ---------------------------------------------------------------------------
 // BuiltinsRegistry
 // ---------------------------------------------------------------------------
@@ -440,6 +463,18 @@ export class BuiltinsRegistry {
      */
     getNames() {
         return Array.from(this._stubs.keys());
+    }
+
+    /**
+     * Merge the pythonize string methods into the 'str' type members so that
+     * dot-completions on string variables include all Python-style methods.
+     * Safe to call multiple times (idempotent).
+     */
+    enablePythonizeStrings() {
+        const str_map = TYPE_MEMBERS.str;
+        for (const [name, member] of PYTHONIZE_STR_EXTRA_MEMBERS) {
+            if (!str_map.has(name)) str_map.set(name, member);
+        }
     }
 
     /**

@@ -54,6 +54,7 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
         keep_docstrings: argv.keep_docstrings,
         discard_asserts: argv.discard_asserts,
         module_cache_dir: cache_dir,
+        pythonize_strings: argv.pythonize_strings,
     };
 
     var files = argv.files.slice();

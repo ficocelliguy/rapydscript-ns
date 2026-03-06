@@ -56,6 +56,7 @@ output_stream_defaults = {
     'js_version':5,
     'write_name': True,
     'omit_function_metadata': False,
+    'pythonize_strings': False,
 }
 
 class OutputStream:
