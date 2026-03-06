@@ -45,7 +45,7 @@ var FILES = [
 // Internal classes (ScopeMap, SourceAnalyzer, Diagnostics, …) remain accessible
 // via the returned service object but are not re-exported.
 
-var PUBLIC_EXPORTS = ["registerRapydScript"];
+var PUBLIC_EXPORTS = ["registerRapydScript", "web_repl"];
 
 // ── Embed the RapydScript compiler ────────────────────────────────────────────
 // rapydscript.js uses (function(external_namespace){...})(this) to attach to
@@ -162,6 +162,15 @@ FILES.forEach(function (file) {
         ""
     );
 });
+
+// ── Compiler utility exports ──────────────────────────────────────────────────
+chunks.push(
+    "// ── Compiler utility exports " + "─".repeat(41),
+    "",
+    "/** Returns a web_repl compiler instance (same as RapydScript.web_repl()). */",
+    "function web_repl() { return _RS_COMPILER.web_repl(); }",
+    ""
+);
 
 // ── Final named export ────────────────────────────────────────────────────────
 chunks.push("export { " + PUBLIC_EXPORTS.join(", ") + " };", "");

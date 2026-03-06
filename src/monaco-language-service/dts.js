@@ -387,6 +387,27 @@ export function parse_dts(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Type-string helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the first concrete type name from a TypeScript type string.
+ * Handles union types (A | B), generic types (A<B>), and simple names.
+ * Returns null if no plain identifier can be extracted.
+ *
+ * Examples:
+ *   'Server'                                       → 'Server'
+ *   'Server | (DarkServer & { isOnline: boolean })' → 'Server'
+ *   'Promise<number>'                              → 'Promise'
+ */
+export function resolve_first_type(type_str) {
+    if (!type_str) return null;
+    const first = type_str.split('|')[0].trim();
+    const base  = first.replace(/<.*$/, '').trim();
+    return /^\w+$/.test(base) ? base : null;
+}
+
+// ---------------------------------------------------------------------------
 // DtsRegistry
 // ---------------------------------------------------------------------------
 
@@ -464,7 +485,7 @@ export class DtsRegistry {
         let ti = this._globals.get(parts[0]);
         // Dereference var → type (e.g. var ns: NS → NS interface)
         if (ti && !ti.members && ti.return_type) {
-            ti = this._globals.get(ti.return_type);
+            ti = this._globals.get(resolve_first_type(ti.return_type));
         }
         // Walk remaining path segments
         for (let i = 1; i < parts.length && ti; i++) {
@@ -473,7 +494,7 @@ export class DtsRegistry {
             if (member.members) {
                 ti = member;
             } else if (member.return_type) {
-                ti = this._globals.get(member.return_type);
+                ti = this._globals.get(resolve_first_type(member.return_type));
             } else {
                 ti = null;
             }

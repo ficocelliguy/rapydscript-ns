@@ -134,10 +134,38 @@ class RapydScriptLanguageService {
 
         // Apply Python syntax highlighting — RapydScript is syntactically Python-like
         // enough that Monaco's built-in Python tokenizer gives correct coloring.
+        // We then inject game-specific token rules so the same theme colors used for
+        // JS/TS files (ns, netscriptfunction, otherkeyvars, this) apply here too.
+        const extra_names = this._extraBuiltinNames;
         const pythonLang = monaco.languages.getLanguages().find(l => l.id === 'python');
         if (pythonLang && pythonLang.loader) {
             pythonLang.loader().then(function(mod) {
-                monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, mod.language);
+                const lang = mod.language;
+
+                // Python equivalents of the JS/TS otherkeyvars / this custom tokens.
+                // Unshift in reverse-priority order (last unshift = highest priority).
+                lang.tokenizer.root.unshift(
+                    // self → 'this' color (Python's equivalent of JS `this`)
+                    [/\bself\b/, { token: 'this' }],
+                    // True / False / None → 'otherkeyvars' (accent color, distinct from keywords)
+                    [/\b(True|False|None)\b/, { token: 'otherkeyvars' }],
+                );
+
+                // ns → 'ns' token (the game API namespace object)
+                lang.tokenizer.root.unshift([/\bns\b/, { token: 'ns' }]);
+
+                // extraBuiltins → 'netscriptfunction' token (all NS API names)
+                if (extra_names.length) {
+                    const alt = extra_names
+                        .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                        .join('|');
+                    lang.tokenizer.root.unshift([
+                        new RegExp('\\b(?:' + alt + ')\\b'),
+                        { token: 'netscriptfunction' },
+                    ]);
+                }
+
+                monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, lang);
                 monaco.languages.setLanguageConfiguration(LANGUAGE_ID, mod.conf);
             });
         }

@@ -730,6 +730,154 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
         },
 
         {
+            name: "dot_dts_return_type_simple",
+            description: "x = ns.getServer(...) gives x. the members of the return type (Server)",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface Server {",
+                    "    hostname: string;",
+                    "    hasAdminRights: boolean;",
+                    "    hackDifficulty: number;",
+                    "}",
+                    "interface NS {",
+                    "    getServer(host: string): Server;",
+                    "    hack(host: string): Promise<number>;",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "server = ns.getServer('n00dles')",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "server.", MockKind);
+                assert_has(list, 'hostname',       'Server.hostname');
+                assert_has(list, 'hasAdminRights', 'Server.hasAdminRights');
+                assert_has(list, 'hackDifficulty', 'Server.hackDifficulty');
+                assert_missing(list, 'hack', 'NS.hack not in Server');
+            },
+        },
+
+        // ── DTS return-type: function-local scope fallback ────────────────
+
+        {
+            name: "dot_dts_return_type_in_function",
+            description: "server = ns.getServer(...) inside async def main gives server. Server members (scope fallback)",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface Server {",
+                    "    hostname: string;",
+                    "    hasAdminRights: boolean;",
+                    "}",
+                    "interface NS {",
+                    "    getServer(host?: string): Server;",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var analyzer = new SourceAnalyzer(RS);
+                // The parsed code ends at line 2; the user is typing server. on line 3
+                var scopeMap = analyzer.analyze([
+                    "async def main(ns):",
+                    "    server = ns.getServer('n00dles')",
+                ].join("\n"), {});
+
+                // Line 3 is past the end of the parsed scope — requires scope fallback
+                var list = engine.getCompletions(scopeMap, pos(3, 12), "    server.", MockKind);
+                assert_has(list, 'hostname',       'Server.hostname via scope fallback');
+                assert_has(list, 'hasAdminRights', 'Server.hasAdminRights via scope fallback');
+            },
+        },
+
+        {
+            name: "dot_dts_return_type_union",
+            description: "getServer returning a union type (A | B) still yields members of the first type",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface Server {",
+                    "    hostname: string;",
+                    "    hasAdminRights: boolean;",
+                    "}",
+                    "interface DarkServer { darkProp: string; }",
+                    "interface NS {",
+                    "    getServer(host?: string): Server | (DarkServer & { isOnline: boolean });",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "async def main(ns):",
+                    "    server = ns.getServer('n00dles')",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(3, 12), "    server.", MockKind);
+                assert_has(list, 'hostname',       'Server.hostname (first type in union)');
+                assert_has(list, 'hasAdminRights', 'Server.hasAdminRights (first type in union)');
+            },
+        },
+
+        {
+            name: "dot_list_literal_in_function_scope_fallback",
+            description: "a = [1,2,3] inside async def main gives a. list members (scope fallback)",
+            run: function () {
+                var engine = make_engine({}, [], null,
+                    require(path.join(__dirname, '../../src/monaco-language-service/builtins.js')));
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "async def main(ns):",
+                    "    a = [1,2,3]",
+                ].join("\n"), {});
+
+                // Line 3 is past the end of the parsed scope
+                var list = engine.getCompletions(scopeMap, pos(3, 7), "    a.", MockKind);
+                assert_has(list, 'length', 'list.length via scope fallback');
+                assert_has(list, 'append', 'list.append via scope fallback');
+                assert_has(list, 'push',   'list.push via scope fallback');
+            },
+        },
+
+        {
+            name: "dot_dts_return_type_nested",
+            description: "x = ns.hacknet.getNodeStats(...) gives x. the members of the return type",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface NodeStats {",
+                    "    name: string;",
+                    "    level: number;",
+                    "    ram: number;",
+                    "}",
+                    "interface Hacknet {",
+                    "    getNodeStats(index: number): NodeStats;",
+                    "    purchaseNode(): number;",
+                    "}",
+                    "interface NS {",
+                    "    readonly hacknet: Hacknet;",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine({}, [], reg);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "stats = ns.hacknet.getNodeStats(0)",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 1), "stats.", MockKind);
+                assert_has(list, 'name',  'NodeStats.name');
+                assert_has(list, 'level', 'NodeStats.level');
+                assert_has(list, 'ram',   'NodeStats.ram');
+                assert_missing(list, 'purchaseNode', 'Hacknet.purchaseNode not in NodeStats');
+            },
+        },
+
+        {
             name: "dot_scopemap_wins_over_dts",
             description: "ScopeMap class members take precedence over DTS for same name",
             run: function () {

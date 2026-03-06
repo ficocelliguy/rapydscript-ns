@@ -6,6 +6,7 @@
 //   const items  = engine.getCompletions(scopeMap, position, linePrefix, monacoKind);
 
 import { SourceAnalyzer } from './analyzer.js';
+import { resolve_first_type } from './dts.js';
 
 // ---------------------------------------------------------------------------
 // Context detection
@@ -306,7 +307,7 @@ export class CompletionEngine {
             let ti = this._dts.getGlobal(parts[0]);
             // Follow first var → type reference (e.g. var ns: NS → NS interface)
             if (ti && !ti.members && ti.return_type) {
-                ti = this._dts.getGlobal(ti.return_type);
+                ti = this._dts.getGlobal(resolve_first_type(ti.return_type));
             }
             // Walk remaining path segments through member types
             for (let i = 1; i < parts.length && ti; i++) {
@@ -315,7 +316,7 @@ export class CompletionEngine {
                 if (member.members) {
                     ti = member;
                 } else if (member.return_type) {
-                    ti = this._dts.getGlobal(member.return_type);
+                    ti = this._dts.getGlobal(resolve_first_type(member.return_type));
                 } else {
                     ti = null;
                 }
@@ -391,13 +392,39 @@ export class CompletionEngine {
             }
         }
 
+        // 1.75. DTS return-type resolution — variables assigned from DTS method calls.
+        //       e.g. `server = ns.getServer(...)` → resolve return type of ns.getServer from DTS.
+        if (!scope_matched && this._dts && obj_sym && obj_sym.dts_call_path) {
+            const call_path = obj_sym.dts_call_path;
+            const last_dot  = call_path.lastIndexOf('.');
+            if (last_dot > 0) {
+                const object_path = call_path.slice(0, last_dot);
+                const method_name = call_path.slice(last_dot + 1);
+                const member_ti   = this._dts.getMemberInfo(object_path, method_name);
+                if (member_ti && member_ti.return_type) {
+                    const return_ti = this._dts.getGlobal(resolve_first_type(member_ti.return_type));
+                    if (return_ti && return_ti.members) {
+                        scope_matched = true;
+                        for (const [name, member] of return_ti.members) {
+                            if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                                if (!seen.has(name)) {
+                                    seen.add(name);
+                                    items.push(_dts_member_to_item(member, range, monacoKind));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 2. DTS registry fallback — namespaces / interfaces / classes from .d.ts.
         //    Skipped when ScopeMap already matched a class (ScopeMap wins).
         if (!scope_matched && this._dts) {
             let ti = this._dts.getGlobal(ctx.objectName);
             // Follow type reference: `var console: Console` → look up `Console`
             if (ti && !ti.members && ti.return_type) {
-                ti = this._dts.getGlobal(ti.return_type);
+                ti = this._dts.getGlobal(resolve_first_type(ti.return_type));
             }
             if (ti && ti.members) {
                 for (const [name, member] of ti.members) {

@@ -30,6 +30,22 @@ function extract_doc(node) {
 }
 
 /**
+ * Recursively build a dot-path string from a chain of AST_Dot / AST_SymbolRef nodes.
+ * Returns null if the node is not a plain dot-chain (e.g. bracket subscript access).
+ * Examples:
+ *   AST_SymbolRef{name:'ns'}                        → 'ns'
+ *   AST_Dot{expr: AST_SymbolRef{name:'ns'}, prop: 'getServer'}  → 'ns.getServer'
+ */
+function dot_path_from_node(node, RS) {
+    if (node instanceof RS.AST_SymbolRef) return node.name;
+    if (node instanceof RS.AST_Dot) {
+        const left = dot_path_from_node(node.expression, RS);
+        return left ? left + '.' + node.property : null;
+    }
+    return null;
+}
+
+/**
  * Collect parameter descriptors from an AST_Lambda node.
  * Handles regular args, *args (starargs), and **kwargs.
  */
@@ -106,6 +122,7 @@ class ScopeBuilder {
             doc:            opts.doc            || null,
             params:         opts.params         || null,
             inferred_class: opts.inferred_class || null,
+            dts_call_path:  opts.dts_call_path  || null,
         });
         scope.addSymbol(sym);
         return sym;
@@ -250,9 +267,15 @@ class ScopeBuilder {
                 if (scope) {
                     // Detect the RHS type regardless of whether the symbol exists.
                     let inferred_class = null;
+                    let dts_call_path  = null;
                     if (node.right instanceof RS.AST_BaseCall &&
                         node.right.expression instanceof RS.AST_SymbolRef) {
                         inferred_class = node.right.expression.name;
+                    } else if (node.right instanceof RS.AST_BaseCall &&
+                               node.right.expression instanceof RS.AST_Dot) {
+                        // x = obj.method(...) — capture the full dot-path for DTS type resolution.
+                        const call_path = dot_path_from_node(node.right.expression, RS);
+                        if (call_path) dts_call_path = call_path;
                     } else if (node.right instanceof RS.AST_Array) {
                         inferred_class = 'list';
                     } else if (node.right instanceof RS.AST_Object) {
@@ -269,10 +292,13 @@ class ScopeBuilder {
                             kind:           'variable',
                             defined_at:     pos_from_token(node.left.start),
                             inferred_class,
+                            dts_call_path,
                         });
                     } else if (inferred_class && !existing.inferred_class) {
                         // Update the hoisted-but-untyped symbol with the inferred type.
                         existing.inferred_class = inferred_class;
+                    } else if (dts_call_path && !existing.dts_call_path) {
+                        existing.dts_call_path = dts_call_path;
                     }
                 }
             }
