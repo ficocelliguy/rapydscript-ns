@@ -205,7 +205,12 @@ class RapydScriptLanguageService {
                     const scopeMap = state ? state._scopeMap : null;
                     const word_info = model.getWordAtPosition(position);
                     const word = word_info ? word_info.word : null;
-                    return self._hover.getHover(scopeMap, position, word);
+                    const line_content = model.getLineContent(position.lineNumber);
+                    // Text before the word's start column, used to detect dot-chain access
+                    const line_before_word = word_info
+                        ? line_content.substring(0, word_info.startColumn - 1)
+                        : '';
+                    return self._hover.getHover(scopeMap, position, word, line_before_word);
                 },
             })
         );

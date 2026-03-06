@@ -446,6 +446,52 @@ export class DtsRegistry {
         if (!ti || !ti.members) return [];
         return Array.from(ti.members.keys());
     }
+
+    /**
+     * Follow a dot-path through the type registry and return the TypeInfo
+     * for the named member at the end of the chain.
+     *
+     * Examples:
+     *   getMemberInfo('ns', 'hack')               → TypeInfo for NS.hack
+     *   getMemberInfo('ns.hacknet', 'purchaseNode') → TypeInfo for Hacknet.purchaseNode
+     *
+     * @param {string} objectPath  dot-separated path (e.g. 'ns' or 'ns.hacknet')
+     * @param {string} memberName  the attribute being accessed
+     * @returns {TypeInfo|null}
+     */
+    getMemberInfo(objectPath, memberName) {
+        const parts = objectPath.split('.');
+        let ti = this._globals.get(parts[0]);
+        // Dereference var → type (e.g. var ns: NS → NS interface)
+        if (ti && !ti.members && ti.return_type) {
+            ti = this._globals.get(ti.return_type);
+        }
+        // Walk remaining path segments
+        for (let i = 1; i < parts.length && ti; i++) {
+            const member = ti.members ? ti.members.get(parts[i]) : null;
+            if (!member) { ti = null; break; }
+            if (member.members) {
+                ti = member;
+            } else if (member.return_type) {
+                ti = this._globals.get(member.return_type);
+            } else {
+                ti = null;
+            }
+        }
+        if (!ti || !ti.members) return null;
+        return ti.members.get(memberName) || null;
+    }
+
+    /**
+     * Return hover markdown for a member accessed via a dot-path, or null.
+     * @param {string} objectPath
+     * @param {string} memberName
+     * @returns {string|null}
+     */
+    getMemberHoverMarkdown(objectPath, memberName) {
+        const ti = this.getMemberInfo(objectPath, memberName);
+        return ti ? build_dts_hover(ti) : null;
+    }
 }
 
 // ---------------------------------------------------------------------------

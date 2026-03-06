@@ -72,15 +72,16 @@ export class HoverEngine {
 
     /**
      * Return a Monaco IHover for the word under the cursor.
-     * Priority: ScopeMap (user-defined) → DTS (.d.ts globals) → builtins.
+     * Priority: ScopeMap (user-defined) → DTS member (dot-chain) → DTS global → builtins.
      * Returns null if the word is not found in any source.
      *
      * @param {import('./scope.js').ScopeMap|null} scopeMap
      * @param {{lineNumber:number,column:number}} position  1-indexed Monaco position
      * @param {string|null} word  the identifier under the cursor (from model.getWordAtPosition)
+     * @param {string} [line_before_word]  text on the current line before the word's start column
      * @returns {{ contents: {value:string}[], range?: object }|null}
      */
-    getHover(scopeMap, position, word) {
+    getHover(scopeMap, position, word, line_before_word) {
         if (!word) return null;
 
         // 1. ScopeMap lookup (user-defined symbols)
@@ -91,13 +92,24 @@ export class HoverEngine {
             }
         }
 
-        // 2. DTS registry (.d.ts globals)
+        // 2. DTS member lookup — check for dot-chain access
+        //    e.g. hovering 'hack' in 'ns.hack(' → line_before_word ends with 'ns.'
+        //    e.g. hovering 'purchaseNode' in 'ns.hacknet.purchaseNode(' → ends with 'ns.hacknet.'
+        if (this._dts && line_before_word) {
+            const dot_match = line_before_word.match(/([\w.]+)\.$/);
+            if (dot_match) {
+                const md = this._dts.getMemberHoverMarkdown(dot_match[1], word);
+                if (md) return { contents: [{ value: md }] };
+            }
+        }
+
+        // 3. DTS global lookup (top-level declarations like `var ns: NS`)
         if (this._dts) {
             const md = this._dts.getHoverMarkdown(word);
             if (md) return { contents: [{ value: md }] };
         }
 
-        // 3. Built-in stubs
+        // 4. Built-in stubs
         if (this._builtins) {
             const md = this._builtins.getHoverMarkdown(word);
             if (md) return { contents: [{ value: md }] };

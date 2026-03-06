@@ -33,9 +33,11 @@ function hover_text(result) {
 // Test definitions
 // ---------------------------------------------------------------------------
 
-function make_tests(HoverEngine, SourceAnalyzer, RS) {
+function make_tests(HoverEngine, SourceAnalyzer, DtsRegistry, RS) {
 
-    function make_engine() { return new HoverEngine(); }
+    function make_engine(dts_registry) {
+        return new HoverEngine(dts_registry || null, null);
+    }
 
     function analyze(src) {
         return new SourceAnalyzer(RS).analyze(src, {});
@@ -273,6 +275,82 @@ function make_tests(HoverEngine, SourceAnalyzer, RS) {
             },
         },
 
+        // ── DTS member hover via dot-chain ────────────────────────────────
+
+        {
+            name: "hover_dts_member_single_level",
+            description: "Hovering 'hack' with line_before_word='ns.' shows NS.hack doc",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface NS {",
+                    "    /** Hack a server to steal money. */",
+                    "    hack(host: string): Promise<number>;",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine(reg);
+                var result = engine.getHover(null, pos(1, 4), "hack", "ns.");
+                assert.ok(result, "expected hover result");
+                var text = hover_text(result);
+                assert.ok(text.indexOf("hack") !== -1,  "should include method name");
+                assert.ok(text.indexOf("host") !== -1,  "should include param");
+                assert.ok(text.indexOf("Hack a server") !== -1, "should include JSDoc");
+            },
+        },
+
+        {
+            name: "hover_dts_member_multi_level",
+            description: "Hovering 'purchaseNode' with 'ns.hacknet.' shows Hacknet.purchaseNode doc",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", [
+                    "interface Hacknet {",
+                    "    /** Buy a new hacknet node. */",
+                    "    purchaseNode(): number;",
+                    "}",
+                    "interface NS {",
+                    "    readonly hacknet: Hacknet;",
+                    "}",
+                    "declare var ns: NS;",
+                ].join("\n"));
+                var engine = make_engine(reg);
+                var result = engine.getHover(null, pos(1, 16), "purchaseNode", "ns.hacknet.");
+                assert.ok(result, "expected hover result");
+                var text = hover_text(result);
+                assert.ok(text.indexOf("purchaseNode") !== -1, "should include method name");
+                assert.ok(text.indexOf("Buy a new hacknet node") !== -1, "should include JSDoc");
+            },
+        },
+
+        {
+            name: "hover_dts_member_no_dot_falls_through",
+            description: "No dot before word → falls through to global DTS lookup",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", "declare var ns: NS;");
+                var engine = make_engine(reg);
+                // 'ns' is a top-level global; no dot before it
+                var result = engine.getHover(null, pos(1, 1), "ns", "");
+                assert.ok(result, "expected hover for top-level 'ns'");
+                var text = hover_text(result);
+                assert.ok(text.indexOf("ns") !== -1, "should mention ns");
+            },
+        },
+
+        {
+            name: "hover_dts_member_unknown_path_returns_null",
+            description: "Dot-chain hover on unknown path returns null",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("lib", "declare var ns: NS;");
+                var engine = make_engine(reg);
+                // 'unknown.' is not a registered type
+                var result = engine.getHover(null, pos(1, 9), "hack", "unknown.");
+                assert.strictEqual(result, null, "unknown dot-chain path → null");
+            },
+        },
+
         // ── Method hover ──────────────────────────────────────────────────
 
         {
@@ -354,16 +432,22 @@ var analyzer_path = url.pathToFileURL(
     path.join(__dirname, "../../src/monaco-language-service/analyzer.js")
 ).href;
 
+var dts_path = url.pathToFileURL(
+    path.join(__dirname, "../../src/monaco-language-service/dts.js")
+).href;
+
 var filter = process.argv[2] || null;
 
 Promise.all([
     import(hover_path),
     import(analyzer_path),
+    import(dts_path),
 ]).then(function (mods) {
     var HoverEngine    = mods[0].HoverEngine;
     var SourceAnalyzer = mods[1].SourceAnalyzer;
+    var DtsRegistry    = mods[2].DtsRegistry;
     var RS             = compiler_module.create_compiler();
-    var TESTS          = make_tests(HoverEngine, SourceAnalyzer, RS);
+    var TESTS          = make_tests(HoverEngine, SourceAnalyzer, DtsRegistry, RS);
     run_tests(TESTS, filter);
 }).catch(function (e) {
     console.error(colored("Failed to load hover module:", "red"), e);
