@@ -23,12 +23,19 @@
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 
 - print should console.log , not call printer dialog
-- 
+
 - variables just say (variable) on hover, not their type?
 
 - source maps!
 
-- move base library to global scope
+- add walrus operator := to readme
+
+
+
+I would like you to add support for [ the lambda keyword ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please also update the README to mention this support.
+
+
+
 
 
 Python Feature Gap Report: RapydScript-NS
@@ -44,9 +51,9 @@ differences.
 ┌───────────────────────────────────────────────┬────────────────┬──────────────────────────────────────────────────────────────┐
 │                    Feature                    │ Python Version │                            Notes                             │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ match/case (structural pattern matching)      │ 3.10+          │ No parser support                                            │
+│ match/case (structural pattern matching)      │ 3.10+          │ done                                           │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Walrus operator :=                            │ 3.8+           │ No parser support                                            │
+│ Walrus operator :=                            │ 3.8+           │ done                                         │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ lambda keyword                                │ all            │ Must use def(args): expr; workaround                         │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤

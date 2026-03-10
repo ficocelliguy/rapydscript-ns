@@ -63,7 +63,8 @@ OPERATORS = make_predicate([
     "and",
     "or",
     "@",
-    "->"
+    "->",
+    ":="
 ])
 
 OP_MAP = {
@@ -637,6 +638,10 @@ def tokenizer(raw_text, filename):
             return read_num()
 
         if PUNC_CHARS[ch]:
+            if ch is ':' and S.text.charAt(S.pos + 1) is '=':
+                next()  # consume ':'
+                next()  # consume '='
+                return token("operator", ":=")
             return token("punc", next())
 
         if OPERATOR_CHARS[ch]:

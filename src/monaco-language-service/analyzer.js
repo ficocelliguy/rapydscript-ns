@@ -303,6 +303,18 @@ class ScopeBuilder {
                 }
             }
 
+        } else if (node instanceof RS.AST_NamedExpr) {
+            // Walrus operator: name := value — register the name in the current scope.
+            const name  = node.name && node.name.name;
+            const scope = this._current_scope();
+            if (name && scope && !scope.getSymbol(name)) {
+                this._add_symbol({
+                    name,
+                    kind:       'variable',
+                    defined_at: pos_from_token(node.name.start),
+                });
+            }
+
         } else if (
             node instanceof RS.AST_ForIn &&
             !(node instanceof RS.AST_ListComprehension) &&
@@ -331,6 +343,44 @@ class ScopeBuilder {
                 name:       node.alias.name,
                 kind:       'variable',
                 defined_at: pos_from_token(node.alias.start),
+            });
+
+        } else if (RS.AST_MatchCapture && node instanceof RS.AST_MatchCapture) {
+            // match/case capture pattern: `case x:` → binds x
+            if (node.name) {
+                this._add_symbol({
+                    name:       node.name,
+                    kind:       'variable',
+                    defined_at: pos_from_token(node.start),
+                });
+            }
+
+        } else if (RS.AST_MatchAs && node instanceof RS.AST_MatchAs) {
+            // match/case AS pattern: `case pattern as name:` → binds name
+            if (node.name) {
+                this._add_symbol({
+                    name:       node.name,
+                    kind:       'variable',
+                    defined_at: pos_from_token(node.start),
+                });
+            }
+
+        } else if (RS.AST_MatchStar && node instanceof RS.AST_MatchStar) {
+            // Star element in sequence pattern: `case [*rest]` → binds rest
+            if (node.name) {
+                this._add_symbol({
+                    name:       node.name,
+                    kind:       'variable',
+                    defined_at: pos_from_token(node.start),
+                });
+            }
+
+        } else if (RS.AST_MatchMapping && node instanceof RS.AST_MatchMapping && node.rest_name) {
+            // Mapping rest: `case {"k": v, **rest}` → binds rest
+            this._add_symbol({
+                name:       node.rest_name,
+                kind:       'variable',
+                defined_at: pos_from_token(node.start),
             });
         }
 

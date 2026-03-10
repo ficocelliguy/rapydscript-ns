@@ -35,6 +35,7 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [List/Set/Dict Comprehensions](#listsetdict-comprehensions)
 - [Strings](#strings)
 - [The Existential Operator](#the-existential-operator)
+- [Walrus Operator](#walrus-operator)
 - [Regular Expressions](#regular-expressions)
 - [Creating DOM trees easily](#creating-dom-trees-easily)
 - [Classes](#classes)
@@ -43,6 +44,7 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [Iterators](#iterators)
 - [Generators](#generators)
 - [Modules](#modules)
+- [Structural Pattern Matching](#structural-pattern-matching)
 - [Exception Handling](#exception-handling)
 - [Scope Control](#scope-control)
 - [Available Libraries](#available-libraries)
@@ -937,6 +939,29 @@ a = b ? c
 a = c if (b is undefined or b is None) else b
 ```
 
+Walrus Operator
+---------------
+
+RapydScript supports the walrus (assignment expression) operator `:=` from
+Python 3.8 (PEP 572). It assigns a value and returns it as an expression,
+allowing you to avoid repeating a computation:
+
+```python
+# assign and test in a single expression
+if m := re.match(r'\d+', line):
+    print(m.group())
+
+# drain an iterable in a while loop
+while chunk := file.read(8192):
+    process(chunk)
+
+# filter and capture in a comprehension
+results = [y for x in data if (y := transform(x)) is not None]
+```
+
+The walrus operator binds to the nearest enclosing function or module scope
+(not the comprehension scope), matching Python semantics.
+
 Regular Expressions
 ----------------------
 
@@ -1283,10 +1308,105 @@ compiling. You can add additional directories to the searched locations via
 the RAPYDSCRIPT_IMPORT_PATH environment variable or the --import-path option 
 to the RapydScript compiler. See the documentation of the option for details.
 
+Structural Pattern Matching
+---------------------------
+
+RapydScript supports Python's `match/case` statement (PEP 634). The syntax is
+identical to Python's and transpiles to efficient JavaScript using a labeled
+`do { … } while (false)` block.
+
+`match` and `case` are **soft keywords** — they remain valid variable names
+when not used as a statement head, so existing code is unaffected.
+
+**Literal patterns**
+
+```python
+match command:
+    case "quit":
+        quit()
+    case "go north":
+        go_north()
+    case _:
+        print("unknown command")
+```
+
+**Capture patterns**
+
+```python
+match value:
+    case x:
+        print(x)   # x is bound to value
+```
+
+**OR patterns**
+
+```python
+match status:
+    case 200 | 201 | 202:
+        print("success")
+    case 404:
+        print("not found")
+```
+
+**Guards**
+
+```python
+match point:
+    case [x, y] if x == y:
+        print("on diagonal")
+    case [x, y]:
+        print("off diagonal")
+```
+
+**Sequence patterns**
+
+```python
+match items:
+    case []:
+        print("empty")
+    case [head, *tail]:
+        print(head, tail)
+    case [a, b]:
+        print(a, b)
+```
+
+**Mapping patterns**
+
+```python
+match data:
+    case {"action": "move", "x": x, "y": y}:
+        move(x, y)
+    case {"action": "quit"}:
+        quit()
+```
+
+**Class patterns**
+
+```python
+class Point:
+    __match_args__ = ["x", "y"]
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+match shape:
+    case Point(x=0, y=0):
+        print("origin")
+    case Point(x=px, y=py):
+        print(px, py)
+```
+
+**AS patterns**
+
+```python
+match val:
+    case [x, y] as point:
+        print(point, x, y)
+```
+
 Exception Handling
 ------------------
 
-Exception handling in RapydScript works just like it does in python. 
+Exception handling in RapydScript works just like it does in python.
 
 An example:
 

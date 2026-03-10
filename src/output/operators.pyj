@@ -3,7 +3,7 @@
 from __python__ import hash_literals
 from ast import (
     AST_Array, AST_Assign, AST_BaseCall, AST_Binary, AST_Conditional,
-    AST_ItemAccess, AST_Number, AST_Object, AST_Return, AST_Seq, AST_Set,
+    AST_ItemAccess, AST_NamedExpr, AST_Number, AST_Object, AST_Return, AST_Seq, AST_Set,
     AST_SimpleStatement, AST_Statement, AST_String, AST_Sub, AST_Symbol,
     AST_SymbolRef, AST_Unary, is_node_type
 )
@@ -344,3 +344,10 @@ def print_seq(output):
         output.with_square(print_seq)
     else:
         print_seq()
+
+def print_named_expr(self, output):
+    # Walrus operator: name := value  →  (name = value)
+    output.with_parens(def():
+        output.assign(self.name)
+        self.value.print(output)
+    )

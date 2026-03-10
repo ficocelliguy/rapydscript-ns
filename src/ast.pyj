@@ -299,6 +299,139 @@ class AST_WithClause(AST_Node):
             if self.alias:
                 self.alias._walk(visitor)
         )
+
+# Match/case statement {{{
+
+class AST_MatchPattern(AST_Node):
+    "Base class for all match patterns"
+
+class AST_MatchWildcard(AST_MatchPattern):
+    "Wildcard pattern: _"
+
+class AST_MatchCapture(AST_MatchPattern):
+    "Capture pattern: a simple name that binds the matched value"
+    properties = {
+        'name': "[string] the variable name to capture into"
+    }
+
+class AST_MatchLiteral(AST_MatchPattern):
+    "Literal pattern: 42, 'hello', True, False, None, or a dotted value reference"
+    properties = {
+        'value': "[AST_Node] the literal value (or dotted name) to match against"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.value._walk(visitor)
+        )
+
+class AST_MatchOr(AST_MatchPattern):
+    "OR pattern: pat1 | pat2 | ..."
+    properties = {
+        'patterns': "[AST_MatchPattern*] the alternative patterns"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            for p in self.patterns:
+                p._walk(visitor)
+        )
+
+class AST_MatchAs(AST_MatchPattern):
+    "AS pattern: pattern as name  (or bare catch-all when pattern is None)"
+    properties = {
+        'pattern': "[AST_MatchPattern?] the inner pattern, or None for a bare catch-all",
+        'name': "[string] the variable name to bind the matched value to"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            if self.pattern:
+                self.pattern._walk(visitor)
+        )
+
+class AST_MatchStar(AST_MatchPattern):
+    "Star element inside a sequence pattern: *name or *_"
+    properties = {
+        'name': "[string?] the capture name, or None for *_ (discard)"
+    }
+
+class AST_MatchSequence(AST_MatchPattern):
+    "Sequence pattern: [a, b, *rest]"
+    properties = {
+        'elements': "[AST_MatchPattern*] the element patterns (may include AST_MatchStar)"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            for e in self.elements:
+                e._walk(visitor)
+        )
+
+class AST_MatchMapping(AST_MatchPattern):
+    "Mapping pattern: {'key': value, ...}"
+    properties = {
+        'keys': "[AST_Node*] the key expressions (literals)",
+        'values': "[AST_MatchPattern*] the corresponding value patterns",
+        'rest_name': "[string?] capture name for remaining items (**rest), or None"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            for k in self.keys:
+                k._walk(visitor)
+            for v in self.values:
+                v._walk(visitor)
+        )
+
+class AST_MatchClass(AST_MatchPattern):
+    "Class pattern: ClassName(pos_pat, kw=pat, ...)"
+    properties = {
+        'cls': "[AST_Node] the class reference expression",
+        'positional': "[AST_MatchPattern*] positional argument patterns",
+        'keys': "[string*] keyword argument names",
+        'values': "[AST_MatchPattern*] keyword argument value patterns"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.cls._walk(visitor)
+            for p in self.positional:
+                p._walk(visitor)
+            for v in self.values:
+                v._walk(visitor)
+        )
+
+class AST_MatchCase(AST_Node):
+    "A single case clause inside a match statement"
+    properties = {
+        'pattern': "[AST_MatchPattern] the pattern to match",
+        'guard': "[AST_Node?] optional guard expression (after 'if')",
+        'body': "[AST_Statement] the body to execute when the pattern matches"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.pattern._walk(visitor)
+            if self.guard:
+                self.guard._walk(visitor)
+            self.body._walk(visitor)
+        )
+
+class AST_Match(AST_Statement):
+    "A match/case statement"
+    properties = {
+        'subject': "[AST_Node] the expression being matched",
+        'cases': "[AST_MatchCase*] the case clauses"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.subject._walk(visitor)
+            for c in self.cases:
+                c._walk(visitor)
+        )
+
 # }}}
 
 # Scope and functions {{{
@@ -856,6 +989,19 @@ class AST_Assign(AST_Binary):
             break
         return left_hand_sides, right
 
+
+class AST_NamedExpr(AST_Node):
+    "Walrus operator (named expression): `name := value`"
+    properties = {
+        'name': "[AST_SymbolRef] the symbol being assigned to",
+        'value': "[AST_Node] the value expression",
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.name._walk(visitor)
+            self.value._walk(visitor)
+        )
 
 # }}}
 

@@ -5,7 +5,10 @@ from __python__ import hash_literals
 from ast import (
     AST_Definitions, AST_Scope, AST_Method, AST_Except, AST_EmptyStatement,
     AST_Statement, AST_Seq, AST_BaseCall, AST_Dot, AST_Sub, AST_ItemAccess,
-    AST_Conditional, AST_Binary, AST_BlockStatement, is_node_type
+    AST_Conditional, AST_Binary, AST_BlockStatement, is_node_type,
+    AST_Match, AST_MatchCase,
+    AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
+    AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
 )
 
 def force_statement(stat, output):
@@ -176,4 +179,272 @@ def print_assert(self, output):
         output.print('(')
         self.message.print(output)
         output.print(')')
+    output.end_statement()
+
+# ---- Match/case code generation ----
+
+def _match_is_always_true(pattern):
+    """Return True if this pattern always succeeds (no structural check needed)."""
+    return (is_node_type(pattern, AST_MatchWildcard) or
+            is_node_type(pattern, AST_MatchCapture) or
+            (is_node_type(pattern, AST_MatchAs) and not pattern.pattern))
+
+def _match_write_cond(pattern, subj, output):
+    """Write the JS condition expression for a pattern to the output stream."""
+    if is_node_type(pattern, AST_MatchWildcard) or is_node_type(pattern, AST_MatchCapture):
+        output.print('true')
+
+    elif is_node_type(pattern, AST_MatchLiteral):
+        output.print(subj + ' === ')
+        pattern.value.print(output)
+
+    elif is_node_type(pattern, AST_MatchOr):
+        for i, p in enumerate(pattern.patterns):
+            if i > 0:
+                output.print(' || ')
+            if not _match_is_always_true(p):
+                output.print('(')
+                _match_write_cond(p, subj, output)
+                output.print(')')
+            else:
+                output.print('true')
+
+    elif is_node_type(pattern, AST_MatchAs):
+        if pattern.pattern and not is_node_type(pattern.pattern, AST_MatchWildcard):
+            _match_write_cond(pattern.pattern, subj, output)
+        else:
+            output.print('true')
+
+    elif is_node_type(pattern, AST_MatchSequence):
+        _match_write_seq_cond(pattern, subj, output)
+
+    elif is_node_type(pattern, AST_MatchMapping):
+        _match_write_map_cond(pattern, subj, output)
+
+    elif is_node_type(pattern, AST_MatchClass):
+        _match_write_class_cond(pattern, subj, output)
+
+    else:
+        output.print('true')
+
+def _match_write_seq_cond(pattern, subj, output):
+    has_star = False
+    for e in pattern.elements:
+        if is_node_type(e, AST_MatchStar):
+            has_star = True
+            break
+    n = pattern.elements.length
+    n_non_star = n - (1 if has_star else 0)
+
+    output.print('Array.isArray(' + subj + ')')
+    if has_star:
+        output.print(' && ' + subj + '.length >= ' + str(n_non_star))
+    else:
+        output.print(' && ' + subj + '.length === ' + str(n))
+
+    # Add sub-conditions for complex element patterns
+    star_idx = -1
+    for i, e in enumerate(pattern.elements):
+        if is_node_type(e, AST_MatchStar):
+            star_idx = i
+            continue
+        if not _match_is_always_true(e):
+            if star_idx >= 0 and i > star_idx:
+                elem_var = subj + '[' + subj + '.length - ' + str(n - i) + ']'
+            else:
+                elem_var = subj + '[' + str(i) + ']'
+            output.print(' && (')
+            _match_write_cond(e, elem_var, output)
+            output.print(')')
+
+def _match_write_map_cond(pattern, subj, output):
+    output.print('(' + subj + ' !== null && ' + subj + ' !== undefined && typeof ' + subj + ' === \'object\')')
+    for i, key in enumerate(pattern.keys):
+        output.print(' && (')
+        key.print(output)
+        output.print(' in ' + subj + ')')
+        # Sub-condition for non-trivial value patterns
+        if not _match_is_always_true(pattern.values[i]):
+            val_var = subj + '[' + _key_to_js_str(key) + ']'
+            output.print(' && (')
+            _match_write_cond(pattern.values[i], val_var, output)
+            output.print(')')
+
+def _key_to_js_str(key_node):
+    """Return a JS expression string for a mapping key AST node."""
+    # For simple string and number literals we can produce the literal inline
+    from ast import AST_String, AST_Number, AST_True, AST_False, AST_Null
+    if is_node_type(key_node, AST_String):
+        return JSON.stringify(key_node.value)
+    elif is_node_type(key_node, AST_Number):
+        return str(key_node.value)
+    elif is_node_type(key_node, AST_True):
+        return 'true'
+    elif is_node_type(key_node, AST_False):
+        return 'false'
+    elif is_node_type(key_node, AST_Null):
+        return 'null'
+    return '"__key__"'
+
+def _match_write_class_cond(pattern, subj, output):
+    output.print('(' + subj + ' instanceof ')
+    pattern.cls.print(output)
+    output.print(')')
+    # Keyword patterns: check literal sub-patterns
+    for i, kname in enumerate(pattern.keys):
+        vpat = pattern.values[i]
+        if is_node_type(vpat, AST_MatchLiteral):
+            output.print(' && ' + subj + '.' + kname + ' === ')
+            vpat.value.print(output)
+        elif not _match_is_always_true(vpat):
+            attr_var = subj + '.' + kname
+            output.print(' && (')
+            _match_write_cond(vpat, attr_var, output)
+            output.print(')')
+    # Positional patterns: check literal sub-patterns via __match_args__
+    for i, ppat in enumerate(pattern.positional):
+        if is_node_type(ppat, AST_MatchLiteral):
+            output.print(' && ' + subj + '[' + subj + '.constructor.__match_args__[' + str(i) + ']] === ')
+            ppat.value.print(output)
+        elif not _match_is_always_true(ppat):
+            pos_var = subj + '[' + subj + '.constructor.__match_args__[' + str(i) + ']]'
+            output.print(' && (')
+            _match_write_cond(ppat, pos_var, output)
+            output.print(')')
+
+def _match_write_bindings(pattern, subj, output):
+    """Write JS assignment statements for all captures in a pattern."""
+    if is_node_type(pattern, AST_MatchCapture):
+        output.indent()
+        output.print(pattern.name + ' = ' + subj)
+        output.end_statement()
+
+    elif is_node_type(pattern, AST_MatchAs):
+        if pattern.pattern and not is_node_type(pattern.pattern, AST_MatchWildcard):
+            _match_write_bindings(pattern.pattern, subj, output)
+        if pattern.name:
+            output.indent()
+            output.print(pattern.name + ' = ' + subj)
+            output.end_statement()
+
+    elif is_node_type(pattern, AST_MatchOr):
+        # Bindings from first alternative (all must bind the same names per Python spec)
+        if pattern.patterns.length:
+            _match_write_bindings(pattern.patterns[0], subj, output)
+
+    elif is_node_type(pattern, AST_MatchSequence):
+        star_idx = -1
+        n = pattern.elements.length
+        for i, e in enumerate(pattern.elements):
+            if is_node_type(e, AST_MatchStar):
+                star_idx = i
+                break
+        for i, e in enumerate(pattern.elements):
+            if is_node_type(e, AST_MatchStar):
+                if e.name:
+                    before = i
+                    after = n - i - 1
+                    output.indent()
+                    if after > 0:
+                        output.print(e.name + ' = ' + subj + '.slice(' + str(before) + ', ' + subj + '.length - ' + str(after) + ')')
+                    else:
+                        output.print(e.name + ' = ' + subj + '.slice(' + str(before) + ')')
+                    output.end_statement()
+            else:
+                if star_idx >= 0 and i > star_idx:
+                    elem_var = subj + '[' + subj + '.length - ' + str(n - i) + ']'
+                else:
+                    elem_var = subj + '[' + str(i) + ']'
+                _match_write_bindings(e, elem_var, output)
+
+    elif is_node_type(pattern, AST_MatchMapping):
+        for i, key in enumerate(pattern.keys):
+            val_var = subj + '[' + _key_to_js_str(key) + ']'
+            _match_write_bindings(pattern.values[i], val_var, output)
+        if pattern.rest_name:
+            # Build rest object excluding matched keys
+            key_strs = [_key_to_js_str(k) for k in pattern.keys]
+            output.indent()
+            output.print(pattern.rest_name + ' = (function() { var ρσ_rest = {}; for (var ρσ_k in ' + subj + ') { if ([' + key_strs.join(', ') + '].indexOf(ρσ_k) < 0) ρσ_rest[ρσ_k] = ' + subj + '[ρσ_k]; } return ρσ_rest; })()')
+            output.end_statement()
+
+    elif is_node_type(pattern, AST_MatchClass):
+        # Positional patterns via __match_args__
+        for i, ppat in enumerate(pattern.positional):
+            pos_var = subj + '[' + subj + '.constructor.__match_args__[' + str(i) + ']]'
+            _match_write_bindings(ppat, pos_var, output)
+        # Keyword patterns
+        for i, kname in enumerate(pattern.keys):
+            attr_var = subj + '.' + kname
+            _match_write_bindings(pattern.values[i], attr_var, output)
+
+def print_match(self, output):
+    output.match_counter += 1
+    n = output.match_counter
+    subj_var = 'ρσ_match_subject_' + n
+    label = 'ρσ_match_' + n
+
+    # var ρσ_match_subject_N = <subject>;
+    output.indent()
+    output.print('var ' + subj_var + ' = ')
+    self.subject.print(output)
+    output.end_statement()
+
+    # ρσ_match_N: do { ... } while (false);
+    output.newline()
+    output.indent()
+    output.print(label + ': do')
+    output.space()
+    output.with_block(def():
+        for mcase in self.cases:
+            always = _match_is_always_true(mcase.pattern)
+
+            if always:
+                # No structural if-check needed
+                output.indent()
+                _match_write_bindings(mcase.pattern, subj_var, output)
+                if mcase.guard:
+                    output.indent()
+                    output.print('if (')
+                    mcase.guard.print(output)
+                    output.print(')')
+                    output.space()
+                    output.with_block(def():
+                        _match_print_body(mcase.body, label, output)
+                    )
+                    output.newline()
+                else:
+                    _match_print_body(mcase.body, label, output)
+            else:
+                output.indent()
+                output.print('if (')
+                _match_write_cond(mcase.pattern, subj_var, output)
+                output.print(')')
+                output.space()
+                output.with_block(def():
+                    _match_write_bindings(mcase.pattern, subj_var, output)
+                    if mcase.guard:
+                        output.indent()
+                        output.print('if (')
+                        mcase.guard.print(output)
+                        output.print(')')
+                        output.space()
+                        output.with_block(def():
+                            _match_print_body(mcase.body, label, output)
+                        )
+                        output.newline()
+                    else:
+                        _match_print_body(mcase.body, label, output)
+                )
+                output.newline()
+    )
+    output.spaced('while', '(false)')
+    output.end_statement()
+
+def _match_print_body(body, label, output):
+    """Print the statements of a case body, followed by break <label>."""
+    stmts = body.body if is_node_type(body, AST_BlockStatement) else [body]
+    display_body(stmts, False, output)
+    output.indent()
+    output.print('break ' + label)
     output.end_statement()

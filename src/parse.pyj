@@ -21,7 +21,10 @@ AST_SymbolCatch, AST_SymbolDefun, AST_SymbolFunarg,
 AST_SymbolLambda, AST_SymbolNonlocal, AST_SymbolRef, AST_SymbolVar, AST_This,
 AST_Throw, AST_Toplevel, AST_True, AST_Try, AST_UnaryPrefix,
 AST_Undefined, AST_Var, AST_VarDef, AST_Verbatim, AST_While, AST_With, AST_WithClause,
-AST_Yield, AST_Await, AST_Assert, AST_Existential, is_node_type
+AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, is_node_type,
+AST_Match, AST_MatchCase,
+AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
+AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
 )
 from tokenizer import tokenizer, is_token, RESERVED_WORDS
 
@@ -348,6 +351,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     for clause in stmt.clauses:
                         if clause.alias:
                             push(clause.alias.name)
+                elif is_node_type(stmt, AST_Match):
+                    for mcase in stmt.cases:
+                        for cap in scan_match_pattern_captures(mcase.pattern):
+                            push(cap)
+                        if mcase.body:
+                            extend(scan_for_local_vars(mcase.body))
 
         elif body.body:
             # recursive descent into wrapper statements that contain body blocks
@@ -371,10 +380,47 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             if not is_node_type(body.right, AST_Scope):
                 extend(scan_for_local_vars(body.right))
 
+        elif is_node_type(body, AST_NamedExpr):
+            # walrus operator: name := value
+            push(body.name.name)
+            extend(scan_for_local_vars(body.value))
+
         elif is_node_type(body, AST_ForIn):
             add_for_in(body)
 
         return localvars
+
+    def scan_match_pattern_captures(pattern):
+        """Recursively collect all capture variable names from a match pattern."""
+        captures = v'[]'
+        if is_node_type(pattern, AST_MatchCapture):
+            captures.push(pattern.name)
+        elif is_node_type(pattern, AST_MatchAs):
+            if pattern.name:
+                captures.push(pattern.name)
+            if pattern.pattern:
+                captures = captures.concat(scan_match_pattern_captures(pattern.pattern))
+        elif is_node_type(pattern, AST_MatchOr):
+            # OR patterns must bind the same names – scan first alternative
+            if pattern.patterns.length:
+                captures = captures.concat(scan_match_pattern_captures(pattern.patterns[0]))
+        elif is_node_type(pattern, AST_MatchSequence):
+            for e in pattern.elements:
+                captures = captures.concat(scan_match_pattern_captures(e))
+        elif is_node_type(pattern, AST_MatchStar):
+            if pattern.name:
+                captures.push(pattern.name)
+        elif is_node_type(pattern, AST_MatchMapping):
+            for v in pattern.values:
+                captures = captures.concat(scan_match_pattern_captures(v))
+            if pattern.rest_name:
+                captures.push(pattern.rest_name)
+        elif is_node_type(pattern, AST_MatchClass):
+            for p in pattern.positional:
+                captures = captures.concat(scan_match_pattern_captures(p))
+            for v in pattern.values:
+                captures = captures.concat(scan_match_pattern_captures(v))
+        return captures
 
     def scan_for_nonlocal_defs(body):
         vars = v'[]'
@@ -458,6 +504,13 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             else:
                 unexpected()
         elif tmp_ is "name":
+            if S.token.value is 'match':
+                p = peek()
+                # 'match' is a soft keyword: treat as match statement when followed by
+                # a token that can start an expression subject (not an assignment/attr-access/call op)
+                if p.type is 'name' or p.type is 'string' or p.type is 'num' or p.type is 'atom' or p.type is 'js' or (p.type is 'punc' and (p.value is '[' or p.value is '(')):
+                    next()  # consume the 'match' name token
+                    return match_()
             if (is_token(peek(), 'punc', ':')) token_error(peek(), 'invalid syntax, colon not allowed here')
             return simple_statement()
         elif tmp_ is "keyword":
@@ -617,6 +670,335 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         return new AST_With({
             'clauses': clauses,
             'body': body
+        })
+
+    # ---- Match/case (structural pattern matching) ----
+
+    def parse_match_literal_node(tok):
+        """Build an AST literal node from a token."""
+        if tok.type is 'string':
+            return new AST_String({'start': tok, 'value': tok.value, 'end': tok})
+        elif tok.type is 'num':
+            return new AST_Number({'start': tok, 'value': tok.value, 'end': tok})
+        elif tok.type is 'atom':
+            if tok.value is 'True':
+                return new AST_True({'start': tok, 'end': tok})
+            elif tok.value is 'False':
+                return new AST_False({'start': tok, 'end': tok})
+            else:
+                return new AST_Null({'start': tok, 'end': tok})
+        croak('Expected a literal in match pattern')
+
+    def parse_match_closed_pattern():
+        """Parse a single atomic/closed pattern (no OR, no AS)."""
+        start = S.token
+
+        # Negative number literal: -42
+        if is_('operator', '-') and peek().type is 'num':
+            next()  # consume '-'
+            val = -S.token.value
+            tok = S.token
+            next()
+            return new AST_MatchLiteral({
+                'start': start,
+                'value': new AST_Number({'start': start, 'value': val, 'end': tok}),
+                'end': prev()
+            })
+
+        # Number literal
+        if is_('num'):
+            tok = S.token
+            next()
+            return new AST_MatchLiteral({
+                'start': tok,
+                'value': new AST_Number({'start': tok, 'value': tok.value, 'end': tok}),
+                'end': prev()
+            })
+
+        # String literal
+        if is_('string'):
+            tok = S.token
+            next()
+            return new AST_MatchLiteral({
+                'start': tok,
+                'value': new AST_String({'start': tok, 'value': tok.value, 'end': tok}),
+                'end': prev()
+            })
+
+        # Atom: True, False, None
+        if is_('atom'):
+            tok = S.token
+            next()
+            return new AST_MatchLiteral({
+                'start': tok,
+                'value': parse_match_literal_node(tok),
+                'end': prev()
+            })
+
+        # Sequence: [...]
+        if is_('punc', '['):
+            return parse_match_sequence('[', ']')
+
+        # Group or sequence: (...)
+        if is_('punc', '('):
+            return parse_match_sequence('(', ')')
+
+        # Mapping: {...}
+        if is_('punc', '{'):
+            return parse_match_mapping()
+
+        # Name: wildcard, capture, class pattern, or dotted value pattern
+        if is_('name'):
+            name = S.token.value
+            next()
+
+            # Build dotted value pattern: Mod.CONST or Mod.Sub.CONST
+            expr = new AST_SymbolRef({'start': start, 'name': name, 'end': prev()})
+            while is_('punc', '.'):
+                next()  # consume '.'
+                if not is_('name'):
+                    croak('Expected name after . in match pattern')
+                prop = S.token.value
+                prop_end = S.token
+                next()
+                expr = new AST_Dot({'start': start, 'expression': expr, 'property': prop, 'end': prop_end})
+
+            # Class pattern: Name(...) or Dotted.Name(...)
+            if is_('punc', '('):
+                return parse_match_class(expr, start)
+
+            # After a dot, it's a value pattern
+            if is_node_type(expr, AST_Dot):
+                return new AST_MatchLiteral({'start': start, 'value': expr, 'end': prev()})
+
+            # Wildcard: _
+            if name is '_':
+                return new AST_MatchWildcard({'start': start, 'end': prev()})
+
+            # Capture: plain name
+            return new AST_MatchCapture({'start': start, 'name': name, 'end': prev()})
+
+        croak('Expected a match pattern, got: ' + S.token.type + ' ' + S.token.value)
+
+    def parse_match_sequence(open_punc, close_punc):
+        start = S.token
+        next()  # consume '[' or '('
+        elements = v'[]'
+
+        if is_('punc', close_punc):
+            next()
+            return new AST_MatchSequence({'start': start, 'elements': elements, 'end': prev()})
+
+        while True:
+            if is_('operator', '*'):
+                star_start = S.token
+                next()  # consume '*'
+                if is_('name', '_'):
+                    next()
+                    elements.push(new AST_MatchStar({'start': star_start, 'name': None, 'end': prev()}))
+                elif is_('name'):
+                    nm = S.token.value
+                    next()
+                    elements.push(new AST_MatchStar({'start': star_start, 'name': nm, 'end': prev()}))
+                else:
+                    croak('Expected a name after * in sequence pattern')
+            else:
+                elements.push(parse_match_pattern())
+
+            if is_('punc', ','):
+                next()
+                if is_('punc', close_punc):
+                    break
+            elif is_('punc', close_punc):
+                break
+            else:
+                unexpected()
+
+        next()  # consume ']' or ')'
+
+        # A parenthesised group with exactly one non-star element → unwrap
+        if open_punc is '(' and elements.length is 1 and not is_node_type(elements[0], AST_MatchStar):
+            return elements[0]
+
+        return new AST_MatchSequence({'start': start, 'elements': elements, 'end': prev()})
+
+    def parse_match_mapping():
+        start = S.token
+        next()  # consume '{'
+        keys = v'[]'
+        values = v'[]'
+        rest_name = None
+
+        if not is_('punc', '}'):
+            while True:
+                if is_('operator', '**'):
+                    next()  # consume '**'
+                    if is_('name', '_'):
+                        next()
+                        rest_name = None
+                    elif is_('name'):
+                        rest_name = S.token.value
+                        next()
+                    else:
+                        croak('Expected a name after ** in mapping pattern')
+                    break
+                # Parse key (string, num, atom, or name-as-string)
+                if is_('string') or is_('num') or is_('atom'):
+                    key_tok = S.token
+                    next()
+                    keys.push(parse_match_literal_node(key_tok))
+                elif is_('name'):
+                    # Treat bare name as string key (for dict-style access)
+                    key_tok = S.token
+                    next()
+                    keys.push(new AST_String({'start': key_tok, 'value': key_tok.value, 'end': key_tok}))
+                else:
+                    croak('Expected a literal key in mapping pattern')
+
+                if not is_('punc', ':'):
+                    croak('Expected : after key in mapping pattern')
+                next()  # consume ':'
+
+                values.push(parse_match_pattern())
+
+                if is_('punc', ','):
+                    next()
+                    if is_('punc', '}'):
+                        break
+                elif is_('punc', '}'):
+                    break
+                else:
+                    unexpected()
+
+        next()  # consume '}'
+        return new AST_MatchMapping({
+            'start': start,
+            'keys': keys,
+            'values': values,
+            'rest_name': rest_name,
+            'end': prev()
+        })
+
+    def parse_match_class(cls_expr, start):
+        next()  # consume '('
+        positional = v'[]'
+        keys = v'[]'
+        values = v'[]'
+
+        if not is_('punc', ')'):
+            while True:
+                # Keyword arg: name=pattern
+                if is_('name') and is_token(peek(), 'operator', '='):
+                    kname = S.token.value
+                    next()  # consume name
+                    next()  # consume '='
+                    vpat = parse_match_pattern()
+                    keys.push(kname)
+                    values.push(vpat)
+                else:
+                    if keys.length:
+                        croak('Positional patterns must come before keyword patterns in class pattern')
+                    positional.push(parse_match_pattern())
+
+                if is_('punc', ','):
+                    next()
+                    if is_('punc', ')'):
+                        break
+                elif is_('punc', ')'):
+                    break
+                else:
+                    unexpected()
+
+        next()  # consume ')'
+        return new AST_MatchClass({
+            'start': start,
+            'cls': cls_expr,
+            'positional': positional,
+            'keys': keys,
+            'values': values,
+            'end': prev()
+        })
+
+    def parse_match_or_pattern():
+        start = S.token
+        pat = parse_match_closed_pattern()
+        if is_('operator', '|'):
+            patterns = [pat]
+            while is_('operator', '|'):
+                next()  # consume '|'
+                patterns.push(parse_match_closed_pattern())
+            return new AST_MatchOr({'start': start, 'patterns': patterns, 'end': prev()})
+        return pat
+
+    def parse_match_pattern():
+        """Parse a full pattern including optional AS suffix."""
+        start = S.token
+        pat = parse_match_or_pattern()
+        if is_('keyword', 'as'):
+            next()  # consume 'as'
+            if not is_('name'):
+                croak('Expected a capture name after "as" in match pattern')
+            aname = S.token.value
+            next()
+            return new AST_MatchAs({
+                'start': start,
+                'pattern': pat,
+                'name': aname,
+                'end': prev()
+            })
+        return pat
+
+    @embed_tokens
+    def match_():
+        """Parse a match/case statement. 'match' name token already consumed."""
+        start = prev()  # the 'match' token
+        subject = expression(True)
+
+        if not is_('punc', ':'):
+            croak("Expected ':' after match subject")
+
+        cases = v'[]'
+        prev_whitespace = S.token.leading_whitespace
+        next()  # consume ':'
+
+        if not S.token.nlb:
+            croak('Expected an indented block of case statements after match')
+
+        current_whitespace = S.token.leading_whitespace
+        if current_whitespace.length is 0 or prev_whitespace is current_whitespace:
+            croak('Expected an indented block after match')
+
+        while not is_('punc', '}') and not is_('eof'):
+            if not (S.token.type is 'name' and S.token.value is 'case'):
+                token_error(S.token, 'Expected "case" inside match block')
+
+            case_start = S.token
+            next()  # consume 'case'
+
+            pattern = parse_match_pattern()
+
+            guard = None
+            if is_('keyword', 'if'):
+                next()  # consume 'if'
+                guard = expression(True)
+
+            body = statement()  # sees ':', creates AST_BlockStatement
+
+            cases.push(new AST_MatchCase({
+                'start': case_start,
+                'pattern': pattern,
+                'guard': guard,
+                'body': body,
+                'end': prev()
+            }))
+
+        if is_('punc', '}'):
+            next()  # consume the outer '}'
+
+        return new AST_Match({
+            'start': start,
+            'subject': subject,
+            'cases': cases
         })
 
     def simple_statement(tmp):
@@ -2086,6 +2468,17 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         start = S.token
         left = maybe_conditional(no_in)
         val = S.token.value
+        if is_("operator", ":="):
+            # walrus operator (named expression): name := value
+            if not is_node_type(left, AST_SymbolRef):
+                croak('Walrus operator := requires a simple name on the left-hand side')
+            next()
+            return new AST_NamedExpr({
+                'start': start,
+                'name': left,
+                'value': maybe_assign(no_in),
+                'end': prev()
+            })
         if is_("operator") and ASSIGNMENT[val]:
             if only_plain_assignment and val is not '=':
                 croak('Invalid assignment operator for chained assignment: ' + val)

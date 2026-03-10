@@ -625,6 +625,40 @@ function make_tests(SourceAnalyzer, RS) {
             },
         },
 
+        // ── Walrus operator (:=) ─────────────────────────────────────────────
+
+        {
+            name: "walrus_registers_symbol_in_scope",
+            description: "name := expr registers name as a variable in the enclosing scope",
+            run: function () {
+                var m = analyze([
+                    "if (n := 42) > 0:",
+                    "    pass",
+                ].join("\n"));
+                var syms = m.getAllSymbols();
+                assert_has(syms, "n", "walrus LHS should be registered");
+                var sym = find(syms, "n");
+                assert.strictEqual(sym.kind, "variable");
+            },
+        },
+
+        {
+            name: "walrus_in_function_scope",
+            description: "walrus inside a function registers name in the function scope",
+            run: function () {
+                var m = analyze([
+                    "def check(data):",
+                    "    if (result := len(data)) > 0:",
+                    "        return result",
+                    "    return 0",
+                ].join("\n"));
+                var syms = m.getAllSymbols();
+                assert_has(syms, "result", "walrus LHS in function should be registered");
+                var sym = find(syms, "result");
+                assert.strictEqual(sym.kind, "variable");
+            },
+        },
+
         // ── Virtual file imports ──────────────────────────────────────────
 
         {

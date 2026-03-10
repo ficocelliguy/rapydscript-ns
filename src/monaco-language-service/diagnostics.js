@@ -282,6 +282,17 @@ function Linter(RS, toplevel, code, builtins) {
         }
     };
 
+    this.handle_named_expr = function() {
+        const node = this.current_node;
+        // Walrus operator: name := value — treat the name as a new binding.
+        if (node.name instanceof RS.AST_SymbolRef) {
+            node.name.lint_visited = true;
+            this.current_node = node.name;
+            this.add_binding(node.name.name);
+            this.current_node = node;
+        }
+    };
+
     this.handle_vardef = function() {
         const node = this.current_node;
         if (node.name instanceof RS.AST_SymbolNonlocal) {
@@ -419,6 +430,7 @@ function Linter(RS, toplevel, code, builtins) {
         else if (node instanceof RS.AST_Class)           this.handle_class();
         else if (node instanceof RS.AST_BaseCall)        this.handle_call();
         else if (node instanceof RS.AST_Assign)          this.handle_assign();
+        else if (node instanceof RS.AST_NamedExpr)       this.handle_named_expr();
         else if (node instanceof RS.AST_VarDef)          this.handle_vardef();
         else if (node instanceof RS.AST_SymbolRef)       this.handle_symbol_ref();
         else if (node instanceof RS.AST_Decorator)       this.handle_decorator();
