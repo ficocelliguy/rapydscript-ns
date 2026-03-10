@@ -659,6 +659,49 @@ function make_tests(SourceAnalyzer, RS) {
             },
         },
 
+        // ── Lambda ────────────────────────────────────────────────────────
+
+        {
+            name: "lambda_parameter_in_scope",
+            description: "lambda parameters are registered as 'parameter' symbols inside the lambda scope",
+            run: function () {
+                var m = analyze([
+                    "add = lambda x, y: x + y",
+                ].join("\n"));
+                var syms = m.getAllSymbols();
+                assert_has(syms, "x", "lambda param x should be in scope");
+                assert_has(syms, "y", "lambda param y should be in scope");
+                var sx = find(syms, "x");
+                assert.strictEqual(sx.kind, "parameter");
+            },
+        },
+
+        {
+            name: "lambda_creates_function_scope",
+            description: "lambda body creates a new function scope frame",
+            run: function () {
+                var m = analyze([
+                    "fn = lambda x: x * 2",
+                ].join("\n"));
+                var function_frames = m.frames.filter(function (f) { return f.kind === "function"; });
+                assert.ok(function_frames.length >= 1, "Expected at least one function frame for the lambda");
+            },
+        },
+
+        {
+            name: "lambda_closure_outer_symbol_accessible",
+            description: "symbols assigned in outer scope are visible when lambda is assigned to them",
+            run: function () {
+                var m = analyze([
+                    "def make_adder(n):",
+                    "    return lambda x: x + n",
+                ].join("\n"));
+                var syms = m.getAllSymbols();
+                assert_has(syms, "n", "outer parameter n should be in scope");
+                assert_has(syms, "x", "lambda parameter x should be in scope");
+            },
+        },
+
         // ── Virtual file imports ──────────────────────────────────────────
 
         {
@@ -672,6 +715,58 @@ function make_tests(SourceAnalyzer, RS) {
                 assert_has(syms, "square");
                 var sym = find(syms, "square");
                 assert.strictEqual(sym.kind, "import");
+            },
+        },
+
+        // ── Variable type annotations ──────────────────────────────────────
+
+        {
+            name: "annotated_assign_registers_symbol",
+            description: "x: int = 1 registers x as a variable symbol",
+            run: function () {
+                var m = analyze("x: int = 1");
+                var syms = m.getAllSymbols();
+                assert_has(syms, "x");
+                var sym = find(syms, "x");
+                assert.strictEqual(sym.kind, "variable");
+            },
+        },
+
+        {
+            name: "annotated_assign_inferred_class",
+            description: "x: MyType = val sets inferred_class to 'MyType'",
+            run: function () {
+                var m = analyze("x: MyType = MyType()");
+                var syms = m.getAllSymbols();
+                var sym = find(syms, "x");
+                assert.ok(sym, "symbol x should exist");
+                assert.strictEqual(sym.inferred_class, "MyType");
+            },
+        },
+
+        {
+            name: "annotated_assign_only_registers_symbol",
+            description: "x: int (no value) still registers x as a variable",
+            run: function () {
+                var m = analyze("x: int");
+                var syms = m.getAllSymbols();
+                assert_has(syms, "x");
+                var sym = find(syms, "x");
+                assert.strictEqual(sym.kind, "variable");
+            },
+        },
+
+        {
+            name: "annotated_assign_in_function",
+            description: "x: int = 1 inside a function registers x in function scope",
+            run: function () {
+                var m = analyze("def f():\n    x: int = 10\n    return x");
+                var all = m.getAllSymbols();
+                assert_has(all, "x");
+                var xsym = find(all, "x");
+                assert.strictEqual(xsym.kind, "variable");
+                // x should be in function scope (depth 1), not module scope (depth 0)
+                assert.ok(xsym.scope_depth > 0, "x should be in a nested scope");
             },
         },
 

@@ -382,6 +382,31 @@ class ScopeBuilder {
                 kind:       'variable',
                 defined_at: pos_from_token(node.start),
             });
+
+        } else if (RS.AST_AnnotatedAssign && node instanceof RS.AST_AnnotatedAssign) {
+            // Variable type annotation: `x: int = value` or `x: int`
+            if (node.target instanceof RS.AST_SymbolRef) {
+                const name  = node.target.name;
+                const scope = this._current_scope();
+                if (name && scope) {
+                    let inferred_class = null;
+                    // Use the annotation as the declared type for inferred_class
+                    if (node.annotation instanceof RS.AST_SymbolRef) {
+                        inferred_class = node.annotation.name;
+                    }
+                    const existing = scope.getSymbol(name);
+                    if (!existing) {
+                        this._add_symbol({
+                            name,
+                            kind:           'variable',
+                            defined_at:     pos_from_token(node.target.start),
+                            inferred_class,
+                        });
+                    } else if (inferred_class && !existing.inferred_class) {
+                        existing.inferred_class = inferred_class;
+                    }
+                }
+            }
         }
 
         // ------------------------------------------------------------------

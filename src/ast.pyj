@@ -138,6 +138,22 @@ class AST_SimpleStatement(AST_Statement):
             self.body._walk(visitor)
         )
 
+class AST_AnnotatedAssign(AST_Statement):
+    "An annotated variable assignment: `x: int = 1` or just `x: int`"
+    properties = {
+        'target': "[AST_SymbolRef|AST_Dot] the variable being annotated",
+        'annotation': "[AST_Node] the type annotation expression",
+        'value': "[AST_Node?] the assigned value, or null if no assignment"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.target._walk(visitor)
+            self.annotation._walk(visitor)
+            if self.value:
+                self.value._walk(visitor)
+        )
+
 class AST_Assert(AST_Statement):
     "An assert statement, e.g. assert True, 'an error message'"
     properties = {

@@ -21,7 +21,7 @@ AST_SymbolCatch, AST_SymbolDefun, AST_SymbolFunarg,
 AST_SymbolLambda, AST_SymbolNonlocal, AST_SymbolRef, AST_SymbolVar, AST_This,
 AST_Throw, AST_Toplevel, AST_True, AST_Try, AST_UnaryPrefix,
 AST_Undefined, AST_Var, AST_VarDef, AST_Verbatim, AST_While, AST_With, AST_WithClause,
-AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, is_node_type,
+AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, is_node_type,
 AST_Match, AST_MatchCase,
 AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
 AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
@@ -357,6 +357,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                             push(cap)
                         if mcase.body:
                             extend(scan_for_local_vars(mcase.body))
+                elif is_node_type(stmt, AST_AnnotatedAssign):
+                    if stmt.value is not None and is_node_type(stmt.target, AST_SymbolRef):
+                        push(stmt.target.name)
+                    if stmt.value:
+                        extend(scan_for_local_vars(stmt.value))
 
         elif body.body:
             # recursive descent into wrapper statements that contain body blocks
@@ -384,6 +389,13 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             # walrus operator: name := value
             push(body.name.name)
             extend(scan_for_local_vars(body.value))
+
+        elif is_node_type(body, AST_AnnotatedAssign):
+            # annotated assignment: name: annotation [= value]
+            if body.value is not None and is_node_type(body.target, AST_SymbolRef):
+                push(body.target.name)
+            if body.value:
+                extend(scan_for_local_vars(body.value))
 
         elif is_node_type(body, AST_ForIn):
             add_for_in(body)
@@ -511,7 +523,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 if p.type is 'name' or p.type is 'string' or p.type is 'num' or p.type is 'atom' or p.type is 'js' or (p.type is 'punc' and (p.value is '[' or p.value is '(')):
                     next()  # consume the 'match' name token
                     return match_()
-            if (is_token(peek(), 'punc', ':')) token_error(peek(), 'invalid syntax, colon not allowed here')
+            if (is_token(peek(), 'punc', ':')):
+                return annotated_var_statement()
             return simple_statement()
         elif tmp_ is "keyword":
             tmp_ = S.token.value
@@ -587,6 +600,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                         'body': chain,
                         'end': prev()
                     })
+            elif tmp_ is "lambda":
+                start = prev()
+                func = lambda_()
+                func.start = start
+                func.end = prev()
+                return new AST_SimpleStatement({'start': start, 'body': func, 'end': prev()})
             elif tmp_ is "await":
                 start = prev()
                 value = expression(True)
@@ -1008,6 +1027,38 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'body': tmp
         })
 
+    def annotated_var_statement():
+        # Parse a variable type annotation: `name: annotation [= value]`
+        # Called when the current token is a name and the next token is ':'
+        start = S.token
+        target = new AST_SymbolRef({
+            'start': S.token,
+            'name': S.token.value,
+            'end': S.token
+        })
+        next()  # consume the name token
+        expect(':')  # consume the ':'
+        annotation = maybe_conditional()
+        value = None
+        if is_("operator", "="):
+            next()  # consume '='
+            value = expression(True)
+            # Track as class variable if inside a class body
+            if S.in_class.length and S.in_class[-1]:
+                class_name = S.in_class[-1]
+                if S.classes.length > 1:
+                    c = S.classes[-2][class_name]
+                    if c:
+                        c.provisional_classvars[target.name] = True
+        semicolon()
+        return new AST_AnnotatedAssign({
+            'start': start,
+            'target': target,
+            'annotation': annotation,
+            'value': value,
+            'end': prev()
+        })
+
     def break_cont(t):
         if S.in_loop is 0:
             croak(t.name.slice(4) + " not inside a loop or switch")
@@ -1400,6 +1451,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                         token_error(node.left.start, varname + ' is not allowed as a class variable name')
                     class_var_names[varname] = True
                     definition.classvars[varname] = True
+                elif is_node_type(node, AST_AnnotatedAssign) and is_node_type(node.target, AST_SymbolRef):
+                    varname = node.target.name
+                    if FORBIDDEN_CLASS_VARS.indexOf(varname) is not -1:
+                        token_error(node.target.start, varname + ' is not allowed as a class variable name')
+                    class_var_names[varname] = True
+                    definition.classvars[varname] = True
                 elif is_node_type(node, AST_SymbolRef) and has_prop(class_var_names, node.name):
                     node.thedef = new AST_SymbolDefun({'name':name.name + '.prototype.' + node.name})
                 if descend:
@@ -1596,6 +1653,113 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             baselib_items['yield'] = True
 
         # detect local variables, strip function arguments
+        assignments = scan_for_local_vars(definition.body)
+        for i in range(assignments.length):
+            for j in range(definition.argnames.length+1):
+                if j is definition.argnames.length:
+                    definition.localvars.push(new_symbol(AST_SymbolVar, assignments[i]))
+                elif j < definition.argnames.length and assignments[i] is definition.argnames[j].name:
+                    break
+
+        nonlocals = scan_for_nonlocal_defs(definition.body)
+        nonlocals = {name for name in nonlocals}
+        definition.localvars = definition.localvars.filter(def(v): return not nonlocals.has(v.name);)
+        return definition
+
+    def lambda_():
+        # Parse Python-style lambda: lambda arg1, arg2, ...: expression
+        # Arguments are comma-separated names (no parentheses), terminated by ':'
+        is_generator = v'[]'
+        argnames = (def(a):
+            defaults = {}
+            first = True
+            seen_names = {}
+
+            def get_arg():
+                if not is_("name"):
+                    croak("Name expected in lambda argument list")
+                    return None
+                current_arg_name = S.token.value
+                if has_prop(seen_names, current_arg_name):
+                    token_error(S.token, "Can't repeat parameter names")
+                seen_names[current_arg_name] = True
+                sym = new AST_SymbolFunarg({
+                    'name': current_arg_name,
+                    'start': S.token,
+                    'end': S.token,
+                    'annotation': None
+                })
+                next()
+                return sym
+
+            while not is_("punc", ":"):
+                if first:
+                    first = False
+                else:
+                    expect(",")
+                    if is_("punc", ":"):
+                        break
+                if is_('operator', '**'):
+                    next()
+                    if a.kwargs:
+                        croak("Can't define multiple **kwargs in lambda")
+                    a.kwargs = get_arg()
+                elif is_('operator', '*'):
+                    next()
+                    if a.starargs:
+                        croak("Can't define multiple *args in lambda")
+                    if a.kwargs:
+                        croak("Can't define *args after **kwargs in lambda")
+                    a.starargs = get_arg()
+                else:
+                    if a.starargs or a.kwargs:
+                        croak("Can't define a formal parameter after *args or **kwargs")
+                    arg = get_arg()
+                    a.push(arg)
+                    if is_("operator", "="):
+                        next()
+                        defaults[arg.name] = maybe_conditional()
+                        a.has_defaults = True
+                    else:
+                        if a.has_defaults:
+                            croak("Can't define required formal parameters after optional formal parameters")
+            a.defaults = defaults
+            a.is_simple_func = not a.starargs and not a.kwargs and not a.has_defaults
+            return a
+        )(v'[]')
+
+        expect(":")
+
+        # Parse the body expression inside a function scope (mirrors function_())
+        S.in_class.push(False)
+        S.classes.push({})
+        S.scoped_flags.push()
+        S.in_function += 1
+        S.functions.push({})
+        body_expr = maybe_conditional()
+        S.in_function -= 1
+        S.scoped_flags.pop()
+        is_generator.push(bool(S.functions.pop().is_generator))
+        S.classes.pop()
+        S.in_class.pop()
+
+        ret_node = new AST_Return({'value': body_expr, 'start': body_expr.start, 'end': body_expr.end})
+        body = v'[ret_node]'
+
+        definition = new AST_Function({
+            'name': None,
+            'is_expression': True,
+            'is_anonymous': True,
+            'argnames': argnames,
+            'localvars': [],
+            'decorators': [],
+            'docstrings': [],
+            'body': body,
+        })
+        definition.return_annotation = None
+        definition.is_generator = is_generator[0]
+        definition.is_async = False
+
         assignments = scan_for_local_vars(definition.body)
         for i in range(assignments.length):
             for j in range(definition.argnames.length+1):
@@ -1875,6 +2039,13 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         if is_("keyword", "def"):
             next()
             func = function_(False, True)
+            func.start = start
+            func.end = prev()
+            return subscripts(func, allow_calls)
+
+        if is_("keyword", "lambda"):
+            next()
+            func = lambda_()
             func.start = start
             func.end = prev()
             return subscripts(func, allow_calls)

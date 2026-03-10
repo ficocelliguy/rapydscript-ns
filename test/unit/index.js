@@ -907,6 +907,229 @@ assrt.equal(fib(15), 610)
         js_checks: [],
     },
 
+    // ── Lambda ────────────────────────────────────────────────────────────
+
+    {
+        name: "lambda_basic",
+        description: "lambda compiles to an anonymous JS function expression",
+        src: [
+            "# globals: assrt",
+            "double = lambda x: x * 2",
+            "assrt.equal(double(5), 10)",
+            "add = lambda a, b: a + b",
+            "assrt.equal(add(3, 4), 7)",
+        ].join("\n"),
+        js_checks: ["function"],
+    },
+
+    {
+        name: "lambda_no_args",
+        description: "lambda with no arguments works",
+        src: [
+            "# globals: assrt",
+            "forty_two = lambda: 42",
+            "assrt.equal(forty_two(), 42)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "lambda_inline",
+        description: "lambda used inline in a function call",
+        src: [
+            "# globals: assrt",
+            "def apply(fn, x):",
+            "    return fn(x)",
+            "assrt.equal(apply(lambda x: x * x, 5), 25)",
+            "nums = [3, 1, 2]",
+            "nums.sort(lambda a, b: a - b)",
+            "assrt.deepEqual(nums, [1, 2, 3])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "lambda_ternary_body",
+        description: "lambda body can be a ternary (if/else) expression",
+        src: [
+            "# globals: assrt",
+            "abs_val = lambda x: x if x >= 0 else -x",
+            "assrt.equal(abs_val(5), 5)",
+            "assrt.equal(abs_val(-3), 3)",
+            "clamp = lambda x, lo, hi: lo if x < lo else (hi if x > hi else x)",
+            "assrt.equal(clamp(5, 0, 10), 5)",
+            "assrt.equal(clamp(-1, 0, 10), 0)",
+            "assrt.equal(clamp(15, 0, 10), 10)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "lambda_default_args",
+        description: "lambda supports default argument values",
+        src: [
+            "# globals: assrt",
+            "greet = lambda name='world': 'hello ' + name",
+            "assrt.equal(greet(), 'hello world')",
+            "assrt.equal(greet('alice'), 'hello alice')",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "lambda_closure",
+        description: "lambda captures variables from enclosing scope",
+        src: [
+            "# globals: assrt",
+            "def make_adder(n):",
+            "    return lambda x: x + n",
+            "add5 = make_adder(5)",
+            "assrt.equal(add5(3), 8)",
+            "assrt.equal(add5(10), 15)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "lambda_in_list",
+        description: "lambda can be stored in a list and called",
+        src: [
+            "# globals: assrt",
+            "ops = [lambda x: x + 1, lambda x: x * 2, lambda x: x - 3]",
+            "assrt.equal(ops[0](5), 6)",
+            "assrt.equal(ops[1](5), 10)",
+            "assrt.equal(ops[2](5), 2)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "lambda_nested",
+        description: "nested lambdas work (lambda returning lambda)",
+        src: [
+            "# globals: assrt",
+            "mult = lambda x: lambda y: x * y",
+            "triple = mult(3)",
+            "assrt.equal(triple(4), 12)",
+            "assrt.equal(mult(5)(6), 30)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "lambda_star_args",
+        description: "lambda supports *args",
+        src: [
+            "# globals: assrt",
+            "total = lambda *args: sum(args)",
+            "assrt.equal(total(1, 2, 3), 6)",
+            "assrt.equal(total(10, 20), 30)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    // ── Variable type annotations ──────────────────────────────────────────
+
+    {
+        name: "var_annotation_with_value",
+        description: "variable type annotations with assignment compile and run correctly",
+        src: [
+            "# globals: assrt",
+            "x: int = 42",
+            "assrt.equal(x, 42)",
+            "y: str = 'hello'",
+            "assrt.equal(y, 'hello')",
+            "z: float = 3.14",
+            "assrt.equal(z, 3.14)",
+        ].join("\n"),
+        js_checks: ["x = 42", "y = \"hello\"", "z = 3.14"],
+    },
+
+    {
+        name: "var_annotation_only",
+        description: "annotation-only (no value) compiles and runs without error",
+        src: [
+            "# globals: assrt",
+            "x: int",
+            "assrt.ok(True)",
+        ].join("\n"),
+        // annotation-only produces no assignment
+        js_checks: [],
+    },
+
+    {
+        name: "var_annotation_complex_type",
+        description: "variable annotations with complex type expressions work correctly",
+        src: [
+            "# globals: assrt",
+            "xs: list = [1, 2, 3]",
+            "assrt.deepEqual(xs, [1, 2, 3])",
+            "d: dict = {'a': 1}",
+            "assrt.equal(d['a'], 1)",
+            "n: int = 2 + 3",
+            "assrt.equal(n, 5)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "var_annotation_in_function",
+        description: "variable annotations inside functions work correctly",
+        src: [
+            "# globals: assrt",
+            "def f():",
+            "    x: int = 10",
+            "    y: str = 'hi'",
+            "    return x",
+            "assrt.equal(f(), 10)",
+        ].join("\n"),
+        js_checks: ["x = 10"],
+    },
+
+    {
+        name: "var_annotation_in_class",
+        description: "variable annotations as class attributes work correctly",
+        src: [
+            "# globals: assrt",
+            "class Counter:",
+            "    count: int = 0",
+            "    def increment(self):",
+            "        self.count += 1",
+            "c = Counter()",
+            "c.increment()",
+            "assrt.equal(c.count, 1)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "var_annotation_expr_rhs",
+        description: "annotation with complex RHS expression evaluates correctly",
+        src: [
+            "# globals: assrt",
+            "def compute():",
+            "    result: int = 0",
+            "    for i in range(5):",
+            "        result += i",
+            "    return result",
+            "assrt.equal(compute(), 10)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "var_annotation_multiple",
+        description: "multiple annotated assignments in sequence all execute",
+        src: [
+            "# globals: assrt",
+            "a: int = 1",
+            "b: int = 2",
+            "c: int = a + b",
+            "assrt.equal(c, 3)",
+        ].join("\n"),
+        js_checks: ["a = 1", "b = 2"],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

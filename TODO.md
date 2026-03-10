@@ -32,7 +32,7 @@
 
 
 
-I would like you to add support for [ the lambda keyword ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please also update the README to mention this support.
+I would like you to add support for [ Variable type annotations e.g. x: int = 1 ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please also update the README to mention this support.
 
 
 
@@ -51,13 +51,13 @@ differences.
 ┌───────────────────────────────────────────────┬────────────────┬──────────────────────────────────────────────────────────────┐
 │                    Feature                    │ Python Version │                            Notes                             │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ match/case (structural pattern matching)      │ 3.10+          │ done                                           │
+│ match/case (structural pattern matching)      │ 3.10+          │ needs testing                                           │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Walrus operator :=                            │ 3.8+           │ done                                         │
+│ Walrus operator :=                            │ 3.8+           │ needs testing                                         │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ lambda keyword                                │ all            │ Must use def(args): expr; workaround                         │
+│ lambda keyword                                │ all            │ needs testing                         │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Variable type annotations x: int = 1          │ 3.6+           │ Only function argument/return annotations work               │
+│ Variable type annotations x: int = 1          │ 3.6+           │ needs testing            │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Positional-only parameters (def f(a, /, b):)  │ 3.8+           │ / separator not in parser                                    │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤

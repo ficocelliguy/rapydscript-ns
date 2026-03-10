@@ -22,6 +22,7 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [Getting Started](#getting-started)
 - [Leveraging other APIs](#leveraging-other-apis)
 - [Anonymous Functions](#anonymous-functions)
+- [Lambda Expressions](#lambda-expressions)
 - [Decorators](#decorators)
 - [Self-Executing Functions](#self-executing-functions)
 - [Chaining Blocks](#chaining-blocks)
@@ -36,6 +37,7 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [Strings](#strings)
 - [The Existential Operator](#the-existential-operator)
 - [Walrus Operator](#walrus-operator)
+- [Variable Type Annotations](#variable-type-annotations)
 - [Regular Expressions](#regular-expressions)
 - [Creating DOM trees easily](#creating-dom-trees-easily)
 - [Classes](#classes)
@@ -284,10 +286,9 @@ Anonymous Functions
 
 Like JavaScript, RapydScript allows the use of anonymous functions. In fact,
 you've already seen the use of anonymous functions in previous section when
-creating an object literal ('onmouseover' and 'onmouseout' assignments). This
-is similar to Python's lambda function, except that the syntax isn't awkward
-like lambda, and the function isn't limited to one line. The following two
-function declarations are equivalent:
+creating an object literal ('onmouseover' and 'onmouseout' assignments). Unlike
+Python's `lambda`, anonymous functions created with `def` are not limited to a
+single expression. The following two function declarations are equivalent:
 
 ```js
 def factorial(n):
@@ -359,9 +360,67 @@ semi-colons as newline separators within functions that aren't inlined, as in
 the example in the previous section).
 
 
+Lambda Expressions
+------------------
+
+RapydScript supports Python's `lambda` keyword for creating single-expression
+anonymous functions inline. The syntax is identical to Python:
+
+```
+lambda arg1, arg2, ...: expression
+```
+
+The body must be a single expression whose value is implicitly returned. For
+multi-statement bodies, use `def` instead.
+
+```py
+# Simple lambda assigned to a variable
+double = lambda x: x * 2
+double(5)  # → 10
+
+# Lambda with multiple arguments
+add = lambda a, b: a + b
+add(3, 4)  # → 7
+
+# Lambda with no arguments
+forty_two = lambda: 42
+
+# Lambda with a ternary body
+abs_val = lambda x: x if x >= 0 else -x
+abs_val(-5)  # → 5
+
+# Lambda used inline (e.g. as a sort key)
+nums = [3, 1, 2]
+nums.sort(lambda a, b: a - b)
+# nums is now [1, 2, 3]
+
+# Lambda with a default argument value
+greet = lambda name='world': 'hello ' + name
+greet()         # → 'hello world'
+greet('alice')  # → 'hello alice'
+
+# Lambda with *args
+total = lambda *args: sum(args)
+total(1, 2, 3)  # → 6
+
+# Closure: lambda captures variables from the enclosing scope
+def make_adder(n):
+    return lambda x: x + n
+add5 = make_adder(5)
+add5(3)   # → 8
+
+# Nested lambdas
+mult = lambda x: lambda y: x * y
+mult(3)(4)  # → 12
+```
+
+`lambda` is purely syntactic sugar — `lambda x: expr` compiles to the same
+JavaScript as `def(x): return expr`. Use `def` when the body spans multiple
+lines or needs statements.
+
 Decorators
 ----------
-Like Python, RapydScript supports decorators. 
+Like Python, RapydScript supports decorators.
 
 ```py
 def makebold(fn):
@@ -961,6 +1020,57 @@ results = [y for x in data if (y := transform(x)) is not None]
 
 The walrus operator binds to the nearest enclosing function or module scope
 (not the comprehension scope), matching Python semantics.
+
+Variable Type Annotations
+--------------------------
+
+RapydScript supports Python's variable type annotation syntax (PEP 526). You
+can annotate a variable with a type hint, with or without an initial value:
+
+```python
+# Annotated assignment: declares and assigns the variable
+x: int = 42
+name: str = "Alice"
+items: list = [1, 2, 3]
+
+# Annotation only: declares the type without assigning a value
+count: int
+```
+
+Annotations follow the same syntax as Python: the variable name, a colon, the
+type expression, and optionally `= value`. The type expression can be any valid
+RapydScript expression:
+
+```python
+# Complex annotation expressions
+data: Optional[str] = None
+mapping: dict = {}
+result: int = len(items) * 2
+```
+
+Annotations work at module scope, inside functions, and inside class bodies:
+
+```python
+class Point:
+    x: float = 0.0
+    y: float = 0.0
+
+    def move(self, dx: float, dy: float) -> None:
+        self.x += dx
+        self.y += dy
+
+def distance(p: Point) -> float:
+    dx: float = p.x
+    dy: float = p.y
+    return (dx * dx + dy * dy) ** 0.5
+```
+
+In the compiled JavaScript, the type annotation is erased — only the
+assignment (if present) is emitted. This matches Python's runtime behaviour
+where annotations are metadata and do not affect execution. The existing
+function parameter annotation support (`:` on parameters, `->` for return
+types) is unaffected and continues to emit `__annotations__` metadata on the
+function object.
 
 Regular Expressions
 ----------------------

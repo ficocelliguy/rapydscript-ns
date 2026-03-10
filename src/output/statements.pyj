@@ -8,7 +8,8 @@ from ast import (
     AST_Conditional, AST_Binary, AST_BlockStatement, is_node_type,
     AST_Match, AST_MatchCase,
     AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
-    AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
+    AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass,
+    AST_AnnotatedAssign
 )
 
 def force_statement(stat, output):
@@ -448,3 +449,15 @@ def _match_print_body(body, label, output):
     output.indent()
     output.print('break ' + label)
     output.end_statement()
+
+def print_annotated_assign(self, output):
+    # Variable type annotation: `x: int = value` or `x: int` (annotation only).
+    # The annotation is erased in the JavaScript output; only the assignment is emitted.
+    if self.value is not None:
+        self.target.print(output)
+        output.space()
+        output.print('=')
+        output.space()
+        self.value.print(output)
+        output.semicolon()
+    # annotation-only (no value) emits nothing
