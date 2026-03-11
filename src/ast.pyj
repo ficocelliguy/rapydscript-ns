@@ -790,6 +790,19 @@ class AST_ClassCall(AST_BaseCall):
                 arg._walk(visitor)
         )
 
+class AST_Super(AST_Node):
+    "Represents a resolved super() proxy, carrying the parent class expression"
+    properties = {
+        'parent': "[AST_Node] the parent class expression",
+        'class_name': "[string] name of the class where super() appears",
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            if self.parent:
+                self.parent._walk(visitor)
+        )
+
 class AST_New(AST_Call):
     "An object instantiation. Derives from a function call since it has exactly the same properties"
 

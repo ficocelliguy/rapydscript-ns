@@ -21,7 +21,7 @@ AST_SymbolCatch, AST_SymbolDefun, AST_SymbolFunarg,
 AST_SymbolLambda, AST_SymbolNonlocal, AST_SymbolRef, AST_SymbolVar, AST_This,
 AST_Throw, AST_Toplevel, AST_True, AST_Try, AST_UnaryPrefix,
 AST_Undefined, AST_Var, AST_VarDef, AST_Verbatim, AST_While, AST_With, AST_WithClause,
-AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, is_node_type,
+AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, AST_Super, is_node_type,
 AST_Match, AST_MatchCase,
 AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
 AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
@@ -1380,6 +1380,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     next()
                     continue
 
+        class_details['parent'] = class_parent
+
         docstrings = v'[]'
         definition = new AST_Class({
             'name': name,
@@ -2434,6 +2436,27 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             return ret
         else:
             if is_node_type(expr, AST_Dot):
+                if is_node_type(expr.expression, AST_Super):
+                    # super().method(args) → ParentClass.prototype.method.call(this, args)
+                    super_node = expr.expression
+                    method_name = expr.property
+                    method_args = func_call_list()
+                    this_node = new AST_This({
+                        'name': 'this',
+                        'start': start,
+                        'end': start
+                    })
+                    method_args.unshift(this_node)
+                    ret = subscripts(new AST_ClassCall({
+                        'start': start,
+                        'class': super_node.parent,
+                        'method': method_name,
+                        'static': False,
+                        'args': method_args,
+                        'end': prev()
+                    }), True)
+                    S.in_parenthesized_expr = False
+                    return ret
                 c = get_class_in_scope(expr.expression)
 
             if c:
@@ -2474,6 +2497,43 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     })
                     S.in_parenthesized_expr = False
                     return ret
+                elif tmp_ is "super":
+                    # Find the innermost enclosing class name
+                    current_class = None
+                    for v'var i = S.in_class.length - 1; i >= 0; i--':
+                        if S.in_class[i]:
+                            current_class = S.in_class[i]
+                            break
+                    if not current_class:
+                        croak('super() is only valid inside a class method')
+                    super_args = func_call_list()
+                    parent_expr = None
+                    if super_args.length is 0:
+                        # 0-arg form: use parent of current class
+                        for v'var s = S.classes.length - 1; s >= 0; s--':
+                            if has_prop(S.classes[s], current_class):
+                                parent_expr = S.classes[s][current_class].parent
+                                break
+                        if not parent_expr:
+                            croak('super() used in a class without a parent class')
+                    elif super_args.length is 2:
+                        # 2-arg form: super(ClassName, self) — use parent of ClassName
+                        cls_ref = super_args[0]
+                        cls_info = get_class_in_scope(cls_ref)
+                        if not cls_info or not cls_info.parent:
+                            croak('First argument to super() must be a subclass with a parent')
+                        parent_expr = cls_info.parent
+                    else:
+                        croak('super() takes 0 or 2 arguments (' + super_args.length + ' given)')
+                    super_node = new AST_Super({
+                        'start': start,
+                        'parent': parent_expr,
+                        'class_name': current_class,
+                        'end': prev()
+                    })
+                    S.in_parenthesized_expr = False
+                    # Call subscripts to handle subsequent .method(args) chain
+                    return subscripts(super_node, True)
 
             # fall-through to basic function call
             ret = subscripts(new AST_Call({

@@ -1214,6 +1214,32 @@ arguments) the parent method gets executed. Also note the use of `\` operator
 to break up a line. This is something Python allows for keeping each line short
 and legible. Likewise, RapydScript, being indentation-based, allows the same.
 
+RapydScript also supports Python 3's `super()` built-in for calling parent
+class methods without naming the parent explicitly:
+
+```py
+class Animal:
+    def __init__(self, name):
+        self.name = name
+
+    def speak(self):
+        return self.name + ' says something'
+
+class Dog(Animal):
+    def __init__(self, name, breed):
+        super().__init__(name)   # calls Animal.__init__
+        self.breed = breed
+
+    def speak(self):
+        return super().speak() + ' (woof!)'
+```
+
+Both the zero-argument form `super()` (Python 3 style) and the two-argument
+form `super(ClassName, self)` (Python 2 style) are supported. The call
+`super().method(args)` compiles to `ParentClass.prototype.method.call(this,
+args)` in JavaScript. The Monaco language service also recognises `super` for
+completions, hover documentation, and diagnostics.
+
 Like Python, RapydScript allows multiple inheritance. The only caveat is that 
 the internal semantics of how it works are pretty different from python, since
 it is built on JavaScript's prototypical inheritance. For the most part you

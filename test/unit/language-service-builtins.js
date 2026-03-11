@@ -559,6 +559,49 @@ function make_tests(BuiltinsRegistry, BuiltinInfo, HoverEngine, SignatureHelpEng
             },
         },
 
+        // ── super() ───────────────────────────────────────────────────────
+
+        {
+            name: "super_in_registry",
+            description: "BuiltinsRegistry has an entry for super()",
+            run: function () {
+                var reg  = new BuiltinsRegistry();
+                var info = reg.get('super');
+                assert.ok(info, 'super should be in the registry');
+                assert.strictEqual(info.name, 'super');
+                assert.strictEqual(info.kind, 'function');
+                assert.ok(info.doc && info.doc.length > 0, 'super should have a doc string');
+            },
+        },
+
+        {
+            name: "super_hover",
+            description: "HoverEngine provides hover docs for super()",
+            run: function () {
+                var reg    = new BuiltinsRegistry();
+                var md     = reg.getHoverMarkdown('super');
+                assert.ok(md && md.indexOf('super') !== -1, 'hover markdown should mention super');
+            },
+        },
+
+        {
+            name: "super_in_completions",
+            description: "super appears in completion list as a built-in function",
+            run: function () {
+                var reg      = new BuiltinsRegistry();
+                var analyzer = new SourceAnalyzer(RS);
+                var engine   = new CompletionEngine(analyzer, {
+                    virtualFiles:    {},
+                    builtinNames:    ['super'],
+                    builtinsRegistry: reg,
+                });
+                var list = engine.getCompletions(null, pos(1, 5), 'super', MockKind);
+                var item = list.suggestions.find(function (s) { return s.label === 'super'; });
+                assert.ok(item, 'super should appear in completions');
+                assert.strictEqual(item.kind, MockKind.Function, 'super should have Function kind');
+            },
+        },
+
     ];
 
     return TESTS;

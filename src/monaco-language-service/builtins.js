@@ -219,6 +219,11 @@ const STUBS = [
         return_type: 'list',
         doc: 'Return a new sorted list from the items in iterable.' }),
 
+    new BuiltinInfo({ name: 'super',
+        params: [],
+        return_type: 'object',
+        doc: 'Return a proxy object that delegates method calls to a parent class.\n\nUse `super()` inside a class method to call parent class methods:\n\n    class Child(Parent):\n        def __init__(self):\n            super().__init__()\n        def greet(self):\n            return super().greet() + " from child"\n\nAlso supports the two-argument form `super(ClassName, self)` for explicit MRO lookup.' }),
+
     new BuiltinInfo({ name: 'str', kind: 'class',
         params: [p('obj', { optional: true })],
         return_type: 'str',

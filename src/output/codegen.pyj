@@ -19,7 +19,7 @@ from ast import (
     AST_Symbol, AST_This, AST_Throw, AST_Toplevel, AST_Try, AST_Unary,
     AST_UnaryPrefix, AST_Undefined, AST_Var, AST_VarDef, AST_Assert,
     AST_Verbatim, AST_While, AST_With, AST_Yield, AST_Await, TreeWalker, AST_Existential,
-    AST_Match, AST_AnnotatedAssign
+    AST_Match, AST_AnnotatedAssign, AST_Super
 )
 from output.exceptions import print_try
 from output.classes import print_class
@@ -404,6 +404,11 @@ def generate_code():
 
     # -----[ other expressions ]-----
     DEFPRINT(AST_BaseCall, print_function_call)
+
+    DEFPRINT(AST_Super, def(self, output):
+        # super() used without a method call — emit a runtime error
+        output.print('(function(){ throw new TypeError("super() must be used as super().method(...)"); })()')
+    )
 
     AST_Seq.prototype._do_print = print_seq
 

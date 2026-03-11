@@ -1130,6 +1130,112 @@ assrt.equal(fib(15), 610)
         js_checks: ["a = 1", "b = 2"],
     },
 
+    // ── super() ───────────────────────────────────────────────────────────
+
+    {
+        name: "super_init",
+        description: "super().__init__() calls parent constructor",
+        src: [
+            "# globals: assrt",
+            "class Animal:",
+            "    def __init__(self, name):",
+            "        self.name = name",
+            "class Dog(Animal):",
+            "    def __init__(self, name, breed):",
+            "        super().__init__(name)",
+            "        self.breed = breed",
+            "d = Dog('Rex', 'Labrador')",
+            "assrt.equal(d.name, 'Rex')",
+            "assrt.equal(d.breed, 'Labrador')",
+        ].join("\n"),
+        js_checks: [/Animal\.prototype\.__init__\.call\(this/],
+    },
+
+    {
+        name: "super_method",
+        description: "super().method() calls parent method",
+        src: [
+            "# globals: assrt",
+            "class Base:",
+            "    def greet(self):",
+            "        return 'Hello'",
+            "class Child(Base):",
+            "    def greet(self):",
+            "        return super().greet() + ' World'",
+            "c = Child()",
+            "assrt.equal(c.greet(), 'Hello World')",
+        ].join("\n"),
+        js_checks: [/Base\.prototype\.greet\.call\(this/],
+    },
+
+    {
+        name: "super_with_args",
+        description: "super().method() passes arguments to parent",
+        src: [
+            "# globals: assrt",
+            "class Adder:",
+            "    def add(self, a, b):",
+            "        return a + b",
+            "class LoggingAdder(Adder):",
+            "    def add(self, a, b):",
+            "        return super().add(a, b)",
+            "la = LoggingAdder()",
+            "assrt.equal(la.add(3, 4), 7)",
+        ].join("\n"),
+        js_checks: [/Adder\.prototype\.add\.call\(this/],
+    },
+
+    {
+        name: "super_two_arg_form",
+        description: "super(ClassName, self).method() two-argument form works",
+        src: [
+            "# globals: assrt",
+            "class A:",
+            "    def val(self):",
+            "        return 'A'",
+            "class B(A):",
+            "    def val(self):",
+            "        return super(B, self).val() + 'B'",
+            "b = B()",
+            "assrt.equal(b.val(), 'AB')",
+        ].join("\n"),
+        js_checks: [/A\.prototype\.val\.call\(this/],
+    },
+
+    {
+        name: "super_multi_level",
+        description: "super() works across multiple levels of inheritance",
+        src: [
+            "# globals: assrt",
+            "class A:",
+            "    def name(self):",
+            "        return 'A'",
+            "class B(A):",
+            "    def name(self):",
+            "        return super().name() + 'B'",
+            "class C(B):",
+            "    def name(self):",
+            "        return super().name() + 'C'",
+            "assrt.equal(C().name(), 'ABC')",
+        ].join("\n"),
+    },
+
+    {
+        name: "super_in_nested_method",
+        description: "super() resolves correctly inside nested function in method",
+        src: [
+            "# globals: assrt",
+            "class Base:",
+            "    def make_greeting(self, name):",
+            "        return 'Hi ' + name",
+            "class Child(Base):",
+            "    def make_greeting(self, name):",
+            "        result = super().make_greeting(name)",
+            "        return result + '!'",
+            "assrt.equal(Child().make_greeting('world'), 'Hi world!')",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
