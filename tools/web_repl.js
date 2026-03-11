@@ -65,6 +65,13 @@ module.exports = function(compiler, baselib, vf_context) {
             return streaming_compiler.compile(code, opts);
         },
 
+        'compile_mapped': function web_repl_compile_mapped(code, opts) {
+            opts = opts || {};
+            opts.keep_docstrings = true;
+            opts.filename = '<input>';
+            return streaming_compiler.compile_with_sourcemap(code, opts);
+        },
+
         'runjs': function runjs(code) {
             var ans = vm.runInContext(strip_exports(code), ctx);
             if (ans !== undefined || ans === null) {

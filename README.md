@@ -60,6 +60,14 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [Internationalization](#internationalization)
 - [Gotchas](#gotchas)
 - [Monaco Language Service](#monaco-language-service)
+    - [Building the bundle](#building-the-bundle)
+    - [Basic setup](#basic-setup)
+    - [Options](#options)
+    - [Runtime API](#runtime-api)
+    - [TypeScript declaration files](#typescript-declaration-files)
+    - [Virtual modules](#virtual-modules)
+    - [Source maps](#source-maps)
+    - [Running the tests](#running-the-tests)
 - [Reasons for the fork](#reasons-for-the-fork)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -2078,6 +2086,86 @@ var service = registerRapydScript(monaco, {
 
 // Live-update a module as the user edits it in another tab:
 service.setVirtualFiles({ utils: updatedSource });
+```
+
+### Source maps
+
+The object returned by `RapydScript.web_repl()` exposes a `compile_mapped`
+method alongside the standard `compile` method.  `compile_mapped` compiles
+RapydScript to JavaScript and simultaneously produces a
+[Source Map v3](https://tc39.es/source-map/) JSON string that maps every
+position in the generated JavaScript back to the corresponding position in the
+original `.py` source.
+
+```js
+var repl   = RapydScript.web_repl();
+var result = repl.compile_mapped(source, opts);
+// result.code      — compiled JavaScript string
+// result.sourceMap — Source Map v3 JSON string
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `code` | string | The compiled JavaScript. |
+| `sourceMap` | string | Source Map v3 JSON string. `sources` defaults to `['<input>']`; override before use. `sourcesContent` holds the original `.py` source inline so no server fetch is needed. |
+
+**Using with the browser debugger**
+
+Append the source map as an inline data-URL comment.  The browser DevTools then
+map runtime errors and breakpoints back to the original `.py` file:
+
+```js
+var repl   = RapydScript.web_repl();
+var result = repl.compile_mapped(pySource, { export_main: true });
+
+// Set the display name shown in DevTools
+var map         = JSON.parse(result.sourceMap);
+map.sources     = ['home/user/myscript.py'];
+map.sourceRoot  = '/';
+
+var b64  = btoa(unescape(encodeURIComponent(JSON.stringify(map))));
+var code = result.code
+         + '\n//# sourceURL=home/user/myscript.py'
+         + '\n//# sourceMappingURL=data:application/json;base64,' + b64;
+
+// Load as a module blob so DevTools associates the source map with the file
+var url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+import(url);
+```
+
+When the browser loads that blob the DevTools **Sources** panel shows your
+original `.py` file with working breakpoints and correct error stack frames.
+
+**Accepted options** (`opts`)
+
+`compile_mapped` accepts the same options as `compile`:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `export_main` | bool | `false` | Add `export` to the top-level `main` function. |
+| `pythonize_strings` | bool | `false` | Add Python-style string methods to string literals. |
+| `keep_baselib` | bool | `false` | Embed the base library in the output. |
+| `keep_docstrings` | bool | `false` | Keep docstrings in the output. |
+| `js_version` | number | `6` | Target ECMAScript version (5 or 6). |
+| `private_scope` | bool | `false` | Wrap the output in an IIFE. |
+
+**How it works**
+
+The compiler's `OutputStream` tracks the current generated line and column as
+it walks the AST.  `compile_mapped` installs a per-compilation hook on
+`push_node` — called once per AST node just before its code is emitted — that
+records `(generated_line, generated_col) → (source_line, source_col)` pairs.
+After code generation those pairs are delta-encoded into Base64-VLQ segments
+and assembled into the standard `mappings` field.  The implementation lives in
+`tools/embedded_compiler.js` (`vlq_encode`, `build_source_map`,
+`print_ast_with_sourcemap`, `compile_with_sourcemap`) and is exposed via
+`tools/web_repl.js` (`compile_mapped`).
+
+**Rebuilding the bundle after changes**
+
+```bash
+node bin/web-repl-export web-repl          # rebuilds web-repl/rapydscript.js
+node tools/build-language-service.js       # rebuilds web-repl/language-service.js
 ```
 
 ### Running the tests
