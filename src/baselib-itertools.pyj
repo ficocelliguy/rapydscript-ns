@@ -69,13 +69,29 @@ def zip():
     return ans
 
 def any(iterable):
-    for i in iterable:
-        if i:
+    if Array.isArray(iterable) or jstype(iterable) is 'string':
+        for v'var i = 0; i < iterable.length; i++':
+            if iterable[i]:  # noqa:undef
+                return True
+        return False
+    iterator = iter(iterable)
+    r = iterator.next()
+    while not r.done:
+        if r.value:
             return True
+        r = iterator.next()
     return False
 
 def all(iterable):
-    for i in iterable:
-        if not i:
+    if Array.isArray(iterable) or jstype(iterable) is 'string':
+        for v'var i = 0; i < iterable.length; i++':
+            if not iterable[i]:  # noqa:undef
+                return False
+        return True
+    iterator = iter(iterable)
+    r = iterator.next()
+    while not r.done:
+        if not r.value:
             return False
+        r = iterator.next()
     return True

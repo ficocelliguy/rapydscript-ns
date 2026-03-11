@@ -94,7 +94,7 @@ function make_tests(BuiltinsRegistry, BuiltinInfo, HoverEngine, SignatureHelpEng
                 var names = reg.getNames();
                 var core  = ['len', 'range', 'print', 'type', 'str', 'int', 'list',
                              'dict', 'set', 'abs', 'min', 'max', 'sum', 'sorted',
-                             'enumerate', 'zip', 'map', 'filter'];
+                             'enumerate', 'zip', 'map', 'filter', 'any', 'all'];
                 core.forEach(function (n) {
                     assert.ok(names.indexOf(n) !== -1, n + ' should be in getNames()');
                 });
@@ -599,6 +599,138 @@ function make_tests(BuiltinsRegistry, BuiltinInfo, HoverEngine, SignatureHelpEng
                 var item = list.suggestions.find(function (s) { return s.label === 'super'; });
                 assert.ok(item, 'super should appear in completions');
                 assert.strictEqual(item.kind, MockKind.Function, 'super should have Function kind');
+            },
+        },
+
+        // ── any() ─────────────────────────────────────────────────────────
+
+        {
+            name: "any_in_registry",
+            description: "BuiltinsRegistry has an entry for any()",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var bi  = reg.get('any');
+                assert.ok(bi, 'any should be registered');
+                assert.strictEqual(bi.name, 'any');
+                assert.strictEqual(bi.kind, 'function');
+                assert.ok(Array.isArray(bi.params) && bi.params.length === 1, 'any should have one param');
+                assert.strictEqual(bi.params[0].label, 'iterable');
+                assert.strictEqual(bi.return_type, 'bool');
+                assert.ok(bi.doc && bi.doc.length > 0, 'any should have a docstring');
+            },
+        },
+
+        {
+            name: "any_hover_markdown",
+            description: "getHoverMarkdown('any') contains signature and docstring",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var md  = reg.getHoverMarkdown('any');
+                assert.ok(md, 'hover markdown should not be null');
+                assert.ok(md.indexOf('any(iterable)') !== -1, 'should contain any(iterable)');
+                assert.ok(md.indexOf('```') !== -1, 'should be in a code fence');
+                assert.ok(md.indexOf('→ bool') !== -1, 'should show return type bool');
+                assert.ok(md.indexOf('true') !== -1 || md.indexOf('True') !== -1,
+                    'docstring should mention true');
+            },
+        },
+
+        {
+            name: "any_signature_info",
+            description: "getSignatureInfo('any') returns correct label and param",
+            run: function () {
+                var reg  = new BuiltinsRegistry();
+                var info = reg.getSignatureInfo('any');
+                assert.ok(info, 'should return info for any');
+                assert.ok(info.label.indexOf('any(') === 0, 'label should start with any(');
+                assert.strictEqual(info.params.length, 1);
+                assert.ok(info.params[0].label.indexOf('iterable') !== -1);
+                assert.ok(info.doc, 'should have doc');
+            },
+        },
+
+        {
+            name: "any_in_completions",
+            description: "any appears in completion list as a built-in function",
+            run: function () {
+                var reg      = new BuiltinsRegistry();
+                var analyzer = new SourceAnalyzer(RS);
+                var engine   = new CompletionEngine(analyzer, {
+                    virtualFiles:    {},
+                    builtinNames:    ['any'],
+                    builtinsRegistry: reg,
+                });
+                var list = engine.getCompletions(null, pos(1, 3), 'any', MockKind);
+                var item = list.suggestions.find(function (s) { return s.label === 'any'; });
+                assert.ok(item, 'any should appear in completions');
+                assert.strictEqual(item.kind, MockKind.Function, 'any should have Function kind');
+                assert.ok(item.detail && item.detail.indexOf('(iterable)') !== -1,
+                    'detail should show param list: ' + item.detail);
+            },
+        },
+
+        // ── all() ─────────────────────────────────────────────────────────
+
+        {
+            name: "all_in_registry",
+            description: "BuiltinsRegistry has an entry for all()",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var bi  = reg.get('all');
+                assert.ok(bi, 'all should be registered');
+                assert.strictEqual(bi.name, 'all');
+                assert.strictEqual(bi.kind, 'function');
+                assert.ok(Array.isArray(bi.params) && bi.params.length === 1, 'all should have one param');
+                assert.strictEqual(bi.params[0].label, 'iterable');
+                assert.strictEqual(bi.return_type, 'bool');
+                assert.ok(bi.doc && bi.doc.length > 0, 'all should have a docstring');
+            },
+        },
+
+        {
+            name: "all_hover_markdown",
+            description: "getHoverMarkdown('all') contains signature and docstring",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var md  = reg.getHoverMarkdown('all');
+                assert.ok(md, 'hover markdown should not be null');
+                assert.ok(md.indexOf('all(iterable)') !== -1, 'should contain all(iterable)');
+                assert.ok(md.indexOf('```') !== -1, 'should be in a code fence');
+                assert.ok(md.indexOf('→ bool') !== -1, 'should show return type bool');
+            },
+        },
+
+        {
+            name: "all_signature_info",
+            description: "getSignatureInfo('all') returns correct label and param",
+            run: function () {
+                var reg  = new BuiltinsRegistry();
+                var info = reg.getSignatureInfo('all');
+                assert.ok(info, 'should return info for all');
+                assert.ok(info.label.indexOf('all(') === 0, 'label should start with all(');
+                assert.strictEqual(info.params.length, 1);
+                assert.ok(info.params[0].label.indexOf('iterable') !== -1);
+                assert.ok(info.doc, 'should have doc');
+            },
+        },
+
+        {
+            name: "all_in_completions",
+            description: "all appears in completion list as a built-in function",
+            run: function () {
+                var reg      = new BuiltinsRegistry();
+                var analyzer = new SourceAnalyzer(RS);
+                var engine   = new CompletionEngine(analyzer, {
+                    virtualFiles:    {},
+                    builtinNames:    ['all'],
+                    builtinsRegistry: reg,
+                });
+                var list = engine.getCompletions(null, pos(1, 3), 'all', MockKind);
+                var item = list.suggestions.find(function (s) { return s.label === 'all'; });
+                assert.ok(item, 'all should appear in completions');
+                assert.strictEqual(item.kind, MockKind.Function, 'all should have Function kind');
+                assert.ok(item.detail && item.detail.indexOf('(iterable)') !== -1,
+                    'detail should show param list: ' + item.detail);
             },
         },
 

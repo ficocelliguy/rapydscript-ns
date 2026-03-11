@@ -877,6 +877,51 @@ myDict = {x:x+1 for x in range(20) if x > 2}
 mySet = {i*i for i in range(1,20) if i*i%3 == 0}
 ```
 
+Builtin iteration functions: any() and all()
+---------------------------------------------
+
+RapydScript supports Python's `any()` and `all()` built-in functions with
+identical semantics. Both work with arrays, strings, iterators, `range()` objects,
+and any other iterable.
+
+`any(iterable)` returns `True` if at least one element of the iterable is
+truthy, and `False` if all elements are falsy or the iterable is empty:
+
+```py
+any([False, 0, '', 1])   # True
+any([False, 0, None])    # False
+any([])                  # False
+any(range(3))            # True  (range produces 0, 1, 2 — 1 and 2 are truthy)
+any(range(0))            # False (empty range)
+```
+
+`all(iterable)` returns `True` only if every element is truthy (or the iterable
+is empty):
+
+```py
+all([1, 2, 3])           # True
+all([1, 0, 3])           # False
+all([])                  # True  (vacuously true)
+all(range(1, 4))         # True  (1, 2, 3 — all truthy)
+all(range(0, 3))         # False (range starts at 0, which is falsy)
+```
+
+Both functions short-circuit: `any()` stops as soon as it finds a truthy
+element, and `all()` stops as soon as it finds a falsy element. This makes
+them efficient even with large or lazy iterables.
+
+They work naturally with list comprehensions for expressive one-liners:
+
+```py
+nums = [2, 4, 6, 8]
+all([x > 0 for x in nums])   # True — all positive
+any([x > 5 for x in nums])   # True — some greater than 5
+all([x > 5 for x in nums])   # False — not all greater than 5
+```
+
+Both `any()` and `all()` compile to plain JavaScript function calls and are
+always available without any import.
+
 Strings
 ---------
 
@@ -1903,7 +1948,7 @@ editor that powers VS Code). Once registered it provides:
 - **Signature help** — parameter hints triggered by `(` and `,`
 - **Hover** — type signature and documentation popup on hover
 - **Built-in stubs** — signatures and docs for Python and JavaScript built-ins
-  (`len`, `range`, `print`, `sorted`, `setTimeout`, …)
+  (`len`, `range`, `print`, `sorted`, `any`, `all`, `setTimeout`, …)
 - **TypeScript declaration support** — load `.d.ts` files to register external
   globals for completions and hover (e.g. DOM APIs, third-party libraries)
 

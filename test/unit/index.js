@@ -1236,6 +1236,149 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── any() ─────────────────────────────────────────────────────────────
+
+    {
+        name: "any_true_on_truthy_element",
+        description: "any() returns True when at least one element is truthy",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(any([False, 0, '', 1]), True)",
+            "assrt.equal(any([1, 2, 3]), True)",
+            "assrt.equal(any(['hello']), True)",
+        ].join("\n"),
+    },
+
+    {
+        name: "any_false_on_all_falsy",
+        description: "any() returns False when all elements are falsy",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(any([False, 0, '', None]), False)",
+            "assrt.equal(any([0, 0, 0]), False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "any_empty_iterable",
+        description: "any() returns False for an empty iterable",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(any([]), False)",
+            "assrt.equal(any(iter([])), False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "any_with_iterator",
+        description: "any() works with an iterator (not just arrays)",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(any(iter([0, 0, 3])), True)",
+            "assrt.equal(any(iter([0, 0, 0])), False)",
+            "assrt.equal(any(iter([True])), True)",
+        ].join("\n"),
+    },
+
+    {
+        name: "any_with_range",
+        description: "any() works with range()",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(any(range(3)), True)",
+            "assrt.equal(any(range(0)), False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "any_compiles_to_function_call",
+        description: "any(x) compiles to a function call to any",
+        src: [
+            "# globals: assrt",
+            "result = any([True, False])",
+            "assrt.equal(result, True)",
+        ].join("\n"),
+        js_checks: ["any("],
+    },
+
+    // ── all() ─────────────────────────────────────────────────────────────
+
+    {
+        name: "all_true_on_all_truthy",
+        description: "all() returns True when every element is truthy",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(all([1, 2, 3]), True)",
+            "assrt.equal(all(['a', 'b']), True)",
+            "assrt.equal(all([True, True]), True)",
+        ].join("\n"),
+    },
+
+    {
+        name: "all_false_on_any_falsy",
+        description: "all() returns False when any element is falsy",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(all([1, 0, 3]), False)",
+            "assrt.equal(all([True, False, True]), False)",
+            "assrt.equal(all([1, None]), False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "all_empty_iterable",
+        description: "all() returns True for an empty iterable",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(all([]), True)",
+            "assrt.equal(all(iter([])), True)",
+        ].join("\n"),
+    },
+
+    {
+        name: "all_with_iterator",
+        description: "all() works with an iterator (not just arrays)",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(all(iter([1, 2, 3])), True)",
+            "assrt.equal(all(iter([1, 0, 3])), False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "all_with_range",
+        description: "all() works with range()",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(all(range(1, 4)), True)",
+            "assrt.equal(all(range(0, 3)), False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "all_compiles_to_function_call",
+        description: "all(x) compiles to a function call to all",
+        src: [
+            "# globals: assrt",
+            "result = all([True, True])",
+            "assrt.equal(result, True)",
+        ].join("\n"),
+        js_checks: ["all("],
+    },
+
+    {
+        name: "any_all_combined",
+        description: "any() and all() can be composed and used together",
+        src: [
+            "# globals: assrt",
+            "nums = [2, 4, 6, 8]",
+            "assrt.equal(all([x > 0 for x in nums]), True)",
+            "assrt.equal(any([x > 5 for x in nums]), True)",
+            "assrt.equal(all([x > 5 for x in nums]), False)",
+            "assrt.equal(any([x > 10 for x in nums]), False)",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
