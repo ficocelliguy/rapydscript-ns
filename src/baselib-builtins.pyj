@@ -7,12 +7,11 @@
 def ρσ_bool(val):
     return v'!!val'
 
-def ρσ_print():
+def ρσ_print(*args, **kwargs):
     if v'typeof console' is 'object':
-        parts = v'[]'
-        for v'var i = 0; i < arguments.length; i++':
-            parts.push(ρσ_str(arguments[i]))  # noqa: undef
-        console.log(parts.join(' '))
+        sep = kwargs.sep if kwargs.sep is not undefined else ' '
+        parts = [ρσ_str(a) for a in args]
+        console.log(parts.join(sep))
 
 def ρσ_int(val, base):
     if jstype(val) is "number":
@@ -272,7 +271,7 @@ def ρσ_max(*args, **kwargs):
 
 v'var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
 v'var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
-v'var print = ρσ_print, id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod'
+v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod'
 v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable'
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'
 v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr'

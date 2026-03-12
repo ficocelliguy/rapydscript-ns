@@ -180,9 +180,9 @@ const STUBS = [
         doc: 'Return base raised to the power exp, optionally modulo mod.' }),
 
     new BuiltinInfo({ name: 'print',
-        params: [p('*args', { rest: true })],
+        params: [p('*args', { rest: true }), p('sep', { default_val: "' '" }), p('end', { default_val: "'\\n'" })],
         return_type: 'None',
-        doc: 'Print objects to the console, separated by sep and followed by end.' }),
+        doc: 'Print objects to the console. Items are separated by sep (default space). Transpiles to console.log().' }),
 
     new BuiltinInfo({ name: 'range',
         params: [p('start_or_stop', { type: 'int' }), p('stop', { type: 'int', optional: true }), p('step', { type: 'int', optional: true })],

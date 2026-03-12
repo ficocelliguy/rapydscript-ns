@@ -300,7 +300,11 @@ def print_function_call(self, output):
                 if is_node_type(self.expression, AST_Dot):
                     print_getattr(self.expression, output, True)
             else:
-                self.expression.print(output)
+                # Bare print(...) → ρσ_print(...) in kwargs/starargs context
+                if is_node_type(self.expression, AST_SymbolRef) and self.expression.name is 'print':
+                    output.print('ρσ_print')
+                else:
+                    self.expression.print(output)
 
     def print_kwargs():
         output.print('ρσ_desugar_kwargs(')
@@ -377,7 +381,11 @@ def print_function_call(self, output):
         # A simple function call, do nothing special
         if is_new:
             output.print('new'), output.space()
-        print_function_name()
+        # Bare print(...) → console.log(...) to avoid clobbering window.print
+        if not is_new and is_node_type(self.expression, AST_SymbolRef) and self.expression.name is 'print':
+            output.print('console.log')
+        else:
+            print_function_name()
         output.with_parens(def():
             for i, a in enumerate(self.args):
                 if i:

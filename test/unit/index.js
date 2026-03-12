@@ -1379,6 +1379,80 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── print() ───────────────────────────────────────────────────────────
+
+    {
+        name: "print_compiles_to_console_log",
+        description: "print(x) compiles directly to console.log(x)",
+        src: [
+            "# globals: assrt",
+            "print('hello')",
+            "print(1, 2, 3)",
+        ].join("\n"),
+        js_checks: ["console.log(\"hello\")", "console.log(1, 2, 3)"],
+    },
+
+    {
+        name: "print_outputs_to_console",
+        description: "print() captures output via console.log",
+        src: [
+            "# globals: assrt, captured",
+            "captured = []",
+            "def mock_log(*args):",
+            "    captured.push(args.join(' '))",
+            "orig = console.log",
+            "console.log = mock_log",
+            "print('hello')",
+            "print('a', 'b', 'c')",
+            "console.log = orig",
+            "assrt.equal(captured[0], 'hello')",
+            "assrt.equal(captured[1], 'a b c')",
+        ].join("\n"),
+    },
+
+    {
+        name: "print_sep_kwarg",
+        description: "print(a, b, sep=x) joins args with sep",
+        src: [
+            "# globals: assrt, captured",
+            "captured = []",
+            "def mock_log(*args):",
+            "    captured.push(args.join(' '))",
+            "orig = console.log",
+            "console.log = mock_log",
+            "print('x', 'y', 'z', sep='-')",
+            "console.log = orig",
+            "assrt.equal(captured[0], 'x-y-z')",
+        ].join("\n"),
+        js_checks: ["ρσ_print"],
+    },
+
+    {
+        name: "print_does_not_clobber_window_print",
+        description: "print() transpilation does not overwrite window.print",
+        src: [
+            "# globals: assrt",
+            "print('test')",
+        ].join("\n"),
+        // The compiled JS must NOT contain 'var print = ' (which would overwrite window.print)
+        js_checks: [/console\.log\("test"\)/],
+    },
+
+    {
+        name: "window_print_preserved",
+        description: "window.print() compiles as window.print() for browser print dialog",
+        src: [
+            "# globals: assrt",
+            "state = {'called': False}",
+            "def on_print():",
+            "    state['called'] = True",
+            "window_mock = {'print': on_print}",
+            "window_mock.print()",
+            "assrt.equal(state['called'], True)",
+        ].join("\n"),
+        js_checks: ["window_mock.print()"],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
