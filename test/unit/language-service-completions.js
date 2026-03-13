@@ -63,7 +63,7 @@ function find_item(list, label) {
 
 function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistry, RS) {
 
-    function make_engine(virtual_files, extra_builtins, dts_registry, builtins_mod) {
+    function make_engine(virtual_files, extra_builtins, dts_registry, builtins_mod, stdlib_files) {
         var analyzer = new SourceAnalyzer(RS);
         var builtins_registry = null;
         if (builtins_mod) {
@@ -71,11 +71,16 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
         }
         return new CompletionEngine(analyzer, {
             virtualFiles:     virtual_files    || {},
+            stdlibFiles:      stdlib_files     || {},
             builtinNames:     extra_builtins   || ['print', 'len', 'range'],
             dtsRegistry:      dts_registry     || null,
             builtinsRegistry: builtins_registry,
         });
     }
+
+    var FUNCTOOLS_SRC = require('fs').readFileSync(
+        require('path').join(__dirname, '../../src/lib/functools.pyj'), 'utf-8'
+    );
 
     var TESTS = [
 
@@ -900,6 +905,45 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 var list = engine.getCompletions(scopeMap, pos(5, 1), "MyClass.", MockKind);
                 assert_has(list,    'user_method', 'ScopeMap method present');
                 assert_missing(list,'dts_only',    'DTS member absent when ScopeMap matches');
+            },
+        },
+
+        // ── functools stdlib completions ──────────────────────────────────
+
+        {
+            name: "functools_from_import_completions",
+            description: "from functools import shows all functools exports via stdlibFiles",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { functools: FUNCTOOLS_SRC });
+                var list = engine.getCompletions(null, pos(1, 24), "from functools import ", MockKind);
+                assert_has(list, 'reduce',          'reduce in functools completions');
+                assert_has(list, 'partial',         'partial in functools completions');
+                assert_has(list, 'wraps',           'wraps in functools completions');
+                assert_has(list, 'lru_cache',       'lru_cache in functools completions');
+                assert_has(list, 'cache',           'cache in functools completions');
+                assert_has(list, 'total_ordering',  'total_ordering in functools completions');
+                assert_has(list, 'cmp_to_key',      'cmp_to_key in functools completions');
+            },
+        },
+
+        {
+            name: "functools_from_import_prefix",
+            description: "from functools import with prefix filters to matching names",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { functools: FUNCTOOLS_SRC });
+                var list = engine.getCompletions(null, pos(1, 27), "from functools import lru", MockKind);
+                assert_has(list,    'lru_cache', 'lru_cache matches prefix "lru"');
+                assert_missing(list,'reduce',    'reduce does not match prefix "lru"');
+            },
+        },
+
+        {
+            name: "functools_module_in_import",
+            description: "import shows functools when it is in stdlibFiles",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { functools: FUNCTOOLS_SRC });
+                var list = engine.getCompletions(null, pos(1, 7), "import ", MockKind);
+                assert_has(list, 'functools', 'functools module in import suggestions');
             },
         },
 

@@ -15,7 +15,7 @@
 ### libraries
 - itertools 
 - collections
-- functools ?
+- functools  - needs testing
 
 - allow var etc as property name
 - revert numpy variance method to be var
@@ -26,7 +26,7 @@
 
 
 
-I would like you to add support for [ the  all() and any() builtin function] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please also update the README to mention this support.
+I would like you to add support for [ the functools imported library ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please also update the README to mention this support.
 
 
 
@@ -195,7 +195,7 @@ These are Python stdlib modules with no equivalent in src/lib/:
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
 │ collections │ deque, OrderedDict, defaultdict, Counter, namedtuple, ChainMap                  │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
-│ functools   │ reduce, partial, lru_cache, cache, wraps, total_ordering                        │
+│ functools   │ needs testing                                                                   │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
 │ itertools   │ chain, product, combinations, permutations, groupby, islice, zip_longest, cycle │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
@@ -286,15 +286,15 @@ Priority Gaps (Most Impactful)
 
 If prioritizing what to implement next, these have the highest user impact:
 
-1. super() — required for idiomatic OOP code
+1. super() — required for idiomatic OOP code - done
 2. Operator overloading (__add__, __lt__, etc.) — blocks numerical/scientific code
 3. __bool__ / truthiness fix — silent Python compatibility trap
-4. lambda keyword — commonly expected
-5. all() / any() — extremely common builtins
-6. functools.reduce / partial — core functional programming tools
+4. lambda keyword — commonly expected - done
+5. all() / any() — extremely common builtins - done
+6. functools.reduce / partial — core functional programming tools - done
 7. collections.defaultdict / Counter — frequently used
 8. Nested comprehensions — common Python pattern
-9. Walrus operator := — increasingly common in modern Python
+9. Walrus operator := — increasingly common in modern Python - done
 10. classmethod decorator — standard OOP pattern
 
        

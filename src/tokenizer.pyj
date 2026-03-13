@@ -303,6 +303,8 @@ def tokenizer(raw_text, filename):
                 return -1
             else:
                 # indent mismatch, inconsistent indentation
+                S.tokline = S.line
+                S.tokcol = 0
                 parse_error("Inconsistent indentation")
         return 0
 

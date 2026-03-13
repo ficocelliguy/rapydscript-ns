@@ -211,6 +211,7 @@ export class CompletionEngine {
      * @param {import('./analyzer.js').SourceAnalyzer} analyzer
      * @param {object} opts
      * @param {object} [opts.virtualFiles]   module-name → source
+     * @param {object} [opts.stdlibFiles]    stdlib module-name → source (fallback for from X import)
      * @param {string[]} [opts.builtinNames] names always available (BASE_BUILTINS + extras)
      * @param {import('./dts.js').DtsRegistry|null}      [opts.dtsRegistry]      DTS globals for dot completion
      * @param {import('./builtins.js').BuiltinsRegistry|null} [opts.builtinsRegistry] stubs for rich builtin items
@@ -218,6 +219,7 @@ export class CompletionEngine {
     constructor(analyzer, opts) {
         this._analyzer     = analyzer;
         this._virtualFiles = opts.virtualFiles    || {};
+        this._stdlibFiles  = opts.stdlibFiles     || {};
         this._builtinNames = opts.builtinNames    || [];
         this._dts          = opts.dtsRegistry     || null;
         this._builtins     = opts.builtinsRegistry || null;
@@ -447,7 +449,7 @@ export class CompletionEngine {
         const range = word_range(position, ctx.prefix);
         const items = [];
 
-        const src = this._virtualFiles[ctx.moduleName];
+        const src = this._virtualFiles[ctx.moduleName] || this._stdlibFiles[ctx.moduleName];
         if (!src) return items;
 
         let scopeMap;
@@ -476,7 +478,7 @@ export class CompletionEngine {
         const items = [];
         const seen  = new Set();
 
-        for (const modname of Object.keys(this._virtualFiles)) {
+        for (const modname of [...Object.keys(this._virtualFiles), ...Object.keys(this._stdlibFiles)]) {
             if (!ctx.prefix || modname.startsWith(ctx.prefix)) {
                 if (!seen.has(modname)) {
                     seen.add(modname);

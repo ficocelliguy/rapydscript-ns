@@ -1,0 +1,148 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's functools standard library.
+#
+# Supported: reduce, partial, wraps, lru_cache, cache, total_ordering, cmp_to_key
+
+def reduce(func, iterable, *rest):
+    """Apply func cumulatively to items of iterable, from left to right."""
+    it = iter(iterable)
+    r = it.next()
+    if len(rest) == 0:
+        if r.done:
+            raise TypeError('reduce() of empty sequence with no initial value')
+        value = r.value
+        r = it.next()
+    else:
+        value = rest[0]
+    while not r.done:
+        value = func(value, r.value)
+        r = it.next()
+    return value
+
+
+def partial(func, *args, **kwargs):
+    """Return a new function with partial application of args and kwargs."""
+    stored_args = args
+    stored_kwargs = kwargs
+    def wrapper(*more_args, **more_kwargs):
+        return func(*stored_args.concat(more_args), **stored_kwargs, **more_kwargs)
+    wrapper.func = func
+    wrapper.args = stored_args
+    wrapper.keywords = stored_kwargs
+    return wrapper
+
+
+def wraps(wrapped):
+    """Decorator factory: copy metadata from wrapped onto the wrapper function."""
+    def decorator(wrapper):
+        wrapper.__name__ = wrapped.name or wrapped.__name__
+        wrapper.__doc__ = wrapped.__doc__
+        wrapper.__wrapped__ = wrapped
+        return wrapper
+    return decorator
+
+
+def _make_lru_cached(func, maxsize):
+    state = v"{'cache': new Map(), 'order': [], 'hits': 0, 'misses': 0}"
+    def wrapper(*args):
+        key = JSON.stringify(args)
+        if state.cache.has(key):
+            state.hits += 1
+            return state.cache.get(key)
+        state.misses += 1
+        result = func(*args)
+        if maxsize is None or state.order.length < maxsize:
+            state.cache.set(key, result)
+            state.order.push(key)
+        elif maxsize > 0:
+            old = state.order.shift()
+            state.cache.delete(old)
+            state.cache.set(key, result)
+            state.order.push(key)
+        return result
+    def cache_clear():
+        v'state.cache.clear(); state.order.length = 0;'
+        state.hits = 0
+        state.misses = 0
+    wrapper.cache_clear = cache_clear
+    wrapper.cache_info = def():
+        return {'hits': state.hits, 'misses': state.misses,
+                'maxsize': maxsize, 'currsize': state.cache.size}
+    wrapper.__wrapped__ = func
+    return wrapper
+
+
+def lru_cache(maxsize=128):
+    """Memoizing decorator. Use as @lru_cache or @lru_cache(maxsize=N)."""
+    if callable(maxsize):
+        return _make_lru_cached(maxsize, 128)
+    def decorator(func):
+        return _make_lru_cached(func, maxsize)
+    return decorator
+
+
+def cache(func):
+    """Simple unbounded memoizing decorator (equivalent to lru_cache(maxsize=None))."""
+    return _make_lru_cached(func, None)
+
+
+def total_ordering(cls):
+    """Class decorator that fills in missing ordering methods from one root method."""
+    p = cls.prototype
+    has_eq = jstype(p.__eq__) is 'function'
+    if jstype(p.__lt__) is 'function':
+        if jstype(p.__gt__) is not 'function':
+            p.__gt__ = v'function(other) { return other.__lt__(this); }'
+        if jstype(p.__le__) is not 'function':
+            if has_eq:
+                p.__le__ = v'function(other) { return this.__lt__(other) || this.__eq__(other); }'
+            else:
+                p.__le__ = v'function(other) { return this.__lt__(other) || this === other; }'
+        if jstype(p.__ge__) is not 'function':
+            p.__ge__ = v'function(other) { return !this.__lt__(other); }'
+    elif jstype(p.__gt__) is 'function':
+        if jstype(p.__lt__) is not 'function':
+            p.__lt__ = v'function(other) { return other.__gt__(this); }'
+        if jstype(p.__ge__) is not 'function':
+            if has_eq:
+                p.__ge__ = v'function(other) { return this.__gt__(other) || this.__eq__(other); }'
+            else:
+                p.__ge__ = v'function(other) { return this.__gt__(other) || this === other; }'
+        if jstype(p.__le__) is not 'function':
+            p.__le__ = v'function(other) { return !this.__gt__(other); }'
+    elif jstype(p.__le__) is 'function':
+        if jstype(p.__ge__) is not 'function':
+            p.__ge__ = v'function(other) { return other.__le__(this); }'
+        if jstype(p.__lt__) is not 'function':
+            if has_eq:
+                p.__lt__ = v'function(other) { return this.__le__(other) && !this.__eq__(other); }'
+            else:
+                p.__lt__ = v'function(other) { return this.__le__(other) && this !== other; }'
+        if jstype(p.__gt__) is not 'function':
+            p.__gt__ = v'function(other) { return !this.__le__(other); }'
+    elif jstype(p.__ge__) is 'function':
+        if jstype(p.__le__) is not 'function':
+            p.__le__ = v'function(other) { return other.__ge__(this); }'
+        if jstype(p.__gt__) is not 'function':
+            if has_eq:
+                p.__gt__ = v'function(other) { return this.__ge__(other) && !this.__eq__(other); }'
+            else:
+                p.__gt__ = v'function(other) { return this.__ge__(other) && this !== other; }'
+        if jstype(p.__lt__) is not 'function':
+            p.__lt__ = v'function(other) { return !this.__ge__(other); }'
+    return cls
+
+
+def cmp_to_key(mycmp):
+    """Convert a comparison function (returning negative/zero/positive) to a key class."""
+    v"""var K = function K(obj) {
+        if (!(this instanceof K)) return new K(obj);
+        this.obj = obj;
+    };
+    K.prototype.__lt__ = function(other) { return mycmp(this.obj, other.obj) < 0; };
+    K.prototype.__gt__ = function(other) { return mycmp(this.obj, other.obj) > 0; };
+    K.prototype.__eq__ = function(other) { return mycmp(this.obj, other.obj) === 0; };
+    K.prototype.__le__ = function(other) { return mycmp(this.obj, other.obj) <= 0; };
+    K.prototype.__ge__ = function(other) { return mycmp(this.obj, other.obj) >= 0; };"""
+    return K

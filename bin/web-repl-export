@@ -42,7 +42,7 @@ function process_dir(relpath) {
         var s = fs.statSync(q);
         if (s.isDirectory()) return process_dir(relpath + '/' + x);
         if (!x.endsWith('.pyj')) return;
-        var iname = path.normalize('__stdlib__' + '/' + relpath + '/' + x);
+        var iname = ('__stdlib__' + '/' + relpath + '/' + x).replace(/\\/g, '/').replace(/\/+/g, '/');
         var raw = fs.readFileSync(q, {'encoding':'utf-8'});
         manifest[iname] = raw;
         total += s.size;

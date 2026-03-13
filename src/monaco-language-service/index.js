@@ -96,6 +96,7 @@ class RapydScriptLanguageService {
 
         // Preserve extra builtin names so they survive addDts() rebuilds
         this._extraBuiltinNames = options.extraBuiltins ? Object.keys(options.extraBuiltins) : [];
+        this._stdlibFiles = Object.assign({}, options.stdlibFiles || {});
 
         // DTS registry — load any files supplied at construction time
         this._dts = new DtsRegistry();
@@ -105,7 +106,7 @@ class RapydScriptLanguageService {
 
         // Built-in stubs registry (always present)
         this._builtins = new BuiltinsRegistry();
-        if (options.pythonize_strings) this._builtins.enablePythonizeStrings();
+        this._builtins.enablePythonizeStrings();
 
         // Merge BASE_BUILTINS + extra globals + DTS globals for completions
         const builtin_names = BASE_BUILTINS
@@ -114,6 +115,7 @@ class RapydScriptLanguageService {
 
         this._completions    = new CompletionEngine(this._analyzer, {
             virtualFiles:    this._virtualFiles,
+            stdlibFiles:     this._stdlibFiles,
             builtinNames:    builtin_names,
             dtsRegistry:     this._dts,
             builtinsRegistry: this._builtins,
@@ -319,6 +321,7 @@ class RapydScriptLanguageService {
         const builtin_names = BASE_BUILTINS.concat(this._extraBuiltinNames).concat(new_names);
         this._completions = new CompletionEngine(this._analyzer, {
             virtualFiles:    this._virtualFiles,
+            stdlibFiles:     this._stdlibFiles,
             builtinNames:    builtin_names,
             dtsRegistry:     this._dts,
             builtinsRegistry: this._builtins,
