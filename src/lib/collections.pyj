@@ -1,0 +1,695 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's collections standard library.
+#
+# Supported: namedtuple, deque, Counter, OrderedDict, defaultdict
+#
+# Note: Counter, OrderedDict, and defaultdict use __getitem__/__setitem__.
+# For Python-compatible subscript syntax (obj[key]) in user code, add:
+#   from __python__ import overload_getitem
+
+
+def namedtuple(typename, field_names):
+    """Return a new class with named fields, like Python's collections.namedtuple."""
+    if isinstance(field_names, str):
+        # Use explicit JS regex split for cross-environment safety
+        fields = v"field_names.replace(/,/g, ' ').trim().split(/\\s+/).filter(function(s){return s.length>0;})"
+    else:
+        fields = list(field_names)
+    n = fields.length
+
+    # Build the constructor using raw JS so we can use `instanceof` and `new`.
+    v"""
+    function constructor() {
+        if (!(this instanceof constructor)) {
+            var inst = Object.create(constructor.prototype);
+            constructor.apply(inst, arguments);
+            return inst;
+        }
+        var args = Array.prototype.slice.call(arguments);
+        // Strip trailing RapydScript kwargs sentinel if present
+        if (args.length > 0 && args[args.length-1] !== null && typeof args[args.length-1] === 'object' && args[args.length-1][ρσ_kwargs_symbol] === true) {
+            args = args.slice(0, -1);
+        }
+        if (args.length !== n) {
+            throw new TypeError(typename + '() takes ' + n + ' positional arguments but ' + args.length + ' were given');
+        }
+        for (var _i = 0; _i < n; _i++) {
+            this[fields[_i]] = args[_i];
+            this[_i] = args[_i];
+        }
+        this.length = n;
+    }
+    """
+
+    constructor.__name__ = typename
+    constructor._fields = fields
+
+    v"""constructor.prototype[Symbol.iterator] = function() {
+        var self = this, i = 0;
+        return {
+            next: function() {
+                if (i < n) return { value: self[fields[i++]], done: false };
+                return { value: undefined, done: true };
+            }
+        };
+    };"""
+
+    constructor.prototype._asdict = def():
+        d = {}
+        for f in fields:
+            d[f] = this[f]
+        return d
+
+    constructor.prototype._replace = def(**kwargs):
+        _self = this
+        args = []
+        for f in fields:
+            if f in kwargs:
+                args.push(kwargs[f])
+            else:
+                args.push(_self[f])
+        v"""var _inst = Object.create(constructor.prototype); constructor.apply(_inst, args); return _inst;"""
+
+    constructor.prototype.__repr__ = def():
+        _self = this
+        parts = [f + '=' + repr(_self[f]) for f in fields]
+        return typename + '(' + parts.join(', ') + ')'
+
+    constructor.prototype.__eq__ = def(other):
+        v"""if (!(other instanceof constructor)) return false;"""
+        for f in fields:
+            if this[f] is not other[f]:
+                return False
+        return True
+
+    constructor.prototype.__getitem__ = def(i):
+        if i < 0:
+            i = n + i
+        if i < 0 or i >= n:
+            raise IndexError('index out of range')
+        return this[fields[i]]
+
+    constructor._make = def(iterable):
+        args = list(iterable)
+        v"""var _inst = Object.create(constructor.prototype); constructor.apply(_inst, args); return _inst;"""
+
+    return constructor
+
+
+class deque:
+    """Double-ended queue with optional maximum length."""
+
+    def __init__(self, iterable=None, maxlen=None):
+        self._data = []
+        self._maxlen = maxlen
+        if iterable is not None:
+            for item in iterable:
+                self.append(item)
+
+    @property
+    def maxlen(self):
+        return self._maxlen
+
+    def _trim_left(self):
+        if self._maxlen is not None:
+            while len(self._data) > self._maxlen:
+                self._data.shift()
+
+    def _trim_right(self):
+        if self._maxlen is not None:
+            while len(self._data) > self._maxlen:
+                self._data.pop()
+
+    def append(self, x):
+        self._data.push(x)
+        self._trim_left()
+
+    def appendleft(self, x):
+        self._data.unshift(x)
+        self._trim_right()
+
+    def extend(self, iterable):
+        for item in iterable:
+            self.append(item)
+
+    def extendleft(self, iterable):
+        for item in iterable:
+            self.appendleft(item)
+
+    def pop(self):
+        if not self._data.length:
+            raise IndexError('pop from an empty deque')
+        return self._data.pop()
+
+    def popleft(self):
+        if not self._data.length:
+            raise IndexError('pop from an empty deque')
+        return self._data.shift()
+
+    def rotate(self, n=1):
+        size = len(self._data)
+        if size == 0:
+            return
+        n = n % size
+        if n == 0:
+            return
+        if n > 0:
+            for i in range(n):
+                self._data.unshift(self._data.pop())
+        else:
+            for i in range(-n):
+                self._data.push(self._data.shift())
+
+    def clear(self):
+        self._data = []
+
+    def copy(self):
+        return deque(self._data, self._maxlen)
+
+    def count(self, x):
+        c = 0
+        for item in self._data:
+            if item == x:
+                c += 1
+        return c
+
+    def remove(self, value):
+        for i in range(len(self._data)):
+            if self._data[i] == value:
+                self._data.splice(i, 1)
+                return
+        raise ValueError(repr(value) + ' is not in deque')
+
+    def reverse(self):
+        self._data.reverse()
+
+    def index(self, x, start=0, stop=None):
+        if stop is None:
+            stop = len(self._data)
+        for i in range(start, stop):
+            if self._data[i] == x:
+                return i
+        raise ValueError(repr(x) + ' is not in deque')
+
+    def insert(self, i, x):
+        if self._maxlen is not None and len(self._data) >= self._maxlen:
+            raise IndexError('deque already at its maximum size')
+        self._data.splice(i, 0, x)
+
+    def __len__(self):
+        return self._data.length
+
+    def __getitem__(self, i):
+        size = len(self._data)
+        if i < 0:
+            i += size
+        if i < 0 or i >= size:
+            raise IndexError('deque index out of range')
+        return self._data[i]
+
+    def __setitem__(self, i, value):
+        size = len(self._data)
+        if i < 0:
+            i += size
+        if i < 0 or i >= size:
+            raise IndexError('deque index out of range')
+        self._data[i] = value
+
+    def __contains__(self, x):
+        for item in self._data:
+            if item == x:
+                return True
+        return False
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __repr__(self):
+        if self._maxlen is not None:
+            return 'deque(' + repr(list(self._data)) + ', maxlen=' + str(self._maxlen) + ')'
+        return 'deque(' + repr(list(self._data)) + ')'
+
+    def __eq__(self, other):
+        if not isinstance(other, deque):
+            return False
+        if len(self._data) != len(other._data):
+            return False
+        for i in range(len(self._data)):
+            if self._data[i] != other._data[i]:
+                return False
+        return True
+
+
+class Counter:
+    """Dict subclass for counting hashable objects."""
+
+    def __init__(self, iterable=None, **kwargs):
+        self._data = {}
+        if iterable is not None:
+            if isinstance(iterable, Counter):
+                for k in iterable._data:
+                    self._data[k] = (self._data[k] or 0) + iterable._data[k]
+            elif isinstance(iterable, OrderedDict) or isinstance(iterable, defaultdict):
+                src = iterable._data
+                for k in src:
+                    self._data[k] = (self._data[k] or 0) + src[k]
+            elif jstype(iterable) is 'object' and not Array.isArray(iterable):
+                for k in Object.keys(iterable):
+                    self._data[k] = (self._data[k] or 0) + iterable[k]
+            else:
+                for item in iterable:
+                    key = str(item)
+                    self._data[key] = (self._data[key] or 0) + 1
+        for k in kwargs:
+            self._data[k] = (self._data[k] or 0) + kwargs[k]
+
+    def __getitem__(self, key):
+        return self._data[key] or 0
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __delitem__(self, key):
+        v'delete this._data[key]'
+
+    def __contains__(self, key):
+        return key in self._data and self._data[key] != 0
+
+    def __len__(self):
+        return Object.keys(self._data).length
+
+    def __iter__(self):
+        return iter(Object.keys(self._data))
+
+    def __repr__(self):
+        items = [[k, self._data[k]] for k in self._data]
+        pairs = [repr(p[0]) + ': ' + repr(p[1]) for p in items]
+        return 'Counter({' + pairs.join(', ') + '})'
+
+    def __eq__(self, other):
+        if not isinstance(other, Counter):
+            return False
+        keys_a = Object.keys(self._data)
+        keys_b = Object.keys(other._data)
+        if keys_a.length != keys_b.length:
+            return False
+        for k in keys_a:
+            if self._data[k] != other._data[k]:
+                return False
+        return True
+
+    def get(self, key, dflt=None):
+        if key in self._data:
+            return self._data[key]
+        return dflt
+
+    def keys(self):
+        return Object.keys(self._data)
+
+    def values(self):
+        return Object.values(self._data)
+
+    def items(self):
+        return [[k, self._data[k]] for k in self._data]
+
+    def update(self, iterable=None, **kwargs):
+        if iterable is not None:
+            if isinstance(iterable, Counter):
+                for k in iterable._data:
+                    self._data[k] = (self._data[k] or 0) + iterable._data[k]
+            elif isinstance(iterable, OrderedDict) or isinstance(iterable, defaultdict):
+                src = iterable._data
+                for k in src:
+                    self._data[k] = (self._data[k] or 0) + src[k]
+            elif jstype(iterable) is 'object' and not Array.isArray(iterable):
+                for k in Object.keys(iterable):
+                    self._data[k] = (self._data[k] or 0) + iterable[k]
+            else:
+                for item in iterable:
+                    key = str(item)
+                    self._data[key] = (self._data[key] or 0) + 1
+        for k in kwargs:
+            self._data[k] = (self._data[k] or 0) + kwargs[k]
+
+    def subtract(self, iterable=None, **kwargs):
+        if iterable is not None:
+            if isinstance(iterable, Counter):
+                for k in iterable._data:
+                    self._data[k] = (self._data[k] or 0) - iterable._data[k]
+            elif isinstance(iterable, OrderedDict) or isinstance(iterable, defaultdict):
+                src = iterable._data
+                for k in src:
+                    self._data[k] = (self._data[k] or 0) - src[k]
+            elif jstype(iterable) is 'object' and not Array.isArray(iterable):
+                for k in Object.keys(iterable):
+                    self._data[k] = (self._data[k] or 0) - iterable[k]
+            else:
+                for item in iterable:
+                    key = str(item)
+                    self._data[key] = (self._data[key] or 0) - 1
+        for k in kwargs:
+            self._data[k] = (self._data[k] or 0) - kwargs[k]
+
+    def most_common(self, n=None):
+        items = [[k, self._data[k]] for k in self._data]
+        items.pysort(key=def(pair): return -pair[1];)
+        if n is not None:
+            return items[:n]
+        return items
+
+    def elements(self):
+        result = []
+        for k in self._data:
+            count = self._data[k]
+            for i in range(max(0, count)):
+                result.push(k)
+        return iter(result)
+
+    def total(self):
+        s = 0
+        for k in self._data:
+            s += self._data[k]
+        return s
+
+    def copy(self):
+        c = Counter()
+        for k in self._data:
+            c._data[k] = self._data[k]
+        return c
+
+    def clear(self):
+        self._data = {}
+
+    def pop(self, key, *rest):
+        if key in self._data:
+            val = self._data[key]
+            v'delete this._data[key]'
+            return val
+        if len(rest) > 0:
+            return rest[0]
+        raise KeyError(repr(key))
+
+    def __add__(self, other):
+        result = Counter()
+        all_keys = Object.keys(self._data).concat(Object.keys(other._data))
+        for k in all_keys:
+            val = (self._data[k] or 0) + (other._data[k] or 0)
+            if val > 0:
+                result._data[k] = val
+        return result
+
+    def __sub__(self, other):
+        result = Counter()
+        for k in self._data:
+            val = (self._data[k] or 0) - (other._data[k] or 0)
+            if val > 0:
+                result._data[k] = val
+        return result
+
+    def __or__(self, other):
+        result = Counter()
+        all_keys = Object.keys(self._data).concat(Object.keys(other._data))
+        for k in all_keys:
+            val = max(self._data[k] or 0, other._data[k] or 0)
+            if val > 0:
+                result._data[k] = val
+        return result
+
+    def __and__(self, other):
+        result = Counter()
+        for k in self._data:
+            if k in other._data:
+                val = min(self._data[k] or 0, other._data[k] or 0)
+                if val > 0:
+                    result._data[k] = val
+        return result
+
+
+class OrderedDict:
+    """Dict that remembers insertion order and supports move_to_end / popitem."""
+
+    def __init__(self, iterable=None, **kwargs):
+        self._keys = []
+        self._data = {}
+        if iterable is not None:
+            if isinstance(iterable, OrderedDict):
+                for k in iterable._keys:
+                    self._set(k, iterable._data[k])
+            elif jstype(iterable) is 'object' and not Array.isArray(iterable):
+                for k in Object.keys(iterable):
+                    self._set(k, iterable[k])
+            else:
+                for pair in iterable:
+                    self._set(pair[0], pair[1])
+        for k in kwargs:
+            self._set(k, kwargs[k])
+
+    def _set(self, key, value):
+        if key not in self._data:
+            self._keys.push(key)
+        self._data[key] = value
+
+    def __setitem__(self, key, value):
+        self._set(key, value)
+
+    def __getitem__(self, key):
+        if key not in self._data:
+            raise KeyError(repr(key))
+        return self._data[key]
+
+    def __delitem__(self, key):
+        if key not in self._data:
+            raise KeyError(repr(key))
+        v'delete this._data[key]'
+        idx = self._keys.indexOf(key)
+        if idx != -1:
+            self._keys.splice(idx, 1)
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return self._keys.length
+
+    def __iter__(self):
+        return iter(list(self._keys))
+
+    def __repr__(self):
+        pairs = ['(' + repr(k) + ', ' + repr(self._data[k]) + ')' for k in self._keys]
+        return 'OrderedDict([' + pairs.join(', ') + '])'
+
+    def __eq__(self, other):
+        if isinstance(other, OrderedDict):
+            if self._keys.length != other._keys.length:
+                return False
+            for i in range(len(self._keys)):
+                if self._keys[i] != other._keys[i]:
+                    return False
+                k = self._keys[i]
+                if self._data[k] != other._data[k]:
+                    return False
+            return True
+        if jstype(other) is 'object' and not Array.isArray(other) and not isinstance(other, OrderedDict):
+            keys_b = Object.keys(other)
+            if self._keys.length != keys_b.length:
+                return False
+            for k in self._keys:
+                if k not in other or self._data[k] != other[k]:
+                    return False
+            return True
+        return False
+
+    def get(self, key, dflt=None):
+        if key in self._data:
+            return self._data[key]
+        return dflt
+
+    def keys(self):
+        return list(self._keys)
+
+    def values(self):
+        return [self._data[k] for k in self._keys]
+
+    def items(self):
+        return [[k, self._data[k]] for k in self._keys]
+
+    def pop(self, key, *rest):
+        if key in self._data:
+            val = self._data[key]
+            del self[key]
+            return val
+        if len(rest) > 0:
+            return rest[0]
+        raise KeyError(repr(key))
+
+    def popitem(self, last=True):
+        if not self._keys.length:
+            raise KeyError('dictionary is empty')
+        k = self._keys.pop() if last else self._keys.shift()
+        val = self._data[k]
+        v'delete this._data[k]'
+        return [k, val]
+
+    def move_to_end(self, key, last=True):
+        if key not in self._data:
+            raise KeyError(repr(key))
+        idx = self._keys.indexOf(key)
+        self._keys.splice(idx, 1)
+        if last:
+            self._keys.push(key)
+        else:
+            self._keys.unshift(key)
+
+    def update(self, other=None, **kwargs):
+        if other is not None:
+            if isinstance(other, OrderedDict):
+                for k in other._keys:
+                    self._set(k, other._data[k])
+            elif jstype(other) is 'object' and not Array.isArray(other):
+                for k in Object.keys(other):
+                    self._set(k, other[k])
+            else:
+                for pair in other:
+                    self._set(pair[0], pair[1])
+        for k in kwargs:
+            self._set(k, kwargs[k])
+
+    def setdefault(self, key, dflt=None):
+        if key not in self._data:
+            self._set(key, dflt)
+        return self._data[key]
+
+    def clear(self):
+        self._keys = []
+        self._data = {}
+
+    def copy(self):
+        return OrderedDict(self)
+
+    def fromkeys(self, keys, value=None):
+        od = OrderedDict()
+        for k in keys:
+            od._set(k, value)
+        return od
+
+
+class defaultdict:
+    """Dict subclass that calls a factory for missing keys."""
+
+    def __init__(self, default_factory=None, iterable=None, **kwargs):
+        self.default_factory = default_factory
+        self._data = {}
+        if iterable is not None:
+            if isinstance(iterable, defaultdict):
+                for k in iterable._data:
+                    self._data[k] = iterable._data[k]
+            elif jstype(iterable) is 'object' and not Array.isArray(iterable):
+                for k in Object.keys(iterable):
+                    self._data[k] = iterable[k]
+            else:
+                for pair in iterable:
+                    self._data[pair[0]] = pair[1]
+        for k in kwargs:
+            self._data[k] = kwargs[k]
+
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError(repr(key))
+        val = self.default_factory()
+        self._data[key] = val
+        return val
+
+    def __getitem__(self, key):
+        if key not in self._data:
+            return self.__missing__(key)
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __delitem__(self, key):
+        if key not in self._data:
+            raise KeyError(repr(key))
+        v'delete this._data[key]'
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __len__(self):
+        return Object.keys(self._data).length
+
+    def __iter__(self):
+        return iter(Object.keys(self._data))
+
+    def __repr__(self):
+        parts = [repr(k) + ': ' + repr(self._data[k]) for k in self._data]
+        fname = self.default_factory.name if self.default_factory else 'None'
+        return 'defaultdict(' + fname + ', {' + parts.join(', ') + '})'
+
+    def get(self, key, dflt=None):
+        if key in self._data:
+            return self._data[key]
+        return dflt
+
+    def keys(self):
+        return Object.keys(self._data)
+
+    def values(self):
+        return Object.values(self._data)
+
+    def items(self):
+        return [[k, self._data[k]] for k in self._data]
+
+    def pop(self, key, *rest):
+        if key in self._data:
+            val = self._data[key]
+            v'delete this._data[key]'
+            return val
+        if len(rest) > 0:
+            return rest[0]
+        raise KeyError(repr(key))
+
+    def setdefault(self, key, dflt=None):
+        if key not in self._data:
+            self._data[key] = dflt
+        return self._data[key]
+
+    def update(self, other=None, **kwargs):
+        if other is not None:
+            if isinstance(other, defaultdict):
+                for k in other._data:
+                    self._data[k] = other._data[k]
+            elif jstype(other) is 'object' and not Array.isArray(other):
+                for k in Object.keys(other):
+                    self._data[k] = other[k]
+            else:
+                for pair in other:
+                    self._data[pair[0]] = pair[1]
+        for k in kwargs:
+            self._data[k] = kwargs[k]
+
+    def clear(self):
+        self._data = {}
+
+    def copy(self):
+        d = defaultdict(self.default_factory)
+        for k in self._data:
+            d._data[k] = self._data[k]
+        return d
+
+    def __eq__(self, other):
+        if isinstance(other, defaultdict):
+            src = other._data
+        elif jstype(other) is 'object' and not Array.isArray(other) and not isinstance(other, defaultdict):
+            src = other
+        else:
+            return False
+        keys_a = Object.keys(self._data)
+        keys_b = Object.keys(src)
+        if keys_a.length != keys_b.length:
+            return False
+        for k in keys_a:
+            if self._data[k] != src[k]:
+                return False
+        return True

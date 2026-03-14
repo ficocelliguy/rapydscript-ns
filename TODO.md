@@ -24,9 +24,17 @@
 
 - variables just say (variable) on hover, not their type?
 
+  Note: Counter's __add__/__sub__/__or__/__and__ methods must be called explicitly (e.g. c1.__add__(c2)) since RapydScript doesn't support arithmetic operator overloading for custom classes. For subscript syntax
+  (obj[key]) on Counter, OrderedDict, and defaultdict, user code must include from __python__ import overload_getitem.
 
 
-I would like you to add support for [ the functools imported library ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please also update the README to mention this support.
+The issue is dict(groups) — RapydScript's ρσ_dict() constructor doesn't recognize a custom class as a mapping, so it iterates the keys ('eng', 'hr') as character pairs. The fix is to avoid that conversion:
+
+
+
+
+
+I would like you to add support for [ the collections imported library ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
 
 
 
@@ -45,11 +53,11 @@ differences.
 ┌───────────────────────────────────────────────┬────────────────┬──────────────────────────────────────────────────────────────┐
 │                    Feature                    │ Python Version │                            Notes                             │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ match/case (structural pattern matching)      │ 3.10+          │ needs testing                                                │
+│ match/case (structural pattern matching)      │ 3.10+          │ tested                                                       │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Walrus operator :=                            │ 3.8+           │ needs testing                                                │
+│ Walrus operator :=                            │ 3.8+           │ tested                                                       │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ lambda keyword                                │ all            │ needs testing                                                │
+│ lambda keyword                                │ all            │ tested                                                       │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Variable type annotations x: int = 1          │ 3.6+           │ needs testing                                                │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
@@ -134,7 +142,7 @@ No abc module, no @abstractmethod, no Protocol support.
 ┌──────────────────────────┬────────────────────────────────────────────────┐
 │         Function         │                     Notes                      │
 ├──────────────────────────┼────────────────────────────────────────────────┤
-│ super()                  │ needs testing                                  │
+│ super()                  │ tested                                         │
 ├──────────────────────────┼────────────────────────────────────────────────┤
 │ issubclass()             │ Not implemented                                │
 ├──────────────────────────┼────────────────────────────────────────────────┤
@@ -168,7 +176,7 @@ No abc module, no @abstractmethod, no Protocol support.
 ├──────────────────────────┼────────────────────────────────────────────────┤
 │ enumerate(x, start=N)    │ start parameter may not be supported           │
 ├──────────────────────────┼────────────────────────────────────────────────┤
-│ all() / any()            │ needs testing                                  │
+│ all() / any()            │ tested                                         │
 ├──────────────────────────┼────────────────────────────────────────────────┤
 │ next(iter, default?)     │ Not listed                                     │
 ├──────────────────────────┼────────────────────────────────────────────────┤
@@ -195,7 +203,7 @@ These are Python stdlib modules with no equivalent in src/lib/:
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
 │ collections │ deque, OrderedDict, defaultdict, Counter, namedtuple, ChainMap                  │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
-│ functools   │ needs testing                                                                   │
+│ functools   │ tested                                                                          │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
 │ itertools   │ chain, product, combinations, permutations, groupby, islice, zip_longest, cycle │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
@@ -296,5 +304,7 @@ If prioritizing what to implement next, these have the highest user impact:
 8. Nested comprehensions — common Python pattern
 9. Walrus operator := — increasingly common in modern Python - done
 10. classmethod decorator — standard OOP pattern
+
+
 
        

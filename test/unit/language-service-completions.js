@@ -82,6 +82,10 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
         require('path').join(__dirname, '../../src/lib/functools.pyj'), 'utf-8'
     );
 
+    var COLLECTIONS_SRC = require('fs').readFileSync(
+        require('path').join(__dirname, '../../src/lib/collections.pyj'), 'utf-8'
+    );
+
     var TESTS = [
 
         // ── detect_context ────────────────────────────────────────────────
@@ -944,6 +948,43 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 var engine = make_engine({}, ['print', 'len', 'range'], null, null, { functools: FUNCTOOLS_SRC });
                 var list = engine.getCompletions(null, pos(1, 7), "import ", MockKind);
                 assert_has(list, 'functools', 'functools module in import suggestions');
+            },
+        },
+
+        // ── collections stdlib completions ────────────────────────────────
+
+        {
+            name: "collections_from_import_completions",
+            description: "from collections import shows all collections exports",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { collections: COLLECTIONS_SRC });
+                var list = engine.getCompletions(null, pos(1, 28), "from collections import ", MockKind);
+                assert_has(list, 'namedtuple',  'namedtuple in collections completions');
+                assert_has(list, 'deque',       'deque in collections completions');
+                assert_has(list, 'Counter',     'Counter in collections completions');
+                assert_has(list, 'OrderedDict', 'OrderedDict in collections completions');
+                assert_has(list, 'defaultdict', 'defaultdict in collections completions');
+            },
+        },
+
+        {
+            name: "collections_from_import_prefix",
+            description: "from collections import with prefix filters correctly",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { collections: COLLECTIONS_SRC });
+                var list = engine.getCompletions(null, pos(1, 32), "from collections import named", MockKind);
+                assert_has(list,    'namedtuple', 'namedtuple matches prefix "named"');
+                assert_missing(list,'deque',      'deque does not match prefix "named"');
+            },
+        },
+
+        {
+            name: "collections_module_in_import",
+            description: "import shows collections when it is in stdlibFiles",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { collections: COLLECTIONS_SRC });
+                var list = engine.getCompletions(null, pos(1, 7), "import ", MockKind);
+                assert_has(list, 'collections', 'collections module in import suggestions');
             },
         },
 
