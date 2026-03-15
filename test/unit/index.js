@@ -2038,6 +2038,274 @@ assrt.equal(fib(15), 610)
         js_checks: [],
     },
 
+    // ── itertools ─────────────────────────────────────────────────────────
+
+    {
+        name: "itertools_count",
+        description: "itertools.count counts from start by step",
+        src: [
+            "# globals: assrt",
+            "from itertools import count, islice",
+            "assrt.deepEqual(list(islice(count(), 5)), [0, 1, 2, 3, 4])",
+            "assrt.deepEqual(list(islice(count(10, 2), 4)), [10, 12, 14, 16])",
+            "assrt.deepEqual(list(islice(count(-1, -1), 4)), [-1, -2, -3, -4])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_cycle",
+        description: "itertools.cycle cycles through an iterable indefinitely",
+        src: [
+            "# globals: assrt",
+            "from itertools import cycle, islice",
+            "assrt.deepEqual(list(islice(cycle([1, 2, 3]), 7)), [1, 2, 3, 1, 2, 3, 1])",
+            "assrt.deepEqual(list(islice(cycle('ab'), 5)), ['a', 'b', 'a', 'b', 'a'])",
+            "assrt.deepEqual(list(islice(cycle([42]), 3)), [42, 42, 42])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_repeat",
+        description: "itertools.repeat repeats an element n times or forever",
+        src: [
+            "# globals: assrt",
+            "from itertools import repeat, islice",
+            "assrt.deepEqual(list(repeat(5, 3)), [5, 5, 5])",
+            "assrt.deepEqual(list(repeat('x', 4)), ['x', 'x', 'x', 'x'])",
+            "assrt.deepEqual(list(repeat(0, 0)), [])",
+            "assrt.deepEqual(list(islice(repeat(7), 3)), [7, 7, 7])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_accumulate",
+        description: "itertools.accumulate returns running totals",
+        src: [
+            "# globals: assrt",
+            "from itertools import accumulate",
+            "assrt.deepEqual(list(accumulate([1, 2, 3, 4])), [1, 3, 6, 10])",
+            "assrt.deepEqual(list(accumulate([1, 2, 3], lambda a, b: a * b)), [1, 2, 6])",
+            "assrt.deepEqual(list(accumulate([1, 2, 3], initial=10)), [10, 11, 13, 16])",
+            "assrt.deepEqual(list(accumulate([])), [])",
+            "assrt.deepEqual(list(accumulate([], initial=5)), [5])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_chain",
+        description: "itertools.chain chains multiple iterables together",
+        src: [
+            "# globals: assrt",
+            "from itertools import chain",
+            "assrt.deepEqual(list(chain([1, 2], [3, 4])), [1, 2, 3, 4])",
+            "assrt.deepEqual(list(chain([1], [], [2, 3])), [1, 2, 3])",
+            "assrt.deepEqual(list(chain()), [])",
+            "assrt.deepEqual(list(chain([1, 2])), [1, 2])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_chain_from_iterable",
+        description: "itertools.chain.from_iterable chains from a single iterable of iterables",
+        src: [
+            "# globals: assrt",
+            "from itertools import chain",
+            "assrt.deepEqual(list(chain.from_iterable([[1, 2], [3, 4]])), [1, 2, 3, 4])",
+            "assrt.deepEqual(list(chain.from_iterable([[1], [], [2, 3]])), [1, 2, 3])",
+            "assrt.deepEqual(list(chain.from_iterable([])), [])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_compress",
+        description: "itertools.compress filters data by boolean selectors",
+        src: [
+            "# globals: assrt",
+            "from itertools import compress",
+            "assrt.deepEqual(list(compress([1, 2, 3, 4, 5], [1, 0, 1, 0, 1])), [1, 3, 5])",
+            "assrt.deepEqual(list(compress('ABCDE', [True, False, True, False, True])), ['A', 'C', 'E'])",
+            "assrt.deepEqual(list(compress([1, 2, 3], [0, 0, 0])), [])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_dropwhile",
+        description: "itertools.dropwhile drops elements while predicate is true",
+        src: [
+            "# globals: assrt",
+            "from itertools import dropwhile",
+            "assrt.deepEqual(list(dropwhile(lambda x: x < 5, [1, 4, 6, 4, 1])), [6, 4, 1])",
+            "assrt.deepEqual(list(dropwhile(lambda x: True, [1, 2, 3])), [])",
+            "assrt.deepEqual(list(dropwhile(lambda x: False, [1, 2, 3])), [1, 2, 3])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_filterfalse",
+        description: "itertools.filterfalse yields elements where predicate is falsy",
+        src: [
+            "# globals: assrt",
+            "from itertools import filterfalse",
+            "assrt.deepEqual(list(filterfalse(lambda x: x % 2, range(10))), [0, 2, 4, 6, 8])",
+            "assrt.deepEqual(list(filterfalse(lambda x: x, [0, 1, 0, 2, 0])), [0, 0, 0])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_groupby",
+        description: "itertools.groupby groups consecutive equal elements",
+        src: [
+            "# globals: assrt",
+            "from itertools import groupby",
+            "result = list(groupby([1, 1, 2, 3, 3]))",
+            "assrt.equal(result[0][0], 1)",
+            "assrt.equal(result[1][0], 2)",
+            "assrt.equal(result[2][0], 3)",
+            "assrt.deepEqual(list(result[0][1]), [1, 1])",
+            "assrt.deepEqual(list(result[1][1]), [2])",
+            "assrt.deepEqual(list(result[2][1]), [3, 3])",
+            "# With key function",
+            "words = ['apple', 'ant', 'bat', 'bee', 'cat']",
+            "keyed = [(k, list(g)) for k, g in groupby(words, lambda w: w[0])]",
+            "assrt.equal(keyed[0][0], 'a')",
+            "assrt.equal(keyed[1][0], 'b')",
+            "assrt.equal(keyed[2][0], 'c')",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_islice",
+        description: "itertools.islice slices an iterator",
+        src: [
+            "# globals: assrt",
+            "from itertools import islice",
+            "assrt.deepEqual(list(islice(range(10), 5)), [0, 1, 2, 3, 4])",
+            "assrt.deepEqual(list(islice(range(10), 2, 7)), [2, 3, 4, 5, 6])",
+            "assrt.deepEqual(list(islice(range(10), 2, 8, 2)), [2, 4, 6])",
+            "assrt.deepEqual(list(islice(range(10), 0)), [])",
+            "assrt.deepEqual(list(islice(range(10), None)), [0,1,2,3,4,5,6,7,8,9])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_pairwise",
+        description: "itertools.pairwise yields overlapping consecutive pairs",
+        src: [
+            "# globals: assrt",
+            "from itertools import pairwise",
+            "assrt.deepEqual(list(pairwise([1, 2, 3, 4])), [[1, 2], [2, 3], [3, 4]])",
+            "assrt.deepEqual(list(pairwise([1])), [])",
+            "assrt.deepEqual(list(pairwise([])), [])",
+            "assrt.deepEqual(list(pairwise('ABCD')), [['A','B'],['B','C'],['C','D']])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_starmap",
+        description: "itertools.starmap maps a function with argument unpacking",
+        src: [
+            "# globals: assrt",
+            "from itertools import starmap",
+            "assrt.deepEqual(list(starmap(lambda x, y: x * y, [[2, 3], [4, 5], [1, 6]])), [6, 20, 6])",
+            "assrt.deepEqual(list(starmap(lambda a, b, c: a + b + c, [[1,2,3],[4,5,6]])), [6, 15])",
+            "assrt.deepEqual(list(starmap(pow, [[2, 3], [3, 2]])), [8, 9])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_takewhile",
+        description: "itertools.takewhile yields elements while predicate is true",
+        src: [
+            "# globals: assrt",
+            "from itertools import takewhile",
+            "assrt.deepEqual(list(takewhile(lambda x: x < 5, [1, 4, 6, 4, 1])), [1, 4])",
+            "assrt.deepEqual(list(takewhile(lambda x: True, [1, 2, 3])), [1, 2, 3])",
+            "assrt.deepEqual(list(takewhile(lambda x: False, [1, 2, 3])), [])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_zip_longest",
+        description: "itertools.zip_longest zips iterables using a fill value for shorter ones",
+        src: [
+            "# globals: assrt",
+            "from itertools import zip_longest",
+            "assrt.deepEqual(list(zip_longest([1, 2, 3], [4, 5])), [[1,4],[2,5],[3,None]])",
+            "assrt.deepEqual(list(zip_longest([1, 2], [3, 4, 5], fillvalue=0)), [[1,3],[2,4],[0,5]])",
+            "assrt.deepEqual(list(zip_longest([], [1, 2], fillvalue='x')), [['x',1],['x',2]])",
+            "assrt.deepEqual(list(zip_longest()), [])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_product",
+        description: "itertools.product returns the cartesian product of iterables",
+        src: [
+            "# globals: assrt",
+            "from itertools import product",
+            "assrt.deepEqual(list(product([1,2],[3,4])), [[1,3],[1,4],[2,3],[2,4]])",
+            "assrt.deepEqual(list(product([0,1], repeat=2)), [[0,0],[0,1],[1,0],[1,1]])",
+            "assrt.deepEqual(list(product([1,2],[3,4],[5,6])), [[1,3,5],[1,3,6],[1,4,5],[1,4,6],[2,3,5],[2,3,6],[2,4,5],[2,4,6]])",
+            "assrt.deepEqual(list(product([], [1,2])), [])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_permutations",
+        description: "itertools.permutations returns all r-length permutations",
+        src: [
+            "# globals: assrt",
+            "from itertools import permutations",
+            "assrt.deepEqual(list(permutations([1,2,3])), [[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]])",
+            "assrt.deepEqual(list(permutations([1,2,3], 2)), [[1,2],[1,3],[2,1],[2,3],[3,1],[3,2]])",
+            "assrt.deepEqual(list(permutations([1,2], 0)), [[]])",
+            "assrt.deepEqual(list(permutations([1], 2)), [])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_combinations",
+        description: "itertools.combinations returns r-length combinations without repeats",
+        src: [
+            "# globals: assrt",
+            "from itertools import combinations",
+            "assrt.deepEqual(list(combinations([1,2,3,4], 2)), [[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]])",
+            "assrt.deepEqual(list(combinations([1,2,3], 3)), [[1,2,3]])",
+            "assrt.deepEqual(list(combinations([1,2,3], 0)), [[]])",
+            "assrt.deepEqual(list(combinations([1,2], 3)), [])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "itertools_combinations_with_replacement",
+        description: "itertools.combinations_with_replacement returns r-length combinations allowing repeats",
+        src: [
+            "# globals: assrt",
+            "from itertools import combinations_with_replacement",
+            "assrt.deepEqual(list(combinations_with_replacement([1,2,3], 2)), [[1,1],[1,2],[1,3],[2,2],[2,3],[3,3]])",
+            "assrt.deepEqual(list(combinations_with_replacement([1,2], 3)), [[1,1,1],[1,1,2],[1,2,2],[2,2,2]])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
     // ── operator overloading ───────────────────────────────────────────────
 
     {

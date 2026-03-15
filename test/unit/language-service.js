@@ -407,6 +407,40 @@ function make_tests(Diagnostics, RS) {
         },
 
         {
+            name: "itertools_import_no_errors",
+            description: "Importing and using itertools symbols produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "from itertools import chain, islice, count, cycle, repeat",
+                    "from itertools import accumulate, compress, dropwhile, filterfalse",
+                    "from itertools import groupby, pairwise, starmap, takewhile, zip_longest",
+                    "from itertools import product, permutations, combinations",
+                    "from itertools import combinations_with_replacement",
+                    "a = list(islice(count(), 3))",
+                    "b = list(chain([1, 2], [3, 4]))",
+                    "c = list(islice(cycle([1, 2]), 4))",
+                    "d2 = list(repeat(5, 3))",
+                    "e = list(accumulate([1, 2, 3]))",
+                    "f = list(compress([1,2,3], [1,0,1]))",
+                    "g = list(dropwhile(lambda x: x < 2, [1,2,3]))",
+                    "h = list(filterfalse(lambda x: x % 2, [1,2,3,4]))",
+                    "i2 = list(groupby([1,1,2]))",
+                    "j = list(pairwise([1,2,3]))",
+                    "k = list(starmap(lambda a,b: a+b, [[1,2],[3,4]]))",
+                    "l2 = list(takewhile(lambda x: x < 3, [1,2,3,4]))",
+                    "m = list(zip_longest([1,2],[3]))",
+                    "n2 = list(product([1,2],[3,4]))",
+                    "o = list(permutations([1,2,3], 2))",
+                    "p = list(combinations([1,2,3], 2))",
+                    "q = list(combinations_with_replacement([1,2], 2))",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
             name: "op_overloading_no_errors",
             description: "Class with arithmetic dunder methods and overload_operators flag produces no errors",
             run: function () {

@@ -1,0 +1,580 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's itertools standard library.
+#
+# Supported: count, cycle, repeat, accumulate, chain, compress,
+#            dropwhile, filterfalse, groupby, islice, pairwise,
+#            starmap, takewhile, zip_longest, product,
+#            permutations, combinations, combinations_with_replacement
+
+# Sentinel: distinguishes "initial not provided" from "initial=None"
+_NO_INITIAL = {}
+
+
+def _to_array(iterable):
+    """Convert any iterable to a plain JavaScript array."""
+    if Array.isArray(iterable):
+        return iterable.slice()
+    if jstype(iterable) is 'string':
+        return iterable.split('')
+    a = []
+    it = iter(iterable)
+    r = it.next()
+    while not r.done:
+        a.push(r.value)
+        r = it.next()
+    return a
+
+
+# ── Infinite iterators ─────────────────────────────────────────────────────
+
+class count:
+    """count(start=0, step=1) -> count from start by step indefinitely."""
+
+    def __init__(self, start=0, step=1):
+        self._n = start
+        self._step = step
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        val = self._n
+        self._n += self._step
+        return {'value': val, 'done': False}
+
+    def __next__(self):
+        return self.next()['value']
+
+
+class cycle:
+    """cycle(p) -> p0, p1, ... plast, p0, p1, ... indefinitely."""
+
+    def __init__(self, iterable):
+        self._data = _to_array(iterable)
+        self._i = 0
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._data.length == 0:
+            return {'value': undefined, 'done': True}
+        val = self._data[self._i]
+        self._i = (self._i + 1) % self._data.length
+        return {'value': val, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class repeat:
+    """repeat(elem, n=None) -> repeat elem n times, or forever if n is None."""
+
+    def __init__(self, obj, times=None):
+        self._obj = obj
+        self._times = times
+        self._n = 0
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._times is not None and self._n >= self._times:
+            return {'value': undefined, 'done': True}
+        self._n += 1
+        return {'value': self._obj, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+# ── Finite iterators ───────────────────────────────────────────────────────
+
+class accumulate:
+    """accumulate(p, func=add, initial=no_value) -> p0, p0+p1, p0+p1+p2, ..."""
+
+    def __init__(self, iterable, func=None, initial=_NO_INITIAL):
+        self._it = iter(iterable)
+        self._func = func
+        self._has_initial = initial is not _NO_INITIAL
+        self._total = initial if self._has_initial else None
+        self._started = self._has_initial
+        self._initial_pending = self._has_initial
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._initial_pending:
+            self._initial_pending = False
+            return {'value': self._total, 'done': False}
+        r = self._it.next()
+        if r.done:
+            return {'value': undefined, 'done': True}
+        if not self._started:
+            self._total = r.value
+            self._started = True
+        else:
+            if self._func is None:
+                self._total += r.value
+            else:
+                self._total = self._func(self._total, r.value)
+        return {'value': self._total, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class _ChainIter:
+    """Internal: chain from a pre-built list of iterators."""
+
+    def __init__(self, iters):
+        self._iters = iters
+        self._i = 0
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        while self._i < self._iters.length:
+            r = self._iters[self._i].next()
+            if not r.done:
+                return r
+            self._i += 1
+        return {'value': undefined, 'done': True}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class _ChainFromIterable:
+    """Internal: chain.from_iterable implementation."""
+
+    def __init__(self, iterable):
+        self._outer = iter(iterable)
+        self._inner = None
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        while True:
+            if self._inner is not None:
+                r = self._inner.next()
+                if not r.done:
+                    return r
+                self._inner = None
+            outer_r = self._outer.next()
+            if outer_r.done:
+                return {'value': undefined, 'done': True}
+            self._inner = iter(_to_array(outer_r.value))
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+def chain(*iterables):
+    """chain(p, q, ...) -> p0, p1, ... plast, q0, q1, ..."""
+    return _ChainIter([iter(it) for it in iterables])
+
+chain.from_iterable = def(iterable):
+    """chain.from_iterable([[A,B],[C,D]]) -> A B C D"""
+    return _ChainFromIterable(iterable)
+
+
+class compress:
+    """compress(data, selectors) -> (d[i] if s[i]) for each i."""
+
+    def __init__(self, data, selectors):
+        self._data = iter(data)
+        self._sel = iter(selectors)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        while True:
+            dr = self._data.next()
+            sr = self._sel.next()
+            if dr.done or sr.done:
+                return {'value': undefined, 'done': True}
+            if sr.value:
+                return {'value': dr.value, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class dropwhile:
+    """dropwhile(pred, seq) -> seq[n], seq[n+1], ... (starting where pred fails)."""
+
+    def __init__(self, predicate, iterable):
+        self._pred = predicate
+        self._it = iter(iterable)
+        self._dropping = True
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        while True:
+            r = self._it.next()
+            if r.done:
+                return {'value': undefined, 'done': True}
+            if self._dropping:
+                if not self._pred(r.value):
+                    self._dropping = False
+                    return {'value': r.value, 'done': False}
+            else:
+                return {'value': r.value, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class filterfalse:
+    """filterfalse(pred, seq) -> elements of seq where pred(elem) is falsy."""
+
+    def __init__(self, predicate, iterable):
+        self._pred = predicate
+        self._it = iter(iterable)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        while True:
+            r = self._it.next()
+            if r.done:
+                return {'value': undefined, 'done': True}
+            if not self._pred(r.value):
+                return {'value': r.value, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class groupby:
+    """groupby(iterable, key=None) -> (k, group_iter) pairs for consecutive equal keys."""
+
+    def __init__(self, iterable, key=None):
+        self._it = iter(iterable)
+        self._key = key
+        self._curr = {'value': undefined, 'done': False}
+        self._curr_key = undefined
+        self._initialized = False
+
+    def __iter__(self):
+        return self
+
+    def _get_key(self, val):
+        if self._key is not None:
+            return self._key(val)
+        return val
+
+    def _advance(self):
+        self._curr = self._it.next()
+        if not self._curr.done:
+            self._curr_key = self._get_key(self._curr.value)
+
+    def next(self):
+        if not self._initialized:
+            self._initialized = True
+            self._advance()
+        if self._curr.done:
+            return {'value': undefined, 'done': True}
+        group_key = self._curr_key
+        group_items = []
+        while not self._curr.done and self._curr_key == group_key:
+            group_items.push(self._curr.value)
+            self._advance()
+        return {'value': [group_key, iter(group_items)], 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class islice:
+    """islice(p, stop) or islice(p, start, stop[, step]) -> sliced iterator."""
+
+    def __init__(self, iterable, *args):
+        self._it = iter(iterable)
+        if len(args) == 1:
+            self._start = 0
+            self._stop = args[0]
+            self._step = 1
+        elif len(args) == 2:
+            self._start = args[0] if args[0] is not None else 0
+            self._stop = args[1]
+            self._step = 1
+        elif len(args) >= 3:
+            self._start = args[0] if args[0] is not None else 0
+            self._stop = args[1]
+            self._step = args[2] if args[2] is not None else 1
+        else:
+            raise TypeError('islice() requires at least 2 arguments')
+        if self._step < 1:
+            raise ValueError('Step for islice() must be a positive integer or None')
+        self._consumed = 0
+        self._next_pos = self._start
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._stop is not None and self._next_pos >= self._stop:
+            return {'value': undefined, 'done': True}
+        # Advance underlying iterator to _next_pos
+        while self._consumed < self._next_pos:
+            r = self._it.next()
+            if r.done:
+                return {'value': undefined, 'done': True}
+            self._consumed += 1
+        # Get element at _next_pos
+        r = self._it.next()
+        if r.done:
+            return {'value': undefined, 'done': True}
+        self._consumed += 1
+        self._next_pos += self._step
+        return {'value': r.value, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class pairwise:
+    """pairwise(iterable) -> (a,b), (b,c), (c,d), ..."""
+
+    def __init__(self, iterable):
+        self._it = iter(iterable)
+        self._prev = undefined
+        self._started = False
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if not self._started:
+            r = self._it.next()
+            if r.done:
+                return {'value': undefined, 'done': True}
+            self._prev = r.value
+            self._started = True
+        r = self._it.next()
+        if r.done:
+            return {'value': undefined, 'done': True}
+        pair = [self._prev, r.value]
+        self._prev = r.value
+        return {'value': pair, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class starmap:
+    """starmap(func, iterable) -> func(*it[0]), func(*it[1]), ..."""
+
+    def __init__(self, func, iterable):
+        self._func = func
+        self._it = iter(iterable)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        r = self._it.next()
+        if r.done:
+            return {'value': undefined, 'done': True}
+        args = _to_array(r.value)
+        v"var _result = this._func.apply(undefined, args)"
+        return {'value': _result, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class takewhile:
+    """takewhile(pred, seq) -> seq[0], seq[1], ... until pred fails."""
+
+    def __init__(self, predicate, iterable):
+        self._pred = predicate
+        self._it = iter(iterable)
+        self._done = False
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._done:
+            return {'value': undefined, 'done': True}
+        r = self._it.next()
+        if r.done:
+            self._done = True
+            return {'value': undefined, 'done': True}
+        if self._pred(r.value):
+            return {'value': r.value, 'done': False}
+        self._done = True
+        return {'value': undefined, 'done': True}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+class zip_longest:
+    """zip_longest(*iterables, fillvalue=None) -> zip with fill for shorter iterables."""
+
+    def __init__(self, *iterables, **kwargs):
+        self._iters = [iter(it) for it in iterables]
+        self._fill = kwargs['fillvalue'] if kwargs and 'fillvalue' in kwargs else None
+        self._active = self._iters.length
+        self._exhausted = [False for _ in range(self._iters.length)]
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._active == 0:
+            return {'value': undefined, 'done': True}
+        values = []
+        all_done = True
+        for i in range(self._iters.length):
+            if self._exhausted[i]:
+                values.push(self._fill)
+            else:
+                r = self._iters[i].next()
+                if r.done:
+                    self._exhausted[i] = True
+                    self._active -= 1
+                    values.push(self._fill)
+                else:
+                    all_done = False
+                    values.push(r.value)
+        if all_done:
+            return {'value': undefined, 'done': True}
+        return {'value': values, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+# ── Combinatoric generators ─────────────────────────────────────────────────
+
+def product(*iterables, **kwargs):
+    """product(*iterables, repeat=1) -> cartesian product of iterables."""
+    repeat_n = kwargs['repeat'] if kwargs and 'repeat' in kwargs else 1
+    pools = [_to_array(it) for it in iterables]
+    # Build a flat list of pools repeated repeat_n times
+    all_pools = []
+    for i in range(repeat_n):
+        for p in pools:
+            all_pools.push(p)
+    result = [[]]
+    for pool in all_pools:
+        new_result = []
+        for x in result:
+            for y in pool:
+                new_result.push(x.concat([y]))
+        result = new_result
+    return iter(result)
+
+
+def permutations(iterable, r=None):
+    """permutations(p, r=None) -> r-length permutations of elements in p."""
+    pool = _to_array(iterable)
+    n = pool.length
+    if r is None:
+        r = n
+    if r > n or (n == 0 and r > 0):
+        return iter([])
+    result = []
+    def _helper(current, remaining):
+        if current.length == r:
+            result.push(current.slice())
+            return
+        for i in range(remaining.length):
+            current.push(remaining[i])
+            _helper(current, remaining.slice(0, i).concat(remaining.slice(i + 1)))
+            current.pop()
+    _helper([], pool.slice())
+    return iter(result)
+
+
+def combinations(iterable, r):
+    """combinations(p, r) -> r-length subsequences of elements in p (no repeats)."""
+    pool = _to_array(iterable)
+    n = pool.length
+    if r > n:
+        return iter([])
+    result = []
+    def _helper(start, current):
+        if current.length == r:
+            result.push(current.slice())
+            return
+        for i in range(start, n):
+            current.push(pool[i])
+            _helper(i + 1, current)
+            current.pop()
+    _helper(0, [])
+    return iter(result)
+
+
+def combinations_with_replacement(iterable, r):
+    """combinations_with_replacement(p, r) -> r-length subsequences allowing repeats."""
+    pool = _to_array(iterable)
+    n = pool.length
+    if n == 0 and r > 0:
+        return iter([])
+    result = []
+    def _helper(start, current):
+        if current.length == r:
+            result.push(current.slice())
+            return
+        for i in range(start, n):
+            current.push(pool[i])
+            _helper(i, current)
+            current.pop()
+    _helper(0, [])
+    return iter(result)

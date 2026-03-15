@@ -1,21 +1,6 @@
-### Variable type definitions
-- document stripping out
-- move to parser
-- add flag
-
-### export
-- strip out of initial code
-- add to all root-level functions after (without a leading underscore)
-
-### imports
-- support an array of rapydscript files with names? compile them all at once?
-- how does the current file importer work?
-
 
 ### libraries
-- itertools 
-- collections
-- functools  - needs testing
+- itertools - needs testing
 
 - allow var etc as property name
 - revert numpy variance method to be var
@@ -24,17 +9,12 @@
 
 - variables just say (variable) on hover, not their type?
 
-  Note: Counter's __add__/__sub__/__or__/__and__ methods must be called explicitly (e.g. c1.__add__(c2)) since RapydScript doesn't support arithmetic operator overloading for custom classes. For subscript syntax
-  (obj[key]) on Counter, OrderedDict, and defaultdict, user code must include from __python__ import overload_getitem.
+- compress language service export
 
 
 
 
-
-
-I would like you to add support for [  arithmetic operator overloading for custom classes ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
-
-Please also update the collections library to take advantage of this, with unit tests
+I would like you to add support for [  the itertools importable python library ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
 
 
 
@@ -200,7 +180,7 @@ These are Python stdlib modules with no equivalent in src/lib/:
 ┌─────────────┬─────────────────────────────────────────────────────────────────────────────────┐
 │   Module    │                                 What's Missing                                  │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
-│ collections │ deque, OrderedDict, defaultdict, Counter, namedtuple, ChainMap                  │
+│ collections │ tested                                                                          │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
 │ functools   │ tested                                                                          │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
@@ -294,12 +274,12 @@ Priority Gaps (Most Impactful)
 If prioritizing what to implement next, these have the highest user impact:
 
 1. super() — required for idiomatic OOP code - done
-2. Operator overloading (__add__, __lt__, etc.) — blocks numerical/scientific code
+2. Operator overloading (__add__, __lt__, etc.) — blocks numerical/scientific code - done
 3. __bool__ / truthiness fix — silent Python compatibility trap
 4. lambda keyword — commonly expected - done
 5. all() / any() — extremely common builtins - done
 6. functools.reduce / partial — core functional programming tools - done
-7. collections.defaultdict / Counter — frequently used
+7. collections.defaultdict / Counter — frequently used - done
 8. Nested comprehensions — common Python pattern
 9. Walrus operator := — increasingly common in modern Python - done
 10. classmethod decorator — standard OOP pattern

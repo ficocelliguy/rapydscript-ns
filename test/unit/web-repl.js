@@ -258,6 +258,55 @@ var TESTS = [
         },
     },
 
+    // ── itertools ─────────────────────────────────────────────────────────
+
+    {
+        name: "itertools_chain_web_repl",
+        description: "itertools.chain works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from itertools import chain, islice, count",
+                "assrt.deepEqual(list(chain([1,2],[3,4])), [1,2,3,4])",
+                "assrt.deepEqual(list(islice(count(5), 4)), [5,6,7,8])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "itertools_combinatorics_web_repl",
+        description: "itertools combinatoric functions work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from itertools import product, permutations, combinations, combinations_with_replacement",
+                "assrt.deepEqual(list(product([1,2],[3,4])), [[1,3],[1,4],[2,3],[2,4]])",
+                "assrt.deepEqual(list(permutations([1,2,3],2)), [[1,2],[1,3],[2,1],[2,3],[3,1],[3,2]])",
+                "assrt.deepEqual(list(combinations([1,2,3],2)), [[1,2],[1,3],[2,3]])",
+                "assrt.deepEqual(list(combinations_with_replacement([1,2],2)), [[1,1],[1,2],[2,2]])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "itertools_filtering_web_repl",
+        description: "itertools filtering/selecting functions work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from itertools import compress, dropwhile, filterfalse, takewhile, zip_longest",
+                "assrt.deepEqual(list(compress([1,2,3,4,5],[1,0,1,0,1])), [1,3,5])",
+                "assrt.deepEqual(list(dropwhile(lambda x: x < 3, [1,2,3,4])), [3,4])",
+                "assrt.deepEqual(list(filterfalse(lambda x: x%2, [1,2,3,4])), [2,4])",
+                "assrt.deepEqual(list(takewhile(lambda x: x < 3, [1,2,3,4])), [1,2])",
+                "assrt.deepEqual(list(zip_longest([1,2],[3],fillvalue=0)), [[1,3],[2,0]])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

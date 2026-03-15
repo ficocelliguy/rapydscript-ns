@@ -1774,6 +1774,9 @@ It is for that reason that I try to keep RapydScript bells and whistles to a min
 	operator            # a subset of python;s operator module
 	functools           # reduce, partial, wraps, lru_cache, cache, total_ordering, cmp_to_key
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
+	itertools           # count, cycle, repeat, accumulate, chain, compress, dropwhile, filterfalse,
+	                    # groupby, islice, pairwise, starmap, takewhile, zip_longest,
+	                    # product, permutations, combinations, combinations_with_replacement
 
 For the most part, the logic implemented in these libraries functions identically to the Python versions.  I'd be happy to include more libraries, if other members of the community want to implement them (it's fun to do, `re.pyj` is a good example), but I want to reemphasize that unlike most other Python-to-JavaScript compilers, RapydScript doesn't need them to be complete since there are already tons of available JavaScript libraries that it can use natively.
 
