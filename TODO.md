@@ -28,8 +28,6 @@
   (obj[key]) on Counter, OrderedDict, and defaultdict, user code must include from __python__ import overload_getitem.
 
 
-The issue is dict(groups) — RapydScript's ρσ_dict() constructor doesn't recognize a custom class as a mapping, so it iterates the keys ('eng', 'hr') as character pairs. The fix is to avoid that conversion:
-
 
 
 

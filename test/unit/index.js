@@ -1998,6 +1998,32 @@ assrt.equal(fib(15), 610)
     },
 
     {
+        name: "collections_dict_conversion",
+        description: "dict() converts Counter, OrderedDict, defaultdict to a plain dict",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_getitem",
+            "from collections import Counter, OrderedDict, defaultdict",
+            "c = Counter('aab')",
+            "d = dict(c)",
+            "assrt.equal(d['a'], 2)",
+            "assrt.equal(d['b'], 1)",
+            "od = OrderedDict()",
+            "od['x'] = 10",
+            "od['y'] = 20",
+            "d2 = dict(od)",
+            "assrt.equal(d2['x'], 10)",
+            "assrt.equal(d2['y'], 20)",
+            "dd = defaultdict(list)",
+            "dd['k'].append(1)",
+            "dd['k'].append(2)",
+            "d3 = dict(dd)",
+            "assrt.deepEqual(d3['k'], [1, 2])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
         name: "collections_defaultdict_no_factory",
         description: "defaultdict with no factory raises KeyError on missing key",
         src: [

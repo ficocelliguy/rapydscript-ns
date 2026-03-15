@@ -661,6 +661,10 @@ Object.defineProperties(ρσ_dict.prototype, {
         while not result.done:
             m.set(result.value[0], result.value[1])
             result = iterator.next()
+    elif jstype(iterable.items) is 'function' and not Array.isArray(iterable):
+        pairs = iterable.items()
+        for v'var k2 = 0; k2 < pairs.length; k2++':
+            m.set(pairs[k2][0], pairs[k2][1])
     elif jstype(iterable[ρσ_iterator_symbol]) is 'function':
         iterator = iterable[ρσ_iterator_symbol]()
         result = iterator.next()
