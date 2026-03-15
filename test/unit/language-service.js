@@ -406,6 +406,31 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        {
+            name: "op_overloading_no_errors",
+            description: "Class with arithmetic dunder methods and overload_operators flag produces no errors",
+            run: function () {
+                var markers = d().check([
+                    "from __python__ import overload_operators",
+                    "class Vec:",
+                    "    def __init__(self, x, y):",
+                    "        self.x = x",
+                    "        self.y = y",
+                    "    def __add__(self, other):",
+                    "        return Vec(self.x + other.x, self.y + other.y)",
+                    "    def __neg__(self):",
+                    "        return Vec(-self.x, -self.y)",
+                    "a = Vec(1, 2)",
+                    "b = Vec(3, 4)",
+                    "c = a + b",
+                    "d2 = -a",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
     ];
 
     return TESTS;

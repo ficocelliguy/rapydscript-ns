@@ -249,6 +249,133 @@ def ρσ_mixin():
             p = Object.getPrototypeOf(p)
     Object.defineProperties(target, resolved_props)
 
+# Arithmetic/bitwise operator overloading helpers.
+# Each checks for the forward dunder method, then the reflected one, then
+# falls back to the native JS operation (with special handling for // and **).
+def ρσ_op_add(a, b):
+    if a is not None and jstype(a.__add__) is 'function': return a.__add__(b)
+    if b is not None and jstype(b.__radd__) is 'function': return b.__radd__(a)
+    return a + b
+
+def ρσ_op_sub(a, b):
+    if a is not None and jstype(a.__sub__) is 'function': return a.__sub__(b)
+    if b is not None and jstype(b.__rsub__) is 'function': return b.__rsub__(a)
+    return a - b
+
+def ρσ_op_mul(a, b):
+    if a is not None and jstype(a.__mul__) is 'function': return a.__mul__(b)
+    if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
+    if (jstype(a) is 'string' or v'a instanceof String') and jstype(b) is 'number': return a.repeat(b)
+    if (jstype(b) is 'string' or v'b instanceof String') and jstype(a) is 'number': return b.repeat(a)
+    return a * b
+
+def ρσ_op_truediv(a, b):
+    if a is not None and jstype(a.__truediv__) is 'function': return a.__truediv__(b)
+    if b is not None and jstype(b.__rtruediv__) is 'function': return b.__rtruediv__(a)
+    return a / b
+
+def ρσ_op_floordiv(a, b):
+    if a is not None and jstype(a.__floordiv__) is 'function': return a.__floordiv__(b)
+    if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
+    return Math.floor(a / b)
+
+def ρσ_op_mod(a, b):
+    if a is not None and jstype(a.__mod__) is 'function': return a.__mod__(b)
+    if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
+    return a % b
+
+def ρσ_op_pow(a, b):
+    if a is not None and jstype(a.__pow__) is 'function': return a.__pow__(b)
+    if b is not None and jstype(b.__rpow__) is 'function': return b.__rpow__(a)
+    return Math.pow(a, b)
+
+def ρσ_op_and(a, b):
+    if a is not None and jstype(a.__and__) is 'function': return a.__and__(b)
+    if b is not None and jstype(b.__rand__) is 'function': return b.__rand__(a)
+    return a & b
+
+def ρσ_op_or(a, b):
+    if a is not None and jstype(a.__or__) is 'function': return a.__or__(b)
+    if b is not None and jstype(b.__ror__) is 'function': return b.__ror__(a)
+    return a | b
+
+def ρσ_op_xor(a, b):
+    if a is not None and jstype(a.__xor__) is 'function': return a.__xor__(b)
+    if b is not None and jstype(b.__rxor__) is 'function': return b.__rxor__(a)
+    return a ^ b
+
+def ρσ_op_lshift(a, b):
+    if a is not None and jstype(a.__lshift__) is 'function': return a.__lshift__(b)
+    if b is not None and jstype(b.__rlshift__) is 'function': return b.__rlshift__(a)
+    return a << b
+
+def ρσ_op_rshift(a, b):
+    if a is not None and jstype(a.__rshift__) is 'function': return a.__rshift__(b)
+    if b is not None and jstype(b.__rrshift__) is 'function': return b.__rrshift__(a)
+    return a >> b
+
+# Unary operator overloading helpers
+def ρσ_op_neg(a):
+    if a is not None and jstype(a.__neg__) is 'function': return a.__neg__()
+    return -a
+
+def ρσ_op_pos(a):
+    if a is not None and jstype(a.__pos__) is 'function': return a.__pos__()
+    return +a
+
+def ρσ_op_invert(a):
+    if a is not None and jstype(a.__invert__) is 'function': return a.__invert__()
+    return ~a
+
+# Augmented-assignment helpers: try __i<op>__ first, fall back to binary op
+def ρσ_op_iadd(a, b):
+    if a is not None and jstype(a.__iadd__) is 'function': return a.__iadd__(b)
+    return ρσ_op_add(a, b)
+
+def ρσ_op_isub(a, b):
+    if a is not None and jstype(a.__isub__) is 'function': return a.__isub__(b)
+    return ρσ_op_sub(a, b)
+
+def ρσ_op_imul(a, b):
+    if a is not None and jstype(a.__imul__) is 'function': return a.__imul__(b)
+    return ρσ_op_mul(a, b)
+
+def ρσ_op_itruediv(a, b):
+    if a is not None and jstype(a.__itruediv__) is 'function': return a.__itruediv__(b)
+    return ρσ_op_truediv(a, b)
+
+def ρσ_op_ifloordiv(a, b):
+    if a is not None and jstype(a.__ifloordiv__) is 'function': return a.__ifloordiv__(b)
+    return ρσ_op_floordiv(a, b)
+
+def ρσ_op_imod(a, b):
+    if a is not None and jstype(a.__imod__) is 'function': return a.__imod__(b)
+    return ρσ_op_mod(a, b)
+
+def ρσ_op_ipow(a, b):
+    if a is not None and jstype(a.__ipow__) is 'function': return a.__ipow__(b)
+    return ρσ_op_pow(a, b)
+
+def ρσ_op_iand(a, b):
+    if a is not None and jstype(a.__iand__) is 'function': return a.__iand__(b)
+    return ρσ_op_and(a, b)
+
+def ρσ_op_ior(a, b):
+    if a is not None and jstype(a.__ior__) is 'function': return a.__ior__(b)
+    return ρσ_op_or(a, b)
+
+def ρσ_op_ixor(a, b):
+    if a is not None and jstype(a.__ixor__) is 'function': return a.__ixor__(b)
+    return ρσ_op_xor(a, b)
+
+def ρσ_op_ilshift(a, b):
+    if a is not None and jstype(a.__ilshift__) is 'function': return a.__ilshift__(b)
+    return ρσ_op_lshift(a, b)
+
+def ρσ_op_irshift(a, b):
+    if a is not None and jstype(a.__irshift__) is 'function': return a.__irshift__(b)
+    return ρσ_op_rshift(a, b)
+
 def ρσ_instanceof():
     obj = arguments[0]
     bases = ''

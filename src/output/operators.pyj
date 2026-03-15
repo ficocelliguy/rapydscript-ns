@@ -90,6 +90,16 @@ def print_unary_prefix(self, output):
     op = self.operator
     if op is 'delete':
         return print_delete(self.expression, output)
+    if self.overloaded:
+        if op is '-':
+            output.print('ρσ_op_neg('), self.expression.print(output), output.print(')')
+            return
+        if op is '+':
+            output.print('ρσ_op_pos('), self.expression.print(output), output.print(')')
+            return
+        if op is '~':
+            output.print('ρσ_op_invert('), self.expression.print(output), output.print(')')
+            return
     output.print(op)
     if /^[a-z]/i.test(op):
         output.space()
@@ -152,8 +162,47 @@ function_ops = {
     'nin': '!ρσ_in',
 }
 
+# Maps binary operators to their overloading helper function names.
+overloaded_binary_ops = {
+    '+':  'ρσ_op_add',
+    '-':  'ρσ_op_sub',
+    '*':  'ρσ_op_mul',
+    '/':  'ρσ_op_truediv',
+    '//': 'ρσ_op_floordiv',
+    '%':  'ρσ_op_mod',
+    '**': 'ρσ_op_pow',
+    '&':  'ρσ_op_and',
+    '|':  'ρσ_op_or',
+    '^':  'ρσ_op_xor',
+    '<<': 'ρσ_op_lshift',
+    '>>': 'ρσ_op_rshift',
+}
+
+# Maps augmented-assignment operators to their overloading helper names.
+overloaded_augmented_ops = {
+    '+=':  'ρσ_op_iadd',
+    '-=':  'ρσ_op_isub',
+    '*=':  'ρσ_op_imul',
+    '/=':  'ρσ_op_itruediv',
+    '//=': 'ρσ_op_ifloordiv',
+    '%=':  'ρσ_op_imod',
+    '**=': 'ρσ_op_ipow',
+    '&=':  'ρσ_op_iand',
+    '|=':  'ρσ_op_ior',
+    '^=':  'ρσ_op_ixor',
+    '<<=': 'ρσ_op_ilshift',
+    '>>=': 'ρσ_op_irshift',
+}
+
 
 def print_binary_op(self, output):
+    if self.overloaded and overloaded_binary_ops[self.operator]:
+        output.print(overloaded_binary_ops[self.operator] + '(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
+        return
     if function_ops[self.operator]:
         output.print(function_ops[self.operator])
         output.with_parens(def():
@@ -281,6 +330,15 @@ def print_assignment(self, output):
         unpack_tuple(flat, output, True)
 
 def print_assign(self, output):
+    if self.overloaded and overloaded_augmented_ops[self.operator]:
+        helper = overloaded_augmented_ops[self.operator]
+        output.assign(self.left)
+        output.print(helper + '(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
+        return
     if self.operator is '//=':
         output.assign(self.left)
         output.print('Math.floor')

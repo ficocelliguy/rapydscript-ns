@@ -29,7 +29,7 @@ AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
 from tokenizer import tokenizer, is_token, RESERVED_WORDS
 
 COMPILER_VERSION = '__COMPILER_VERSION__'
-PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True}
+PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True}
 
 
 def get_compiler_version():
@@ -2622,6 +2622,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             ex = make_unary(AST_UnaryPrefix, start.value, expr, is_parenthesized)
             ex.start = start
             ex.end = prev()
+            if S.scoped_flags.get('overload_operators', False) and (start.value is '-' or start.value is '+' or start.value is '~'):
+                ex.overloaded = True
             return ex
 
         val = expr_atom(allow_calls)
@@ -2652,7 +2654,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'left': left,
                 'operator': op,
                 'right': right,
-                'end': right.end
+                'end': right.end,
+                'overloaded': S.scoped_flags.get('overload_operators', False)
             })
             return expr_op(ret, min_prec, no_in)
         return left
@@ -2714,13 +2717,16 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             if only_plain_assignment and val is not '=':
                 croak('Invalid assignment operator for chained assignment: ' + val)
             next()
-            return create_assign({
+            asgn = create_assign({
                 'start': start,
                 'left': left,
                 'operator': val,
                 'right': maybe_assign(no_in, True),
                 'end': prev()
             })
+            if S.scoped_flags.get('overload_operators', False) and val is not '=':
+                asgn.overloaded = True
+            return asgn
         return left
 
     def expression(commas, no_in):

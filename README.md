@@ -817,6 +817,79 @@ isinstance(a, dict) == False # a is a normal JavaScript object
 ```
 
 
+### Arithmetic operator overloading
+
+RapydScript supports Python-style arithmetic operator overloading via the
+``overload_operators`` scoped flag:
+
+```py
+from __python__ import overload_operators
+
+class Vector:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __add__(self, other):
+        return Vector(self.x + other.x, self.y + other.y)
+
+    def __neg__(self):
+        return Vector(-self.x, -self.y)
+
+a = Vector(1, 2)
+b = Vector(3, 4)
+c = a + b   # calls a.__add__(b)  →  Vector(4, 6)
+d = -a      # calls a.__neg__()   →  Vector(-1, -2)
+```
+
+The supported dunder methods are:
+
+| Expression | Forward method  | Reflected method  |
+|------------|-----------------|-------------------|
+| `a + b`    | `__add__`       | `__radd__`        |
+| `a - b`    | `__sub__`       | `__rsub__`        |
+| `a * b`    | `__mul__`       | `__rmul__`        |
+| `a / b`    | `__truediv__`   | `__rtruediv__`    |
+| `a // b`   | `__floordiv__`  | `__rfloordiv__`   |
+| `a % b`    | `__mod__`       | `__rmod__`        |
+| `a ** b`   | `__pow__`       | `__rpow__`        |
+| `a & b`    | `__and__`       | `__rand__`        |
+| `a \| b`   | `__or__`        | `__ror__`         |
+| `a ^ b`    | `__xor__`       | `__rxor__`        |
+| `a << b`   | `__lshift__`    | `__rlshift__`     |
+| `a >> b`   | `__rshift__`    | `__rrshift__`     |
+| `-a`       | `__neg__`       |                   |
+| `+a`       | `__pos__`       |                   |
+| `~a`       | `__invert__`    |                   |
+
+Augmented assignment (``+=``, ``-=``, etc.) first tries the in-place method
+(``__iadd__``, ``__isub__``, …) and then falls back to the binary method.
+
+If neither operand defines the relevant dunder method the operation falls back
+to the native JavaScript operator, so plain numbers, strings, and booleans
+continue to work as expected with no performance penalty when no dunder method
+is defined.
+
+Because the dispatch adds one or two property lookups per operation, the flag
+is **opt-in** rather than always-on. Enable it only in the files or scopes
+where you need it.
+
+The ``collections.Counter`` class defines ``__add__``, ``__sub__``, ``__or__``,
+and ``__and__``. With ``overload_operators`` you can use the natural operator
+syntax:
+
+```py
+from __python__ import overload_getitem, overload_operators
+from collections import Counter
+
+c1 = Counter('aab')
+c2 = Counter('ab')
+c3 = c1 + c2   # {'a': 3, 'b': 2}
+c4 = c1 - c2   # {'a': 1}
+c5 = c1 | c2   # union  (max) → {'a': 2, 'b': 1}
+c6 = c1 & c2   # intersection (min) → {'a': 1, 'b': 1}
+```
+
 ### Container comparisons
 
 Container equality (the `==` and `!=` operators) work for lists and sets and
@@ -1914,8 +1987,9 @@ below:
 - Operators in JavaScript are very different from Python. ``1 + '1'`` would be
   an error in Python, but results in ``'11'`` in JavaScript. Similarly, ``[1] +
   [1]`` is a new list in Python, but a string in JavaScript. Keep that in mind
-  as you write code. RapydScript does not implement operator overloading, as
-  method calls in JavaScript are very slow compared to raw operators.
+  as you write code. By default, RapydScript does not implement operator
+  overloading for performance reasons. You can opt in via the
+  ``overload_operators`` scoped flag (see below).
 
 - There are many more keywords than in Python. Because RapydScript compiles
   down to JavaScript, the set of keywords is all the keywords of Python + all

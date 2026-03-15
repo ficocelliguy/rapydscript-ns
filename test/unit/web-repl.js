@@ -207,6 +207,57 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_operator_overloading",
+        description: "overload_operators flag works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_operators",
+                "class Vec:",
+                "    def __init__(self, x, y):",
+                "        self.x = x",
+                "        self.y = y",
+                "    def __add__(self, other):",
+                "        return Vec(self.x + other.x, self.y + other.y)",
+                "    def __neg__(self):",
+                "        return Vec(-self.x, -self.y)",
+                "a = Vec(1, 2)",
+                "b = Vec(3, 4)",
+                "c = a + b",
+                "assrt.equal(c.x, 4)",
+                "assrt.equal(c.y, 6)",
+                "d = -a",
+                "assrt.equal(d.x, -1)",
+                "assrt.equal(d.y, -2)",
+                // native fallback still works
+                "assrt.equal(10 + 5, 15)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_counter_operators",
+        description: "Counter +, -, |, & work via operator syntax in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_getitem, overload_operators",
+                "from collections import Counter",
+                "c1 = Counter('aab')",
+                "c2 = Counter('ab')",
+                "c3 = c1 + c2",
+                "assrt.equal(c3['a'], 3)",
+                "assrt.equal(c3['b'], 2)",
+                "c4 = c1 - c2",
+                "assrt.equal(c4['a'], 1)",
+                "assrt.equal(c4.get('b', 0), 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

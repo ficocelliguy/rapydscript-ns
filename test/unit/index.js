@@ -2038,6 +2038,249 @@ assrt.equal(fib(15), 610)
         js_checks: [],
     },
 
+    // ── operator overloading ───────────────────────────────────────────────
+
+    {
+        name: "operator_overloading_basic",
+        description: "Binary +, -, *, / dispatch to __add__, __sub__, __mul__, __truediv__",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "class Vec:",
+            "    def __init__(self, x, y):",
+            "        self.x = x",
+            "        self.y = y",
+            "    def __add__(self, other):",
+            "        return Vec(self.x + other.x, self.y + other.y)",
+            "    def __sub__(self, other):",
+            "        return Vec(self.x - other.x, self.y - other.y)",
+            "    def __mul__(self, scalar):",
+            "        return Vec(self.x * scalar, self.y * scalar)",
+            "    def __truediv__(self, scalar):",
+            "        return Vec(self.x / scalar, self.y / scalar)",
+            "a = Vec(3, 4)",
+            "b = Vec(1, 2)",
+            "c = a + b",
+            "assrt.equal(c.x, 4)",
+            "assrt.equal(c.y, 6)",
+            "d = a - b",
+            "assrt.equal(d.x, 2)",
+            "assrt.equal(d.y, 2)",
+            "e = a * 2",
+            "assrt.equal(e.x, 6)",
+            "assrt.equal(e.y, 8)",
+            "f = a / 2",
+            "assrt.equal(f.x, 1.5)",
+            "assrt.equal(f.y, 2)",
+        ].join("\n"),
+        js_checks: [
+            "ρσ_op_add(",
+            "ρσ_op_sub(",
+            "ρσ_op_mul(",
+            "ρσ_op_truediv(",
+        ],
+    },
+
+    {
+        name: "operator_overloading_floor_mod_pow",
+        description: "// % ** dispatch to __floordiv__, __mod__, __pow__",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "class Num:",
+            "    def __init__(self, v):",
+            "        self.v = v",
+            "    def __floordiv__(self, other):",
+            "        return Num(self.v // other.v)",
+            "    def __mod__(self, other):",
+            "        return Num(self.v % other.v)",
+            "    def __pow__(self, other):",
+            "        return Num(self.v ** other.v)",
+            "a = Num(10)",
+            "b = Num(3)",
+            "assrt.equal((a // b).v, 3)",
+            "assrt.equal((a % b).v, 1)",
+            "assrt.equal((a ** b).v, 1000)",
+        ].join("\n"),
+        js_checks: [
+            "ρσ_op_floordiv(",
+            "ρσ_op_mod(",
+            "ρσ_op_pow(",
+        ],
+    },
+
+    {
+        name: "operator_overloading_bitwise",
+        description: "&, |, ^, <<, >> dispatch to bitwise dunder methods",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "class Bits:",
+            "    def __init__(self, v):",
+            "        self.v = v",
+            "    def __and__(self, other):",
+            "        return Bits(self.v & other.v)",
+            "    def __or__(self, other):",
+            "        return Bits(self.v | other.v)",
+            "    def __xor__(self, other):",
+            "        return Bits(self.v ^ other.v)",
+            "    def __lshift__(self, n):",
+            "        return Bits(self.v << n)",
+            "    def __rshift__(self, n):",
+            "        return Bits(self.v >> n)",
+            "a = Bits(0b1010)",
+            "b = Bits(0b1100)",
+            "assrt.equal((a & b).v, 0b1000)",
+            "assrt.equal((a | b).v, 0b1110)",
+            "assrt.equal((a ^ b).v, 0b0110)",
+            "assrt.equal((a << 1).v, 0b10100)",
+            "assrt.equal((a >> 1).v, 0b101)",
+        ].join("\n"),
+        js_checks: [
+            "ρσ_op_and(",
+            "ρσ_op_or(",
+            "ρσ_op_xor(",
+            "ρσ_op_lshift(",
+            "ρσ_op_rshift(",
+        ],
+    },
+
+    {
+        name: "operator_overloading_unary",
+        description: "Unary - + ~ dispatch to __neg__, __pos__, __invert__",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "class MyNum:",
+            "    def __init__(self, v):",
+            "        self.v = v",
+            "    def __neg__(self):",
+            "        return MyNum(-self.v)",
+            "    def __pos__(self):",
+            "        return MyNum(abs(self.v))",
+            "    def __invert__(self):",
+            "        return MyNum(~self.v)",
+            "a = MyNum(5)",
+            "assrt.equal((-a).v, -5)",
+            "assrt.equal((+a).v, 5)",
+            "assrt.equal((~a).v, ~5)",
+        ].join("\n"),
+        js_checks: [
+            "ρσ_op_neg(",
+            "ρσ_op_pos(",
+            "ρσ_op_invert(",
+        ],
+    },
+
+    {
+        name: "operator_overloading_augmented",
+        description: "+= -= *= dispatch to __iadd__, __isub__, __imul__ (or fall back to binary)",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "class Counter:",
+            "    def __init__(self, n):",
+            "        self.n = n",
+            "    def __iadd__(self, other):",
+            "        self.n = self.n + other",
+            "        return self",
+            "    def __isub__(self, other):",
+            "        self.n = self.n - other",
+            "        return self",
+            "c = Counter(10)",
+            "c += 3",
+            "assrt.equal(c.n, 13)",
+            "c -= 4",
+            "assrt.equal(c.n, 9)",
+            // fallback: plain ints have no __iadd__, use native +=
+            "x = 5",
+            "x += 2",
+            "assrt.equal(x, 7)",
+        ].join("\n"),
+        js_checks: [
+            "ρσ_op_iadd(",
+            "ρσ_op_isub(",
+        ],
+    },
+
+    {
+        name: "operator_overloading_reflected",
+        description: "__radd__ is called when left side has no __add__",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "class MyNum:",
+            "    def __init__(self, v):",
+            "        self.v = v",
+            "    def __radd__(self, other):",
+            "        return MyNum(other + self.v)",
+            "n = MyNum(10)",
+            "result = 5 + n",
+            "assrt.equal(result.v, 15)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_add("],
+    },
+
+    {
+        name: "operator_overloading_fallback",
+        description: "Without dunder methods, operators fall back to native JS behavior",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "assrt.equal(2 + 3, 5)",
+            "assrt.equal(10 - 4, 6)",
+            "assrt.equal(3 * 4, 12)",
+            "assrt.equal(10 / 4, 2.5)",
+            "assrt.equal(10 // 4, 2)",
+            "assrt.equal(10 % 3, 1)",
+            "assrt.equal(2 ** 8, 256)",
+            "assrt.equal(6 & 3, 2)",
+            "assrt.equal(6 | 3, 7)",
+            "assrt.equal(6 ^ 3, 5)",
+            "assrt.equal(1 << 4, 16)",
+            "assrt.equal(32 >> 2, 8)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_add("],
+    },
+
+    {
+        name: "operator_overloading_no_flag",
+        description: "Without overload_operators flag operators emit native JS (no helpers in user code)",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(2 + 3, 5)",
+            "assrt.equal(3 * 4, 12)",
+        ].join("\n"),
+        // Verify user-code expressions compile to native operators, not helper calls
+        js_checks: [/assrt\.equal\(2 \+ 3, 5\)/, /assrt\.equal\(3 \* 4, 12\)/],
+        js_not_checks: [],
+    },
+
+    {
+        name: "collections_counter_operator_syntax",
+        description: "Counter +, -, |, & work via operator syntax with overload_operators",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_getitem, overload_operators",
+            "from collections import Counter",
+            "c1 = Counter('aab')",
+            "c2 = Counter('ab')",
+            "c3 = c1 + c2",
+            "assrt.equal(c3['a'], 3)",
+            "assrt.equal(c3['b'], 2)",
+            "c4 = c1 - c2",
+            "assrt.equal(c4['a'], 1)",
+            "assrt.equal(c4.get('b', 0), 0)",
+            "c5 = c1 | c2",
+            "assrt.equal(c5['a'], 2)",
+            "assrt.equal(c5['b'], 1)",
+            "c6 = c1 & c2",
+            "assrt.equal(c6['a'], 1)",
+            "assrt.equal(c6['b'], 1)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_add(", "ρσ_op_sub(", "ρσ_op_or(", "ρσ_op_and("],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -2070,6 +2313,14 @@ function run_tests(filter) {
         // 2 – verify expected patterns appear in the JS output
         try {
             check_js_patterns(test.name, js, test.js_checks);
+            // also check patterns that must NOT appear
+            (test.js_not_checks || []).forEach(function (pat) {
+                var found = (pat instanceof RegExp) ? pat.test(js) : js.indexOf(pat) !== -1;
+                if (found) {
+                    var desc = (pat instanceof RegExp) ? String(pat) : JSON.stringify(pat);
+                    throw new Error("compiled JS unexpectedly contains " + desc + "\n  in test: " + test.name);
+                }
+            });
         } catch (e) {
             failures.push(test.name);
             console.debug("Emitted JS:\n" + js + "\n");
