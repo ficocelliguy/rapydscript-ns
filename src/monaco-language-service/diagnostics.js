@@ -332,6 +332,15 @@ function Linter(RS, toplevel, code, builtins) {
     this.handle_comprehension = function() {
         this.handle_scope();
         this.handle_for_in();
+        // Add bindings for inner clause loop variables (nested comprehensions)
+        const node = this.current_node;
+        if (node.clauses && node.clauses.length) {
+            node.clauses.forEach(clause => {
+                this.current_node = clause;
+                this.handle_for_in();
+            });
+            this.current_node = node;
+        }
     };
 
     this.handle_for_in = function() {

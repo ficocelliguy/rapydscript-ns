@@ -307,6 +307,27 @@ var TESTS = [
         },
     },
 
+    // ── nested comprehensions ─────────────────────────────────────────────
+
+    {
+        name: "nested_comprehension_web_repl",
+        description: "nested list/set/dict comprehensions work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "flat = [x for row in [[1,2],[3,4],[5,6]] for x in row]",
+                "assrt.deepEqual(flat, [1,2,3,4,5,6])",
+                "evens = [x for row in [[1,2,3],[4,5,6]] for x in row if x % 2 == 0]",
+                "assrt.deepEqual(evens, [2,4,6])",
+                "coords = [[i,j] for i in range(2) for j in range(2)]",
+                "assrt.deepEqual(coords, [[0,0],[0,1],[1,0],[1,1]])",
+                "s = sorted(list({x+y for x in range(3) for y in range(3)}))",
+                "assrt.deepEqual(s, [0,1,2,3,4])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

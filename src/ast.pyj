@@ -254,8 +254,9 @@ class AST_ForJS(AST_StatementWithBody):
 class AST_ListComprehension(AST_ForIn):
     "A list comprehension expression"
     properties = {
-        'condition': "[AST_Node] the `if` condition",
-        'statement': "[AST_Node] statement to perform on each element before returning it"
+        'condition': "[AST_Node] the `if` condition for the first for-clause",
+        'statement': "[AST_Node] statement to perform on each element before returning it",
+        'clauses':   "[Array] additional for-clauses for nested comprehensions"
     }
 
     def _walk(self, visitor):
@@ -264,13 +265,19 @@ class AST_ListComprehension(AST_ForIn):
             self.object._walk(visitor)
             self.statement._walk(visitor)
             if (self.condition) self.condition._walk(visitor)
+            if self.clauses:
+                for clause in self.clauses:
+                    clause.init._walk(visitor)
+                    clause.object._walk(visitor)
+                    if clause.condition:
+                        clause.condition._walk(visitor)
         )
 
 class AST_SetComprehension(AST_ListComprehension):
     'A set comprehension'
 
 class AST_DictComprehension(AST_ListComprehension):
-    'A set comprehension'
+    'A dict comprehension'
     properties = {
         'value_statement': "[AST_Node] statement to perform on each value before returning it",
         'is_pydict': "[bool] True if this comprehension is for a python dict",
@@ -284,6 +291,12 @@ class AST_DictComprehension(AST_ListComprehension):
             self.statement._walk(visitor)
             self.value_statement._walk(visitor)
             if (self.condition) self.condition._walk(visitor)
+            if self.clauses:
+                for clause in self.clauses:
+                    clause.init._walk(visitor)
+                    clause.object._walk(visitor)
+                    if clause.condition:
+                        clause.condition._walk(visitor)
         )
 
 class AST_GeneratorComprehension(AST_ListComprehension):

@@ -2549,6 +2549,91 @@ assrt.equal(fib(15), 610)
         js_checks: ["ρσ_op_add(", "ρσ_op_sub(", "ρσ_op_or(", "ρσ_op_and("],
     },
 
+    // ── nested comprehensions ──────────────────────────────────────────────
+
+    {
+        name: "nested_comprehension_list_flatten",
+        description: "list comprehension with two for-clauses flattens a 2-D list",
+        src: [
+            "# globals: assrt",
+            "matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]",
+            "flat = [x for row in matrix for x in row]",
+            "assrt.deepEqual(flat, [1, 2, 3, 4, 5, 6, 7, 8, 9])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "nested_comprehension_list_filter",
+        description: "list comprehension with two for-clauses and if-filter",
+        src: [
+            "# globals: assrt",
+            "pairs = [x for i in range(4) for x in range(i) if x % 2 == 0]",
+            "assrt.deepEqual(pairs, [0, 0, 0, 2])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "nested_comprehension_outer_filter",
+        description: "list comprehension with if-filter on the outer for-clause",
+        src: [
+            "# globals: assrt",
+            "result = [x for row in [[1,2],[3,4],[5,6]] if row[0] > 2 for x in row]",
+            "assrt.deepEqual(result, [3, 4, 5, 6])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "nested_comprehension_three_levels",
+        description: "list comprehension with three for-clauses (triple nested)",
+        src: [
+            "# globals: assrt",
+            "result = [x for a in [[1,2],[3,4]] for b in [a, a] for x in b if x > 2]",
+            "assrt.deepEqual(result, [3, 4, 3, 4])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "nested_comprehension_set",
+        description: "set comprehension with two for-clauses",
+        src: [
+            "# globals: assrt",
+            "s = {x + y for x in range(3) for y in range(3)}",
+            "assrt.equal(sorted(list(s)).toString(), [0,1,2,3,4].toString())",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "nested_comprehension_dict",
+        description: "dict comprehension with two for-clauses",
+        src: [
+            "# globals: assrt",
+            "d = {(i * 10 + j): i * j for i in range(3) for j in range(3) if i != j}",
+            "assrt.equal(d[1], 0)",
+            "assrt.equal(d[2], 0)",
+            "assrt.equal(d[10], 0)",
+            "assrt.equal(d[12], 2)",
+            "assrt.equal(d[20], 0)",
+            "assrt.equal(d[21], 2)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "nested_comprehension_range_product",
+        description: "list comprehension that builds coordinate pairs (equivalent to itertools.product)",
+        src: [
+            "# globals: assrt",
+            "coords = [[i, j] for i in range(2) for j in range(2)]",
+            "assrt.deepEqual(coords, [[0,0],[0,1],[1,0],[1,1]])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

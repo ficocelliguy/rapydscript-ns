@@ -14,7 +14,7 @@
 
 
 
-I would like you to add support for [  the itertools importable python library ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
+I would like you to add support for [ Nested comprehensions ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
 
 
 
@@ -54,7 +54,7 @@ differences.
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ except* (exception groups)                    │ 3.11+          │ No support                                                   │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Nested comprehensions (for a in b for c in d) │ all            │ Parser error — only one for per comprehension                │
+│ Nested comprehensions (for a in b for c in d) │ all            │ tested                                                       │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Complex number literals 3+4j                  │ all            │ No j suffix                                                  │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
@@ -280,7 +280,7 @@ If prioritizing what to implement next, these have the highest user impact:
 5. all() / any() — extremely common builtins - done
 6. functools.reduce / partial — core functional programming tools - done
 7. collections.defaultdict / Counter — frequently used - done
-8. Nested comprehensions — common Python pattern
+8. Nested comprehensions — common Python pattern - done
 9. Walrus operator := — increasingly common in modern Python - done
 10. classmethod decorator — standard OOP pattern
 

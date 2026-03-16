@@ -2237,6 +2237,19 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         next()
         return new AST_Set({'items':a, 'start':ostart, 'end':prev()})
 
+    def _read_comp_conditions():
+        # Read zero or more consecutive `if` conditions, combining them with &&.
+        if not is_('keyword', 'if'):
+            return None
+        expect_token('keyword', 'if')
+        cond = expression(True)
+        while is_('keyword', 'if'):
+            expect_token('keyword', 'if')
+            next_cond = expression(True)
+            cond = new AST_Binary({'operator': '&&', 'left': cond, 'right': next_cond,
+                                   'start': cond.start, 'end': next_cond.end})
+        return cond
+
     def read_comprehension(obj, terminator):
         if is_node_type(obj, AST_GeneratorComprehension):
             baselib_items['yield'] = True
@@ -2247,7 +2260,15 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         obj.init = forloop.init
         obj.name = forloop.name
         obj.object = forloop.object
-        obj.condition = None if is_('punc', terminator) else (expect_token("keyword", "if"), expression(True))
+        obj.condition = _read_comp_conditions()
+        # Read additional for-clauses for nested comprehensions
+        clauses = []
+        while is_('keyword', 'for'):
+            expect_token('keyword', 'for')
+            inner = for_(True)
+            clauses.push({'init': inner.init, 'object': inner.object,
+                          'condition': _read_comp_conditions()})
+        obj.clauses = clauses
         expect(terminator)
         S.in_comprehension = False
         return obj

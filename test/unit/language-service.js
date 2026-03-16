@@ -465,6 +465,22 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        {
+            name: "nested_comprehension_no_errors",
+            description: "Nested comprehensions produce no error markers",
+            run: function () {
+                var markers = d().check([
+                    "flat = [x for row in [[1,2],[3,4]] for x in row]",
+                    "evens = [x for row in [[1,2,3],[4,5,6]] for x in row if x % 2 == 0]",
+                    "pairs = [[i, j] for i in range(3) for j in range(i)]",
+                    "s = {x + y for x in range(3) for y in range(3)}",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
     ];
 
     return TESTS;

@@ -958,6 +958,26 @@ myDict = {x:x+1 for x in range(20) if x > 2}
 mySet = {i*i for i in range(1,20) if i*i%3 == 0}
 ```
 
+Nested comprehensions (multiple `for` and `if` clauses) are also supported,
+using the same syntax as Python:
+
+```py
+# Flatten a 2-D list
+flat = [x for row in matrix for x in row]
+
+# Cartesian product of two ranges
+coords = [[i, j] for i in range(3) for j in range(3)]
+
+# Filter across nested loops
+evens = [x for row in [[1,2,3],[4,5,6]] for x in row if x % 2 == 0]
+
+# Nested set/dict comprehensions work too
+unique_sums = {x + y for x in range(4) for y in range(4)}
+```
+
+Any number of `for` clauses may be combined, each optionally followed by one or
+more `if` conditions.
+
 Builtin iteration functions: any() and all()
 ---------------------------------------------
 
@@ -2003,9 +2023,6 @@ below:
 - Method binding in RS is not automatic. So ``someobj.somemethod()`` will do the
   right thing, but ``x = someobj.somethod; x()`` will not. You can turn method binding on
   via a scoped flag. See the section above on method binding for details.
-
-- Nested comprehensions are not supported. So you cannot do this:
-	[a for a in b for b in c]
 
 - RapydScript automatically appends 'new' keyword when using classes generated
   by it, native JavaScript objects like `Image` and `RegExp` and classes from
