@@ -144,7 +144,7 @@ STATEMENTS_WITH_LABELS = array_to_hash([ "for", "do", "while", "switch" ])
 
 ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "string", "regexp", "name", "js" ])
 
-compile_time_decorators = ['staticmethod', 'external', 'property']
+compile_time_decorators = ['staticmethod', 'classmethod', 'external', 'property']
 
 def has_simple_decorator(decorators, name):
     remove = v'[]'
@@ -1336,12 +1336,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     obj = classes[argvar.name]
                     if obj:
                         key = argvar.alias.name if argvar.alias else argvar.name
-                        S.classes[-1][key] = { "static": obj.static, 'bound': obj.bound, 'classvars': obj.classvars }
+                        S.classes[-1][key] = { "static": obj.static, 'classmethod': obj.classmethod, 'bound': obj.bound, 'classvars': obj.classvars }
             else:
                 for cname in Object.keys(classes):
                     obj = classes[cname]
                     key = imp.alias.name if imp.alias else imp.key
-                    S.classes[-1][key + '.' + obj.name.name] = { 'static': obj.static, 'bound': obj.bound, 'classvars': obj.classvars }
+                    S.classes[-1][key + '.' + obj.name.name] = { 'static': obj.static, 'classmethod': obj.classmethod, 'bound': obj.bound, 'classvars': obj.classvars }
 
         return ans
 
@@ -1355,6 +1355,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
 
         class_details = {
             "static": {},
+            'classmethod': {},
             'bound': v'[]',
             'classvars': {},
             'processing': name.name,
@@ -1393,6 +1394,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'localvars': [],
             'classvars': class_details.classvars,
             'static': class_details.static,
+            'classmethod': class_details.classmethod,
             'external': externaldecorator,
             'bound': class_details.bound,
             'statements': [],
@@ -1478,9 +1480,10 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             croak('Cannot use anonymous function as class methods')
         is_anonymous = not name
 
-        staticmethod = property_getter = property_setter = False
+        staticmethod = property_getter = property_setter = classmethod_flag = False
         if in_class:
             staticloc = has_simple_decorator(S.decorators, 'staticmethod')
+            classmethodloc = has_simple_decorator(S.decorators, 'classmethod')
             property_getter = has_simple_decorator(S.decorators, 'property')
             property_setter = has_setter_decorator(S.decorators, name.name)
             if staticloc:
@@ -1488,6 +1491,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     croak('A method cannot be both static and a property getter/setter')
                 S.classes[S.classes.length - 2][in_class].static[name.name] = True
                 staticmethod = True
+            elif classmethodloc:
+                if property_getter or property_setter:
+                    croak('A method cannot be both classmethod and a property getter/setter')
+                S.classes[S.classes.length - 2][in_class].classmethod[name.name] = True
+                classmethod_flag = True
             elif name.name is not "__init__" and S.scoped_flags.get('bound_methods'):
                 S.classes[S.classes.length - 2][in_class].bound.push(name.name)
 
@@ -1497,6 +1505,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         return_annotation = None
         is_generator = v'[]'
         docstrings = v'[]'
+        cm_cls_arg = v'[]'  # mutable: holds [cls_argname] for classmethod context
         definition = new ctor({
             'name': name,
             'is_expression': is_expression,
@@ -1605,6 +1614,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 S.in_parenthesized_expr = False
                 a.defaults = defaults
                 a.is_simple_func = not a.starargs and not a.kwargs and not a.has_defaults
+                if classmethod_flag and a.length > 0:
+                    cm_cls_arg.push(a[0].name)
                 return a
             )(v'[]'),
             'localvars': [],
@@ -1620,6 +1631,16 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'docstrings': docstrings,
             'body': (def(loop, labels):
                 S.in_class.push(False)
+                cm_pushed = v'[false]'
+                if classmethod_flag and in_class and cm_cls_arg.length > 0:
+                    cm_ctx_entry = None
+                    for v'var si = S.classes.length - 1; si >= 0; si--':
+                        if has_prop(S.classes[si], in_class):
+                            cm_ctx_entry = S.classes[si][in_class]
+                            break
+                    if cm_ctx_entry:
+                        S.classmethod_ctx_stack.push({'cls_name': cm_cls_arg[0], 'class_entry': cm_ctx_entry})
+                        cm_pushed[0] = True
                 S.classes.push({})
                 S.scoped_flags.push()
                 S.in_function += 1
@@ -1634,6 +1655,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 S.in_class.pop()
                 S.in_loop = loop
                 S.labels = labels
+                if cm_pushed[0]:
+                    S.classmethod_ctx_stack.pop()
                 return a
             )(S.in_loop, S.labels)
         })
@@ -1642,6 +1665,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         definition.is_async = is_async
         if is_node_type(definition, AST_Method):
             definition.static = staticmethod
+            definition.is_classmethod = classmethod_flag
             definition.is_getter = property_getter
             definition.is_setter = property_setter
             if definition.argnames.length < 1 and not definition.static:
@@ -2323,10 +2347,19 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         return sym
 
     def is_static_method(cls, method):
-        if has_prop(COMMON_STATIC, method) or (cls.static and has_prop(cls.static, method)):
+        if has_prop(COMMON_STATIC, method):
             return True
-        else:
-            return False
+        if cls.static and has_prop(cls.static, method):
+            return True
+        if cls.classmethod and has_prop(cls.classmethod, method):
+            return True
+        # Walk parent chain for inherited static/classmethod
+        if cls.parent and is_node_type(cls.parent, AST_SymbolRef):
+            parent_name = cls.parent.name
+            for v'var si = S.classes.length - 1; si >= 0; si--':
+                if has_prop(S.classes[si], parent_name):
+                    return is_static_method(S.classes[si][parent_name], method)
+        return False
 
     def getitem(expr, allow_calls):
         start = expr.start
@@ -2574,6 +2607,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             classvars = c.provisional_classvars if c.processing else c.classvars
             if classvars and v'classvars[prop]':
                 prop = 'prototype.' + prop
+        elif S.classmethod_ctx_stack.length > 0:
+            ctx = S.classmethod_ctx_stack[S.classmethod_ctx_stack.length - 1]
+            if is_node_type(expr, AST_SymbolRef) and expr.name is ctx.cls_name:
+                pclassvars = ctx.class_entry.provisional_classvars
+                if pclassvars and v'pclassvars[prop]':
+                    prop = 'prototype.' + prop
 
         return subscripts(new AST_Dot({
             'start': expr.start,
@@ -2931,11 +2970,12 @@ def parse(text, options):
             ,
             'set': def (name, val): this.stack[-1][name] = val;,
         },
+        'classmethod_ctx_stack': v'[]',
     }
 
     if options.classes:
         for cname in options.classes:
             obj = options.classes[cname]
-            S.classes[0][cname] = { 'static':obj.static, 'bound':obj.bound, 'classvars': obj.classvars }
+            S.classes[0][cname] = { 'static':obj.static, 'classmethod':obj.classmethod, 'bound':obj.bound, 'classvars': obj.classvars }
 
     return create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_ids, imported_modules, importing_modules, options)()

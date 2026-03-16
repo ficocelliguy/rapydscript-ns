@@ -576,6 +576,7 @@ class AST_Class(AST_Scope):
         'parent': "[AST_Symbol?] parent class this class inherits from",
         'bases': "[AST_Symbol*] list of base classes this class inherits from",
         "static": "[dict] A hash whose keys are names of static methods for this class",
+        'classmethod': "[dict] A hash whose keys are names of classmethods for this class",
         'external': "[boolean] true if class is declared elsewhere, but will be within current scope at runtime",
         'bound': "[string*] list of methods that need to be bound to self",
         'decorators': "[AST_Decorator*] function decorators, if any",
@@ -599,6 +600,7 @@ class AST_Method(AST_Lambda):
     "A class method definition"
     properties = {
         "static": "[boolean] true if method is static",
+        "is_classmethod": "[boolean] true if method is a classmethod",
         "is_getter": "[boolean] true if method is a property getter",
         "is_setter": "[boolean] true if method is a property setter",
     }

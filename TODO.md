@@ -1,5 +1,8 @@
 
 ### libraries
+
+compliler flags for the various __python__ opt-in things
+
 - itertools - needs testing
 
 - allow var etc as property name
@@ -14,7 +17,7 @@
 
 
 
-I would like you to add support for [ Nested comprehensions ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
+I would like you to add support for [ the classmethod decorator ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
 
 
 

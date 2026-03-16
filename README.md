@@ -1408,6 +1408,78 @@ class Test:
 		return a+1
 ```
 
+### Class Identity Properties
+
+Every RapydScript class automatically gets the following Python-compatible identity properties:
+
+| Property | Value | Notes |
+|----------|-------|-------|
+| `MyClass.__name__` | `"MyClass"` | The class name as a string |
+| `MyClass.__qualname__` | `"MyClass"` | Qualified name (same as `__name__` for top-level classes) |
+| `MyClass.__module__` | module ID string | Module where the class is defined |
+| `instance.__class__` | `MyClass` | The class of the instance (same as `type(instance)`) |
+
+```py
+class Animal:
+	def __init__(self, name):
+		self.name = name
+
+print(Animal.__name__)      # "Animal"
+print(Animal.__qualname__)  # "Animal"
+
+a = Animal("Rex")
+print(a.__class__ is Animal)       # True
+print(type(a).__name__)            # "Animal"
+```
+
+This makes patterns like `type(obj).__name__` and `obj.__class__` work identically to Python.
+
+### Class Methods
+
+RapydScript supports the `@classmethod` decorator, which works just like Python's `classmethod`. The first argument (conventionally named `cls`) receives the class itself rather than an instance. Class methods can be called on the class directly or on an instance (which delegates to the class with the correct type):
+
+```py
+class Shape:
+	def __init__(self, kind, size):
+		self.kind = kind
+		self.size = size
+
+	@classmethod
+	def circle(cls, size):
+		return cls('circle', size)
+
+	@classmethod
+	def square(cls, size):
+		return cls('square', size)
+
+s1 = Shape.circle(10)   # s1.kind == 'circle', s1.size == 10
+s2 = Shape.square(5)    # s2.kind == 'square', s2.size == 5
+
+# Can also be called on an instance (delegates to the class)
+s3 = s1.circle(7)       # equivalent to Shape.circle(7)
+```
+
+Class variables declared in the class body are accessible via `cls.varname` inside a classmethod, just as in Python:
+
+```py
+class Counter:
+	count = 0
+
+	@classmethod
+	def increment(cls):
+		cls.count += 1
+
+	@classmethod
+	def get_count(cls):
+		return cls.count
+
+Counter.increment()
+Counter.increment()
+print(Counter.get_count())  # 2
+```
+
+The `@classmethod` decorator compiles to a method placed directly on the class (not its prototype), with `cls` mapped to `this`. A prototype delegation shim is also generated so instance calls work correctly.
+
 ### External Classes
 
 RapydScript will automatically detect classes declared within the same scope (as long as the declaration occurs before use), as well as classes properly imported into the module (each module making use of a certain class should explicitly import the module containing that class). RapydScript will also properly detect native JavaScript classes (String, Array, Date, etc.). Unfortunately, RapydScript has no way of detecting classes from third-party libraries. In those cases, you could use the `new` keyword every time you create an object from such class. Alternatively, you could mark the class as external.

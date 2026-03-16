@@ -466,6 +466,73 @@ function make_tests(Diagnostics, RS) {
         },
 
         {
+            name: "class_dunder_no_errors",
+            description: "__name__, __qualname__, __module__, __class__ access on classes/instances produces no errors",
+            run: function () {
+                var markers = d().check([
+                    "class Foo:",
+                    "    def __init__(self):",
+                    "        pass",
+                    "name = Foo.__name__",
+                    "qual = Foo.__qualname__",
+                    "mod  = Foo.__module__",
+                    "obj  = Foo()",
+                    "cls  = obj.__class__",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "classmethod_no_errors",
+            description: "@classmethod decorator produces no error markers; cls param is recognized",
+            run: function () {
+                var markers = d().check([
+                    "class Factory:",
+                    "    @classmethod",
+                    "    def create(cls, value):",
+                    "        obj = cls()",
+                    "        obj.value = value",
+                    "        return obj",
+                    "    @classmethod",
+                    "    def from_string(cls, s):",
+                    "        return cls.create(int(s))",
+                    "    def __init__(self):",
+                    "        self.value = 0",
+                    "f = Factory.create(42)",
+                    "g = Factory.from_string('7')",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "classmethod_classvar_no_errors",
+            description: "cls.classvar in @classmethod body produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Counter:",
+                    "    count = 0",
+                    "    @classmethod",
+                    "    def increment(cls):",
+                    "        cls.count += 1",
+                    "    @classmethod",
+                    "    def get_count(cls):",
+                    "        return cls.count",
+                    "Counter.increment()",
+                    "x = Counter.get_count()",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
             name: "nested_comprehension_no_errors",
             description: "Nested comprehensions produce no error markers",
             run: function () {
