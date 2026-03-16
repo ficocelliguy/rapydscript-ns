@@ -328,6 +328,85 @@ var TESTS = [
         },
     },
 
+    // ── python_flags via embedded compiler opts ────────────────────────────
+
+    {
+        name: "python_flags_overload_operators_web_repl",
+        description: "python_flags='overload_operators' in compile opts activates operator overloading",
+        run: function () {
+            var repl = RS.web_repl();
+            // Compile without inline import — flag passed via opts.python_flags
+            var js = repl.compile([
+                "class Vec:",
+                "    def __init__(self, x):",
+                "        self.x = x",
+                "    def __add__(self, other):",
+                "        return Vec(self.x + other.x)",
+                "a = Vec(3)",
+                "b = Vec(4)",
+                "c = a + b",
+                "assrt.equal(c.x, 7)",
+            ].join("\n"), {
+                keep_baselib: true,
+                python_flags: "overload_operators",
+            });
+            assert.ok(js.indexOf("ρσ_op_add") !== -1,
+                "Expected ρσ_op_add in output, got: " + js.slice(0, 500));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "python_flags_overload_getitem_web_repl",
+        description: "python_flags='overload_getitem' in compile opts activates __getitem__",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "class MyList:",
+                "    def __init__(self):",
+                "        self.data = [10, 20, 30]",
+                "    def __getitem__(self, i):",
+                "        return self.data[i]",
+                "ml = MyList()",
+                "assrt.equal(ml[1], 20)",
+            ].join("\n"), {
+                keep_baselib: true,
+                python_flags: "overload_getitem",
+            });
+            assert.ok(js.indexOf("__getitem__") !== -1,
+                "Expected __getitem__ in output");
+            run_js(js);
+        },
+    },
+
+    {
+        name: "python_flags_multiple_web_repl",
+        description: "python_flags with multiple comma-separated flags all activate",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "class N:",
+                "    def __init__(self, v):",
+                "        self.v = v",
+                "    def __add__(self, o):",
+                "        return N(self.v + o.v)",
+                "    def __getitem__(self, k):",
+                "        return self.v * k",
+                "a = N(3)",
+                "b = N(4)",
+                "c = a + b",
+                "assrt.equal(c.v, 7)",
+                "assrt.equal(a[2], 6)",
+            ].join("\n"), {
+                keep_baselib: true,
+                python_flags: "overload_operators,overload_getitem",
+            });
+            assert.ok(js.indexOf("ρσ_op_add") !== -1, "Expected ρσ_op_add");
+            assert.ok(js.indexOf("__getitem__") !== -1, "Expected __getitem__");
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

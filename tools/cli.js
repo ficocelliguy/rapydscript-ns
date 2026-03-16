@@ -351,6 +351,15 @@ Python-style string methods to be used directly on any
 string in RapydScript without an explicit import.
 */});
 
+opt("python_flags", "F", 'string', '', function(){/*
+Comma-separated list of Python compatibility flags to enable
+globally for all compiled files. Equivalent to adding
+"from __python__ import <flags>" at the top of every file.
+Available flags: dict_literals, overload_getitem, bound_methods,
+hash_literals, overload_operators. Prefix a flag with no_ to
+explicitly disable it (e.g. no_bound_methods).
+*/});
+
 create_group('repl', '', function(){/*
 Run a Read-Eval-Print-Loop (REPL). This allows
 you to type and run RapydScript at a live

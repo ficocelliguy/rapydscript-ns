@@ -548,6 +548,68 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        // ── pythonFlags option ─────────────────────────────────────────────
+
+        {
+            name: "python_flags_no_errors_when_flag_active",
+            description: "pythonFlags constructor option activates flags without inline import",
+            run: function () {
+                // Without pythonFlags, using overload_operators syntax requires
+                // `from __python__ import overload_operators` in the source.
+                // With pythonFlags, it should be active globally.
+                var d_with_flags = new Diagnostics(RS, null, "overload_operators,overload_getitem");
+                var markers = d_with_flags.check([
+                    "class Vec:",
+                    "    def __init__(self, x):",
+                    "        self.x = x",
+                    "    def __add__(self, other):",
+                    "        return Vec(self.x + other.x)",
+                    "a = Vec(1)",
+                    "b = Vec(2)",
+                    "c = a + b",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors with pythonFlags active, got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "python_flags_constructor_same_as_inline_import",
+            description: "pythonFlags constructor option produces same parse result as inline from __python__ import",
+            run: function () {
+                // Code using overload_operators — no inline import
+                var src_no_import = [
+                    "class N:",
+                    "    def __init__(self, v): self.v = v",
+                    "    def __add__(self, o): return N(self.v + o.v)",
+                    "a = N(1)",
+                    "b = N(2)",
+                    "x = a + b",
+                ].join("\n");
+
+                // With inline import
+                var src_with_import = [
+                    "from __python__ import overload_operators",
+                ].concat(src_no_import.split("\n")).join("\n");
+
+                // Both should parse without error when the flag is active
+                var d_flags  = new Diagnostics(RS, null, "overload_operators");
+                var d_inline = new Diagnostics(RS, null, null);
+
+                var m_flags  = d_flags.check(src_no_import);
+                var m_inline = d_inline.check(src_with_import);
+
+                var err_flags  = m_flags.filter(function (m) { return m.severity === SEV_ERROR; });
+                var err_inline = m_inline.filter(function (m) { return m.severity === SEV_ERROR; });
+
+                assert.deepStrictEqual(err_flags, [],
+                    "Flags: expected no errors, got: " + JSON.stringify(err_flags));
+                assert.deepStrictEqual(err_inline, [],
+                    "Inline: expected no errors, got: " + JSON.stringify(err_inline));
+            },
+        },
+
     ];
 
     return TESTS;

@@ -91,8 +91,8 @@ class RapydScriptLanguageService {
         const compiler = options.compiler;
         if (!compiler) throw new Error('registerRapydScript: options.compiler is required');
 
-        this._diagnostics = new Diagnostics(compiler, options.extraBuiltins);
-        this._analyzer    = new SourceAnalyzer(compiler);
+        this._diagnostics = new Diagnostics(compiler, options.extraBuiltins, options.pythonFlags);
+        this._analyzer    = new SourceAnalyzer(compiler, options.pythonFlags);
 
         // Preserve extra builtin names so they survive addDts() rebuilds
         this._extraBuiltinNames = options.extraBuiltins ? Object.keys(options.extraBuiltins) : [];
@@ -377,6 +377,7 @@ class RapydScriptLanguageService {
  * @param {Array}  [options.dtsFiles]        - [{name, content}] d.ts files (Phase 6)
  * @param {number} [options.parseDelay=300]  - debounce ms
  * @param {object} [options.extraBuiltins]   - extra {name: true} globals to suppress undef warnings
+ * @param {string} [options.pythonFlags]     - comma-separated python flags (e.g. "dict_literals,overload_getitem")
  * @returns {RapydScriptLanguageService}
  */
 export function registerRapydScript(monaco, options) {

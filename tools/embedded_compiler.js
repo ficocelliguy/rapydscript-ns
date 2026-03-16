@@ -8,6 +8,19 @@
 
 var has_prop = Object.prototype.hasOwnProperty.call.bind(Object.prototype.hasOwnProperty);
 
+function build_scoped_flags(flags_str) {
+    var result = Object.create(null);
+    if (!flags_str) return result;
+    flags_str.split(',').forEach(function(flag) {
+        flag = flag.trim();
+        if (!flag) return;
+        var val = true;
+        if (flag.slice(0, 3) === 'no_') { val = false; flag = flag.slice(3); }
+        result[flag] = val;
+    });
+    return result;
+}
+
 module.exports = function(compiler, baselib, runjs, name, vf_context) {
     var LINE_CONTINUATION_CHARS = ':\\';
     runjs = runjs || eval;
@@ -120,7 +133,12 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
         'compile': function streaming_compile(code, opts) {
             opts = opts || {};
             var classes = (this.toplevel) ? this.toplevel.classes : undefined;
-            var scoped_flags = (this.toplevel) ? this.toplevel.scoped_flags: undefined;
+            var inherited_flags = (this.toplevel) ? this.toplevel.scoped_flags : undefined;
+            var scoped_flags = Object.assign(
+                Object.create(null),
+                opts.python_flags ? build_scoped_flags(opts.python_flags) : {},
+                inherited_flags || {}
+            );
             var vf = (opts.virtual_files && vf_context) ? opts.virtual_files : null;
             var parse_opts = {
                 'filename': opts.filename || '<embedded>',
@@ -169,7 +187,12 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
         'compile_with_sourcemap': function compile_with_sourcemap(code, opts) {
             opts = opts || {};
             var classes = (this.toplevel) ? this.toplevel.classes : undefined;
-            var scoped_flags = (this.toplevel) ? this.toplevel.scoped_flags : undefined;
+            var inherited_flags = (this.toplevel) ? this.toplevel.scoped_flags : undefined;
+            var scoped_flags = Object.assign(
+                Object.create(null),
+                opts.python_flags ? build_scoped_flags(opts.python_flags) : {},
+                inherited_flags || {}
+            );
             var vf = (opts.virtual_files && vf_context) ? opts.virtual_files : null;
             var parse_opts = {
                 'filename': opts.filename || '<embedded>',

@@ -187,7 +187,7 @@ These are Python stdlib modules with no equivalent in src/lib/:
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
 │ functools   │ tested                                                                          │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
-│ itertools   │ chain, product, combinations, permutations, groupby, islice, zip_longest, cycle │
+│ itertools   │ tested                                                                          │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
 │ typing      │ List, Dict, Optional, Union, Tuple, Generic, TypeVar, etc.                      │
 ├─────────────┼─────────────────────────────────────────────────────────────────────────────────┤
@@ -285,7 +285,7 @@ If prioritizing what to implement next, these have the highest user impact:
 7. collections.defaultdict / Counter — frequently used - done
 8. Nested comprehensions — common Python pattern - done
 9. Walrus operator := — increasingly common in modern Python - done
-10. classmethod decorator — standard OOP pattern
+10. classmethod decorator — standard OOP pattern - done
 
 
 

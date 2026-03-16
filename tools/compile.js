@@ -43,6 +43,19 @@ function process_cache_dir(dir) {
     return dir;
 }
 
+function build_scoped_flags(flags_str) {
+    var result = Object.create(null);
+    if (!flags_str) return result;
+    flags_str.split(',').forEach(function(flag) {
+        flag = flag.trim();
+        if (!flag) return;
+        var val = true;
+        if (flag.slice(0, 3) === 'no_') { val = false; flag = flag.slice(3); }
+        result[flag] = val;
+    });
+    return result;
+}
+
 module.exports = function(start_time, argv, base_path, src_path, lib_path) {
     // configure settings for the output
     var cache_dir = argv.cache_dir ? process_cache_dir(argv.cache_dir) : '';
@@ -61,6 +74,8 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
     var STATS = {}, TOPLEVEL;
     var num_of_files = files.length || 1;
 
+    var global_scoped_flags = build_scoped_flags(argv.python_flags);
+
     function parse_file(code, file, toplevel) {
         return RapydScript.parse(code, {
             filename: file,
@@ -70,6 +85,7 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
             import_dirs: utils.get_import_dirs(argv.import_path),
             discard_asserts: argv.discard_asserts,
             module_cache_dir: cache_dir,
+            scoped_flags: global_scoped_flags,
         });
     }
 

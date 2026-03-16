@@ -11,6 +11,19 @@ import { ScopeMap, ScopeFrame, SymbolInfo } from './scope.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
+function build_scoped_flags(flags_str) {
+    const result = Object.create(null);
+    if (!flags_str) return result;
+    flags_str.split(',').forEach(flag => {
+        flag = flag.trim();
+        if (!flag) return;
+        let val = true;
+        if (flag.startsWith('no_')) { val = false; flag = flag.slice(3); }
+        result[flag] = val;
+    });
+    return result;
+}
+
 /** Convert AST token position {line (1-indexed), col (0-indexed)} → {line, column} (both 1-indexed). */
 function pos_from_token(tok) {
     if (!tok) return { line: 1, column: 1 };
@@ -431,10 +444,12 @@ class ScopeBuilder {
 
 export class SourceAnalyzer {
     /**
-     * @param {object} compiler  - window.RapydScript (the compiled compiler bundle)
+     * @param {object} compiler     - window.RapydScript (the compiled compiler bundle)
+     * @param {string} [pythonFlags] - comma-separated python flags to enable globally
      */
-    constructor(compiler) {
+    constructor(compiler, pythonFlags) {
         this._RS = compiler;
+        this._scoped_flags = build_scoped_flags(pythonFlags);
     }
 
     /**
@@ -457,6 +472,7 @@ export class SourceAnalyzer {
                 filename:    'editor.pyj',
                 for_linting: true,
                 ...(options.virtualFiles ? { virtual_files: options.virtualFiles } : {}),
+                ...(Object.keys(this._scoped_flags).length ? { scoped_flags: this._scoped_flags } : {}),
             });
         } catch (_e) {
             // Syntax/import error — return the empty map; diagnostics.js handles errors.

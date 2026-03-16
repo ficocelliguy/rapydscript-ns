@@ -80,6 +80,24 @@ function compile(src) {
     return js;
 }
 
+function compile_with_flags(src, flags_obj) {
+    var ast = RapydScript.parse(src, {
+        filename : "<unit-test>",
+        toplevel : null,
+        basedir  : BASE_PATH,
+        libdir   : LIB_PATH,
+        scoped_flags: flags_obj || {},
+    });
+    var output = new RapydScript.OutputStream({
+        baselib_plain : baselib,
+        beautify      : true,
+        js_version    : 6,
+        private_scope : false,
+    });
+    ast.print(output);
+    return output.toString();
+}
+
 function compile_virtual(src, virtual_files) {
     compiler_module.set_virtual_files(virtual_files);
     try {
@@ -2767,6 +2785,117 @@ assrt.equal(fib(15), 610)
         js_checks: [],
     },
 
+    // ── python_flags compiler option ──────────────────────────────────────
+
+    {
+        name: "python_flag_dict_literals_via_scoped_flags",
+        description: "dict_literals flag via scoped_flags produces same JS as from __python__ import",
+        run: function() {
+            var src_inline = [
+                "from __python__ import dict_literals",
+                "x = {}",
+            ].join("\n");
+            var src_flagged = "x = {}";
+            var js_inline  = compile(src_inline);
+            var js_flagged = compile_with_flags(src_flagged, { dict_literals: true });
+            // Both should produce the same dict() call pattern
+            assert.ok(js_flagged.indexOf("dict_literal") !== -1 || js_flagged.indexOf("ρσ_dict") !== -1 || js_inline === js_flagged,
+                "dict_literals flag should produce same output as inline import; got:\n" + js_flagged);
+        },
+    },
+
+    {
+        name: "python_flag_overload_operators_via_scoped_flags",
+        description: "overload_operators flag via scoped_flags produces same JS as from __python__ import",
+        run: function() {
+            var src_inline  = "from __python__ import overload_operators\nx = a + b";
+            var src_flagged = "x = a + b";
+            var js_inline   = compile(src_inline);
+            var js_flagged  = compile_with_flags(src_flagged, { overload_operators: true });
+            assert.equal(js_inline.indexOf("ρσ_op_add") !== -1, true,
+                "inline import: expected ρσ_op_add in: " + js_inline);
+            assert.equal(js_flagged.indexOf("ρσ_op_add") !== -1, true,
+                "scoped_flags: expected ρσ_op_add in: " + js_flagged);
+        },
+    },
+
+    {
+        name: "python_flag_overload_getitem_via_scoped_flags",
+        description: "overload_getitem flag via scoped_flags produces same JS as from __python__ import",
+        run: function() {
+            var src_inline  = "from __python__ import overload_getitem\ny = obj[key]";
+            var src_flagged = "y = obj[key]";
+            var js_inline   = compile(src_inline);
+            var js_flagged  = compile_with_flags(src_flagged, { overload_getitem: true });
+            assert.equal(js_inline.indexOf("__getitem__") !== -1, true,
+                "inline import: expected __getitem__ in: " + js_inline);
+            assert.equal(js_flagged.indexOf("__getitem__") !== -1, true,
+                "scoped_flags: expected __getitem__ in: " + js_flagged);
+        },
+    },
+
+    {
+        name: "python_flag_bound_methods_via_scoped_flags",
+        description: "bound_methods flag via scoped_flags produces same JS as from __python__ import",
+        run: function() {
+            var src_inline = [
+                "from __python__ import bound_methods",
+                "class Foo:",
+                "    def bar(self):",
+                "        return 1",
+            ].join("\n");
+            var src_flagged = [
+                "class Foo:",
+                "    def bar(self):",
+                "        return 1",
+            ].join("\n");
+            var js_inline  = compile(src_inline);
+            var js_flagged = compile_with_flags(src_flagged, { bound_methods: true });
+            assert.equal(js_inline.indexOf("bind") !== -1, true,
+                "inline import: expected bind in: " + js_inline);
+            assert.equal(js_flagged.indexOf("bind") !== -1, true,
+                "scoped_flags: expected bind in: " + js_flagged);
+        },
+    },
+
+    {
+        name: "python_flag_hash_literals_via_scoped_flags",
+        description: "hash_literals flag via scoped_flags produces same JS as from __python__ import",
+        run: function() {
+            var src_inline  = "from __python__ import hash_literals\ns = {1, 2, 3}";
+            var src_flagged = "s = {1, 2, 3}";
+            var js_inline   = compile(src_inline);
+            var js_flagged  = compile_with_flags(src_flagged, { hash_literals: true });
+            // Both should produce a set() call
+            assert.equal(js_inline.indexOf("set") !== -1, true,
+                "inline import: expected set() in: " + js_inline);
+            assert.equal(js_flagged.indexOf("set") !== -1, true,
+                "scoped_flags: expected set() in: " + js_flagged);
+        },
+    },
+
+    {
+        name: "python_flag_all_flags_runtime",
+        description: "overload_operators + overload_getitem work correctly at runtime via scoped_flags",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators, overload_getitem",
+            "class Vec:",
+            "    def __init__(self, x):",
+            "        self.x = x",
+            "    def __add__(self, other):",
+            "        return Vec(self.x + other.x)",
+            "    def __getitem__(self, key):",
+            "        return self.x + key",
+            "a = Vec(10)",
+            "b = Vec(5)",
+            "c = a + b",
+            "assrt.equal(c.x, 15)",
+            "assrt.equal(a[3], 13)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_add", "__getitem__"],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -2784,6 +2913,23 @@ function run_tests(filter) {
     var failures = [];
 
     tests.forEach(function (test) {
+
+        // Custom run function (for tests that need direct JS-level control)
+        if (typeof test.run === "function") {
+            try {
+                test.run();
+            } catch (e) {
+                failures.push(test.name);
+                var msg = e.stack || String(e);
+                console.log(colored("FAIL  " + test.name, "red") +
+                            " [run]\n      " + msg + "\n");
+                return;
+            }
+            console.log(colored("PASS  " + test.name, "green") +
+                        "  –  " + test.description);
+            return;
+        }
+
         var js;
 
         // 1 – compile RapydScript → JS

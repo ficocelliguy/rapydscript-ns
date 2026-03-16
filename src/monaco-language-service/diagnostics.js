@@ -44,6 +44,19 @@ function has_prop(obj, name) {
     return Object.prototype.hasOwnProperty.call(obj, name);
 }
 
+function build_scoped_flags(flags_str) {
+    const result = Object.create(null);
+    if (!flags_str) return result;
+    flags_str.split(',').forEach(flag => {
+        flag = flag.trim();
+        if (!flag) return;
+        let val = true;
+        if (flag.startsWith('no_')) { val = false; flag = flag.slice(3); }
+        result[flag] = val;
+    });
+    return result;
+}
+
 function msg_from_node(ident, name, node, level, line) {
     name = name || (node.name ? (node.name.name || node.name) : '');
     const msg = MESSAGES[ident]
@@ -529,10 +542,13 @@ function to_marker(msg, markerSeverity) {
 
 export class Diagnostics {
     /**
-     * @param {object} compiler  - window.RapydScript (the compiled compiler)
+     * @param {object} compiler      - window.RapydScript (the compiled compiler)
      * @param {object} [extraBuiltins] - additional symbol names to treat as defined
+     * @param {string} [pythonFlags]   - comma-separated python flags to enable globally
+     *   (e.g. "dict_literals,overload_getitem").  Equivalent to a global
+     *   `from __python__ import` at the top of every file.
      */
-    constructor(compiler, extraBuiltins) {
+    constructor(compiler, extraBuiltins, pythonFlags) {
         this._RS = compiler;
 
         // Build the builtins lookup table
@@ -552,6 +568,9 @@ export class Diagnostics {
                 this._builtins[name] = true;
             });
         }
+
+        // Pre-set Python compatibility flags
+        this._scoped_flags = build_scoped_flags(pythonFlags);
     }
 
     /**
@@ -587,6 +606,7 @@ export class Diagnostics {
                 for_linting:   true,
                 // virtual files let the parser resolve imports without disk access
                 ...(options.virtualFiles ? { virtual_files: options.virtualFiles } : {}),
+                ...(Object.keys(this._scoped_flags).length ? { scoped_flags: this._scoped_flags } : {}),
             });
         } catch (e) {
             if (e instanceof RS.SyntaxError || e instanceof RS.ImportError) {
