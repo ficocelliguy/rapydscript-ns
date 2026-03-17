@@ -412,6 +412,7 @@ function Linter(RS, toplevel, code, builtins) {
         const node = this.current_node;
         const seen = Object.create(null);
         (node.properties || []).forEach(prop => {
+            if (prop instanceof RS.AST_ObjectSpread) return;
             if (prop.key instanceof RS.AST_Constant) {
                 const val = prop.key.value;
                 if (has_prop(seen, val))

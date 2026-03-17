@@ -13,7 +13,7 @@ AST_Definitions, AST_DictComprehension, AST_Directive, AST_Do, AST_Dot,
 AST_Else, AST_EmptyStatement, AST_Except, AST_ExpressiveObject, AST_False, AST_Finally,
 AST_ForIn, AST_ForJS, AST_Function, AST_GeneratorComprehension, AST_Hole,
 AST_If, AST_Import, AST_ImportedVar, AST_Imports, AST_ListComprehension,
-AST_Method, AST_New, AST_Null, AST_Number, AST_Object, AST_ObjectKeyVal,
+AST_Method, AST_New, AST_Null, AST_Number, AST_Object, AST_ObjectKeyVal, AST_ObjectSpread,
 AST_PropAccess, AST_RegExp, AST_Return, AST_Scope, AST_Set,
 AST_SetComprehension, AST_SetItem, AST_Seq, AST_SimpleStatement, AST_Splice,
 AST_String, AST_Sub, AST_ItemAccess, AST_SymbolAlias,
@@ -2264,6 +2264,15 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             first = False
 
             start = S.token
+            if is_('operator', '**'):
+                next()
+                a.push(new AST_ObjectSpread({
+                    'start': start,
+                    'value': expression(False),
+                    'end': prev()
+                }))
+                has_non_const_keys = True
+                continue
             ctx = S.input.context()
             orig = ctx.expecting_object_literal_key
             ctx.expecting_object_literal_key = True

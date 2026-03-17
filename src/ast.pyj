@@ -1114,6 +1114,17 @@ class AST_ObjectProperty(AST_Node):
 class AST_ObjectKeyVal(AST_ObjectProperty):
     "A key: value object property"
 
+class AST_ObjectSpread(AST_Node):
+    "A **expr spread item inside an object/dict literal"
+    properties = {
+        'value': "[AST_Node] the expression being spread",
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.value._walk(visitor)
+        )
+
 class AST_Set(AST_Node):
     "A set literal"
     properties = {

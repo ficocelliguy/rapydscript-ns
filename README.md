@@ -851,6 +851,38 @@ a = {1:1, 2:2}
 isinstance(a, dict) == False # a is a normal JavaScript object
 ```
 
+### Dict merge literals
+
+RapydScript supports Python's `{**d1, **d2}` dict merge (spread) syntax.
+One or more `**expr` items can appear anywhere inside a `{...}` literal,
+interleaved with ordinary `key: value` pairs:
+
+```py
+defaults = {'color': 'blue', 'size': 10}
+overrides = {'size': 20}
+
+# Merge two dicts — later items win
+merged = {**defaults, **overrides}
+# merged == {'color': 'blue', 'size': 20}
+
+# Mix spread with literal key-value pairs
+result = {**defaults, 'weight': 5}
+# result == {'color': 'blue', 'size': 10, 'weight': 5}
+```
+
+This works for both plain JavaScript-object dicts (the default) and Python
+`dict` objects (enabled via `from __python__ import dict_literals`):
+
+```py
+from __python__ import dict_literals, overload_getitem
+pd1 = {'a': 1}
+pd2 = {'b': 2}
+merged = {**pd1, **pd2}   # isinstance(merged, dict) == True
+```
+
+The spread items are translated using `Object.assign` for plain JS objects
+and `dict.update()` for Python dicts.
+
 
 ### Arithmetic operator overloading
 

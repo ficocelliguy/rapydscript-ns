@@ -1,0 +1,76 @@
+# vim:fileencoding=utf-8
+# Tests for dict merge literal {**d1, **d2}
+
+# Basic merge of two JS-object dicts
+d1 = {'a': 1, 'b': 2}
+d2 = {'c': 3, 'd': 4}
+merged = {**d1, **d2}
+assrt.equal(merged['a'], 1)
+assrt.equal(merged['b'], 2)
+assrt.equal(merged['c'], 3)
+assrt.equal(merged['d'], 4)
+
+# Later key wins (rightmost takes priority)
+da = {'x': 1}
+db = {'x': 99, 'y': 2}
+r = {**da, **db}
+assrt.equal(r['x'], 99)
+assrt.equal(r['y'], 2)
+
+# Mix of spread and literal key-value pairs
+base = {'a': 10, 'b': 20}
+result = {**base, 'c': 30}
+assrt.equal(result['a'], 10)
+assrt.equal(result['b'], 20)
+assrt.equal(result['c'], 30)
+
+# Literal key before spread (spread overrides)
+result2 = {'a': 0, **base}
+assrt.equal(result2['a'], 10)
+
+# Multiple spreads with interleaved key-value pairs
+x = {'x': 1}
+y = {'y': 2}
+z = {'z': 3}
+combined = {**x, 'mid': 99, **y, **z}
+assrt.equal(combined['x'], 1)
+assrt.equal(combined['mid'], 99)
+assrt.equal(combined['y'], 2)
+assrt.equal(combined['z'], 3)
+
+# Single spread only
+src = {'p': 7, 'q': 8}
+copy = {**src}
+assrt.equal(copy['p'], 7)
+assrt.equal(copy['q'], 8)
+
+# Empty dict spread
+empty = {}
+r2 = {**empty, 'k': 42}
+assrt.equal(r2['k'], 42)
+
+# Trailing comma allowed
+tc = {**d1,}
+assrt.equal(tc['a'], 1)
+
+# Python dict literals with dict_literals scoped flag
+def test_pydict_spread():
+    from __python__ import dict_literals, overload_getitem
+    pd1 = {'alpha': 1, 'beta': 2}
+    pd2 = {'gamma': 3}
+    merged_py = {**pd1, **pd2}
+    assrt.ok(isinstance(merged_py, dict))
+    assrt.equal(merged_py['alpha'], 1)
+    assrt.equal(merged_py['beta'], 2)
+    assrt.equal(merged_py['gamma'], 3)
+    # Key override in pydict
+    pd3 = {'alpha': 999}
+    overridden = {**pd1, **pd3}
+    assrt.equal(overridden['alpha'], 999)
+    assrt.equal(overridden['beta'], 2)
+    # Mix spread and literal
+    mixed = {**pd1, 'delta': 4}
+    assrt.equal(mixed['alpha'], 1)
+    assrt.equal(mixed['delta'], 4)
+
+test_pydict_spread()

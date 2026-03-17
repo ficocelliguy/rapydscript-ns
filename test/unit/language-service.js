@@ -610,6 +610,37 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        {
+            name: "dict_spread_no_errors",
+            description: "Dict merge literal {**d1, **d2} produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "d1 = {'a': 1}",
+                    "d2 = {'b': 2}",
+                    "merged = {**d1, **d2}",
+                    "mixed = {**d1, 'c': 3}",
+                    "single = {**d1}",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for dict spread, got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "dict_spread_no_dup_key_false_positive",
+            description: "Spread items do not trigger dup-key warnings alongside real keys",
+            run: function () {
+                var markers = d().check([
+                    "d1 = {'a': 1}",
+                    "result = {**d1, 'b': 2, 'c': 3}",
+                ].join("\n"));
+                var dup_key = markers.filter(function (m) { return m.message.indexOf("dup") !== -1; });
+                assert.deepStrictEqual(dup_key, [],
+                    "Expected no dup-key warnings for spread, got: " + JSON.stringify(dup_key));
+            },
+        },
+
     ];
 
     return TESTS;

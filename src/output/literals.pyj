@@ -2,7 +2,7 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-from ast import AST_Binary, is_node_type
+from ast import AST_Binary, AST_ObjectSpread, is_node_type
 
 def print_array(self, output):
     output.print('ρσ_list_decorate')
@@ -34,7 +34,18 @@ def print_obj_literal(self, output):
             output.end_statement()
             for i, prop in enumerate(self.properties):
                 output.indent()
-                if self.is_pydict:
+                if is_node_type(prop, AST_ObjectSpread):
+                    if self.is_pydict:
+                        output.print('ρσ_d.update')
+                        output.with_parens(def(): prop.value.print(output);)
+                    else:
+                        output.print('Object.assign')
+                        output.with_parens(def():
+                            output.print('ρσ_d')
+                            output.print(','), output.space()
+                            prop.value.print(output)
+                        )
+                elif self.is_pydict:
                     output.print('ρσ_d.set')
                     output.with_parens(def():
                         prop.key.print(output)

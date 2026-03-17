@@ -407,6 +407,44 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_dict_spread_js_object",
+        description: "Dict merge literal {**d1, **d2} works for plain JS-object dicts in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "d1 = {'a': 1, 'b': 2}",
+                "d2 = {'c': 3, 'b': 99}",
+                "merged = {**d1, **d2}",
+                "assrt.equal(merged['a'], 1)",
+                "assrt.equal(merged['b'], 99)",
+                "assrt.equal(merged['c'], 3)",
+                "single = {**d1, 'extra': 42}",
+                "assrt.equal(single['a'], 1)",
+                "assrt.equal(single['extra'], 42)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_dict_spread_pydict",
+        description: "Dict merge literal {**d1, **d2} works for Python dicts (dict_literals) in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import dict_literals, overload_getitem",
+                "pd1 = {'x': 10, 'y': 20}",
+                "pd2 = {'y': 99, 'z': 30}",
+                "merged = {**pd1, **pd2}",
+                "assrt.equal(merged['x'], 10)",
+                "assrt.equal(merged['y'], 99)",
+                "assrt.equal(merged['z'], 30)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------
