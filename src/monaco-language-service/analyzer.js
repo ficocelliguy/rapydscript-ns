@@ -293,7 +293,28 @@ class ScopeBuilder {
             // or update inferred_class on an existing symbol (hoisted var declarations
             // inside functions are added by AST_VarDef without type info; the
             // assignment provides the type).
-            if (node.left instanceof RS.AST_SymbolRef) {
+            // Tuple/starred unpacking: register each variable in the LHS
+            if (node.left instanceof RS.AST_Array) {
+                const scope = this._current_scope();
+                if (scope) {
+                    node.left.flatten().forEach(elem => {
+                        let sym = null;
+                        if (elem instanceof RS.AST_Starred && elem.expression instanceof RS.AST_SymbolRef) {
+                            sym = elem.expression;
+                        } else if (elem instanceof RS.AST_SymbolRef) {
+                            sym = elem;
+                        }
+                        if (sym && !scope.getSymbol(sym.name)) {
+                            this._add_symbol({
+                                name:       sym.name,
+                                kind:       'variable',
+                                defined_at: pos_from_token(sym.start),
+                                inferred_class: elem instanceof RS.AST_Starred ? 'list' : null,
+                            });
+                        }
+                    });
+                }
+            } else if (node.left instanceof RS.AST_SymbolRef) {
                 const name  = node.left.name;
                 const scope = this._current_scope();
                 if (scope) {

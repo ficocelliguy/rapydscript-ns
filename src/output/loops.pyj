@@ -3,17 +3,39 @@
 # globals: regenerate
 from __python__ import hash_literals
 
-from ast import AST_BaseCall, AST_SymbolRef, AST_Array, AST_Unary, AST_Number, has_calls, AST_Seq, AST_ListComprehension, is_node_type
+from ast import AST_BaseCall, AST_SymbolRef, AST_Array, AST_Unary, AST_Number, has_calls, AST_Seq, AST_ListComprehension, AST_Starred, is_node_type
 from output.stream import OutputStream
 
 def unpack_tuple(elems, output, in_statement):
+    starred_idx = -1
+    for i, elem in enumerate(elems):
+        if is_node_type(elem, AST_Starred):
+            starred_idx = i
+            break
+    after_count = elems.length - starred_idx - 1 if starred_idx >= 0 else 0
+
     for i, elem in enumerate(elems):
         output.indent()
-        output.assign(elem)
+        is_starred = is_node_type(elem, AST_Starred)
+        actual_elem = elem.expression if is_starred else elem
+        output.assign(actual_elem)
         output.print("ρσ_unpack")
-        output.with_square(def():
+        if is_starred:
+            output.print('.slice(')
             output.print(i)
-        )
+            if after_count > 0:
+                output.print(', ρσ_unpack.length - ')
+                output.print(after_count)
+            output.print(')')
+        elif starred_idx >= 0 and i > starred_idx:
+            from_end = i - elems.length
+            output.print('[ρσ_unpack.length + ')
+            output.print(from_end)
+            output.print(']')
+        else:
+            output.with_square(def():
+                output.print(i)
+            )
         if not in_statement or i < elems.length - 1:
             output.semicolon()
             output.newline()

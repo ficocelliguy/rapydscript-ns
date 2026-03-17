@@ -695,6 +695,15 @@ a = tmp[0]
 b = tmp[1]
 ```
 
+RapydScript also supports Python's **starred assignment** (`a, *b, c = iterable`), which collects the remaining elements into a list. The starred variable can appear at any position — front, middle, or end:
+
+```py
+first, *rest = [1, 2, 3, 4]       # first=1, rest=[2, 3, 4]
+*init, last = [1, 2, 3, 4]        # init=[1, 2, 3], last=4
+head, *mid, tail = [1, 2, 3, 4, 5] # head=1, mid=[2, 3, 4], tail=5
+```
+
+Starred assignment works with any iterable, including generators and strings (which are unpacked character by character). The starred variable always receives a list, even if it captures zero elements.
 
 Operators and keywords
 ------------------------

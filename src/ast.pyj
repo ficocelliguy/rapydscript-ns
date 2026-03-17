@@ -1049,6 +1049,18 @@ class AST_NamedExpr(AST_Node):
             self.value._walk(visitor)
         )
 
+
+class AST_Starred(AST_Node):
+    "A starred assignment target: `*name` in `a, *name, b = iterable`"
+    properties = {
+        'expression': "[AST_SymbolRef] the symbol being collected into",
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.expression._walk(visitor)
+        )
+
 # }}}
 
 # LITERALS {{{

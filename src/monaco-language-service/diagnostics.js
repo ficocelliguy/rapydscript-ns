@@ -273,7 +273,13 @@ function Linter(RS, toplevel, code, builtins) {
         const node = this.current_node;
         const handle_destructured = (flat) => {
             flat.forEach(cnode => {
-                if (cnode instanceof RS.AST_SymbolRef) {
+                if (cnode instanceof RS.AST_Starred && cnode.expression instanceof RS.AST_SymbolRef) {
+                    const sym = cnode.expression;
+                    this.current_node = sym;
+                    sym.lint_visited = true;
+                    this.add_binding(sym.name);
+                    this.current_node = node;
+                } else if (cnode instanceof RS.AST_SymbolRef) {
                     this.current_node = cnode;
                     cnode.lint_visited = true;
                     this.add_binding(cnode.name);

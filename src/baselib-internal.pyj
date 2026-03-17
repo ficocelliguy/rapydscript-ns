@@ -68,6 +68,20 @@ def ρσ_unpack_asarray(num, iterable):
             result = iterator.next()
     return ans
 
+def ρσ_unpack_starred_asarray(iterable):
+    if jstype(iterable) is 'string' or v'iterable instanceof String':
+        return iterable.split('')
+    if ρσ_arraylike(iterable):
+        return iterable
+    ans = v'[]'
+    if jstype(iterable[ρσ_iterator_symbol]) is 'function':
+        iterator = iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
+        result = iterator.next()
+        while not result.done:
+            ans.push(result.value)
+            result = iterator.next()
+    return ans
+
 def ρσ_extends(child, parent):
     child.prototype = Object.create(parent.prototype)
     child.prototype.constructor = child

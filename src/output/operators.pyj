@@ -5,7 +5,7 @@ from ast import (
     AST_Array, AST_Assign, AST_BaseCall, AST_Binary, AST_Conditional,
     AST_ItemAccess, AST_NamedExpr, AST_Number, AST_Object, AST_Return, AST_Seq, AST_Set,
     AST_SimpleStatement, AST_Statement, AST_String, AST_Sub, AST_Symbol,
-    AST_SymbolRef, AST_Unary, is_node_type
+    AST_SymbolRef, AST_Starred, AST_Unary, is_node_type
 )
 from output.loops import unpack_tuple
 
@@ -310,6 +310,11 @@ def print_assignment(self, output):
     if is_node_type(left, AST_Array):
         flat = left.flatten()
         flattened = flat.length > left.elements.length
+        has_starred = False
+        for elem in flat:
+            if is_node_type(elem, AST_Starred):
+                has_starred = True
+                break
         output.print("ρσ_unpack")
     else:
         left.print(output)
@@ -325,7 +330,10 @@ def print_assignment(self, output):
         output.end_statement()
         if not is_node_type(self.right, AST_Seq) and not is_node_type(self.right, AST_Array):
             output.assign('ρσ_unpack')
-            output.print('ρσ_unpack_asarray(' + flat.length), output.comma(), output.print('ρσ_unpack)')
+            if has_starred:
+                output.print('ρσ_unpack_starred_asarray('), output.print('ρσ_unpack)')
+            else:
+                output.print('ρσ_unpack_asarray(' + flat.length), output.comma(), output.print('ρσ_unpack)')
             output.end_statement()
         unpack_tuple(flat, output, True)
 

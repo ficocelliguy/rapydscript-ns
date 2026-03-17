@@ -1,0 +1,104 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+
+eq = assrt.equal
+de = assrt.deepEqual
+ok = assrt.ok
+
+# ----[ Transpilation tests (parse + codegen) ]----
+
+def compile_test(code):
+    # Returns the JS output as a string (main code section only)
+    ast = RapydScript.parse(code + '\n', {'filename': code})
+    opts = RapydScript.OutputStream({'beautify': True, 'js_version': 7})
+    ast.print(opts)
+    return opts.get()
+
+def throw_parse_test(code):
+    assrt.throws(def():
+        RapydScript.parse(code + '\n', {'filename': code})
+    , RapydScript.SyntaxError)
+
+# ----[ Basic runtime correctness tests ]----
+
+# a, *b, c = list — middle starred
+a, *b, c = [1, 2, 3, 4, 5]
+eq(a, 1)
+de(b, [2, 3, 4])
+eq(c, 5)
+
+# *a, b = list — starred at front
+*a, b = [1, 2, 3]
+de(a, [1, 2])
+eq(b, 3)
+
+# x, *y = list — starred at end
+x, *y = [1, 2, 3, 4]
+eq(x, 1)
+de(y, [2, 3, 4])
+
+# first, *rest, last — first and last are scalars
+first, *rest, last = [10, 20, 30, 40, 50]
+eq(first, 10)
+de(rest, [20, 30, 40])
+eq(last, 50)
+
+# Minimal: only two elements on rhs, starred in front
+*p, q = [7, 8]
+de(p, [7])
+eq(q, 8)
+
+# Minimal: only two elements on rhs, starred at end
+m, *n = [7, 8]
+eq(m, 7)
+de(n, [8])
+
+# Starred gets empty list when nothing to absorb
+a2, *b2, c2 = [1, 2]
+eq(a2, 1)
+de(b2, [])
+eq(c2, 2)
+
+# Works with tuple packing on rhs
+i, *j, k = 1, 2, 3, 4
+eq(i, 1)
+de(j, [2, 3])
+eq(k, 4)
+
+# Works with string (iterable)
+head, *tail = "hello"
+eq(head, "h")
+de(tail, ["e", "l", "l", "o"])
+
+# Works with generator
+def make_gen():
+    yield 10
+    yield 20
+    yield 30
+    yield 40
+
+g1, *g2, g3 = make_gen()
+eq(g1, 10)
+de(g2, [20, 30])
+eq(g3, 40)
+
+# Starred result is a list (not raw js array)
+*s1, s2 = [1, 2, 3]
+ok(Array.isArray(s1))
+eq(s1.length, 2)
+
+# ----[ Language service parse tests ]----
+
+# Parsing: starred assignment produces an AST_SimpleStatement containing AST_Assign
+parsed = RapydScript.parse('a, *b, c = [1,2,3]\n', {'filename': 'test'}).body[0]
+ok(v'parsed instanceof RapydScript.AST_SimpleStatement')
+ok(v'parsed.body instanceof RapydScript.AST_Assign')
+ok(v'parsed.body.left instanceof RapydScript.AST_Array')
+
+# ----[ Error detection ]----
+
+# Multiple starred expressions should throw
+throw_parse_test('*a, *b = [1, 2]')
+
+# Starred in augmented assignment should throw
+throw_parse_test('a, *b += [1, 2]')

@@ -21,7 +21,7 @@ AST_SymbolCatch, AST_SymbolDefun, AST_SymbolFunarg,
 AST_SymbolLambda, AST_SymbolNonlocal, AST_SymbolRef, AST_SymbolVar, AST_This,
 AST_Throw, AST_Toplevel, AST_True, AST_Try, AST_UnaryPrefix,
 AST_Undefined, AST_Var, AST_VarDef, AST_Verbatim, AST_While, AST_With, AST_WithClause,
-AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, AST_Super, is_node_type,
+AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, AST_Super, AST_Starred, is_node_type,
 AST_Match, AST_MatchCase,
 AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
 AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
@@ -299,6 +299,9 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     x = x.to_array()
                 elif is_node_type(x, AST_Array):
                     x = x.elements
+                elif is_node_type(x, AST_Starred):
+                    push(x.expression.name)
+                    continue
                 if Array.isArray(x):
                     scan_in_array(x)
                 else:
@@ -2763,6 +2766,10 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             op = None
 
         prec = PRECEDENCE[op] if op is not None else None
+        # Prevent * from crossing a newline boundary outside of brackets:
+        # `*name` at the start of a line is a starred assignment target, not multiplication.
+        if prec is not None and op is '*' and S.token.nlb and not S.in_parenthesized_expr and peek().type is 'name':
+            prec = None
         if prec is not None and prec > min_prec:
             next()
             right = expr_op(maybe_unary(True), prec, no_in)
@@ -2802,6 +2809,15 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 is_node_type(data.right.car, AST_Assign) or
                 is_node_type(data.right.cdr, AST_Assign)) and data.operator is not '=':
             token_error(data.start, 'Invalid assignment operator for chained assignment: ' + data.operator)
+        if is_node_type(data.left, AST_Array):
+            starred_count = 0
+            for elem in data.left.elements:
+                if is_node_type(elem, AST_Starred):
+                    starred_count += 1
+            if starred_count > 1:
+                token_error(data.start, 'Multiple starred expressions in assignment')
+            if starred_count > 0 and data.operator is not '=':
+                token_error(data.start, 'Starred assignment requires = operator, not ' + data.operator)
         ans = AST_Assign(data)
         if S.in_class.length and S.in_class[-1]:
             class_name = S.in_class[-1]
@@ -2846,11 +2862,32 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             return asgn
         return left
 
+    def parse_starred_lhs():
+        # Parse *name as a starred assignment target
+        start = S.token
+        next()  # consume '*'
+        if not is_('name'):
+            croak('Expected identifier after * in starred assignment')
+        name_tok = S.token
+        next()
+        return new AST_Starred({
+            'start': start,
+            'expression': new AST_SymbolRef({
+                'start': name_tok,
+                'name': name_tok.value,
+                'end': name_tok
+            }),
+            'end': prev()
+        })
+
     def expression(commas, no_in):
         # if there is an assignment, we want the sequences to pivot
         # around it to allow for tuple packing/unpacking
         start = S.token
-        expr = maybe_assign(no_in)
+        if commas and is_('operator', '*'):
+            expr = parse_starred_lhs()
+        else:
+            expr = maybe_assign(no_in)
         def build_seq(a):
             if a.length is 1:
                 return a[0]
@@ -2880,8 +2917,23 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                         'end': peek()
                     })
 
-                expr = maybe_assign(no_in)
+                if is_('operator', '*'):
+                    expr = parse_starred_lhs()
+                else:
+                    expr = maybe_assign(no_in)
                 left.push(expr)
+
+            # Handle starred as final LHS item: a, *b = rhs
+            if left.length > 1 and is_node_type(left[-1], AST_Starred) and is_("operator") and ASSIGNMENT[S.token.value]:
+                val = S.token.value
+                next()
+                return create_assign({
+                    'start': start,
+                    'left': new AST_Array({'elements': left}),
+                    'operator': val,
+                    'right': expression(True, no_in),
+                    'end': prev()
+                })
 
             # if last one was an assignment, fix it
             if left.length > 1 and is_node_type(left[-1], AST_Assign):
