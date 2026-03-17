@@ -60,21 +60,40 @@ function dot_path_from_node(node, RS) {
 
 /**
  * Collect parameter descriptors from an AST_Lambda node.
- * Handles regular args, *args (starargs), and **kwargs.
+ * Handles regular args, positional-only (/), keyword-only (*), *args, and **kwargs.
+ * Each entry: { name, is_rest, is_kwargs, is_posonly, is_kwonly, is_separator }
+ * Separator entries have is_separator=true and name='/' or '*'.
  */
 function extract_params(lambda_node) {
     const params = [];
     const argnames = lambda_node.argnames;
     if (!argnames) return params;
 
+    let posonly_done = false;
     argnames.forEach(arg => {
-        if (arg && arg.name) params.push({ name: arg.name, is_rest: false, is_kwargs: false });
+        if (!arg || !arg.name) return;
+        // Emit '/' separator after all positional-only args
+        if (!posonly_done && !arg.posonly && (argnames.posonly_count || 0) > 0) {
+            params.push({ name: '/', is_rest: false, is_kwargs: false, is_posonly: false, is_kwonly: false, is_separator: true });
+            posonly_done = true;
+        } else if (!posonly_done && arg.posonly) {
+            posonly_done = false; // still in posonly section
+        }
+        params.push({ name: arg.name, is_rest: false, is_kwargs: false,
+                      is_posonly: !!arg.posonly, is_kwonly: !!arg.kwonly, is_separator: false });
     });
+    // If all args were posonly, still emit the '/' separator
+    if (!posonly_done && (argnames.posonly_count || 0) > 0 && !argnames.starargs && !argnames.bare_star) {
+        params.push({ name: '/', is_rest: false, is_kwargs: false, is_posonly: false, is_kwonly: false, is_separator: true });
+    }
+    if (argnames.bare_star) {
+        params.push({ name: '*', is_rest: false, is_kwargs: false, is_posonly: false, is_kwonly: false, is_separator: true });
+    }
     if (argnames.starargs && argnames.starargs.name) {
-        params.push({ name: argnames.starargs.name, is_rest: true,  is_kwargs: false });
+        params.push({ name: argnames.starargs.name, is_rest: true,  is_kwargs: false, is_posonly: false, is_kwonly: false, is_separator: false });
     }
     if (argnames.kwargs && argnames.kwargs.name) {
-        params.push({ name: argnames.kwargs.name,  is_rest: false, is_kwargs: true  });
+        params.push({ name: argnames.kwargs.name,  is_rest: false, is_kwargs: true,  is_posonly: false, is_kwonly: false, is_separator: false });
     }
     return params;
 }

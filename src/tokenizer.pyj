@@ -175,6 +175,7 @@ def tokenizer(raw_text, filename):
         'prev': undefined,
         'index_or_slice': v'[ false ]',
         'expecting_object_literal_key': False,  # This is set by the parser when it is expecting an object literal key
+        'prev_was_comma': False,  # True when the previous token was a ',' — used to detect positional-only '/' separator
     }
     def peek():
         return S.text.charAt(S.pos)
@@ -208,6 +209,7 @@ def tokenizer(raw_text, filename):
         S.tokpos = S.pos
 
     def token(type, value, is_comment, keep_newline):
+        S.prev_was_comma = (type is "punc" and value is ",")
         S.regex_allowed = (type is "operator"
             or type is "keyword" and KEYWORDS_BEFORE_EXPRESSION[value]
             or type is "punc" and PUNC_BEFORE_EXPRESSION[value])
@@ -596,7 +598,20 @@ def tokenizer(raw_text, filename):
 
     def handle_slash():
         next()
-        return read_regexp("") if S.regex_allowed else read_operator("/")
+        if S.regex_allowed:
+            # When the previous token was ',' and what follows the '/' (skipping
+            # optional whitespace) is ',' or ')', this is the positional-only
+            # parameter separator, not a regex literal.
+            if S.prev_was_comma:
+                i = S.pos
+                while i < S.text.length and WHITESPACE_CHARS[S.text.charAt(i)]:
+                    i += 1
+                if i < S.text.length:
+                    c = S.text.charAt(i)
+                    if c is ',' or c is ')':
+                        return read_operator("/")
+            return read_regexp("")
+        return read_operator("/")
 
     def handle_dot():
         next()

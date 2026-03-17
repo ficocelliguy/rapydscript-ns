@@ -51,6 +51,7 @@ def function_preamble(node, output, offset):
     fname = node.name.name if node.name else anonfunc
     kw = 'arguments[arguments.length-1]'
     # Define all formal parameters
+    positional_count = 0
     for c, arg in enumerate(a):
         i = c - offset
         if i >= 0:
@@ -58,18 +59,27 @@ def function_preamble(node, output, offset):
             output.print("var")
             output.space()
             output.assign(arg)
-            if Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
-                output.spaced('(arguments[' + i + ']', '===', 'undefined', '||',
-                                '(', i, '===', 'arguments.length-1', '&&', kw, '!==', 'null', '&&', 'typeof', kw, '===', '"object"', '&&',
-                                kw, '[ρσ_kwargs_symbol]', '===', 'true))', '?', '')
-                output.print(fname + '.__defaults__.'), arg.print(output)
-                output.space(), output.print(':'), output.space()
+            if arg.kwonly:
+                # Keyword-only params: initialize from defaults or undefined; read from kwargs later
+                if Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
+                    output.print(fname + '.__defaults__.'), arg.print(output)
+                else:
+                    output.print('undefined')
             else:
-                output.spaced('(', i, '===', 'arguments.length-1', '&&', kw, '!==', 'null', '&&', 'typeof', kw, '===', '"object"', '&&',
-                                kw, '[ρσ_kwargs_symbol]', '===', 'true)', '?', 'undefined', ':', '')
-            output.print('arguments[' + i + ']')
+                positional_count += 1
+                if Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
+                    output.spaced('(arguments[' + i + ']', '===', 'undefined', '||',
+                                    '(', i, '===', 'arguments.length-1', '&&', kw, '!==', 'null', '&&', 'typeof', kw, '===', '"object"', '&&',
+                                    kw, '[ρσ_kwargs_symbol]', '===', 'true))', '?', '')
+                    output.print(fname + '.__defaults__.'), arg.print(output)
+                    output.space(), output.print(':'), output.space()
+                    output.print('arguments[' + i + ']')
+                else:
+                    output.spaced('(', i, '===', 'arguments.length-1', '&&', kw, '!==', 'null', '&&', 'typeof', kw, '===', '"object"', '&&',
+                                    kw, '[ρσ_kwargs_symbol]', '===', 'true)', '?', 'undefined', ':', '')
+                    output.print('arguments[' + i + ']')
             output.end_statement()
-    if a.kwargs or a.has_defaults:
+    if a.kwargs or a.has_defaults or a.bare_star:
         # Look for an options object
         kw = a.kwargs.name if a.kwargs else 'ρσ_kwargs_obj'
         output.indent()
@@ -79,9 +89,25 @@ def function_preamble(node, output, offset):
         output.indent()
         output.spaced('if', '(' + kw, '===', 'null', '||', 'typeof', kw, '!==', '"object"', '||', kw, '[ρσ_kwargs_symbol]', '!==', 'true)', kw, '=', '{}')
         output.end_statement()
-        # Read values from the kwargs object for any formal parameters
+        # Read values from the kwargs object for non-positional-only formal parameters with defaults
         if a.has_defaults:
             for dname in Object.keys(a.defaults):
+                # Skip positional-only params: they must not be passed by keyword name
+                is_posonly = False
+                for v'var qi = 0; qi < (a.posonly_count || 0); qi++':
+                    if a[qi].name is dname:
+                        is_posonly = True
+                        break
+                if is_posonly:
+                    continue
+                # Skip kwonly params here; they are handled in the kwonly loop below
+                is_kwonly = False
+                for v'var ki = 0; ki < a.length; ki++':
+                    if a[ki].name is dname and a[ki].kwonly:
+                        is_kwonly = True
+                        break
+                if is_kwonly:
+                    continue
                 output.indent()
                 output.spaced('if', '(Object.prototype.hasOwnProperty.call(' + kw + ',', '"' + dname + '"))')
                 output.with_block(def():
@@ -91,6 +117,24 @@ def function_preamble(node, output, offset):
                     if a.kwargs:
                         output.indent()
                         output.spaced('delete', kw + '.' + dname)
+                        output.end_statement()
+                )
+                output.newline()
+        # Read keyword-only params from the kwargs object (with or without defaults)
+        if a.bare_star:
+            for arg in a:
+                if not arg.kwonly:
+                    continue
+                aname = arg.name
+                output.indent()
+                output.spaced('if', '(Object.prototype.hasOwnProperty.call(' + kw + ',', '"' + aname + '"))')
+                output.with_block(def():
+                    output.indent()
+                    output.spaced(aname, '=', kw + '.' + aname)
+                    output.end_statement()
+                    if a.kwargs:
+                        output.indent()
+                        output.spaced('delete', kw + '.' + aname)
                         output.end_statement()
                 )
                 output.newline()
@@ -156,14 +200,25 @@ def function_annotation(self, output, strip_first, name):
             output.print('true')
 
     # Create __argnames__
-    if self.argnames.length > (1 if strip_first else 0):
+    # Positional-only params use null (prevents kwarg matching by name).
+    # Keyword-only params are omitted (they stay in the kwargs object and
+    # are read directly by the function preamble).
+    argnames_entries = v'[]'
+    for i, arg in enumerate(self.argnames):
+        if strip_first and i is 0:
+            continue
+        if arg.kwonly:
+            continue  # kwonly params not in __argnames__
+        argnames_entries.push({'posonly': arg.posonly or False, 'name': arg.name})
+    if argnames_entries.length > 0:
         props.__argnames__ = def():
             output.print('[')
-            for i, arg in enumerate(self.argnames):
-                if strip_first and i is 0:
-                    continue
-                output.print(JSON.stringify(arg.name))
-                if i is not self.argnames.length - 1:
+            for ei, entry in enumerate(argnames_entries):
+                if entry.posonly:
+                    output.print('null')
+                else:
+                    output.print(JSON.stringify(entry.name))
+                if ei is not argnames_entries.length - 1:
                     output.comma()
             output.print(']')
 

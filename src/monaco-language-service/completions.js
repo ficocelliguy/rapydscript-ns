@@ -98,6 +98,7 @@ function symbol_to_item(sym, range, monacoKind, sortPrefix) {
     let detail = sym.kind;
     if (sym.params) {
         const param_str = sym.params.map(p => {
+            if (p.is_separator) return p.name;  // '/' or '*'
             if (p.is_kwargs) return '**' + p.name;
             if (p.is_rest)   return '*'  + p.name;
             return p.name;

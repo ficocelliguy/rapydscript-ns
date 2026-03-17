@@ -93,6 +93,7 @@ export class SignatureHelpEngine {
             const sym = scopeMap.getSymbol(ctx.callee, position.lineNumber, position.column);
             if (sym && sym.params && sym.params.length > 0) {
                 const param_labels = sym.params.map(function (p) {
+                    if (p.is_separator) return p.name;  // '/' or '*'
                     if (p.is_kwargs) return '**' + p.name;
                     if (p.is_rest)   return '*'  + p.name;
                     return p.name;

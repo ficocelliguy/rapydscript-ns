@@ -27,6 +27,7 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [Self-Executing Functions](#self-executing-functions)
 - [Chaining Blocks](#chaining-blocks)
 - [Function calling with optional arguments](#function-calling-with-optional-arguments)
+  - [Positional-only and keyword-only parameters](#positional-only-and-keyword-only-parameters)
 - [Inferred Tuple Packing/Unpacking](#inferred-tuple-packingunpacking)
 - [Operators and keywords](#operators-and-keywords)
 - [Literal JavaScript](#literal-javascript)
@@ -581,6 +582,40 @@ best:
 	f4(1, 2, 3, a=1, b=2):
 		return [[1, 2, 3], {a:1, b:2}]
 ```
+
+### Positional-only and keyword-only parameters
+
+RapydScript supports Python's ``/`` and ``*`` parameter separators:
+
+- **``/`` (positional-only separator)**: parameters listed before ``/`` can only
+  be passed positionally — they cannot be named at the call site.
+- **``*`` (keyword-only separator)**: parameters listed after a bare ``*`` can
+  only be passed by name — they cannot be passed positionally.
+
+```py
+	def greet(name, /, greeting="Hello", *, punctuation="!"):
+	    return greeting + ", " + name + punctuation
+
+	greet("Alice")                          # Hello, Alice!
+	greet("Bob", greeting="Hi")             # Hi, Bob!
+	greet("Carol", punctuation=".")         # Hello, Carol.
+	greet("Dave", greeting="Hey", punctuation="?")  # Hey, Dave?
+
+	# name is positional-only: greet(name="Alice") would silently ignore the kwarg
+	# punctuation is keyword-only: must be passed as punctuation="."
+```
+
+The two separators can be combined, and each section can have its own default
+values.  All combinations supported by Python 3.8+ are accepted.
+
+RapydScript is lenient: passing a positional-only parameter by keyword will not
+raise a ``TypeError`` at runtime (the named value is silently ignored), and
+passing a keyword-only parameter positionally will not raise an error either.
+This is consistent with RapydScript's general approach of favouring
+interoperability over strict enforcement.
+
+The Monaco language service correctly shows ``/`` and ``*`` separators in
+signature help and hover tooltips.
 
 One difference between RapydScript and Python is that RapydScript is not as
 strict as Python when it comes to validating function arguments. This is both

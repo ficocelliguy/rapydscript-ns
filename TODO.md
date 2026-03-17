@@ -1,10 +1,5 @@
 
 ### libraries
-
-compliler flags for the various __python__ opt-in things
-
-- itertools - needs testing
-
 - allow var etc as property name
 - revert numpy variance method to be var
 
@@ -14,10 +9,15 @@ compliler flags for the various __python__ opt-in things
 
 - compress language service export
 
+- vscode plugin based on language service
+
+- export language service to npm module
+- update url links
+- make npm module
 
 
 
-I would like you to add support for [ the classmethod decorator ] to rapydscript, which exists at `C:\Users\Mike\work\rapydscript-n`. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
+I would like you to add support for [ the / separater for Positional-only parameters, and the * bare separator for Keyword-only parameters  ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
 
 
 
@@ -35,29 +35,29 @@ differences.
 ┌───────────────────────────────────────────────┬────────────────┬──────────────────────────────────────────────────────────────┐
 │                    Feature                    │ Python Version │                            Notes                             │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ match/case (structural pattern matching)      │ 3.10+          │ tested                                                       │
+│ match/case (structural pattern matching)      │ 3.10+          │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Walrus operator :=                            │ 3.8+           │ tested                                                       │
+│ Walrus operator :=                            │ 3.8+           │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ lambda keyword                                │ all            │ tested                                                       │
+│ lambda keyword                                │ all            │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Variable type annotations x: int = 1          │ 3.6+           │ needs testing                                                │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Positional-only parameters (def f(a, /, b):)  │ 3.8+           │ / separator not in parser                                    │
+│ Positional-only parameters (def f(a, /, b):)  │ 3.8+           │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Keyword-only parameters (def f(a, *, b):)     │ 3.0+           │ * bare separator not in parser                               │
+│ Keyword-only parameters (def f(a, *, b):)     │ 3.0+           │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Starred assignment a, *b, c = [1,2,3,4,5]     │ 3.0+           │ Only simple tuple unpack works                               │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Dict merge literal {**d1, **d2}               │ 3.5+           │ ** spread only works in function calls                       │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Parenthesized with (multi-context)            │ 3.10+          │ Comma-form with a, b: works, paren form may not              │
+│ Parenthesized with (multi-context)            │ 3.10+          │  - doesn't make sense in a web context                       │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Exception chaining raise X from Y             │ 3.0+           │ Plain raise only                                             │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ except* (exception groups)                    │ 3.11+          │ No support                                                   │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Nested comprehensions (for a in b for c in d) │ all            │ tested                                                       │
+│ Nested comprehensions (for a in b for c in d) │ all            │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Complex number literals 3+4j                  │ all            │ No j suffix                                                  │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
@@ -74,7 +74,7 @@ Not Supported at All
 ┌─────────────────────────────────────────┬─────────────────────────────────────────────────────────────────┐
 │                 Feature                 │                              Notes                              │
 ├─────────────────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│ super()                                 │ Must call ParentClass.method(self, ...) explicitly              │
+│ super()                                 │ -tested                                                         │
 ├─────────────────────────────────────────┼─────────────────────────────────────────────────────────────────┤
 │ __new__                                 │ No alternative constructor support                              │
 ├─────────────────────────────────────────┼─────────────────────────────────────────────────────────────────┤

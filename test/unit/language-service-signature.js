@@ -307,6 +307,67 @@ function make_tests(SignatureHelpEngine, detect_call_context, SourceAnalyzer, RS
         },
 
         {
+            name: "help_posonly_separator",
+            description: "Signature label includes '/' for positional-only parameters",
+            run: function () {
+                var engine   = make_engine();
+                var scopeMap = analyze([
+                    "def f(a, b, /, c):",
+                    "    return a",
+                    "z = f(1, 2, 3)",
+                    "pass",
+                ].join("\n"));
+
+                var help = engine.getSignatureHelp(scopeMap, pos(4, 1), "f(");
+                assert.ok(help, "expected signature help");
+                var label = help.value.signatures[0].label;
+                assert.ok(label.indexOf("/") !== -1, "label should contain '/'");
+                assert.ok(label.indexOf("a") !== -1, "label should contain 'a'");
+                assert.ok(label.indexOf("c") !== -1, "label should contain 'c'");
+            },
+        },
+
+        {
+            name: "help_kwonly_separator",
+            description: "Signature label includes '*' bare separator for keyword-only parameters",
+            run: function () {
+                var engine   = make_engine();
+                var scopeMap = analyze([
+                    "def g(a, *, b, c=1):",
+                    "    return a",
+                    "z = g(1, b=2)",
+                    "pass",
+                ].join("\n"));
+
+                var help = engine.getSignatureHelp(scopeMap, pos(4, 1), "g(");
+                assert.ok(help, "expected signature help");
+                var label = help.value.signatures[0].label;
+                assert.ok(label.indexOf("*") !== -1, "label should contain '*' separator");
+                assert.ok(label.indexOf("b") !== -1, "label should contain 'b'");
+            },
+        },
+
+        {
+            name: "help_posonly_and_kwonly",
+            description: "Signature label shows both '/' and '*' separators",
+            run: function () {
+                var engine   = make_engine();
+                var scopeMap = analyze([
+                    "def h(a, /, b, *, c):",
+                    "    return a",
+                    "z = h(1, 2, c=3)",
+                    "pass",
+                ].join("\n"));
+
+                var help = engine.getSignatureHelp(scopeMap, pos(4, 1), "h(");
+                assert.ok(help, "expected signature help");
+                var label = help.value.signatures[0].label;
+                assert.ok(label.indexOf("/") !== -1, "label should contain '/'");
+                assert.ok(label.indexOf("*") !== -1, "label should contain '*'");
+            },
+        },
+
+        {
             name: "help_dispose_is_function",
             description: "Returned help object has a dispose() function",
             run: function () {

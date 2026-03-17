@@ -25,6 +25,7 @@ function build_signature(sym) {
 
     if ((sym.kind === 'function' || sym.kind === 'method') && sym.params) {
         const param_str = sym.params.map(function (p) {
+            if (p.is_separator) return p.name;  // '/' or '*'
             if (p.is_kwargs) return '**' + p.name;
             if (p.is_rest)   return '*'  + p.name;
             return p.name;
