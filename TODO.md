@@ -5,13 +5,9 @@
 
 - vscode plugin based on language service
 
-- error with variable type definitions
+- export .t.ds for language service
 
-async def main():
-  a: int = 5
-  a += 4
 
-Undefined symbol: "a"
 
 
 I would like you to add support for [  Python's extended subscript syntax where commas inside [] implicitly form a tuple ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
@@ -38,7 +34,7 @@ differences.
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ lambda keyword                                │ all            │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Variable type annotations x: int = 1          │ 3.6+           │ needs testing                                                │
+│ Variable type annotations x: int = 1          │ 3.6+           │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Positional-only parameters (def f(a, /, b):)  │ 3.8+           │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤

@@ -44,7 +44,7 @@ function has_prop(obj, name) {
     return Object.prototype.hasOwnProperty.call(obj, name);
 }
 
-function build_scoped_flags(flags_str) {
+export function build_scoped_flags(flags_str) {
     const result = Object.create(null);
     if (!flags_str) return result;
     flags_str.split(',').forEach(flag => {
@@ -312,6 +312,23 @@ function Linter(RS, toplevel, code, builtins) {
         }
     };
 
+    this.handle_annotated_assign = function() {
+        const node = this.current_node;
+        // Variable type annotation: `x: int = value` or `x: int`
+        // Register the target as a binding (with or without a value).
+        if (node.target instanceof RS.AST_SymbolRef) {
+            node.target.lint_visited = true;
+            this.current_node = node.target;
+            this.add_binding(node.target.name);
+            this.current_node = node;
+        }
+        // Mark annotation symbol refs as visited so they aren't treated as uses
+        // of undefined variables (e.g. `int`, `str` are type names, not runtime refs).
+        if (node.annotation instanceof RS.AST_SymbolRef) {
+            node.annotation.lint_visited = true;
+        }
+    };
+
     this.handle_vardef = function() {
         const node = this.current_node;
         if (node.name instanceof RS.AST_SymbolNonlocal) {
@@ -461,6 +478,7 @@ function Linter(RS, toplevel, code, builtins) {
         else if (node instanceof RS.AST_Assign)          this.handle_assign();
         else if (node instanceof RS.AST_NamedExpr)       this.handle_named_expr();
         else if (node instanceof RS.AST_VarDef)          this.handle_vardef();
+        else if (RS.AST_AnnotatedAssign && node instanceof RS.AST_AnnotatedAssign) this.handle_annotated_assign();
         else if (node instanceof RS.AST_SymbolRef)       this.handle_symbol_ref();
         else if (node instanceof RS.AST_Decorator)       this.handle_decorator();
         else if (node instanceof RS.AST_SymbolFunarg)    this.handle_symbol_funarg();

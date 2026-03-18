@@ -6,23 +6,11 @@
 //   const scopeMap = analyzer.analyze(sourceCode, { virtualFiles: {...} });
 
 import { ScopeMap, ScopeFrame, SymbolInfo } from './scope.js';
+import { build_scoped_flags } from './diagnostics.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function build_scoped_flags(flags_str) {
-    const result = Object.create(null);
-    if (!flags_str) return result;
-    flags_str.split(',').forEach(flag => {
-        flag = flag.trim();
-        if (!flag) return;
-        let val = true;
-        if (flag.startsWith('no_')) { val = false; flag = flag.slice(3); }
-        result[flag] = val;
-    });
-    return result;
-}
 
 /** Convert AST token position {line (1-indexed), col (0-indexed)} → {line, column} (both 1-indexed). */
 function pos_from_token(tok) {

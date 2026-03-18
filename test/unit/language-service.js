@@ -641,6 +641,56 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        // ── Type annotations ──────────────────────────────────────────────
+
+        {
+            name: "annotated_assign_no_undef",
+            description: "Variable declared with type annotation (a: int = 5) is not flagged as undefined",
+            run: function () {
+                var markers = d().check([
+                    "async def main():",
+                    "    a: int = 5",
+                    "    a += 4",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.message.indexOf("Undefined symbol") !== -1; });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no 'Undefined symbol' errors but got: " + JSON.stringify(undef));
+            },
+        },
+
+        {
+            name: "annotated_assign_used",
+            description: "Variable declared with type annotation is recognized as used when referenced",
+            run: function () {
+                var markers = d().check([
+                    "def foo():",
+                    "    x: str = 'hello'",
+                    "    return x",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for annotated var used in same scope, got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "annotated_assign_compound_ops",
+            description: "All compound assignment operators work on annotated variables without undef errors",
+            run: function () {
+                var markers = d().check([
+                    "def bar():",
+                    "    n: int = 10",
+                    "    n += 1",
+                    "    n -= 1",
+                    "    n *= 2",
+                    "    return n",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.message.indexOf("Undefined symbol") !== -1; });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no 'Undefined symbol' errors but got: " + JSON.stringify(undef));
+            },
+        },
+
     ];
 
     return TESTS;
