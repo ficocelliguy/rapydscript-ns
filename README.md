@@ -38,6 +38,8 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [Strings](#strings)
 - [The Existential Operator](#the-existential-operator)
 - [Walrus Operator](#walrus-operator)
+- [Ellipsis Literal](#ellipsis-literal)
+- [Extended Subscript Syntax](#extended-subscript-syntax)
 - [Variable Type Annotations](#variable-type-annotations)
 - [Regular Expressions](#regular-expressions)
 - [Creating DOM trees easily](#creating-dom-trees-easily)
@@ -718,6 +720,7 @@ Keywords:
 	None			null
 	False			false
 	True			true
+	...			ρσ_Ellipsis (the Ellipsis singleton)
 	undefined		undefined
 	this			this
 
@@ -1242,6 +1245,74 @@ results = [y for x in data if (y := transform(x)) is not None]
 
 The walrus operator binds to the nearest enclosing function or module scope
 (not the comprehension scope), matching Python semantics.
+
+Ellipsis Literal
+-----------------
+
+RapydScript supports the Python `...` (Ellipsis) literal. It compiles to a
+frozen singleton object `ρσ_Ellipsis` and is also accessible as `Ellipsis`
+(the global name), matching Python behaviour.
+
+Common uses:
+
+```py
+# As a placeholder body (like pass)
+def stub():
+    ...
+
+# As a sentinel / marker value
+def process(data, mask=...):
+    if mask is ...:
+        mask = default_mask()
+
+# In type annotations
+from typing import Callable
+f: Callable[..., int]
+
+# In numpy-style array indexing
+arr[..., 0]   # Ellipsis selects all leading dimensions
+```
+
+`str(...)` returns `'Ellipsis'`, and `... is ...` is `True` (singleton
+identity). `...` is truthy.
+
+Extended Subscript Syntax
+--------------------------
+
+RapydScript supports Python's extended subscript syntax, where **commas
+inside `[]` implicitly form a tuple**. This is the same syntax Python uses for
+multi-dimensional indexing (e.g. NumPy arrays, custom `__getitem__`
+implementations).
+
+```python
+# a[i, j] is equivalent to a[(i, j)] in Python
+# RapydScript compiles it to a[[i, j]] in JavaScript
+
+# Multi-dimensional dict key
+d = {}
+d[0, 1] = "origin"
+print(d[0, 1])   # → "origin"
+
+# Three or more indices
+d[1, 2, 3] = "cube"
+print(d[1, 2, 3])  # → "cube"
+
+# Works with variables
+row, col = 2, 5
+matrix = {}
+matrix[row, col] = 42
+print(matrix[row, col])  # → 42
+```
+
+The tuple is represented as a plain JavaScript array in the generated output:
+
+```python
+d[0, 1]   # → d[[0, 1]]
+d[x, y]   # → d[[x, y]]
+```
+
+This works in both plain subscript access and with `overload_getitem` (where
+the tuple is passed as a RapydScript list to `__getitem__`/`__setitem__`).
 
 Variable Type Annotations
 --------------------------

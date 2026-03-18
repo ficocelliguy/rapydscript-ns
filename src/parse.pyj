@@ -10,7 +10,7 @@ AST_Array, AST_Assign, AST_Binary, AST_BlockStatement, AST_Break,
 AST_Call, AST_Catch, AST_Class, AST_ClassCall, AST_Conditional,
 AST_Constant, AST_Continue, AST_DWLoop, AST_Debugger, AST_Decorator,
 AST_Definitions, AST_DictComprehension, AST_Directive, AST_Do, AST_Dot,
-AST_Else, AST_EmptyStatement, AST_Except, AST_ExpressiveObject, AST_False, AST_Finally,
+AST_Ellipsis, AST_Else, AST_EmptyStatement, AST_Except, AST_ExpressiveObject, AST_False, AST_Finally,
 AST_ForIn, AST_ForJS, AST_Function, AST_GeneratorComprehension, AST_Hole,
 AST_If, AST_Import, AST_ImportedVar, AST_Imports, AST_ListComprehension,
 AST_Method, AST_New, AST_Null, AST_Number, AST_Object, AST_ObjectKeyVal, AST_ObjectSpread,
@@ -2058,6 +2058,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     'start': tok,
                     'end': tok
                 })
+            elif tmp__ is "Ellipsis":
+                return new AST_Ellipsis({
+                    'start': tok,
+                    'end': tok
+                })
         elif tmp_ is "js":
             return new AST_Verbatim({
                 'start': tok,
@@ -2450,6 +2455,16 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             else:
                 slice_bounds.push(expression(False))
 
+        # Multi-dimensional subscript: a[1, 2] → a[[1, 2]]
+        is_multi = False
+        multi_items = v'[]'
+        if not is_slice and is_("punc", ","):
+            is_multi = True
+            multi_items.push(slice_bounds[0] or new AST_Number({'value': 0}))
+            while is_("punc", ","):
+                next()
+                multi_items.push(expression(False))
+
         expect("]")
 
         if is_slice:
@@ -2507,6 +2522,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 }), allow_calls)
         else:
             # regular index (arr[index])
+            prop = slice_bounds[0] or new AST_Number({'value': 0})
+            if is_multi:
+                multi_arr = new AST_Array({'start': start, 'elements': multi_items, 'end': prev()})
+                multi_arr.is_subscript_tuple = True
+                prop = multi_arr
             if is_py_sub:
                 assignment = None
                 assign_operator = ''
@@ -2517,9 +2537,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 return subscripts(new AST_ItemAccess({
                     'start': start,
                     'expression': expr,
-                    'property': slice_bounds[0] or new AST_Number({
-                        'value': 0
-                    }),
+                    'property': prop,
                     'assignment':assignment,
                     'assign_operator': assign_operator,
                     'end': prev()
@@ -2528,9 +2546,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             return subscripts(new AST_Sub({
                 'start': start,
                 'expression': expr,
-                'property': slice_bounds[0] or new AST_Number({
-                    'value': 0
-                }),
+                'property': prop,
                 'end': prev()
             }), allow_calls)
 

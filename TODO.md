@@ -17,7 +17,44 @@
 
 
 
-I would like you to add support for [  Starred assignment a, *b, c = [1,2,3,4,5] ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
+I would like you to add support for [  Python's extended subscript syntax where commas inside [] implicitly form a tuple ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
+
+
+
+
+# 1. Placeholder body (like pass)
+def todo():
+  ...
+
+class MyProtocol:
+  def method(self) -> int: ...
+
+
+# 3. Sentinel / default marker
+_MISSING = ...
+
+def greet(name=...):                                    
+  if name is ...:                                   
+    name = "World"                                                                                                                                                                           
+  print(f"Hello, {name}!")
+
+greet()           # Hello, World!                                                                                                                                                                
+greet("Alice")    # Hello, Alice!
+
+
+# 4. NumPy-style slice shorthand (all leading dimensions)
+import numpy as np                                                                                                                                                                               
+arr = np.zeros((2, 3, 4))                                                                                                                                                                        
+print(arr[..., 0] )  # shape (2, 3) — first element of last axis                                                                                                                                        
+print(arr[1, ...])   # shape (3, 4) — entire second "sheet"
+
+# 5. Identity check
+print(... is ...)        # True  (singleton)                                                                                                                                                     
+print(... is Ellipsis)   # True                                                                                                                                                                  
+print(type(...).__name__) # ellipsis
+
+
+
 
 
 

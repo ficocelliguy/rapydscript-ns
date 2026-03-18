@@ -615,6 +615,10 @@ def tokenizer(raw_text, filename):
 
     def handle_dot():
         next()
+        if peek() is '.' and S.text.charAt(S.pos + 1) is '.':
+            next()  # consume second '.'
+            next()  # consume third '.'
+            return token("atom", "Ellipsis")
         return read_num(".") if is_digit(peek().charCodeAt(0)) else token("punc", ".")
 
     def read_word():

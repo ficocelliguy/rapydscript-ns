@@ -463,6 +463,9 @@ def generate_code():
     DEFPRINT(AST_Undefined, def(self, output):
         output.print("void 0")
     )
+    DEFPRINT(ρσ_modules.ast.AST_Ellipsis, def(self, output):
+        output.print("ρσ_Ellipsis")
+    )
     DEFPRINT(AST_Hole, noop)
 
     DEFPRINT(AST_Infinity, def(self, output):

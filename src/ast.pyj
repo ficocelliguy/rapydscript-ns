@@ -1251,6 +1251,10 @@ class AST_Null(AST_Atom):
     "The `null` atom"
     value = None
 
+class AST_Ellipsis(AST_Atom):
+    "The `...` (Ellipsis) literal"
+    value = v'ρσ_Ellipsis'
+
 class AST_NaN(AST_Atom):
     "The impossible value"
     value = v'NaN'

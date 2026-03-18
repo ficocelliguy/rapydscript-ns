@@ -150,8 +150,9 @@ class RapydScriptLanguageService {
                 lang.tokenizer.root.unshift(
                     // self → 'this' color (Python's equivalent of JS `this`)
                     [/\bself\b/, { token: 'this' }],
-                    // True / False / None → 'otherkeyvars' (accent color, distinct from keywords)
+                    // True / False / None / ... → 'otherkeyvars' (accent color, distinct from keywords)
                     [/\b(True|False|None)\b/, { token: 'otherkeyvars' }],
+                    [/\.\.\./, { token: 'otherkeyvars' }],
                 );
 
                 // ns → 'ns' token (the game API namespace object)

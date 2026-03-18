@@ -1,0 +1,49 @@
+# globals: assrt
+
+# Ellipsis is a singleton — two uses of ... reference the same object
+assrt.ok(... is ..., "... is ...")
+assrt.ok(... is Ellipsis, "... is Ellipsis")
+assrt.ok(Ellipsis is ..., "Ellipsis is ...")
+
+# Ellipsis is not null/undefined/false
+assrt.ok(... is not None, "... is not None")
+assrt.ok(... is not undefined, "... is not undefined")
+assrt.ok(... is not False, "... is not False")
+
+# str(...) should return 'Ellipsis'
+assrt.equal(str(...), 'Ellipsis', "str(...) == 'Ellipsis'")
+assrt.equal(str(Ellipsis), 'Ellipsis', "str(Ellipsis) == 'Ellipsis'")
+
+# Assignment and re-use
+e = ...
+assrt.ok(e is ..., "assigned ... is ...")
+assrt.ok(e is Ellipsis, "assigned ... is Ellipsis")
+
+# Ellipsis in a list
+lst = [1, ..., 3]
+assrt.ok(lst[1] is ..., "Ellipsis in list")
+
+# Ellipsis as function argument
+def identity(x):
+    return x
+
+assrt.ok(identity(...) is ..., "passing ... to function")
+
+# Ellipsis as return value
+def get_ellipsis():
+    return ...
+
+assrt.ok(get_ellipsis() is ..., "returning ...")
+
+# Ellipsis as function body placeholder (like pass)
+def placeholder():
+    ...
+
+placeholder()  # should not raise
+
+# Ellipsis used as dict value
+d = {'key': ...}
+assrt.ok(d['key'] is ..., "Ellipsis as dict value")
+
+# Ellipsis truthiness (should be truthy, like in Python)
+assrt.ok(..., "... is truthy")

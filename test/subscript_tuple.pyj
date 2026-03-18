@@ -1,0 +1,53 @@
+# globals: assrt
+# Tests for Python's extended subscript syntax: commas inside [] form tuples (JS arrays)
+
+# --- Basic tuple key access ---
+d = {}
+d[[1, 2]] = 'two-d'
+assrt.equal(d[[1, 2]], 'two-d', 'dict with [1,2] key')
+
+# --- Tuple subscript syntax: a[1, 2] is equivalent to a[[1, 2]] ---
+d2 = {}
+d2[1, 2] = 'hello'
+assrt.equal(d2[1, 2], 'hello', 'a[1, 2] read/write')
+
+# --- Three-element tuple subscript ---
+d3 = {}
+d3[1, 2, 3] = 'three'
+assrt.equal(d3[1, 2, 3], 'three', 'a[1, 2, 3]')
+
+# --- Mixed types ---
+d4 = {}
+d4['x', 0] = 99
+assrt.equal(d4['x', 0], 99, "a['x', 0]")
+
+# --- Consistency: a[1, 2] and a[[1, 2]] access the same key ---
+arr = {}
+arr[1, 2] = 'via tuple syntax'
+key = [1, 2]
+# Since JS uses reference equality for array keys, both forms produce the same
+# string key when used directly in the subscript
+arr2 = {}
+arr2[1, 2] = 'A'
+arr2[1, 2] = 'B'
+assrt.equal(arr2[1, 2], 'B', 'overwrite via tuple subscript')
+
+# --- Works with variables in subscript ---
+x = 3
+y = 7
+d5 = {}
+d5[x, y] = 'xy'
+assrt.equal(d5[x, y], 'xy', 'variable tuple subscript')
+
+# --- Works as expression in larger expressions ---
+m = {}
+m[0, 0] = 1
+m[0, 1] = 2
+m[1, 0] = 3
+m[1, 1] = 4
+assrt.equal(m[0, 0] + m[1, 1], 5, 'sum of diagonal')
+
+# --- Two-element tuple subscript round-trip ---
+t = {}
+t[10, 20] = 'found'
+assrt.equal(t[10, 20], 'found', 'round-trip [10,20]')
