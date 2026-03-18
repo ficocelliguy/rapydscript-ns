@@ -368,6 +368,13 @@ def print_assign(self, output):
             self.right.print(output)
         )
         return
+    if self.operator is '**=':
+        output.assign(self.left)
+        if output.options.js_version > 6:
+            output.print('(('), self.left.print(output), output.spaced(')', '**', '('), self.right.print(output), output.print('))')
+        else:
+            output.print('Math.pow('), self.left.print(output), output.comma(), self.right.print(output), output.print(')')
+        return
     if self.operator is '=' and self.is_chained():
         left_hand_sides, rhs = self.traverse_chain()
         is_compound_assign = False

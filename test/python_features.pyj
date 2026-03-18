@@ -1,0 +1,855 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# python_features.pyj
+# Survey of Python syntax features and their support status in RapydScript.
+# Sections marked SKIP are known parse-time or runtime unsupported features.
+# All other tests exercise features that were uncertain before this survey.
+
+ae = assrt.equal
+ade = assrt.deepEqual
+ok = assrt.ok
+
+# ── 1. super() with zero arguments ──────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+class _Base:
+    def greet(self):
+        return 'base'
+
+class _Child(_Base):
+    def greet(self):
+        return super().greet() + '+child'
+
+ae(_Child().greet(), 'base+child')
+
+class _Child2(_Base):
+    def greet(self):
+        return super(_Child2, self).greet() + '+child2'
+
+ae(_Child2().greet(), 'base+child2')
+
+# ── 2. Multiple exception types — comma form ─────────────────────────────────
+# STATUS: ✓ WORKS
+
+def _multi_except():
+    for exc_cls in [TypeError, ValueError]:
+        caught_type = None
+        try:
+            raise exc_cls('test')
+        except TypeError, ValueError as e:
+            caught_type = type(e)
+        ae(caught_type, exc_cls)
+
+_multi_except()
+
+# ── 3. Multiple exception types — tuple form ─────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+def _multi_except_tuple():
+    caught = False
+    try:
+        raise ValueError('boom')
+    except (TypeError, ValueError) as e:
+        caught = True
+    ae(caught, True)
+
+_multi_except_tuple()
+
+# ── 4. try / else ────────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+def _try_else():
+    ran = []
+    try:
+        x = 1
+    except:
+        ran.push('except')
+    else:
+        ran.push('else')
+    ade(ran, ['else'])
+
+    ran = []
+    try:
+        raise ValueError('oops')
+    except ValueError:
+        ran.push('except')
+    else:
+        ran.push('else')
+    ade(ran, ['except'])
+
+_try_else()
+
+# ── 5. for / else ────────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+def _for_else():
+    # else runs when loop finishes without break
+    ran_else = False
+    for x in [1, 2, 3]:
+        pass
+    else:
+        ran_else = True
+    ae(ran_else, True)
+
+    # else is skipped when break occurs
+    ran_else = False
+    for x in [1, 2, 3]:
+        if x == 2:
+            break
+    else:
+        ran_else = True
+    ae(ran_else, False)
+
+    # else runs for empty iterable (no break possible)
+    ran_else = False
+    for x in []:
+        pass
+    else:
+        ran_else = True
+    ae(ran_else, True)
+
+    # typical search pattern: find item or report not found
+    def find_item(lst, target):
+        for item in lst:
+            if item == target:
+                return 'found'
+        else:
+            return 'not found'
+
+    ae(find_item([1, 2, 3], 2), 'found')
+    ae(find_item([1, 2, 3], 9), 'not found')
+
+    # nested loops: break in inner should NOT affect outer for/else
+    outer_else = False
+    for i in [1, 2]:
+        for j in [10, 20]:
+            if j == 10:
+                break   # breaks inner only
+    else:
+        outer_else = True
+    ae(outer_else, True)
+
+_for_else()
+
+# ── 6. Multiple context managers in a single with statement ─────────────────
+# STATUS: ✓ WORKS — enters L→R, exits R→L (LIFO, Python-correct)
+
+class _CM:
+    def __init__(self, name, log):
+        self.name = name
+        self.log = log
+    def __enter__(self):
+        self.log.push('enter:' + self.name)
+        return self
+    def __exit__(self):
+        self.log.push('exit:' + self.name)
+        return False
+
+def _test_multi_with():
+    log = []
+    with _CM('a', log) as a, _CM('b', log) as b:
+        log.push('body')
+    ae(log[0], 'enter:a')
+    ae(log[1], 'enter:b')
+    ae(log[2], 'body')
+    # LIFO exit order: b exits before a (Python-correct)
+    ae(log[3], 'exit:b')
+    ae(log[4], 'exit:a')
+
+_test_multi_with()
+
+# ── 7. callable() ────────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS — checks typeof function AND __call__ method
+
+ae(callable(len),  True)
+ae(callable(42),   False)
+ae(callable(None), False)
+ae(callable(def(): pass;), True)
+
+class _WithCall:
+    def __call__(self):
+        return 42
+
+class _WithoutCall:
+    pass
+
+ae(callable(_WithCall()),    True)
+ae(callable(_WithoutCall()), False)
+
+# ── 8. round(x, ndigits) ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+ae(round(3),          3)
+ae(round(3.7),        4)
+ae(round(3.14159, 2), 3.14)
+ae(round(3.145,   2), 3.15)
+ae(round(1234,   -2), 1200)
+ae(round(0.5),        1)
+
+# ── 9. enumerate(iterable, start) ────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+ade(list(enumerate(['a', 'b', 'c'], 1)), [[1, 'a'], [2, 'b'], [3, 'c']])
+ade(list(enumerate(['x', 'y'],      5)), [[5, 'x'], [6, 'y']])
+ade(list(enumerate(['a', 'b'])),         [[0, 'a'], [1, 'b']])  # default still works
+
+# ── 10. String predicates ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+# isalpha
+ae(str.isalpha('abc'), True)
+ae(str.isalpha('ab3'), False)
+ae(str.isalpha(''),    False)
+
+# isdigit
+ae(str.isdigit('123'), True)
+ae(str.isdigit('12a'), False)
+ae(str.isdigit(''),    False)
+
+# isalnum
+ae(str.isalnum('abc123'), True)
+ae(str.isalnum('abc!'),   False)
+ae(str.isalnum(''),       False)
+
+# isidentifier
+ae(str.isidentifier('hello'),       True)
+ae(str.isidentifier('hello_world'), True)
+ae(str.isidentifier('123abc'),      False)
+ae(str.isidentifier(''),            False)
+
+# isspace — was already supported; smoke test
+ae(str.isspace('   '), True)
+ae(str.isspace('a '),  False)
+
+# ── 11. str.casefold() ───────────────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+ae(str.casefold('Hello World'), 'hello world')
+ae(str.casefold('ABC'),         'abc')
+ae(str.casefold('already'),     'already')
+
+# ── 12. str.removeprefix() / str.removesuffix() ──────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+ae(str.removeprefix('HelloWorld', 'Hello'), 'World')
+ae(str.removeprefix('HelloWorld', 'World'), 'HelloWorld')  # no match → unchanged
+ae(str.removeprefix('Hello',      ''),      'Hello')
+
+ae(str.removesuffix('HelloWorld', 'World'), 'Hello')
+ae(str.removesuffix('HelloWorld', 'Hello'), 'HelloWorld')  # no match → unchanged
+ae(str.removesuffix('Hello',      ''),      'Hello')
+
+# ── 13. String repetition: str * n ───────────────────────────────────────────
+# STATUS: ✓ WORKS with overload_operators flag
+
+def _test_str_multiply():
+    from __python__ import overload_operators
+    ae('ha' * 3, 'hahaha')
+    ae(3 * 'ha', 'hahaha')
+    ae('x' * 0, '')
+
+_test_str_multiply()
+
+# ── 14. List repetition: [x] * n ─────────────────────────────────────────────
+# STATUS: ✓ WORKS with overload_operators flag (added in this release)
+
+def _test_list_multiply():
+    from __python__ import overload_operators
+    ade([0] * 3,    [0, 0, 0])
+    ade([1, 2] * 2, [1, 2, 1, 2])
+    ade(3 * [0],    [0, 0, 0])
+    ade([1] * 0,    [])
+
+_test_list_multiply()
+
+# ── 15. except (Type,) tuple form ────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release) — see §3 above
+
+# ── 16. frozenset ─────────────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — frozenset is not defined.
+#
+#  fs = frozenset([1, 2, 3])
+#  ok(1 in fs)
+#  ae(len(fs), 3)
+
+# ── 17. int.bit_length() ─────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — Number prototype does not have bit_length.
+#
+#  ae((255).bit_length(), 8)
+
+# ── 18. float.is_integer() ───────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — Number prototype does not have is_integer.
+#
+#  ae((1.0).is_integer(), True)
+
+# ── 19. dict | merge operator (Python 3.9+) ──────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — use {**a, **b} spread syntax instead.
+
+ade({**{'x': 1}, **{'y': 2}}, {'x': 1, 'y': 2})  # workaround works
+
+# ── 20. for / else ───────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS — see §5 above
+
+# ── 21. while / else ─────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+def _while_else():
+    # else runs when loop condition becomes False (no break)
+    ran_else = False
+    i = 0
+    while i < 3:
+        i += 1
+    else:
+        ran_else = True
+    ae(ran_else, True)
+    ae(i, 3)
+
+    # else is skipped when break occurs
+    ran_else = False
+    i = 0
+    while i < 5:
+        if i == 2:
+            break
+        i += 1
+    else:
+        ran_else = True
+    ae(ran_else, False)
+
+    # else runs when condition is False from the start (zero iterations)
+    ran_else = False
+    i = 10
+    while i < 3:
+        i += 1
+    else:
+        ran_else = True
+    ae(ran_else, True)
+
+    # nested loops: break in inner should NOT affect outer while/else
+    outer_else = False
+    i = 0
+    while i < 2:
+        j = 0
+        while j < 2:
+            if j == 0:
+                break  # breaks inner only
+            j += 1
+        i += 1
+    else:
+        outer_else = True
+    ae(outer_else, True)
+
+_while_else()
+
+# ── 22. raise X from Y (exception chaining) ──────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+def _test_raise_from():
+    cause_set = False
+    cause_val = None
+    try:
+        try:
+            raise ValueError('original')
+        except ValueError as orig:
+            raise TypeError('chained') from orig
+    except TypeError as e:
+        cause_set = hasattr(e, '__cause__')
+        cause_val = e.__cause__
+    ae(cause_set, True)
+    ok(cause_val is not None)
+    ae(cause_val.message, 'original')
+
+_test_raise_from()
+
+def _test_raise_from_none():
+    # raise X from None: __cause__ is explicitly set to None
+    caught = None
+    try:
+        try:
+            raise ValueError('inner')
+        except ValueError:
+            raise TypeError('outer') from None
+    except TypeError as e:
+        caught = e
+    ok(caught is not None)
+    ae(caught.__cause__, None)
+
+_test_raise_from_none()
+
+# ── 23. __slots__ ────────────────────────────────────────────────────────────
+# STATUS: ✗ NOT ENFORCED — __slots__ is accepted but does not restrict attrs.
+
+# ── 24. Nested classes ───────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — see comment in test/classes.pyj
+
+# ── 25. Generator .throw() ───────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+def _gen_throw():
+    try:
+        yield 1
+    except ValueError as e:
+        yield 'caught'
+
+g = _gen_throw()
+ae(g.next().value, 1)
+ae(g.throw(ValueError('err')).value, 'caught')
+
+# ── 26. Generator .send() ────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+def _gen_send():
+    data = yield 1
+    yield data
+
+g = _gen_send()
+ae(g.next().value,    1)
+ae(g.next('hello').value, 'hello')
+
+# ── 27. zip(strict=True) ─────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — zip() silently truncates to shortest.
+
+ade(list(zip([1, 2], [3, 4])), [[1, 3], [2, 4]])  # basic zip still works
+
+# ── 28. Walrus operator := (limited) ─────────────────────────────────────────
+# STATUS: ✗ PARTIAL — does not hoist correctly in if-conditions at module scope
+#                      and not available as comprehension filter variable.
+# SKIP:
+#  n = 10; if (m := n * 2) > 15: ae(m, 20)
+
+# ── 29. Chained comparisons ──────────────────────────────────────────────────
+# STATUS: ✓ WORKS — same-direction and mixed-direction chains both correct
+
+ae(1 < 2 < 3, True)
+ae(3 > 2 > 1, True)
+ae(1 < 3 < 2, False)
+ae(1 < 2 > 3, False)   # mixed-direction: 1<2 AND 2>3 = True AND False = False
+ae(1 < 2 > 0, True)    # mixed-direction: 1<2 AND 2>0 = True AND True = True
+ae(5 > 3 < 4, True)    # mixed-direction: 5>3 AND 3<4 = True AND True = True
+ae(5 > 3 < 1, False)   # mixed-direction: 5>3 AND 3<1 = True AND False = False
+
+# ── 30. **= power-assign ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS (added in this release)
+
+n = 3
+n **= 2
+ae(n, 9)
+
+n = 2
+n **= 10
+ae(n, 1024)
+
+n = 5
+n **= 0
+ae(n, 1)
+
+n = 4
+n **= 0.5
+ae(n, 2)
+
+# ── 31. Augmented assignment operators ───────────────────────────────────────
+# STATUS: ✓ WORKS — +=, -=, *=, /=, //=, %=, &=, |=, ^=, <<=, >>=
+
+n = 10
+n += 5;  ae(n, 15)
+n -= 3;  ae(n, 12)
+n *= 2;  ae(n, 24)
+n //= 5; ae(n, 4)
+n %= 3;  ae(n, 1)
+n |= 6;  ae(n, 7)   # 1 | 6 = 7
+n &= 5;  ae(n, 5)   # 7 & 5 = 5
+n ^= 3;  ae(n, 6)   # 5 ^ 3 = 6
+n <<= 2; ae(n, 24)  # 6 << 2 = 24
+n >>= 1; ae(n, 12)  # 24 >> 1 = 12
+
+# ── 32. Starred assignment ───────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+a, *b, c = [1, 2, 3, 4, 5]
+ae(a, 1)
+ade(b, [2, 3, 4])
+ae(c, 5)
+
+# ── 33. match / case ─────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+def _classify(x):
+    match x:
+        case 0:
+            return 'zero'
+        case 1:
+            return 'one'
+        case _:
+            return 'other'
+
+ae(_classify(0), 'zero')
+ae(_classify(1), 'one')
+ae(_classify(5), 'other')
+
+# ── 34. dict.fromkeys() ──────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+from __python__ import dict_literals
+ade(dict.fromkeys(['a', 'b'], 0), {'a': 0, 'b': 0})
+
+# ── 35. @classmethod / @staticmethod ─────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+class _Counted:
+    _n = 0
+    @classmethod
+    def bump(cls):
+        cls._n += 1
+    @classmethod
+    def count(cls):
+        return cls._n
+
+_Counted.bump()
+_Counted.bump()
+ae(_Counted.count(), 2)
+
+class _Util:
+    @staticmethod
+    def add(a, b):
+        return a + b
+
+ae(_Util.add(3, 4), 7)
+
+# ── 36. yield from ───────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+def _sub():
+    yield 10
+    yield 20
+
+def _outer():
+    yield from _sub()
+    yield 30
+
+ade(list(_outer()), [10, 20, 30])
+
+# ── 37. lambda keyword ───────────────────────────────────────────────────────
+# STATUS: ✓ WORKS — compiles to anonymous JS function expression
+
+double = lambda x: x * 2
+ae(double(3), 6)
+ae(double(0), 0)
+
+add = lambda a, b: a + b
+ae(add(2, 3), 5)
+
+ae((lambda: 42)(), 42)
+
+abs_val = lambda x: x if x >= 0 else -x
+ae(abs_val(-5), 5)
+ae(abs_val(3),  3)
+
+greet = lambda name='world': 'hello ' + name
+ae(greet(),        'hello world')
+ae(greet('there'), 'hello there')
+
+# lambda captures enclosing scope
+def _make_adder(n):
+    return lambda x: x + n
+
+add10 = _make_adder(10)
+ae(add10(5), 15)
+
+# ── 38. Operator overloading (__add__, __sub__, etc.) ────────────────────────
+# STATUS: ✓ WORKS — requires `from __python__ import overload_operators`
+
+def _test_operator_overloading():
+    from __python__ import overload_operators
+
+    class Vec:
+        def __init__(self, x, y):
+            self.x = x
+            self.y = y
+        def __add__(self, other):
+            return Vec(self.x + other.x, self.y + other.y)
+        def __sub__(self, other):
+            return Vec(self.x - other.x, self.y - other.y)
+        def __mul__(self, n):
+            return Vec(self.x * n, self.y * n)
+        def __eq__(self, other):
+            return self.x == other.x and self.y == other.y
+
+    v1 = Vec(1, 2)
+    v2 = Vec(3, 4)
+    ok((v1 + v2) == Vec(4, 6))
+    ok((v2 - v1) == Vec(2, 2))
+    ok((v1 * 3)  == Vec(3, 6))
+
+    class Num:
+        def __init__(self, n):
+            self.n = n
+        def __neg__(self):
+            return Num(-self.n)
+        def __eq__(self, other):
+            return self.n == other.n
+
+    ok(-Num(5) == Num(-5))
+    ok(-Num(-3) == Num(3))
+
+    # Comparison dunders defined — called directly (< > <= >= are NOT re-dispatched)
+    class Version:
+        def __init__(self, n):
+            self.n = n
+        def __lt__(self, other):
+            return self.n < other.n
+        def __le__(self, other):
+            return self.n <= other.n
+        def __gt__(self, other):
+            return self.n > other.n
+        def __ge__(self, other):
+            return self.n >= other.n
+
+    v1 = Version(1)
+    v2 = Version(2)
+    ok(v1.__lt__(v2))
+    ok(v2.__gt__(v1))
+    ok(v1.__le__(Version(1)))
+    ok(v2.__ge__(Version(2)))
+
+    # __floordiv__ and __mod__
+    class Int:
+        def __init__(self, n):
+            self.n = n
+        def __floordiv__(self, other):
+            return Int(Math.floor(self.n / other.n))
+        def __mod__(self, other):
+            return Int(self.n % other.n)
+        def __eq__(self, other):
+            return self.n == other.n
+
+    ok(Int(7) // Int(2) == Int(3))
+    ok(Int(7) % Int(3)  == Int(1))
+
+_test_operator_overloading()
+
+# ── 39. Nested comprehensions (multi-for) ────────────────────────────────────
+# STATUS: ✓ WORKS
+
+# Flatten nested list
+ade([x for row in [[1,2],[3,4]] for x in row], [1,2,3,4])
+
+# Filter within nested comprehension
+ade([x for row in [[1,2,3],[4,5,6]] for x in row if x % 2 == 0], [2,4,6])
+
+# Nested list comprehension — column extraction
+matrix = [[1,2,3],[4,5,6],[7,8,9]]
+ade([row[0] for row in matrix], [1,4,7])
+
+# Three-level nesting
+ade([i+j+k for i in [1] for j in [10] for k in [100]], [111])
+
+# Dict comprehension over pairs
+ade({k: v for k, v in [['a',1],['b',2]]}, {'a':1, 'b':2})
+
+# Set comprehension with two for-clauses
+ok({x+y for x in [1,2] for y in [10,20]} == {11, 12, 21, 22})
+
+# ── 40. __bool__ semantic difference ─────────────────────────────────────────
+# STATUS: ✗ SEMANTIC DIFFERENCE — empty list/dict are truthy in JS.
+#         RapydScript does not dispatch to __bool__; JS truthiness applies.
+# SKIP:
+#   ok(not [])   # Python: True; RapydScript: FAILS ([] is truthy in JS)
+#   ok(not {})   # Python: True; RapydScript: FAILS ({} is truthy in JS)
+#
+# Workaround: test len() == 0
+ok(len([]) == 0)
+ok(len({}) == 0)
+
+# ── 41. __call__ as callable dispatch ────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — callable() recognises __call__, but obj()
+#         does not dispatch to __call__; use obj.__call__() explicitly.
+# SKIP (calling obj() when __call__ is defined raises a TypeError):
+#   class _Adder:
+#       def __init__(self, n):
+#           self.n = n
+#       def __call__(self, x):
+#           return self.n + x
+#   add5 = _Adder(5)
+#   ae(add5(3), 8)   # NOT supported — obj() does not invoke __call__
+#
+# Workaround: call __call__ directly
+
+class _Adder:
+    def __init__(self, n):
+        self.n = n
+    def __call__(self, x):
+        return self.n + x
+
+add5 = _Adder(5)
+ae(add5.__call__(3),  8)   # explicit call works
+ae(callable(add5), True)   # callable() still detects it (§7 above)
+
+# ── 42. Complex number literals 3+4j ─────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no j suffix; no complex type.
+# SKIP:
+#   c = 3+4j
+#   ae(c.real, 3)
+#   ae(c.imag, 4)
+
+# ── 43. b'...' bytes literals ────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no b prefix; no native bytes type.
+#         Use the encodings module for encoding work.
+# SKIP:
+#   data = b'hello'
+#   ae(data[0], 104)
+
+# ── 44. except* (exception groups) ───────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — Python 3.11+ syntax; no parser support.
+# SKIP:
+#   try:
+#       raise ExceptionGroup('eg', [ValueError('v'), TypeError('t')])
+#   except* ValueError as eg:
+#       pass
+
+# ── 45. __new__ constructor ───────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no alternative constructor hook.
+# SKIP:
+#   class _Singleton:
+#       _instance = None
+#       def __new__(cls):
+#           if cls._instance is None:
+#               cls._instance = super().__new__(cls)
+#           return cls._instance
+#   ae(_Singleton() is _Singleton(), True)
+
+# ── 46. __del__ destructor ────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no destructor/finalizer.
+# SKIP:
+#   class _Tracked:
+#       def __del__(self):
+#           pass  # never called
+
+# ── 47. __hash__ dunder ───────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — set/dict use object identity (=== semantics).
+#         Two instances with equal fields are different keys even with __hash__.
+# SKIP:
+#   class _Point:
+#       def __init__(self, x, y):
+#           self.x = x
+#           self.y = y
+#       def __hash__(self):
+#           return self.x * 31 + self.y
+#       def __eq__(self, other):
+#           return self.x == other.x and self.y == other.y
+#   s = {_Point(1, 2)}
+#   ok(_Point(1, 2) in s)   # FAILS — __hash__ not dispatched
+
+# ── 48. __getattr__ / __setattr__ / __delattr__ ───────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no attribute-access interception.
+# SKIP:
+#   class _Dynamic:
+#       def __getattr__(self, name):
+#           return 'default'
+#   ae(_Dynamic().anything, 'default')   # FAILS
+
+# ── 49. __getattribute__ ─────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no attribute-lookup override.
+
+# ── 50. __format__ dunder ────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — format(obj, spec) is not a defined builtin;
+#         __format__ is not dispatched.
+# SKIP:
+#   class _Fmt:
+#       def __format__(self, spec):
+#           return '<' + spec + '>'
+#   ae(format(_Fmt(), 'test'), '<test>')
+
+# ── 51. __class_getitem__ ────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no generic subscript MyClass[T] syntax.
+# SKIP:
+#   class _Box:
+#       def __class_getitem__(cls, item):
+#           return cls
+#   ok(_Box[int] is _Box)
+
+# ── 52. __init_subclass__ ────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no subclass hook.
+# SKIP:
+#   class _Plugin:
+#       registry = []
+#       def __init_subclass__(cls, **kwargs):
+#           _Plugin.registry.push(cls)
+#   class _MyPlugin(_Plugin): pass
+#   ok(_MyPlugin in _Plugin.registry)
+
+# ── 53. issubclass() ─────────────────────────────────────────────────────────
+# STATUS: ✗ NOT IMPLEMENTED — issubclass() is not a builtin.
+# SKIP:
+#   ok(issubclass(bool, int))
+#   ok(not issubclass(str, int))
+
+# ── 54. hash() builtin ───────────────────────────────────────────────────────
+# STATUS: ✗ NOT IMPLEMENTED — Python's hash() builtin is not defined.
+# SKIP:
+#   ae(type(hash(42)), int)
+
+# ── 55. format(value, spec) builtin ──────────────────────────────────────────
+# STATUS: ✗ NOT IMPLEMENTED — format(value, spec) builtin is not defined.
+#         str.format() and f-strings work fine.
+# SKIP:
+#   ae(format(3.14159, '.2f'), '3.14')
+
+# ── 56. next(iterator[, default]) builtin ────────────────────────────────────
+# STATUS: ✗ NOT IMPLEMENTED — Python's next() builtin is not defined.
+#         Iterators use the JS-style .next() method instead.
+# SKIP:
+#   it = iter([1, 2, 3])
+#   ae(next(it), 1)
+#   ae(next(it, 'done'), 2)
+
+# ── 57. iter(callable, sentinel) two-arg form ────────────────────────────────
+# STATUS: ✗ NOT IMPLEMENTED — two-argument iter(callable, sentinel) not supported.
+# SKIP:
+#   count = [0]
+#   def counter():
+#       count[0] += 1; return count[0]
+#   ae(list(iter(counter, 3)), [1, 2])
+
+# ── 58. slice() as builtin object ────────────────────────────────────────────
+# STATUS: ✗ NOT IMPLEMENTED — slice() constructor is not a builtin.
+# SKIP:
+#   s = slice(1, 5, 2)
+#   ae(s.start, 1)
+#   ae(s.stop, 5)
+#   ae(s.step, 2)
+
+# ── 59. complex() builtin ────────────────────────────────────────────────────
+# STATUS: ✗ NOT SUPPORTED — no complex number type.
+# SKIP:
+#   c = complex(3, 4)
+#   ae(c.real, 3)
+#   ae(c.imag, 4)
+
+# ── 60. vars() / locals() / globals() ────────────────────────────────────────
+# STATUS: ✗ NOT IMPLEMENTED — these Python builtins are not defined.
+# SKIP:
+#   g = globals()
+#   ok(isinstance(g, dict))
+
+# ── 61. Positional-only parameters def f(a, /, b): ────────────────────────────
+# STATUS: ✓ WORKS — tested in test/starargs.pyj
+
+def _po(a, b, /):
+    return [a, b]
+
+ade(_po(1, 2), [1, 2])
+
+def _po_mix(a, /, b):
+    return [a, b]
+
+ade(_po_mix(1, 2),   [1, 2])
+ade(_po_mix(1, b=2), [1, 2])
+
+# ── 62. Keyword-only parameters def f(a, *, b): ───────────────────────────────
+# STATUS: ✓ WORKS — tested in test/starargs.pyj
+
+def _ko(a, *, b):
+    return [a, b]
+
+ade(_ko(1, b=2),   [1, 2])
+ade(_ko(b=2, a=1), [1, 2])

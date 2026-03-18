@@ -76,6 +76,12 @@ class OutputStream:
         self.with_counter = 0
         self.try_else_counter = 0
         self.match_counter = 0
+        self.forelse_counter = 0
+        self.forelse_stack = v'[]'
+
+    def new_forelse_label(self):
+        self.forelse_counter += 1
+        return 'ρσ_forelse_' + self.forelse_counter
 
     def new_try_else_counter(self):
         self.try_else_counter += 1

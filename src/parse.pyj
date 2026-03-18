@@ -116,7 +116,7 @@ FORBIDDEN_CLASS_VARS = 'prototype constructor'.split(' ')
 # -----[ Parser (constants) ]-----
 UNARY_PREFIX = make_predicate('typeof void delete ~ - + ! @')
 
-ASSIGNMENT = make_predicate('= += -= /= //= *= %= >>= <<= >>>= |= ^= &=')
+ASSIGNMENT = make_predicate('= += -= /= //= *= **= %= >>= <<= >>>= |= ^= &=')
 
 PRECEDENCE = (def(a, ret):
     for i in range(a.length):
@@ -336,7 +336,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     continue
 
                 # recursive descent into conditional, loop and exception bodies
-                for option in ('body', 'alternative', 'bcatch', 'condition'):
+                for option in ('body', 'alternative', 'bcatch', 'belse', 'condition'):
                     opt = stmt[option]
                     if opt:
                         extend(scan_for_local_vars(opt))
@@ -558,9 +558,20 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     croak('Assignments in while loop conditions are not allowed')
                 if not is_('punc', ':'):
                     croak('Expected a colon after the while statement')
+                while_body = in_loop(statement)
+                while_belse = None
+                if is_("keyword", "else"):
+                    start = S.token
+                    next()
+                    while_belse = new AST_Else({
+                        'start': start,
+                        'body': block_(),
+                        'end': prev()
+                    })
                 return new AST_While({
                     'condition': while_cond,
-                    'body': in_loop(statement)
+                    'body': while_body,
+                    'belse': while_belse
                 })
             elif tmp_ is "for":
                 if is_('js'):
@@ -647,10 +658,17 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     })
 
                 tmp = expression(True)
+                cause = None
+                if is_("keyword", "from"):
+                    next()
+                    cause = expression(True)
                 semicolon()
-                return new AST_Throw({
+                node = new AST_Throw({
                     'value': tmp
                 })
+                if cause is not None:
+                    node.cause = cause
+                return node
             elif tmp_ is "try":
                 return try_()
             elif tmp_ is "nonlocal":
@@ -1116,11 +1134,22 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'object': obj
             }
 
+        body = in_loop(statement)
+        belse = None
+        if is_("keyword", "else"):
+            start = S.token
+            next()
+            belse = new AST_Else({
+                'start': start,
+                'body': block_(),
+                'end': prev()
+            })
         return new AST_ForIn({
             'init': init,
             'name': lhs,
             'object': obj,
-            'body': in_loop(statement)
+            'body': body,
+            'belse': belse
         })
 
     # A native JavaScript for loop - for v"var i=0; i<5000; i++":
@@ -1917,10 +1946,19 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             next()
             exceptions = []
             if not is_("punc", ":") and not is_("keyword", "as"):
+                # Accept both: except TypeError, ValueError:
+                #          and: except (TypeError, ValueError):
+                paren_wrapped = is_("punc", "(")
+                if paren_wrapped:
+                    next()
                 exceptions.push(as_symbol(AST_SymbolVar))
                 while is_("punc", ","):
                     next()
+                    if paren_wrapped and is_("punc", ")"):
+                        break  # trailing comma inside parens
                     exceptions.push(as_symbol(AST_SymbolVar))
+                if paren_wrapped:
+                    expect(")")
 
             name = None
             if is_("keyword", "as"):

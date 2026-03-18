@@ -227,13 +227,25 @@ class AST_Do(AST_DWLoop):
 
 class AST_While(AST_DWLoop):
     "A `while` statement"
+    properties = {
+        'belse': "[AST_Else?] the `else` clause, run when loop exits without `break`"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.condition._walk(visitor)
+            self.body._walk(visitor)
+            if self.belse:
+                self.belse._walk(visitor)
+        )
 
 class AST_ForIn(AST_StatementWithBody):
     "A `for ... in` statement"
     properties = {
         'init': "[AST_Node] the `for/in` initialization code",
         'name': "[AST_SymbolRef?] the loop variable, only if `init` is AST_Var",
-        'object': "[AST_Node] the object that we're looping through"
+        'object': "[AST_Node] the object that we're looping through",
+        'belse': "[AST_Else?] the `else` clause, run when no break occurred"
     }
 
     def _walk(self, visitor):
@@ -243,6 +255,8 @@ class AST_ForIn(AST_StatementWithBody):
             self.object._walk(visitor)
             if self.body:
                 self.body._walk(visitor)
+            if self.belse:
+                self.belse._walk(visitor)
         )
 
 class AST_ForJS(AST_StatementWithBody):
@@ -647,6 +661,9 @@ class AST_Await(AST_Node):
 
 class AST_Throw(AST_Exit):
     "A `throw` statement"
+    properties = {
+        'cause': "[AST_Node?] the __cause__ of the exception (from `raise X from Y`); may be None"
+    }
 
 class AST_LoopControl(AST_Jump):
     "Base class for loop control statements (`break` and `continue`)"

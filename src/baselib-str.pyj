@@ -525,6 +525,40 @@ define_str_func('isspace', def():
     return this.length > 0 and /^\s+$/.test(this)
 )
 
+define_str_func('isalpha', def():
+    return this.length > 0 and /^[a-zA-Z]+$/.test(this)
+)
+
+define_str_func('isdigit', def():
+    return this.length > 0 and /^\d+$/.test(this)
+)
+
+define_str_func('isalnum', def():
+    return this.length > 0 and /^[a-zA-Z0-9]+$/.test(this)
+)
+
+define_str_func('isidentifier', def():
+    return this.length > 0 and /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this)
+)
+
+define_str_func('casefold', def():
+    return this.toLowerCase()
+)
+
+define_str_func('removeprefix', def(prefix):
+    s = this.toString()
+    if s.startsWith(prefix):
+        return s.slice(prefix.length)
+    return s
+)
+
+define_str_func('removesuffix', def(suffix):
+    s = this.toString()
+    if suffix.length and s.endsWith(suffix):
+        return s.slice(0, s.length - suffix.length)
+    return s
+)
+
 define_str_func('join', def(iterable):
     if Array.isArray(iterable):
         return iterable.join(this)

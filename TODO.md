@@ -7,6 +7,7 @@
 
 - export .t.ds for language service
 
+- add python feature unit tests to test command
 
 
 
@@ -54,7 +55,7 @@ differences.
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Complex number literals 3+4j                  │ all            │ No j suffix                                                  │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Ellipsis literal ... as expression            │ all            │ Only valid as slice (a[...])                                 │
+│ Ellipsis literal ... as expression            │ all            │ -tested                                                      │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ b'...' bytes literals                         │ all            │ No b prefix; encoding module exists but no native bytes type │
 └───────────────────────────────────────────────┴────────────────┴──────────────────────────────────────────────────────────────┘

@@ -727,7 +727,7 @@ Keywords:
 Operators:
 
 	RapydScript		JavaScript
-	
+
 	and				&&
 	or				||
 	not				!
@@ -736,7 +736,10 @@ Operators:
 	+=1				++
 	-=1				--
 	**				Math.pow()
-	
+	**=				x = Math.pow(x, y)
+
+All Python augmented assignment operators are supported: `+=`, `-=`, `*=`, `/=`, `//=`, `**=`, `%=`, `>>=`, `<<=`, `|=`, `^=`, `&=`.
+
 Admittedly, `is` is not exactly the same thing in Python as `===` in JavaScript, but JavaScript is quirky when it comes to comparing objects anyway.
 
 
@@ -949,6 +952,16 @@ to the native JavaScript operator, so plain numbers, strings, and booleans
 continue to work as expected with no performance penalty when no dunder method
 is defined.
 
+When `overload_operators` is active, string and list repetition with `*` works just like Python:
+
+```py
+from __python__ import overload_operators
+'ha' * 3      # 'hahaha'
+3 * 'ha'      # 'hahaha'
+[0] * 4       # [0, 0, 0, 0]
+[1, 2] * 2    # [1, 2, 1, 2]
+```
+
 Because the dispatch adds one or two property lookups per operation, the flag
 is **opt-in** rather than always-on. Enable it only in the files or scopes
 where you need it.
@@ -978,7 +991,16 @@ for your own types.
 
 RapydScript does not overload the ordering operators ```(>, <, >=,
 <=)``` as doing so would be a big performance impact (function calls in
-JavaScript are very slow). So using them on containers is useless. 
+JavaScript are very slow). So using them on containers is useless.
+
+Chained comparisons work just like Python — each middle operand is evaluated only once:
+
+```py
+# All of these work correctly, including mixed-direction chains
+assert 1 < 2 < 3      # True
+assert 1 < 2 > 0      # True  (1<2 AND 2>0)
+assert 1 < 2 > 3 == False  # 1<2 AND 2>3 = True AND False = False
+```
 
 Loops
 -----
@@ -998,6 +1020,39 @@ If you need to use the index in the loop as well, you can do so by using enumera
 ```py
 for index, animal in enumerate(animals):
 	print("index:"+index, "animal:"+animal)
+```
+
+`enumerate()` supports an optional `start` argument (default 0):
+
+```py
+for index, animal in enumerate(animals, 1):
+	print(str(index) + '. ' + animal)  # 1-based numbering
+```
+
+Like in Python, `for` loops support an `else` clause that runs only when the loop completes without hitting a `break`:
+
+```py
+for animal in animals:
+    if animal == 'cat':
+        print('found a cat')
+        break
+else:
+    print('no cat found')
+```
+
+This is useful for search patterns where you want to take an action only if the searched item was not found.
+
+`while` loops also support an `else` clause, which runs when the condition becomes `False` (i.e. no `break` was executed):
+
+```py
+i = 0
+while i < len(items):
+    if items[i] == target:
+        print('found at', i)
+        break
+    i += 1
+else:
+    print('not found')
 ```
 
 Like in Python, if you just want the index, you can use range:
@@ -1116,6 +1171,31 @@ str.strip(' a ') == 'a'
 str.split('a b') == ['a', 'b']
 str.format('{0:02d} {n}', 1, n=2) == '01 2'
 ...
+```
+
+String predicate methods are also available:
+
+```py
+str.isalpha('abc')      # True — all alphabetic
+str.isdigit('123')      # True — all digits
+str.isalnum('abc123')   # True — alphanumeric
+str.isspace('   ')      # True — all whitespace
+str.isupper('ABC')      # True
+str.islower('abc')      # True
+str.isidentifier('my_var')  # True — valid Python identifier
+```
+
+Python 3.9 prefix/suffix removal:
+
+```py
+str.removeprefix('HelloWorld', 'Hello')  # 'World'
+str.removesuffix('HelloWorld', 'World')  # 'Hello'
+```
+
+Case-folding for locale-insensitive lowercase comparison:
+
+```py
+str.casefold('ÄÖÜ') == str.casefold('äöü')  # True (maps to lowercase)
 ```
 
 However, if you want to make the python string methods available on string
@@ -1935,7 +2015,7 @@ class MyError(Exception):
 raise MyError('This is a custom error!')
 ```
 
-You can lump multiple errors in the same except block as well:
+You can catch multiple exception types in one `except` clause. Both the comma form and the tuple form are supported:
 
 ```py
 try:
@@ -1943,9 +2023,31 @@ try:
 except ReferenceError, TypeError as e:
 	print(e.name + ':' + e.message)
 	raise # re-raise the exception
+
+# Equivalent tuple form (Python 3 style):
+try:
+    risky()
+except (ReferenceError, TypeError) as e:
+    handle(e)
 ```
 
-Basically, `try/except/finally` in RapydScript works very similar to the way it does in Python 3. 
+Exception chaining with `raise X from Y` is supported. The cause is stored on the raised exception's `__cause__` attribute:
+
+```py
+try:
+    open_file('data.txt')
+except OSError as exc:
+    raise ValueError('Could not read config') from exc
+```
+
+Use `raise X from None` to explicitly suppress the chained context:
+
+```py
+except SomeInternalError:
+    raise PublicError('something went wrong') from None
+```
+
+Basically, `try/except/finally` in RapydScript works very similar to the way it does in Python 3.
 
 Scope Control
 -------------

@@ -282,6 +282,16 @@ def ρσ_op_mul(a, b):
     if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
     if (jstype(a) is 'string' or v'a instanceof String') and jstype(b) is 'number': return a.repeat(b)
     if (jstype(b) is 'string' or v'b instanceof String') and jstype(a) is 'number': return b.repeat(a)
+    if Array.isArray(a) and jstype(b) is 'number':
+        result = v'[]'
+        for v'var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++':
+            result = result.concat(a)  # noqa:undef
+        return ρσ_list_constructor(result)
+    if Array.isArray(b) and jstype(a) is 'number':
+        result = v'[]'
+        for v'var ρσ_mi = 0; ρσ_mi < a; ρσ_mi++':
+            result = result.concat(b)  # noqa:undef
+        return ρσ_list_constructor(result)
     return a * b
 
 def ρσ_op_truediv(a, b):

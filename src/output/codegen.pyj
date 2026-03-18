@@ -279,7 +279,28 @@ def generate_code():
         self._do_print(output, "return")
     )
     DEFPRINT(AST_Throw, def(self, output):
-        self._do_print(output, "throw")
+        if self.cause:
+            # raise X from Y: set __cause__ on exception before throwing
+            output.print('var ρσ_throw_tmp')
+            output.space()
+            output.print('=')
+            output.space()
+            self.value.print(output)
+            output.semicolon()
+            output.newline()
+            output.indent()
+            output.print('ρσ_throw_tmp.__cause__')
+            output.space()
+            output.print('=')
+            output.space()
+            self.cause.print(output)
+            output.semicolon()
+            output.newline()
+            output.indent()
+            output.print('throw ρσ_throw_tmp')
+            output.semicolon()
+        else:
+            self._do_print(output, "throw")
     )
 
     # -----[ loop control ]-----
@@ -292,6 +313,17 @@ def generate_code():
         output.semicolon()
 
     DEFPRINT(AST_Break, def(self, output):
+        # If we are directly inside a for/else labeled block and this break has
+        # no explicit label, redirect it to the forelse label so the else clause
+        # is skipped.
+        if not self.label and output.forelse_stack and output.forelse_stack.length:
+            top = output.forelse_stack[output.forelse_stack.length - 1]
+            if top:
+                output.print('break')
+                output.space()
+                output.print(top)
+                output.semicolon()
+                return
         self._do_print(output, "break")
     )
     DEFPRINT(AST_Continue, def(self, output):
