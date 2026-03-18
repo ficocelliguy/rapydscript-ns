@@ -9,6 +9,10 @@
     "compiler"
   ],
   "main": "tools/compiler.js",
+  "exports": {
+    ".": "./tools/compiler.js",
+    "./language-service": "./web-repl/language-service.js"
+  },
   "scripts": {
     "test": "node bin/rapydscript self --complete --test && npm run test:unit && npm run test:ls",
     "test:unit": "node test/unit/index.js",
@@ -16,9 +20,10 @@
     "start": "node bin/rapydscript",
     "build-self": "node bin/rapydscript self --complete",
     "build:ls": "node tools/build-language-service.js",
-    "build": "rm -rf **/*pyj-cached dev && node bin/rapydscript self --complete && node bin/web-repl-export web-repl && node tools/build-language-service.js"
+    "build": "rm -rf **/*pyj-cached dev && node bin/rapydscript self --complete && node bin/web-repl-export web-repl && node tools/build-language-service.js",
+    "prepublishOnly": "node tools/build-language-service.js"
   },
-  "version": "0.8.0",
+  "version": "0.8.1",
   "license": "BSD-2-Clause",
   "engines": {
     "node": ">=0.12.0"
