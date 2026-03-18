@@ -7,8 +7,6 @@
 
 - variables just say (variable) on hover, not their type?
 
-- compress language service export
-
 - vscode plugin based on language service
 
 - export language service to npm module
