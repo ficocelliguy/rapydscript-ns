@@ -647,7 +647,7 @@ assrt.equal(fib(15), 610)
         // Full exact expected JS for the user-code section, stored in a fixture
         // file to preserve trailing whitespace on the blank line between the two
         // function definitions (line with 8 spaces that a template literal would drop).
-        js_checks: [fs.readFileSync(path.join(__dirname, "fixtures", "fibonacci_expected.js"), "utf-8")],
+        js_checks: [fs.readFileSync(path.join(__dirname, "fixtures", "fibonacci_expected.js"), "utf-8").replace(/\r\n/g, "\n")],
     },
 
     // ── Virtual file system ───────────────────────────────────────────────

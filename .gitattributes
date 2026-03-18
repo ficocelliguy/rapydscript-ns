@@ -1,0 +1,4 @@
+# Ensure consistent LF line endings across platforms.
+# Without this, git on Windows converts LF→CRLF on checkout,
+# which breaks substring matches against in-memory generated strings.
+* text=auto eol=lf
