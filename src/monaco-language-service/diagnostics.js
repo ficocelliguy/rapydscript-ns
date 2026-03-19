@@ -16,6 +16,7 @@ const MESSAGES = {
     'func-in-branch': 'Named functions/classes inside a branch are not allowed in strict mode',
     'syntax-err':     'Syntax error: {name}',
     'import-err':     'Import error: {name}',
+    'bad-import':     'Unknown module: "{name}"',
     'def-after-use':  'The symbol "{name}" is defined (at line {line}) after it is used',
     'dup-key':        'Duplicate key "{name}" in object literal',
     'dup-method':     'The method "{name}" was defined previously at line: {line}',
@@ -205,7 +206,7 @@ Scope.prototype.messages = function() {
 // Linter — mirrors the Linter in tools/lint.js
 // ---------------------------------------------------------------------------
 
-function Linter(RS, toplevel, code, builtins) {
+function Linter(RS, toplevel, code, builtins, knownModules) {
     this.RS             = RS;
     this.scopes         = [];
     this.walked_scopes  = [];
@@ -213,6 +214,7 @@ function Linter(RS, toplevel, code, builtins) {
     this.branches       = [];
     this.messages       = [];
     this.builtins       = builtins;
+    this._knownModules  = knownModules || null;
 
     this.add_binding = function(name, binding_node) {
         const scope = this.scopes[this.scopes.length - 1];
@@ -239,6 +241,26 @@ function Linter(RS, toplevel, code, builtins) {
         if (!node.argnames) {
             const name = node.alias ? node.alias.name : node.key.split('.', 1)[0];
             this.add_binding(name, node.alias || node);
+        }
+        // Flag imports of modules not present in the known-module registry.
+        // Only active when at least one virtualFile or stdlibFile is registered,
+        // to avoid false positives when no module system is configured.
+        if (this._knownModules) {
+            const root = node.key.split('.')[0];
+            if (!has_prop(this._knownModules, root)) {
+                const sline = node.start ? node.start.line : 1;
+                const scol  = node.start ? node.start.col  : 0;
+                this.messages.push({
+                    start_line: sline,
+                    start_col:  scol,
+                    end_line:   sline,
+                    end_col:    scol + node.key.length - 1,
+                    ident:      'bad-import',
+                    message:    MESSAGES['bad-import'].replace('{name}', node.key),
+                    level:      ERROR,
+                    name:       node.key,
+                });
+            }
         }
     };
 
@@ -652,7 +674,17 @@ export class Diagnostics {
         }
 
         // --- Lint ---
-        const linter = new Linter(RS, toplevel, code, this._builtins);
+        // Build known-module set for import validation.
+        // Only activates when the caller has registered at least one module.
+        let knownModules = null;
+        const vf = options.virtualFiles;
+        const sf = options.stdlibFiles;
+        if ((vf && Object.keys(vf).length > 0) || (sf && Object.keys(sf).length > 0)) {
+            knownModules = Object.create(null);
+            if (vf) Object.keys(vf).forEach(k => { knownModules[k] = true; });
+            if (sf) Object.keys(sf).forEach(k => { knownModules[k] = true; });
+        }
+        const linter = new Linter(RS, toplevel, code, this._builtins, knownModules);
         toplevel.walk(linter);
         messages = linter.resolve(noqa);
 

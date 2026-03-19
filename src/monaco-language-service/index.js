@@ -53,7 +53,7 @@ class ModelState {
     _run() {
         const service = this._service;
         const code    = this._model.getValue();
-        const opts    = { virtualFiles: service._virtualFiles };
+        const opts    = { virtualFiles: service._virtualFiles, stdlibFiles: service._stdlibFiles };
 
         // Diagnostics (syntax errors + lint markers)
         const markers = service._diagnostics.check(code, {

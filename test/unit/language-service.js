@@ -242,11 +242,83 @@ function make_tests(Diagnostics, RS) {
 
         {
             name: "import_error_caught",
-            description: "An unresolvable import is caught and returned as a single Error marker",
+            description: "An unresolvable import produces a single Error marker (unused-import) when no module registry is configured",
             run: function () {
                 var markers = d().check("from nonexistent_lib_xyz import something");
                 assert.strictEqual(markers.length, 1);
                 assert.strictEqual(markers[0].severity, SEV_ERROR);
+            },
+        },
+
+        // ── Bad-import squiggles ───────────────────────────────────────────
+
+        {
+            name: "bad_import_unknown_module",
+            description: "Importing from an unknown module produces a bad-import Error when a module registry is active",
+            run: function () {
+                var markers = d().check(
+                    "from typo_mod import foo\nprint(foo())",
+                    { virtualFiles: { mymod: "def foo(): return 1" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.ok(bad.length >= 1, "Expected at least one 'Unknown module' marker, got: " + JSON.stringify(markers));
+                assert.strictEqual(bad[0].severity, SEV_ERROR);
+                // Squiggle should point at the module name on line 1
+                assert.strictEqual(bad[0].startLineNumber, 1);
+            },
+        },
+
+        {
+            name: "bad_import_known_module_no_error",
+            description: "Importing from a registered module produces no bad-import error",
+            run: function () {
+                var markers = d().check(
+                    "from mymod import foo\nprint(foo())",
+                    { virtualFiles: { mymod: "def foo(): return 1" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.strictEqual(bad.length, 0, "Expected no 'Unknown module' marker for a known module");
+            },
+        },
+
+        {
+            name: "bad_import_no_registry_no_error",
+            description: "Unknown imports produce no bad-import error when no module registry is configured",
+            run: function () {
+                var markers = d().check("from anything import foo\nprint(foo())");
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.strictEqual(bad.length, 0, "Expected no 'Unknown module' marker when no registry is configured");
+            },
+        },
+
+        {
+            name: "bad_import_squiggle_span",
+            description: "The bad-import squiggle covers the module name",
+            run: function () {
+                var markers = d().check(
+                    "from typo_mod import foo",
+                    { virtualFiles: { mymod: "def foo(): return 1" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.ok(bad.length >= 1, "Expected a bad-import marker");
+                var m = bad[0];
+                // 'typo_mod' appears after 'from ' (col 5, 1-indexed col 6)
+                assert.strictEqual(m.startColumn, 6, "startColumn should be 6 (start of 'typo_mod')");
+                // endColumn should cover all of 'typo_mod' (8 chars)
+                assert.ok(m.endColumn > m.startColumn, "endColumn should be past startColumn");
+            },
+        },
+
+        {
+            name: "bad_import_stdlib_registry",
+            description: "Importing from a registered stdlib module produces no bad-import error",
+            run: function () {
+                var markers = d().check(
+                    "from mathlib import sqrt",
+                    { stdlibFiles: { mathlib: "def sqrt(x): return x ** 0.5" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.strictEqual(bad.length, 0, "Expected no 'Unknown module' marker for a known stdlib module");
             },
         },
 
