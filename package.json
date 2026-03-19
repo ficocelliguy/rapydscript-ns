@@ -23,7 +23,7 @@
     "build": "rm -rf **/*pyj-cached dev && node bin/rapydscript self --complete && node bin/web-repl-export web-repl && node tools/build-language-service.js",
     "prepublishOnly": "node tools/build-language-service.js"
   },
-  "version": "0.8.1",
+  "version": "0.8.2",
   "license": "BSD-2-Clause",
   "engines": {
     "node": ">=0.12.0"

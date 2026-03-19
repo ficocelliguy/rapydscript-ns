@@ -1,14 +1,12 @@
 
 ### libraries
 
-- keywords like continue are not tab-completable
 - bitburner - handle missed await / concurrency errors gracefully?
    - two space tabs
 
 - fix error from vuln report
 - https://socket.dev/npm/package/rapydscript-ns/alerts/0.8.1?tab=dependencies
 - https://snyk.io/test/github/ficocelliguy/rapydscript-ns
-- fix missing image from build status?
 
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 
@@ -21,8 +19,6 @@
 - include python truthiness in compiler call
 
 - update changelist for 8.0
-
-Currently, in the monaco editor using the language service, if an import is from a file that can't be found or has a typo, all of the language hints stop working. Instead, I would like the import ot be flagged specifically with a fed squiggle to help the user identify the issue.
 
 I would like you to add support for [  Python's extended subscript syntax where commas inside [] implicitly form a tuple ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
 
