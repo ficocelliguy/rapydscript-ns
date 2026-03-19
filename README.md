@@ -1002,6 +1002,64 @@ assert 1 < 2 > 0      # True  (1<2 AND 2>0)
 assert 1 < 2 > 3 == False  # 1<2 AND 2>3 = True AND False = False
 ```
 
+### Python Truthiness and `__bool__`
+
+By default RapydScript uses JavaScript truthiness, where empty arrays `[]` and
+empty objects `{}` are **truthy**. Activate full Python truthiness semantics
+with:
+
+```py
+from __python__ import truthiness
+```
+
+When this flag is active:
+
+- **Empty containers are falsy**: `[]`, `{}`, `set()`, `''`, `0`, `None` are all falsy.
+- **`__bool__` is dispatched**: objects with a `__bool__` method control their truthiness.
+- **`__len__` is used**: objects with `__len__` are falsy when `len(obj) == 0`.
+- **`and`/`or` return operand values** (not booleans), just like Python.
+- **All condition positions** (`if`, `while`, `assert`, `not`, ternary) use Python semantics.
+
+```py
+from __python__ import truthiness
+
+class Empty:
+    def __bool__(self): return False
+
+if not []:          # True — [] is falsy
+    print('empty')
+
+x = [] or 'default'   # x == 'default'
+y = [1] or 'default'  # y == [1]
+z = [1] and 'ok'      # z == 'ok'
+```
+
+The flag is **scoped** — it applies until the end of the enclosing
+function or class body. Use `from __python__ import no_truthiness` to
+disable it in a sub-scope.
+
+### Callable Objects (`__call__`)
+
+Any class that defines `__call__` can be invoked directly with `obj(args)`,
+just like Python callable objects. This requires `from __python__ import truthiness`:
+
+```python
+from __python__ import truthiness
+
+class Multiplier:
+    def __init__(self, factor):
+        self.factor = factor
+    def __call__(self, x):
+        return self.factor * x
+
+triple = Multiplier(3)
+triple(7)   # 21 — dispatches to triple.__call__(7)
+```
+
+`callable(obj)` returns `True` when `__call__` is defined. The dispatch is
+automatic for all direct function-call expressions that are simple names
+(i.e. not method accesses like `obj.method()`).
+
 Loops
 -----
 RapydScript's loops work like Python, not JavaScript. You can't, for example

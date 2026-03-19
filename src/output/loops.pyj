@@ -47,7 +47,10 @@ def print_do_loop(self, output):
     output.space()
     output.print("while")
     output.space()
-    output.with_parens(def(): self.condition.print(output);)
+    if self.python_truthiness:
+        output.with_parens(def(): output.print('ρσ_bool('), self.condition.print(output), output.print(')');)
+    else:
+        output.with_parens(def(): self.condition.print(output);)
     output.semicolon()
 
 def print_while_loop(self, output):
@@ -67,7 +70,10 @@ def print_while_loop(self, output):
 
     output.print("while")
     output.space()
-    output.with_parens(def(): self.condition.print(output);)
+    if self.python_truthiness:
+        output.with_parens(def(): output.print('ρσ_bool('), self.condition.print(output), output.print(')');)
+    else:
+        output.with_parens(def(): self.condition.print(output);)
     output.space()
     self._do_print_body(output)
 

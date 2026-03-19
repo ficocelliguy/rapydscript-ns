@@ -5,7 +5,21 @@
 # globals: exports, console, ρσ_iterator_symbol, ρσ_kwargs_symbol, ρσ_arraylike, ρσ_list_contains
 
 def ρσ_bool(val):
-    return v'!!val'
+    # Python truthiness — written entirely with verbatim JS so that the
+    # compiled ρσ_bool function never calls itself (no bootstrap recursion).
+    v'if (val === null || val === undefined) return false'
+    v'var ρσ_bool_t = typeof val'
+    v'if (ρσ_bool_t === "boolean") return val'
+    v'if (ρσ_bool_t === "number") return val !== 0'
+    v'if (ρσ_bool_t === "string") return val.length > 0'
+    v'if (ρσ_bool_t === "function") return true'
+    v'if (val.constructor && val.constructor.prototype === val) return true'
+    v'if (typeof val.__bool__ === "function") return !!val.__bool__()'
+    v'if (Array.isArray(val)) return val.length > 0'
+    v'if (typeof val.__len__ === "function") return val.__len__() > 0'
+    v'if ((typeof Set === "function" && val instanceof Set) || (typeof Map === "function" && val instanceof Map)) return val.size > 0'
+    v'if (!val.constructor || val.constructor === Object) return Object.keys(val).length > 0'
+    return True
 
 def ρσ_print(*args, **kwargs):
     if v'typeof console' is 'object':
@@ -74,6 +88,17 @@ def ρσ_chr(code):
 
 def ρσ_callable(x):
     return v'typeof x === "function" || (x !== null && x !== undefined && typeof x.__call__ === "function")'
+
+def ρσ_callable_call(fn):
+    # Dispatch fn(args): check __call__ first (callable objects), then direct call.
+    # __call__ is checked first so callable objects (not functions) are dispatched correctly.
+    args = v'Array.prototype.slice.call(arguments, 1)'
+    if v'fn !== null && fn !== undefined && typeof fn.__call__ === "function"':
+        return v'fn.__call__.apply(fn, args)'
+    if v'typeof fn === "function"':
+        return v'fn.apply(undefined, args)'
+    raise TypeError('object is not callable')
+
 
 def ρσ_round(x, ndigits):
     if ndigits is undefined or ndigits is 0:

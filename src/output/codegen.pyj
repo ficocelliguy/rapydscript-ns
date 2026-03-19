@@ -372,7 +372,10 @@ def generate_code():
     DEFPRINT(AST_If, def(self, output):
         output.print("if")
         output.space()
-        output.with_parens(def(): self.condition.print(output);)
+        if self.python_truthiness:
+            output.with_parens(def(): output.print('ρσ_bool('), self.condition.print(output), output.print(')');)
+        else:
+            output.with_parens(def(): self.condition.print(output);)
         output.space()
         if self.alternative:
             make_then(self, output)

@@ -24,12 +24,13 @@ AST_Undefined, AST_Var, AST_VarDef, AST_Verbatim, AST_While, AST_With, AST_WithC
 AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, AST_Super, AST_Starred, is_node_type,
 AST_Match, AST_MatchCase,
 AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
-AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass
+AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass,
+TreeWalker
 )
 from tokenizer import tokenizer, is_token, RESERVED_WORDS
 
 COMPILER_VERSION = '__COMPILER_VERSION__'
-PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True}
+PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True}
 
 
 def get_compiler_version():
@@ -402,6 +403,23 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
 
         elif is_node_type(body, AST_ForIn):
             add_for_in(body)
+            # Also scan conditions for walrus operators (e.g. comprehension filters)
+            if body.condition:
+                extend(scan_for_local_vars(body.condition))
+            if body.clauses:
+                for clause in body.clauses:
+                    if clause.condition:
+                        extend(scan_for_local_vars(clause.condition))
+
+        else:
+            # Generic expression node — walk for walrus operators, stopping at scope boundaries
+            if body.walk:
+                body.walk(new TreeWalker(def(node):
+                    if is_node_type(node, AST_NamedExpr):
+                        push(node.name.name)
+                    if is_node_type(node, AST_Scope):
+                        return True  # prune: don't descend into inner function scopes
+                ))
 
         return localvars
 
@@ -550,7 +568,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                             croak('Assignments in do loop conditions are not allowed')
                         semicolon()
                         return tmp
-                    )()
+                    )(),
+                    'python_truthiness': S.scoped_flags.get('truthiness', False)
                 })
             elif tmp_ is "while":
                 while_cond = expression(True)
@@ -571,7 +590,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 return new AST_While({
                     'condition': while_cond,
                     'body': while_body,
-                    'belse': while_belse
+                    'belse': while_belse,
+                    'python_truthiness': S.scoped_flags.get('truthiness', False)
                 })
             elif tmp_ is "for":
                 if is_('js'):
@@ -633,7 +653,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 if is_('punc', ','):
                     next()
                     msg = expression(False)
-                return new AST_Assert({'start': start, 'condition':cond, 'message':msg, 'end':prev()})
+                return new AST_Assert({'start': start, 'condition':cond, 'message':msg, 'end':prev(), 'python_truthiness': S.scoped_flags.get('truthiness', False)})
             elif tmp_ is "if":
                 return if_()
             elif tmp_ is "pass":
@@ -1894,7 +1914,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         return new AST_If({
             'condition': cond,
             'body': body,
-            'alternative': belse
+            'alternative': belse,
+            'python_truthiness': S.scoped_flags.get('truthiness', False)
         })
 
     def is_docstring(stmt):
@@ -2708,7 +2729,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'start': start,
                 'expression': expr,
                 'args': func_call_list(),
-                'end': prev()
+                'end': prev(),
+                'python_truthiness': S.scoped_flags.get('truthiness', False) and is_node_type(expr, AST_SymbolRef)
             }), True)
             S.in_parenthesized_expr = False
             return ret
@@ -2798,6 +2820,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             ex.end = prev()
             if S.scoped_flags.get('overload_operators', False) and (start.value is '-' or start.value is '+' or start.value is '~'):
                 ex.overloaded = True
+            if S.scoped_flags.get('truthiness', False) and start.value is '!':
+                ex.python_truthiness = True
             return ex
 
         val = expr_atom(allow_calls)
@@ -2833,7 +2857,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'operator': op,
                 'right': right,
                 'end': right.end,
-                'overloaded': S.scoped_flags.get('overload_operators', False)
+                'overloaded': S.scoped_flags.get('overload_operators', False),
+                'python_truthiness': S.scoped_flags.get('truthiness', False) and (op is '&&' or op is '||')
             })
             return expr_op(ret, min_prec, no_in)
         return left
@@ -2853,7 +2878,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'condition': ne,
                 'consequent': expr,
                 'alternative': expression(False, no_in),
-                'end': peek()
+                'end': peek(),
+                'python_truthiness': S.scoped_flags.get('truthiness', False)
             })
             return conditional
         return expr

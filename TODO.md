@@ -9,6 +9,13 @@
 
 - add python feature unit tests to test command
 
+- add squiggle if import is misnamed / not found
+
+- add opt-out for python truthyness
+- add web-repl flag for python truthiness?
+- include python truthiness in compiler call
+
+- update changelist for 8.0
 
 
 I would like you to add support for [  Python's extended subscript syntax where commas inside [] implicitly form a tuple ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.

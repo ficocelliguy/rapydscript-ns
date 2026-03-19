@@ -50,15 +50,11 @@
 | Nested comprehensions (multi-`for` clause) | `[x for row in matrix for x in row if cond]`; works for list, set, and dict comprehensions |
 | Positional-only parameters `def f(a, b, /):` | Full support — parser enforces placement; runtime passes positional args correctly |
 | Keyword-only parameters `def f(a, *, b):` | Full support — bare `*` separator enforced; `b` must be passed as keyword |
+| Walrus operator `:=` | Fully supported: hoisted in `if`/`while` conditions at any scope; comprehension filter assigns to enclosing scope (Python-correct). |
+| `__call__` dunder dispatch | `obj()` dispatches to `obj.__call__(args)` for callable objects; `callable(obj)` also returns `True`; both forms work. Requires `from __python__ import truthiness`. |
+| **Truthiness / `__bool__`** | Full Python truthiness via `from __python__ import truthiness`: empty `[]`, `{}`, `set()`, `''` are falsy; `__bool__` is dispatched; `and`/`or` return operand values; `not`, `if`, `while`, `assert`, ternary all use `ρσ_bool()`. |
 
 ---
-
-## ⚠️ Partial Support / Known Bugs
-
-| Feature | Status |
-|---|---|
-| **Walrus operator `:=`** | Works in standalone assignments; **not** hoisted correctly in `if`-condition expressions at module scope (ES5); **not** scoped correctly as a comprehension filter variable. |
-| **`__call__` dunder** | `callable(obj)` correctly returns `True` when `__call__` is defined; however `obj()` does **not** dispatch to `__call__` — you must call `obj.__call__(...)` explicitly. |
 
 ---
 

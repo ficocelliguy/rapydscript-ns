@@ -110,6 +110,16 @@ def print_unary_prefix(self, output):
         if op is '~':
             output.print('ρσ_op_invert('), self.expression.print(output), output.print(')')
             return
+    if op is '!' and self.python_truthiness:
+        output.print('!ρσ_bool(')
+        if self.parenthesized:
+            output.with_parens(def():
+                self.expression.print(output)
+            )
+        else:
+            self.expression.print(output)
+        output.print(')')
+        return
     output.print(op)
     if /^[a-z]/i.test(op):
         output.space()
@@ -284,6 +294,36 @@ def print_binary_op(self, output):
             output.spaced(nan_check, '!==' if self.operator is '===' else '===', nan_check)
         else:
             output.spaced(self.left, self.operator, self.right)
+    elif (self.operator is '&&' or self.operator is '||') and self.python_truthiness:
+        # Python `and`/`or` use Python truthiness (only when from __python__ import truthiness is set).
+        # `a and b` → `ρσ_bool(a) ? b : a`   (returns a if falsy, else b)
+        # `a or b`  → `ρσ_bool(a) ? a : b`   (returns a if truthy, else b)
+        # For non-simple left operands, cache in ρσ_expr_temp to avoid double evaluation.
+        is_and = self.operator is '&&'
+        if is_node_type(self.left, AST_SymbolRef):
+            output.print('(ρσ_bool(')
+            self.left.print(output)
+            output.print(') ? ')
+            if is_and:
+                self.right.print(output)
+                output.print(' : ')
+                self.left.print(output)
+            else:
+                self.left.print(output)
+                output.print(' : ')
+                self.right.print(output)
+            output.print(')')
+        else:
+            output.print('(ρσ_expr_temp = ')
+            self.left.print(output)
+            output.print(', ρσ_bool(ρσ_expr_temp) ? ')
+            if is_and:
+                self.right.print(output)
+                output.print(' : ρσ_expr_temp)')
+            else:
+                output.print('ρσ_expr_temp : ')
+                self.right.print(output)
+                output.print(')')
     else:
         output.spaced(self.left, self.operator, self.right)
 
@@ -397,7 +437,12 @@ def print_assign(self, output):
 
 def print_conditional(self, output, condition, consequent, alternative):
     condition, consequent, alternative = self.condition, self.consequent, self.alternative
-    output.with_parens(def():condition.print(output);)
+    if self.python_truthiness:
+        output.print('ρσ_bool(')
+        condition.print(output)
+        output.print(')')
+    else:
+        output.with_parens(def(): condition.print(output);)
     output.space()
     output.print("?")
     output.space()

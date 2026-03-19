@@ -176,7 +176,10 @@ def print_with(self, output):
 def print_assert(self, output):
     if output.options.discard_asserts:
         return
-    output.spaced('if', '(!('), self.condition.print(output), output.spaced('))', 'throw new AssertionError')
+    if self.python_truthiness:
+        output.spaced('if', '(!ρσ_bool('), self.condition.print(output), output.spaced('))', 'throw new AssertionError')
+    else:
+        output.spaced('if', '(!('), self.condition.print(output), output.spaced('))', 'throw new AssertionError')
     if self.message:
         output.print('(')
         self.message.print(output)

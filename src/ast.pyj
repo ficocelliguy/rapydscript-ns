@@ -159,6 +159,7 @@ class AST_Assert(AST_Statement):
     properties = {
         'condition': "[AST_Node] the expression that should be tested",
         'message': "[AST_Node*] the expression that is the error message or None",
+        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 
     def _walk(self, visitor):
@@ -213,7 +214,8 @@ class AST_StatementWithBody(AST_Statement):
 class AST_DWLoop(AST_StatementWithBody):
     "Base class for do/while statements"
     properties = {
-        'condition': "[AST_Node] the loop condition.  Should not be instanceof AST_Statement"
+        'condition': "[AST_Node] the loop condition.  Should not be instanceof AST_Statement",
+        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 
     def _walk(self, visitor):
@@ -680,7 +682,8 @@ class AST_If(AST_StatementWithBody):
     "A `if` statement"
     properties = {
         'condition': "[AST_Node] the `if` condition",
-        'alternative': "[AST_Statement?] the `else` part, or null if not present"
+        'alternative': "[AST_Statement?] the `else` part, or null if not present",
+        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 
     def _walk(self, visitor):
@@ -784,7 +787,8 @@ class AST_BaseCall(AST_Node):
 class AST_Call(AST_BaseCall):
     "A function call expression"
     properties = {
-        'expression': "[AST_Node] expression to invoke as function"
+        'expression': "[AST_Node] expression to invoke as function",
+        'python_truthiness': "[bool] Whether to use Python truthiness for __call__ dispatch"
     }
 
     def _walk(self, visitor):
@@ -958,7 +962,8 @@ class AST_Unary(AST_Node):
         'operator': "[string] the operator",
         'expression': "[AST_Node] expression that this unary operator applies to",
         'parenthesized': "[bool] Whether this unary expression was parenthesized",
-        'overloaded': "[bool] Whether to use Python-style operator overloading dispatch"
+        'overloaded': "[bool] Whether to use Python-style operator overloading dispatch",
+        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 
     def _walk(self, visitor):
@@ -975,7 +980,8 @@ class AST_Binary(AST_Node):
         'left': "[AST_Node] left-hand side expression",
         'operator': "[string] the operator",
         'right': "[AST_Node] right-hand side expression",
-        'overloaded': "[bool] Whether to use Python-style operator overloading dispatch"
+        'overloaded': "[bool] Whether to use Python-style operator overloading dispatch",
+        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 
     def _walk(self, visitor):
@@ -1004,6 +1010,7 @@ class AST_Conditional(AST_Node):
         'condition': "[AST_Node]",
         'consequent': "[AST_Node]",
         'alternative': "[AST_Node]",
+        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 
     def _walk(self, visitor):
