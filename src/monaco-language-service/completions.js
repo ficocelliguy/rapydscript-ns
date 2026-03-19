@@ -9,6 +9,25 @@ import { SourceAnalyzer } from './analyzer.js';
 import { resolve_first_type } from './dts.js';
 
 // ---------------------------------------------------------------------------
+// Language keywords
+// ---------------------------------------------------------------------------
+
+/**
+ * RapydScript / Python keywords that are valid identifier-completion tokens.
+ * Shown in the `identifier` completion context only (not dot / import contexts).
+ */
+export const KEYWORDS = [
+    'and', 'as', 'assert', 'async', 'await',
+    'break', 'class', 'continue', 'def', 'del',
+    'elif', 'else', 'except', 'finally', 'for',
+    'from', 'global', 'if', 'import', 'in', 'is',
+    'lambda', 'nonlocal', 'not', 'or', 'pass',
+    'raise', 'return', 'try', 'while', 'with',
+    'yield',
+    'True', 'False', 'None',
+];
+
+// ---------------------------------------------------------------------------
 // Context detection
 // ---------------------------------------------------------------------------
 
@@ -267,7 +286,25 @@ export class CompletionEngine {
         const seen    = new Set();
 
         if (scopeMap) {
-            const symbols = scopeMap.getSymbolsAtPosition(position.lineNumber, position.column);
+            let symbols = scopeMap.getSymbolsAtPosition(position.lineNumber, position.column);
+
+            // Fallback: cursor is on a new line not yet covered by the last debounced parse
+            // (e.g. the user typed Return and is now on a line past the end of the last AST).
+            // Collect all symbols from all frames, innermost-first, so locals remain visible.
+            if (symbols.length === 0 && scopeMap.frames.length > 0) {
+                const all_frames = scopeMap.frames.slice().sort((a, b) => b.depth - a.depth);
+                const fallback_seen = new Set();
+                symbols = [];
+                for (const frame of all_frames) {
+                    for (const [name, sym] of frame.symbols) {
+                        if (!fallback_seen.has(name)) {
+                            fallback_seen.add(name);
+                            symbols.push(sym);
+                        }
+                    }
+                }
+            }
+
             for (const sym of symbols) {
                 if (!ctx.prefix || sym.name.startsWith(ctx.prefix)) {
                     if (!seen.has(sym.name)) {
@@ -279,7 +316,7 @@ export class CompletionEngine {
             }
         }
 
-        // Builtins (lowest priority) — use rich stub item when available
+        // Builtins (lower priority) — use rich stub item when available
         for (const name of this._builtinNames) {
             if (!seen.has(name) && (!ctx.prefix || name.startsWith(ctx.prefix))) {
                 seen.add(name);
@@ -288,6 +325,21 @@ export class CompletionEngine {
                     ? _builtin_to_item(stub, range, monacoKind)
                     : name_to_item(name, range, monacoKind)
                 );
+            }
+        }
+
+        // Keywords (lowest priority)
+        const kw_kind = monacoKind.Keyword !== undefined ? monacoKind.Keyword : monacoKind.Variable;
+        for (const kw of KEYWORDS) {
+            if (!seen.has(kw) && (!ctx.prefix || kw.startsWith(ctx.prefix))) {
+                seen.add(kw);
+                items.push({
+                    label:      kw,
+                    kind:       kw_kind,
+                    sortText:   '3_' + kw,
+                    insertText: kw,
+                    range,
+                });
             }
         }
 

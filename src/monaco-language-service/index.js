@@ -108,9 +108,12 @@ class RapydScriptLanguageService {
         this._builtins = new BuiltinsRegistry();
         this._builtins.enablePythonizeStrings();
 
-        // Merge BASE_BUILTINS + extra globals + DTS globals for completions
+        // Merge BASE_BUILTINS + DTS globals for completions.
+        // NOTE: _extraBuiltinNames (NS API keys like grow, growthAnalyze, etc.) are
+        // intentionally excluded here — they are handled by the DTS registry as dot-
+        // completions on ns.* and should NOT appear as free-floating identifier
+        // suggestions. They are still used for tokenization and diagnostics suppression.
         const builtin_names = BASE_BUILTINS
-            .concat(this._extraBuiltinNames)
             .concat(this._dts.getGlobalNames());
 
         this._completions    = new CompletionEngine(this._analyzer, {
@@ -318,8 +321,9 @@ class RapydScriptLanguageService {
         const new_names = this._dts.getGlobalNames();
         // Suppress undef warnings for newly added globals
         this._diagnostics.addGlobals(new_names);
-        // Rebuild builtin list so completions include new DTS names (preserve extraBuiltins)
-        const builtin_names = BASE_BUILTINS.concat(this._extraBuiltinNames).concat(new_names);
+        // Rebuild builtin list so completions include new DTS names.
+        // _extraBuiltinNames are excluded — they are dot-completions only (see constructor).
+        const builtin_names = BASE_BUILTINS.concat(new_names);
         this._completions = new CompletionEngine(this._analyzer, {
             virtualFiles:    this._virtualFiles,
             stdlibFiles:     this._stdlibFiles,

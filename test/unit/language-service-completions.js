@@ -26,6 +26,7 @@ var MockKind = {
     Class:     5,
     Variable:  6,
     Module:    8,
+    Keyword:   17,
 };
 
 // Mock Monaco position object
@@ -985,6 +986,114 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 var engine = make_engine({}, ['print', 'len', 'range'], null, null, { collections: COLLECTIONS_SRC });
                 var list = engine.getCompletions(null, pos(1, 7), "import ", MockKind);
                 assert_has(list, 'collections', 'collections module in import suggestions');
+            },
+        },
+
+        // ── Keyword completions ───────────────────────────────────────────
+
+        {
+            name: "keywords_present_in_scope_completions",
+            description: "Control-flow keywords appear in identifier completions",
+            run: function () {
+                var engine = make_engine();
+                var list = engine.getCompletions(null, pos(1, 1), "", MockKind);
+                assert_has(list, 'continue', 'continue keyword');
+                assert_has(list, 'break',    'break keyword');
+                assert_has(list, 'return',   'return keyword');
+                assert_has(list, 'for',      'for keyword');
+                assert_has(list, 'while',    'while keyword');
+                assert_has(list, 'if',       'if keyword');
+                assert_has(list, 'def',      'def keyword');
+                assert_has(list, 'class',    'class keyword');
+                assert_has(list, 'try',      'try keyword');
+                assert_has(list, 'pass',     'pass keyword');
+                assert_has(list, 'yield',    'yield keyword');
+                assert_has(list, 'True',     'True keyword');
+                assert_has(list, 'False',    'False keyword');
+                assert_has(list, 'None',     'None keyword');
+            },
+        },
+
+        {
+            name: "keywords_prefix_filter",
+            description: "Prefix filter narrows keyword completions",
+            run: function () {
+                var engine = make_engine();
+                var list = engine.getCompletions(null, pos(1, 4), "con", MockKind);
+                assert_has(list,    'continue', 'continue matches con');
+                assert_missing(list,'break',    'break does not match con');
+                assert_missing(list,'return',   'return does not match con');
+            },
+        },
+
+        {
+            name: "keywords_have_keyword_kind",
+            description: "Keyword completion items use the Keyword kind",
+            run: function () {
+                var engine = make_engine();
+                var list = engine.getCompletions(null, pos(1, 4), "con", MockKind);
+                var item = find_item(list, 'continue');
+                assert.ok(item, 'continue should be in suggestions');
+                assert.strictEqual(item.kind, MockKind.Keyword, 'continue should have Keyword kind');
+            },
+        },
+
+        {
+            name: "keywords_sort_after_builtins",
+            description: "Keywords sort after builtins (sortText '3_' vs '2_')",
+            run: function () {
+                var engine = make_engine({}, ['for_builtin_test']);
+                var list = engine.getCompletions(null, pos(1, 1), "", MockKind);
+                var builtin_item = find_item(list, 'for_builtin_test');
+                var kw_item      = find_item(list, 'for');
+                assert.ok(builtin_item, 'builtin should be present');
+                assert.ok(kw_item,      'keyword should be present');
+                assert.ok(builtin_item.sortText < kw_item.sortText,
+                    'builtin sorts before keyword: ' + builtin_item.sortText + ' vs ' + kw_item.sortText);
+            },
+        },
+
+        {
+            name: "keywords_not_in_dot_completions",
+            description: "Keywords do not appear in dot (attribute) completions",
+            run: function () {
+                var engine = make_engine();
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "class Dog:",
+                    "    def bark(self): return 'woof'",
+                    "d = Dog()",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(4, 1), "d.", MockKind);
+                assert_missing(list, 'continue', 'continue must not appear in dot completions');
+                assert_missing(list, 'return',   'return must not appear in dot completions');
+            },
+        },
+
+        {
+            name: "keywords_not_in_from_import_completions",
+            description: "Keywords do not appear in from X import completions",
+            run: function () {
+                var vf = { mymod: "def foo(): pass" };
+                var engine = make_engine(vf);
+                var list = engine.getCompletions(null, pos(1, 22), "from mymod import ", MockKind);
+                assert_missing(list, 'continue', 'continue must not appear in from-import completions');
+                assert_missing(list, 'return',   'return must not appear in from-import completions');
+            },
+        },
+
+        {
+            name: "keywords_deduplicated_from_builtins",
+            description: "Keywords that overlap with builtins are not duplicated",
+            run: function () {
+                // 'not', 'in', 'is' etc. are keywords; if any also appear as a builtin name
+                // they must not appear twice.
+                var engine = make_engine({}, ['True']);  // True is also a keyword
+                var list = engine.getCompletions(null, pos(1, 1), "", MockKind);
+                var true_items = list.suggestions.filter(function (s) { return s.label === 'True'; });
+                assert.strictEqual(true_items.length, 1, 'True should appear exactly once');
             },
         },
 

@@ -1,13 +1,15 @@
 
 ### libraries
 
+- keywords like continue are not tab-completable
+- bitburner - handle missed await / concurrency errors gracefully?
+   - two space tabs
+
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 
 - vscode plugin based on language service
 
 - export .t.ds for language service
-
-- add squiggle if import is misnamed / not found - needs testing
 
 - add opt-out for python truthyness
 - add web-repl flag for python truthiness?
@@ -53,7 +55,7 @@ differences.
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ Parenthesized with (multi-context)            │ 3.10+          │  - doesn't make sense in a web context                       │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
-│ Exception chaining raise X from Y             │ 3.0+           │ Plain raise only                                             │
+│ Exception chaining raise X from Y             │ 3.0+           │ - done                                           │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
 │ except* (exception groups)                    │ 3.11+          │ No support                                                   │
 ├───────────────────────────────────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤

@@ -62,41 +62,39 @@
 
 ---
 
----
-
 ## ❌ Not Supported — Missing from Baselib (runtime)
 
-| Feature | Priority |
-|---|---|
-| `format(value[, spec])` | 🟢 Low — not a builtin; `str.format()` and f-strings work |
-| `iter(callable, sentinel)` | 🟢 Low — two-arg form not supported; single-arg `iter(iterable)` works |
-| `slice(start, stop[, step])` | 🟢 Low — not a builtin object; list slicing syntax `a[1:5:2]` works |
-| `complex(real, imag)` | 🟢 Low — no complex number type |
-| `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access |
-| `str.expandtabs(tabsize)` | 🟢 Low |
-| `int.bit_length()` | 🟢 Low — useful for bit manipulation |
-| `float.is_integer()` | 🟢 Low |
+| Feature                             | Priority                                                               |
+|-------------------------------------|------------------------------------------------------------------------|
+| `format(value[, spec])`             | 🟢 Low — not a builtin; `str.format()` and f-strings work              |
+| `iter(callable, sentinel)`          | 🟢 Low — two-arg form not supported; single-arg `iter(iterable)` works |
+| `slice(start, stop[, step])`        | 🟢 Low — not a builtin object; list slicing syntax `a[1:5:2]` works    |
+| `complex(real, imag)`               | 🟢 Low — no complex number type                                        |
+| `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access                      |
+| `str.expandtabs(tabsize)`           | 🟢 Low                                                                 |
+| `int.bit_length()`                  | 🟢 Low — useful for bit manipulation                                   |
+| `float.is_integer()`                | 🟢 Low                                                                 |
 
 ---
 
 ## ❌ Not Supported — Parser / Syntax Level
 
-| Feature | Priority |
-|---|---|
-| `zip(strict=True)` | 🟢 Low |
-| Nested class definitions | 🟢 Low — noted as not yet fully implemented |
-| `__slots__` enforcement | 🟢 Low — accepted but does not restrict attribute assignment |
-| Complex number literals `3+4j` | 🟢 Low — no `j` suffix; no complex type |
-| `b'...'` bytes literals | 🟢 Low — no `b` prefix; use the `encodings` module for encoding work |
-| `except*` (exception groups, Python 3.11+) | 🟢 Low — no parser support |
-| `__new__` constructor hook | 🟢 Low — no alternative constructor support |
-| `__del__` destructor / finalizer | 🟢 Low — JS has no guaranteed finalizer |
-| `__hash__` dunder | 🟢 Low — not dispatched; set/dict use `===` object identity |
-| `__getattr__` / `__setattr__` / `__delattr__` | 🟢 Low — no attribute-access interception |
-| `__getattribute__` | 🟢 Low — no attribute-lookup override |
-| `__format__` dunder | 🟢 Low — `format()` builtin not defined; `__format__` not dispatched |
-| `__class_getitem__` | 🟢 Low — no `MyClass[T]` generic subscript syntax |
-| `__init_subclass__` hook | 🟢 Low |
+| Feature                                       | Priority                                                             |
+|-----------------------------------------------|----------------------------------------------------------------------|
+| `zip(strict=True)`                            | 🟢 Low                                                               |
+| Nested class definitions                      | 🟢 Low — noted as not yet fully implemented                          |
+| `__slots__` enforcement                       | 🟢 Low — accepted but does not restrict attribute assignment         |
+| Complex number literals `3+4j`                | 🟢 Low — no `j` suffix; no complex type                              |
+| `b'...'` bytes literals                       | 🟢 Low — no `b` prefix; use the `encodings` module for encoding work |
+| `except*` (exception groups, Python 3.11+)    | 🟢 Low — no parser support                                           |
+| `__new__` constructor hook                    | 🟢 Low — no alternative constructor support                          |
+| `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
+| `__hash__` dunder                             | 🟢 Low — not dispatched; set/dict use `===` object identity          |
+| `__getattr__` / `__setattr__` / `__delattr__` | 🟢 Low — no attribute-access interception                            |
+| `__getattribute__`                            | 🟢 Low — no attribute-lookup override                                |
+| `__format__` dunder                           | 🟢 Low — `format()` builtin not defined; `__format__` not dispatched |
+| `__class_getitem__`                           | 🟢 Low — no `MyClass[T]` generic subscript syntax                    |
+| `__init_subclass__` hook                      | 🟢 Low                                                               |
 
 ---
 
