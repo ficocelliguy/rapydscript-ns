@@ -2,15 +2,14 @@ RapydScript
 ===========
 
 
-[![Build Status](https://github.com/ficocelliguy/rapydscript-ns/CI/badge.svg)](https://github.com/ficocelliguy/rapydscript-ns/actions?query=workflow%3ACI)
-[![Downloads](https://img.shields.io/npm/dm/rapydscript-ng.svg)](https://www.npmjs.com/package/rapydscript-ng)
-[![Current Release](https://img.shields.io/npm/v/rapydscript-ng.svg)](https://www.npmjs.com/package/rapydscript-ng)
+[![Build Status](https://github.com/ficocelliguy/rapydscript-ns/actions/workflows/ci.yml/badge.svg)](https://github.com/ficocelliguy/rapydscript-ns/actions?query=workflow%3ACI)
+[![Current Release](https://img.shields.io/npm/v/rapydscript-ns)](https://www.npmjs.com/package/rapydscript-ns)
 [![Known Vulnerabilities](https://snyk.io/test/github/ficocelliguy/rapydscript-ns/badge.svg)](https://snyk.io/test/github/ficocelliguy/rapydscript-ns)
 
 This is a fork of the original RapydScript that adds many new (not always
 backwards compatible) features. For more on the forking, [see the bottom of this file](#reasons-for-the-fork)
 
-[Try RapydScript-ng live via an in-browser REPL!](https://ficocelliguy.github.io/rapydscript-ns/)
+[Try RapydScript-ns live via an in-browser REPL!](https://ficocelliguy.github.io/rapydscript-ns/)
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -116,17 +115,17 @@ learn a new language/framework is to dive in.
 Installation
 ------------
 
-[Try RapydScript-ng live via an in-browser REPL!](https://ficocelliguy.github.io/rapydscript-ns/)
+[Try RapydScript-ns live via an in-browser REPL!](https://ficocelliguy.github.io/rapydscript-ns/)
 
 First make sure you have installed the latest version of [node.js](https://nodejs.org/) (You may need to restart your computer after this step). 
 
 From NPM for use as a command line app:
 
-	npm install rapydscript-ng -g
+	npm install rapydscript-ns -g
 
 From NPM for use in your own node project:
 
-	npm install rapydscript-ng
+	npm install rapydscript-ns
 
 From Git:
 
@@ -2786,17 +2785,14 @@ completions, signature help, hover, DTS registry, and built-in stubs).
 Reasons for the fork
 ----------------------
 
-The fork was initially created because the original developer of RapydScript
-did not have the time to keep up with the pace of development. Since then, 
-development on the original RapydScript seems to have stalled completely.
-Also, there are certain disagreements on the future direction of RapydScript.
+The fork was created because both the original developer of RapydScript
+and the developer of the prior fork rapydscript-ng both did not have 
+the time to keep up with the pace of development. Rapydscript has not had
+any npm updates since 2020, and rapydscript-ng since 2022.
 
-Regardless, this fork is not a hostile fork, if development on the original
-ever resumes, they are welcome to use the code from this fork. I have kept all
-new code under the same license, to make that possible.
+This fork is not a hostile fork - if development on the prior versions
+ever resumes, they are welcome to use the code from this fork. All the
+new code is under the same license, to make that possible.
 
 See the [Changelog](https://github.com/ficocelliguy/rapydscript-ns/blob/master/CHANGELOG.md)
-for a list of changes to rapydscript-ng since the fork.
-
-For some discussion surrounding the fork, see 
-[this bug report](https://github.com/ficocelliguy/rapydscript-ns/issues/15)
+for a list of changes to rapydscript-ns, including this fork at version 8.0

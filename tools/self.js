@@ -91,7 +91,7 @@ function check_for_changes(base_path, src_path, signatures) {
 }
 
 
-function compile(src_path, lib_path, sources, source_hash, profile) {
+function compile(src_path, lib_path, sources, source_hash) {
     var file = path.join(src_path, 'compiler.pyj');
     var t1 = new Date().getTime();
     var RapydScript = require('./compiler').create_compiler();
@@ -116,15 +116,7 @@ function compile(src_path, lib_path, sources, source_hash, profile) {
 	}
 
     try {
-        if (profile) {
-            profiler = require('v8-profiler');
-            profiler.startProfiling();
-        }
         toplevel = parse_file(raw, file);
-        if (profile) {
-            cpu_profile = profiler.stopProfiling();
-            fs.writeFileSync('self.cpuprofile', JSON.stringify(cpu_profile), 'utf-8');
-        }
     } catch (e) {
         if (!(e instanceof RapydScript.SyntaxError)) throw e;
         console.error(e.toString());

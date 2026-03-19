@@ -5,6 +5,11 @@
 - bitburner - handle missed await / concurrency errors gracefully?
    - two space tabs
 
+- fix error from vuln report
+- https://socket.dev/npm/package/rapydscript-ns/alerts/0.8.1?tab=dependencies
+- https://snyk.io/test/github/ficocelliguy/rapydscript-ns
+- fix missing image from build status?
+
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 
 - vscode plugin based on language service
