@@ -277,6 +277,67 @@ def ρσ_type(x):
     return x.constructor
 
 
+def ρσ_issubclass(cls, base):
+    if Array.isArray(base):
+        for b in base:
+            if ρσ_issubclass(cls, b):
+                return True
+        return False
+    if jstype(cls) is not 'function':
+        raise TypeError('issubclass() arg 1 must be a class')
+    if jstype(base) is not 'function':
+        raise TypeError('issubclass() arg 2 must be a class')
+    if cls is base:
+        return True
+    v'var proto = cls.prototype; while (proto !== null && proto !== undefined) { if (proto === base.prototype) return true; proto = Object.getPrototypeOf(proto); }'
+    return False
+
+
+v'var ρσ_hash_id_counter = 0'
+
+def ρσ_hash(obj):
+    v'var ρσ_t = typeof obj'
+    v'if (obj === null || obj === undefined) return 0'
+    v'if (ρσ_t === "boolean") return obj ? 1 : 0'
+    v'if (ρσ_t === "number") { return (obj === Math.floor(obj)) ? (obj | 0) : ((obj * 2654435761) | 0); }'
+    v'''if (ρσ_t === "string") {
+        var ρσ_h = 5381;
+        for (var ρσ_i = 0; ρσ_i < obj.length; ρσ_i++) {
+            ρσ_h = (((ρσ_h << 5) + ρσ_h) ^ obj.charCodeAt(ρσ_i)) | 0;
+        }
+        return ρσ_h;
+    }'''
+    v'if (typeof obj.__hash__ === "function") return obj.__hash__()'
+    v'if (Array.isArray(obj)) throw new TypeError("unhashable type: \'list\'")'
+    v'if (typeof ρσ_set === "function" && obj instanceof ρσ_set) throw new TypeError("unhashable type: \'set\'")'
+    v'if (typeof Set === "function" && obj instanceof Set) throw new TypeError("unhashable type: \'set\'")'
+    v'if (typeof ρσ_dict === "function" && obj instanceof ρσ_dict) throw new TypeError("unhashable type: \'dict\'")'
+    v'if (typeof Map === "function" && obj instanceof Map) throw new TypeError("unhashable type: \'dict\'")'
+    v'if (!obj.constructor || obj.constructor === Object) throw new TypeError("unhashable type: \'dict\'")'
+    v'if (obj.ρσ_object_id === undefined) obj.ρσ_object_id = ++ρσ_hash_id_counter'
+    v'return obj.ρσ_object_id'
+
+
+def ρσ_next(iterator, defval):
+    if iterator is None or iterator is undefined:
+        raise TypeError('object is not an iterator')
+    if jstype(iterator.next) is 'function':
+        r = iterator.next()
+        if r.done:
+            if arguments.length > 1:
+                return defval
+            raise StopIteration()
+        return r.value
+    if jstype(iterator.__next__) is 'function':
+        try:
+            return iterator.__next__()
+        except StopIteration:
+            if arguments.length > 1:
+                return defval
+            raise
+    raise TypeError("object is not an iterator")
+
+
 def ρσ_divmod(x, y):
     if y is 0:
         raise ZeroDivisionError('integer division or modulo by zero')
@@ -307,6 +368,6 @@ v'var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), 
 v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod'
 v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round'
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'
-v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr'
+v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next'
 v'var ρσ_Ellipsis = Object.freeze({toString: function(){return "Ellipsis";}, __repr__: function(){return "Ellipsis";}})'
 v'var Ellipsis = ρσ_Ellipsis'

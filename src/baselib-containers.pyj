@@ -468,7 +468,7 @@ Object.defineProperties(ρσ_set.prototype, {
     return '{' + list(this).join(', ') + '}'
 
 ρσ_set.prototype.__eq__ = def(other):
-    if not v'other instanceof this.constructor':
+    if v'!other || !other.jsset':
         return False
     if other.size is not this.size:
         return False
@@ -488,6 +488,142 @@ def ρσ_set_wrap(x):
     return ans
 
 v'var set = ρσ_set, set_wrap = ρσ_set_wrap'
+# }}}
+
+# frozenset {{{
+def ρσ_frozenset(iterable):
+    if v'this instanceof ρσ_frozenset':
+        this.jsset = new ρσ_set_implementation()  # noqa:undef
+        ans = this
+        if iterable is undefined:
+            return ans
+        s = ans.jsset
+        if ρσ_arraylike(iterable):
+            for v'var i = 0; i < iterable.length; i++':
+                s.add(iterable[i])
+        elif jstype(iterable[ρσ_iterator_symbol]) is 'function':
+            iterator = iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
+            result = iterator.next()
+            while not result.done:
+                s.add(result.value)
+                result = iterator.next()
+        else:
+            keys = Object.keys(iterable)
+            for v'var j=0; j < keys.length; j++':
+                s.add(keys[j])
+        return ans
+    else:
+        return new ρσ_frozenset(iterable)
+ρσ_frozenset.prototype.__name__ = 'frozenset'
+
+Object.defineProperties(ρσ_frozenset.prototype, {
+    'length': { 'get': def(): return this.jsset.size; },
+    'size': { 'get': def(): return this.jsset.size; },
+})
+
+ρσ_frozenset.prototype.__len__ = def(): return this.jsset.size
+ρσ_frozenset.prototype.has = ρσ_frozenset.prototype.__contains__ = def(x): return this.jsset.has(x)
+ρσ_frozenset.prototype.copy = def(): return ρσ_frozenset(this)
+ρσ_frozenset.prototype[ρσ_iterator_symbol] = def(): return this.jsset.values()
+
+ρσ_frozenset.prototype.difference = def():
+    ans = new ρσ_frozenset()
+    s = ans.jsset
+    iterator = this.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        x = r.value
+        has = False
+        for v'var i = 0; i < arguments.length; i++':
+            if arguments[i].has(x):  # noqa:undef
+                has = True
+                break
+        if not has:
+            s.add(x)
+        r = iterator.next()
+    return ans
+
+ρσ_frozenset.prototype.intersection = def():
+    ans = new ρσ_frozenset()
+    s = ans.jsset
+    iterator = this.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        x = r.value
+        has = True
+        for v'var i = 0; i < arguments.length; i++':
+            if not arguments[i].has(x):  # noqa:undef
+                has = False
+                break
+        if has:
+            s.add(x)
+        r = iterator.next()
+    return ans
+
+ρσ_frozenset.prototype.isdisjoint = def(other):
+    iterator = this.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        x = r.value
+        if other.has(x):
+            return False
+        r = iterator.next()
+    return True
+
+ρσ_frozenset.prototype.issubset = def(other):
+    iterator = this.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        x = r.value
+        if not other.has(x):
+            return False
+        r = iterator.next()
+    return True
+
+ρσ_frozenset.prototype.issuperset = def(other):
+    s = this.jsset
+    iterator = other[ρσ_iterator_symbol]()
+    r = iterator.next()
+    while not r.done:
+        x = r.value
+        if not s.has(x):
+            return False
+        r = iterator.next()
+    return True
+
+ρσ_frozenset.prototype.symmetric_difference = def(other):
+    return this.union(other).difference(this.intersection(other))
+
+ρσ_frozenset.prototype.union = def():
+    ans = ρσ_frozenset(this)
+    s = ans.jsset
+    for v'var i=0; i < arguments.length; i++':
+        iterator = arguments[i][ρσ_iterator_symbol]()  # noqa:undef
+        r = iterator.next()
+        while not r.done:
+            s.add(r.value)
+            r = iterator.next()
+    return ans
+
+ρσ_frozenset.prototype.toString = ρσ_frozenset.prototype.__repr__ = ρσ_frozenset.prototype.__str__ = ρσ_frozenset.prototype.inspect = def():
+    return 'frozenset({' + list(this).join(', ') + '})'
+
+ρσ_frozenset.prototype.__eq__ = def(other):
+    if v'!other || !other.jsset':
+        return False
+    if other.size is not this.size:
+        return False
+    if other.size is 0:
+        return True
+    iterator = other[ρσ_iterator_symbol]()
+    r = iterator.next()
+    while not r.done:
+        if not this.has(r.value):
+            return False
+        r = iterator.next()
+    return True
+
+v'var frozenset = ρσ_frozenset'
 # }}}
 
 # dict {{{
@@ -703,6 +839,15 @@ Object.defineProperties(ρσ_dict.prototype, {
             return False
         r = iterator.next()
     return True
+
+ρσ_dict.prototype.__or__ = def(other):
+    result = ρσ_dict(this)
+    result.update(other)
+    return result
+
+ρσ_dict.prototype.__ior__ = def(other):
+    this.update(other)
+    return this
 
 ρσ_dict.prototype.as_object = def(other):
     ans = {}

@@ -18,6 +18,8 @@
 - update changelist for 8.0
 
 
+please implement full support for the first medium-priority item in the python feature coverage report. Add unit tests for these features. Update the coverage report and the README as needed.
+
 I would like you to add support for [  Python's extended subscript syntax where commas inside [] implicitly form a tuple ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README to mention this support.
 
 
@@ -279,7 +281,8 @@ If prioritizing what to implement next, these have the highest user impact:
 
 1. super() — required for idiomatic OOP code - done
 2. Operator overloading (__add__, __lt__, etc.) — blocks numerical/scientific code - done
-3. __bool__ / truthiness fix — silent Python compatibility trap
+3. __bool__ / truthiness fix — silent Python compatibility trap - done
+   → frozenset — first medium-priority missing builtin - done
 4. lambda keyword — commonly expected - done
 5. all() / any() — extremely common builtins - done
 6. functools.reduce / partial — core functional programming tools - done

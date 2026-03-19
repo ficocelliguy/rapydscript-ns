@@ -114,6 +114,11 @@ const STUBS = [
         return_type: 'any',
         doc: 'Return the value of the named attribute of obj. If not found, return default (or raise AttributeError).' }),
 
+    new BuiltinInfo({ name: 'hash',
+        params: [p('obj')],
+        return_type: 'int',
+        doc: 'Return the hash value of obj. Strings and numbers are hashed by value; class instances by identity. Raises TypeError for unhashable types (list, set, dict). Objects with __hash__ dispatch to it.' }),
+
     new BuiltinInfo({ name: 'hasattr',
         params: [p('obj'), p('name', { type: 'str' })],
         return_type: 'bool',
@@ -138,6 +143,11 @@ const STUBS = [
         params: [p('obj'), p('classinfo')],
         return_type: 'bool',
         doc: 'Return True if obj is an instance of classinfo (or a subclass thereof).' }),
+
+    new BuiltinInfo({ name: 'issubclass',
+        params: [p('cls'), p('classinfo')],
+        return_type: 'bool',
+        doc: 'Return True if cls is a subclass of classinfo. classinfo may be a class or tuple of classes.' }),
 
     new BuiltinInfo({ name: 'iter',
         params: [p('obj')],

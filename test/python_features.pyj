@@ -267,11 +267,100 @@ _test_list_multiply()
 # STATUS: ✓ WORKS (added in this release) — see §3 above
 
 # ── 16. frozenset ─────────────────────────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — frozenset is not defined.
-#
-#  fs = frozenset([1, 2, 3])
-#  ok(1 in fs)
-#  ae(len(fs), 3)
+# STATUS: ✓ WORKS (added in this release)
+
+def _test_frozenset():
+    # Construction from list
+    fs = frozenset([1, 2, 3])
+    ae(len(fs), 3)
+    ok(1 in fs)
+    ok(2 in fs)
+    ok(not (4 in fs))
+
+    # Construction from set
+    fs2 = frozenset({4, 5})
+    ae(len(fs2), 2)
+    ok(4 in fs2)
+
+    # Empty frozenset
+    empty = frozenset()
+    ae(len(empty), 0)
+    ok(not (1 in empty))
+
+    # Iteration
+    total = 0
+    for x in frozenset([10, 20, 30]):
+        total += x
+    ae(total, 60)
+
+    # isinstance
+    ok(isinstance(fs, frozenset))
+    ok(not isinstance([1, 2], frozenset))
+
+    # copy returns a frozenset with same elements
+    fc = fs.copy()
+    ok(isinstance(fc, frozenset))
+    ae(len(fc), len(fs))
+    ok(1 in fc)
+    ok(3 in fc)
+
+    # union — returns frozenset
+    u = frozenset([1, 2]).union(frozenset([2, 3]))
+    ok(isinstance(u, frozenset))
+    ae(len(u), 3)
+    ok(1 in u and 2 in u and 3 in u)
+
+    # union with multiple args
+    u2 = frozenset([1]).union(frozenset([2]), frozenset([3]))
+    ae(len(u2), 3)
+
+    # intersection — returns frozenset
+    inter = frozenset([1, 2, 3]).intersection(frozenset([2, 3, 4]))
+    ok(isinstance(inter, frozenset))
+    ae(len(inter), 2)
+    ok(2 in inter and 3 in inter)
+    ok(not (1 in inter))
+
+    # difference — returns frozenset
+    diff = frozenset([1, 2, 3]).difference(frozenset([2]))
+    ok(isinstance(diff, frozenset))
+    ae(len(diff), 2)
+    ok(1 in diff and 3 in diff)
+    ok(not (2 in diff))
+
+    # symmetric_difference — returns frozenset
+    sd = frozenset([1, 2, 3]).symmetric_difference(frozenset([2, 3, 4]))
+    ok(isinstance(sd, frozenset))
+    ae(len(sd), 2)
+    ok(1 in sd and 4 in sd)
+
+    # issubset / issuperset
+    ok(frozenset([1, 2]).issubset(frozenset([1, 2, 3])))
+    ok(not frozenset([1, 4]).issubset(frozenset([1, 2, 3])))
+    ok(frozenset([1, 2, 3]).issuperset(frozenset([2, 3])))
+    ok(not frozenset([1, 2]).issuperset(frozenset([1, 2, 3])))
+
+    # isdisjoint
+    ok(frozenset([1, 2]).isdisjoint(frozenset([3, 4])))
+    ok(not frozenset([1, 2]).isdisjoint(frozenset([2, 3])))
+
+    # __eq__ with another frozenset
+    ok(frozenset([1, 2, 3]).__eq__(frozenset([1, 2, 3])))
+    ok(not frozenset([1, 2]).__eq__(frozenset([1, 2, 3])))
+
+    # frozenset and set compare equal when same elements
+    ok(frozenset([1, 2, 3]).__eq__({1, 2, 3}))
+    ok({1, 2, 3}.__eq__(frozenset([1, 2, 3])))
+
+    # Mutation raises — these would throw TypeError in Python.
+    # frozenset has no add/remove/clear methods (immutable by design).
+    ok(not hasattr(fs, 'add'))
+    ok(not hasattr(fs, 'remove'))
+    ok(not hasattr(fs, 'discard'))
+    ok(not hasattr(fs, 'clear'))
+    ok(not hasattr(fs, 'update'))
+
+_test_frozenset()
 
 # ── 17. int.bit_length() ─────────────────────────────────────────────────────
 # STATUS: ✗ NOT SUPPORTED — Number prototype does not have bit_length.
@@ -284,9 +373,36 @@ _test_list_multiply()
 #  ae((1.0).is_integer(), True)
 
 # ── 19. dict | merge operator (Python 3.9+) ──────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — use {**a, **b} spread syntax instead.
+# STATUS: ✓ WORKS — requires `from __python__ import overload_operators, dict_literals`
 
-ade({**{'x': 1}, **{'y': 2}}, {'x': 1, 'y': 2})  # workaround works
+def _test_dict_merge_operator():
+    from __python__ import overload_operators, dict_literals
+    d1 = {'x': 1, 'y': 2}
+    d2 = {'y': 99, 'z': 3}
+
+    # d1 | d2 creates a new merged dict; d2 values win on conflict
+    merged = d1 | d2
+    ade(merged, {'x': 1, 'y': 99, 'z': 3})
+
+    # original dicts are unchanged
+    ade(d1, {'x': 1, 'y': 2})
+    ade(d2, {'y': 99, 'z': 3})
+
+    # empty dict merge
+    ade(d1 | {}, {'x': 1, 'y': 2})
+    ade({} | d1, {'x': 1, 'y': 2})
+
+    # |= updates in place
+    d3 = {'a': 1, 'b': 2}
+    d3 |= {'b': 20, 'c': 3}
+    ade(d3, {'a': 1, 'b': 20, 'c': 3})
+
+    # chained merges
+    base = {'k': 0}
+    r = base | {'k': 1} | {'k': 2}
+    ade(r, {'k': 2})
+
+_test_dict_merge_operator()
 
 # ── 20. for / else ───────────────────────────────────────────────────────────
 # STATUS: ✓ WORKS — see §5 above
@@ -848,15 +964,127 @@ ae(_c(), 3)
 #   ok(_MyPlugin in _Plugin.registry)
 
 # ── 53. issubclass() ─────────────────────────────────────────────────────────
-# STATUS: ✗ NOT IMPLEMENTED — issubclass() is not a builtin.
-# SKIP:
-#   ok(issubclass(bool, int))
-#   ok(not issubclass(str, int))
+# STATUS: ✓ WORKS
+
+class _ISC_Animal:
+    pass
+
+class _ISC_Dog(_ISC_Animal):
+    pass
+
+class _ISC_Poodle(_ISC_Dog):
+    pass
+
+class _ISC_Cat(_ISC_Animal):
+    pass
+
+class _ISC_Unrelated:
+    pass
+
+# every class is a subclass of itself
+ok(issubclass(_ISC_Dog, _ISC_Dog))
+ok(issubclass(_ISC_Animal, _ISC_Animal))
+
+# direct inheritance
+ok(issubclass(_ISC_Dog, _ISC_Animal))
+
+# transitive inheritance (grandchild)
+ok(issubclass(_ISC_Poodle, _ISC_Animal))
+ok(issubclass(_ISC_Poodle, _ISC_Dog))
+
+# sibling is not a subclass
+ok(not issubclass(_ISC_Cat, _ISC_Dog))
+ok(not issubclass(_ISC_Dog, _ISC_Cat))
+
+# parent is not a subclass of child
+ok(not issubclass(_ISC_Animal, _ISC_Dog))
+
+# unrelated class
+ok(not issubclass(_ISC_Unrelated, _ISC_Animal))
+
+# tuple form — True if subclass of any
+ok(issubclass(_ISC_Dog, (_ISC_Cat, _ISC_Animal)))
+ok(issubclass(_ISC_Poodle, (_ISC_Cat, _ISC_Dog)))
+ok(not issubclass(_ISC_Unrelated, (_ISC_Cat, _ISC_Dog)))
+
+# TypeError for non-class first arg
+_isc_err = None
+try:
+    issubclass(42, _ISC_Animal)
+except TypeError as e:
+    _isc_err = str(e)
+ok(_isc_err is not None)
+
+# TypeError for non-class second arg
+_isc_err2 = None
+try:
+    issubclass(_ISC_Dog, 'not_a_class')
+except TypeError as e:
+    _isc_err2 = str(e)
+ok(_isc_err2 is not None)
 
 # ── 54. hash() builtin ───────────────────────────────────────────────────────
-# STATUS: ✗ NOT IMPLEMENTED — Python's hash() builtin is not defined.
-# SKIP:
-#   ae(type(hash(42)), int)
+# STATUS: ✓ WORKS
+
+# None → 0
+ae(hash(None), 0)
+
+# booleans
+ae(hash(True), 1)
+ae(hash(False), 0)
+
+# integers — hash is the integer itself
+ae(hash(0), 0)
+ae(hash(42), 42)
+ae(hash(-1), -1)
+
+# floats that are whole numbers hash like ints
+ae(hash(3.0), 3)
+ae(hash(-7.0), -7)
+
+# strings — same string always gives same hash
+ae(hash('hello'), hash('hello'))
+ae(hash(''), hash(''))
+ok(hash('abc') != hash('xyz'))
+
+# result is always an integer
+ok(jstype(hash(42)) is 'number')
+ok(jstype(hash('hi')) is 'number')
+
+# objects with __hash__ — dispatched
+class _Hashable:
+    def __init__(self, val):
+        self.val = val
+    def __hash__(self):
+        return self.val * 7
+
+ae(hash(_Hashable(3)), 21)
+ae(hash(_Hashable(0)), 0)
+
+# class instances without __hash__ — stable identity hash
+_h1 = _Hashable(99)
+ae(hash(_h1), hash(_h1))   # consistent
+
+# distinct instances have different hashes (identity-based)
+class _Plain:
+    pass
+
+_p1 = _Plain()
+_p2 = _Plain()
+ok(hash(_p1) != hash(_p2))
+
+# unhashable types raise TypeError
+def _check_unhashable(val):
+    _caught = False
+    try:
+        hash(val)
+    except TypeError:
+        _caught = True
+    ok(_caught)
+
+_check_unhashable([1, 2, 3])
+_check_unhashable({1, 2})
+_check_unhashable({'a': 1})
 
 # ── 55. format(value, spec) builtin ──────────────────────────────────────────
 # STATUS: ✗ NOT IMPLEMENTED — format(value, spec) builtin is not defined.
@@ -865,12 +1093,43 @@ ae(_c(), 3)
 #   ae(format(3.14159, '.2f'), '3.14')
 
 # ── 56. next(iterator[, default]) builtin ────────────────────────────────────
-# STATUS: ✗ NOT IMPLEMENTED — Python's next() builtin is not defined.
-#         Iterators use the JS-style .next() method instead.
-# SKIP:
-#   it = iter([1, 2, 3])
-#   ae(next(it), 1)
-#   ae(next(it, 'done'), 2)
+# Basic list iteration
+it = iter([10, 20, 30])
+ae(next(it), 10)
+ae(next(it), 20)
+ae(next(it), 30)
+# Default value when exhausted
+ae(next(it, 'done'), 'done')
+ae(next(it, None), None)
+# StopIteration raised when exhausted and no default
+it2 = iter([])
+raised = False
+try:
+    next(it2)
+except StopIteration:
+    raised = True
+ae(raised, True)
+# Works with range iterator
+it3 = iter(range(3))
+ae(next(it3), 0)
+ae(next(it3), 1)
+ae(next(it3), 2)
+ae(next(it3, -1), -1)
+# Works with enumerate iterator
+it4 = iter(enumerate(['a', 'b']))
+_n4a = next(it4)
+ae(_n4a[0], 0); ae(_n4a[1], 'a')
+_n4b = next(it4)
+ae(_n4b[0], 1); ae(_n4b[1], 'b')
+ae(next(it4, 'end'), 'end')
+# Works with generator
+def _next_gen():
+    yield 100
+    yield 200
+g = _next_gen()
+ae(next(g), 100)
+ae(next(g), 200)
+ae(next(g, 'stop'), 'stop')
 
 # ── 57. iter(callable, sentinel) two-arg form ────────────────────────────────
 # STATUS: ✗ NOT IMPLEMENTED — two-argument iter(callable, sentinel) not supported.

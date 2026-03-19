@@ -898,6 +898,30 @@ merged = {**pd1, **pd2}   # isinstance(merged, dict) == True
 The spread items are translated using `Object.assign` for plain JS objects
 and `dict.update()` for Python dicts.
 
+### Dict merge operator `|` and `|=` (Python 3.9+)
+
+When `from __python__ import overload_operators, dict_literals` is active,
+Python dicts support the `|` (merge) and `|=` (update in-place) operators:
+
+```py
+from __python__ import overload_operators, dict_literals
+
+d1 = {'x': 1, 'y': 2}
+d2 = {'y': 99, 'z': 3}
+
+# Create a new merged dict — right-side values win on key conflict
+merged = d1 | d2   # {'x': 1, 'y': 99, 'z': 3}
+
+# Update d1 in place
+d1 |= d2           # d1 is now {'x': 1, 'y': 99, 'z': 3}
+```
+
+`d1 | d2` creates a new dict (neither operand is mutated).
+`d1 |= d2` merges `d2` into `d1` and returns `d1`.
+
+Without `overload_operators` the `|` symbol is bitwise OR — use
+`{**d1, **d2}` spread syntax as a flag-free alternative.
+
 
 ### Arithmetic operator overloading
 
@@ -1059,6 +1083,98 @@ triple(7)   # 21 — dispatches to triple.__call__(7)
 `callable(obj)` returns `True` when `__call__` is defined. The dispatch is
 automatic for all direct function-call expressions that are simple names
 (i.e. not method accesses like `obj.method()`).
+
+### `frozenset`
+
+RapydScript provides a full `frozenset` builtin — an immutable, unordered
+collection of unique elements, identical to Python's `frozenset`.
+
+```python
+fs = frozenset([1, 2, 3])
+len(fs)          # 3
+2 in fs          # True
+isinstance(fs, frozenset)  # True
+
+# Set operations return new frozensets
+a = frozenset([1, 2, 3])
+b = frozenset([2, 3, 4])
+a.union(b)                 # frozenset({1, 2, 3, 4})
+a.intersection(b)          # frozenset({2, 3})
+a.difference(b)            # frozenset({1})
+a.symmetric_difference(b)  # frozenset({1, 4})
+
+a.issubset(frozenset([1, 2, 3, 4]))   # True
+a.issuperset(frozenset([1, 2]))        # True
+a.isdisjoint(frozenset([5, 6]))        # True
+
+# Compares equal to a set with the same elements
+frozenset([1, 2]).__eq__({1, 2})  # True
+```
+
+Mutation methods (`add`, `remove`, `discard`, `clear`, `update`) are not
+present on `frozenset` instances, enforcing immutability at the API level.
+`frozenset` objects can be iterated and copied with `.copy()`.
+
+### `issubclass`
+
+`issubclass(cls, classinfo)` checks whether a class is a subclass of another
+class (or any class in a tuple of classes).  Every class is considered a
+subclass of itself.
+
+```python
+class Animal: pass
+class Dog(Animal): pass
+class Poodle(Dog): pass
+class Cat(Animal): pass
+
+issubclass(Dog, Animal)            # True
+issubclass(Poodle, Animal)         # True — transitive
+issubclass(Poodle, Dog)            # True
+issubclass(Dog, Dog)               # True — a class is its own subclass
+issubclass(Cat, Dog)               # False
+issubclass(Animal, Dog)            # False — parent is not a subclass of child
+
+# tuple form — True if cls is a subclass of any entry
+issubclass(Dog, (Cat, Animal))     # True
+issubclass(Poodle, (Cat, Dog))     # True
+```
+
+`TypeError` is raised when either argument is not a class.
+
+### `hash`
+
+`hash(obj)` returns an integer hash value for an object, following Python
+semantics:
+
+| Type | Hash rule |
+|---|---|
+| `None` | `0` |
+| `bool` | `1` for `True`, `0` for `False` |
+| `int` / whole `float` | the integer value itself |
+| other `float` | derived from the bit pattern |
+| `str` | djb2 algorithm — stable within a process |
+| object with `__hash__` | dispatches to `__hash__()` |
+| class instance | stable identity hash (assigned on first call) |
+| `list` | `TypeError: unhashable type: 'list'` |
+| `set` | `TypeError: unhashable type: 'set'` |
+| `dict` | `TypeError: unhashable type: 'dict'` |
+
+```python
+hash(None)        # 0
+hash(True)        # 1
+hash(42)          # 42
+hash(3.0)         # 3   (whole float → same as int)
+hash('hello')     # stable integer
+
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    def __hash__(self):
+        return self.x * 31 + self.y
+
+hash(Point(1, 2))  # 33
+```
 
 Loops
 -----
@@ -1894,11 +2010,25 @@ an ``__iter__`` method, just as you would in python. For example:
 	   print (x)  # Will print 1, 2, 3
 ```
 
-Note that unlike python, an iterators ``next()`` method does not return
-the next value, but instead an object with two properties: ``done and value``.
-``value`` is the next value and done will be ``True`` when the iterator is
-exhausted. No ``StopIteration`` exception is raised. These choices were
-made so that the iterator works with other JavaScript code.
+Internally, an iterator's ``.next()`` method returns a JavaScript object with
+two properties: ``done`` and ``value``. ``value`` is the next value and
+``done`` is ``True`` when the iterator is exhausted. This matches the
+JavaScript iterator protocol and allows interoperability with vanilla JS code.
+
+RapydScript also provides the Python-style ``next()`` builtin, which wraps
+this protocol transparently:
+
+```python
+it = iter([1, 2, 3])
+next(it)         # 1
+next(it)         # 2
+next(it, 'end')  # 3
+next(it, 'end')  # 'end'  (iterator exhausted, default returned)
+next(it)         # raises StopIteration
+```
+
+When the iterator is exhausted and no default is given, ``StopIteration``
+is raised — matching standard Python behaviour.
 
 Generators
 ------------

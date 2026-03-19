@@ -35,3 +35,6 @@ class AssertionError(Exception):
 
 class ZeroDivisionError(Exception):
     pass
+
+class StopIteration(Exception):
+    pass

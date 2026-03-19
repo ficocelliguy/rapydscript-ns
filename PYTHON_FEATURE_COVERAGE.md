@@ -53,6 +53,12 @@
 | Walrus operator `:=` | Fully supported: hoisted in `if`/`while` conditions at any scope; comprehension filter assigns to enclosing scope (Python-correct). |
 | `__call__` dunder dispatch | `obj()` dispatches to `obj.__call__(args)` for callable objects; `callable(obj)` also returns `True`; both forms work. Requires `from __python__ import truthiness`. |
 | **Truthiness / `__bool__`** | Full Python truthiness via `from __python__ import truthiness`: empty `[]`, `{}`, `set()`, `''` are falsy; `__bool__` is dispatched; `and`/`or` return operand values; `not`, `if`, `while`, `assert`, ternary all use `ρσ_bool()`. |
+| `frozenset(iterable)` | Immutable set: construction from list/set/iterable; `in`, `len()`, iteration, `copy()`, `union()`, `intersection()`, `difference()`, `symmetric_difference()`, `issubset()`, `issuperset()`, `isdisjoint()` — all return `frozenset`. `isinstance(x, frozenset)` works. Compares equal to a `set` with the same elements via `__eq__`. No mutation methods (`add`, `remove`, etc.). |
+| `issubclass(cls, classinfo)` | Checks prototype chain; `classinfo` may be a class or tuple of classes; every class is a subclass of itself; raises `TypeError` for non-class arguments. |
+| `hash(obj)` | Numbers hash by value (int identity, float → int form if whole); strings use djb2; `None` → 0; booleans → 0/1; objects with `__hash__` dispatch to it; class instances get a stable identity hash; `list`, `set`, `dict` raise `TypeError`. |
+| `next(iterator[, default])` | Advances a JS-protocol iterator (`{done, value}`); returns `default` when exhausted if provided, otherwise raises `StopIteration`. Works with `iter()`, `range()`, `enumerate()`, generators, and any object with a `.next()` or `__next__()` method. |
+| `StopIteration` exception | Defined as a builtin exception class; raised by `next()` when an iterator is exhausted and no default is given. |
+| `dict \| dict` and `dict \|= dict` (Python 3.9+) | Dict merge via `\|` creates a new merged dict (right-side values win); `\|=` updates in-place. Requires `from __python__ import overload_operators, dict_literals`. |
 
 ---
 
@@ -62,10 +68,6 @@
 
 | Feature | Priority |
 |---|---|
-| `frozenset` | 🟡 Medium — immutable set; needed for hashable set keys |
-| `issubclass(cls, base)` | 🟡 Medium — not a builtin; `isinstance` works |
-| `hash(obj)` | 🟡 Medium — not a builtin; set/dict use `===` identity |
-| `next(iterator[, default])` | 🟡 Medium — not a builtin; use JS-style `.next()` method on iterators |
 | `format(value[, spec])` | 🟢 Low — not a builtin; `str.format()` and f-strings work |
 | `iter(callable, sentinel)` | 🟢 Low — two-arg form not supported; single-arg `iter(iterable)` works |
 | `slice(start, stop[, step])` | 🟢 Low — not a builtin object; list slicing syntax `a[1:5:2]` works |
@@ -81,7 +83,6 @@
 
 | Feature | Priority |
 |---|---|
-| `dict \| dict` and `dict \|= dict` (Python 3.9+) | 🟡 Medium — workaround: `{**a, **b}` spread syntax works |
 | `zip(strict=True)` | 🟢 Low |
 | Nested class definitions | 🟢 Low — noted as not yet fully implemented |
 | `__slots__` enforcement | 🟢 Low — accepted but does not restrict attribute assignment |
