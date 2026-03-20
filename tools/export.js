@@ -145,7 +145,7 @@ function vrequire(name, base) {
     return load(modpath);
 }
 
-var UglifyJS = null, regenerator = null;
+var UglifyJS = null;
 var crypto = null, fs = require('fs');
 
 var current_virtual_files = null;
@@ -176,40 +176,6 @@ function uglify(x) {
     return ans.code;
 }
 
-function regenerate(code, beautify) {
-    var orig = fs.readFileSync;
-    fs.readFileSync = function(name) { 
-        if (!has(data, name)) {
-            throw {message: "Failed to readfile from data: " + name};
-        }
-        return data[name]; 
-    };
-    if (!regenerator) regenerator = vrequire('regenerator');
-    var ans;
-    if (code) {
-        try {
-            ans = regenerator.compile(code).code;
-        } catch (e) {
-            console.error('regenerator failed for code: ' + code + 'with error stack:\n' + e.stack);
-            throw e;
-        }
-        if (!beautify) ans = uglify(ans);
-    } else {
-        // Return the runtime
-        ans = regenerator.compile('', {includeRuntime:true}).code;
-        start = ans.indexOf('=') + 1;
-        end = ans.lastIndexOf('typeof');
-        end = ans.lastIndexOf('}(', end);
-        ans = ans.slice(start + 1, end);
-        if (!beautify) {
-            var extra = '})()';
-            ans = uglify(ans + extra).slice(0, extra.length);
-        }
-    }
-    fs.readFileSync = orig;
-    return ans;
-}
-
 if (typeof this != 'object' || typeof this.sha1sum !== 'function') {
     var sha1sum = function (data) { 
         if (!crypto) crypto = require('crypto');
@@ -222,8 +188,8 @@ if (typeof this != 'object' || typeof this.sha1sum !== 'function') {
 function create_compiler() {
     var compilerjs = data['compiler.js'];
     var module = {'id':'compiler', 'exports':{}};
-    var wrapped = '(function(module, exports, readfile, writefile, sha1sum, regenerate) {' + data['compiler.js'] + ';\n})';
-    vm.runInThisContext(wrapped, {'filename': 'compiler.js'})(module, module.exports, readfile_wrapper, writefile_wrapper, sha1sum, regenerate);
+    var wrapped = '(function(module, exports, readfile, writefile, sha1sum) {' + data['compiler.js'] + ';\n})';
+    vm.runInThisContext(wrapped, {'filename': 'compiler.js'})(module, module.exports, readfile_wrapper, writefile_wrapper, sha1sum);
     return module.exports;
 }
 

@@ -39,7 +39,6 @@
     "url": "https://github.com/ficocelliguy/rapydscript-ns.git"
   },
   "dependencies": {
-    "regenerator": ">= 0.12.1",
     "uglify-js": ">= 3.0.15"
   },
   "bin": {

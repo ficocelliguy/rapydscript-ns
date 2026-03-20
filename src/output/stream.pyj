@@ -1,6 +1,5 @@
 # vim:fileencoding=utf-8
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
-# globals:regenerate
 from __python__ import hash_literals
 
 from utils import make_predicate, defaults, repeat_string
@@ -254,18 +253,6 @@ class OutputStream:
         self.print(":")
         if self.options.space_colon:
             self.space()
-
-    def dump_yield(self):
-        self.indent()
-        self.spaced('var', 'ρσ_regenerator', '=', '{}')
-        self.end_statement()
-        code = 'ρσ_regenerator.regeneratorRuntime = ' + regenerate(False, self.options.beautify)
-        if self.options.beautify:
-            code = code.replace(/\/\/.*$/mg, '\n').replace(/^\s*$/gm, '')  # strip comments
-            ci = self.make_indent(0)
-            code = [ci + x for x in code.split('\n')].join('\n')
-        self.print(code + '})(ρσ_regenerator)')
-        self.end_statement()
 
     def get(self):
         return self.OUTPUT

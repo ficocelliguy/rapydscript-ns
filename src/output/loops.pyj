@@ -1,6 +1,5 @@
 # vim:fileencoding=utf-8
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
-# globals: regenerate
 from __python__ import hash_literals
 
 from ast import AST_BaseCall, AST_SymbolRef, AST_Array, AST_Unary, AST_Number, has_calls, AST_Seq, AST_ListComprehension, AST_Starred, is_node_type
@@ -436,8 +435,6 @@ def print_list_comprehension(self, output):
         output.with_block(def():
             body_out = output
             if is_generator:
-                if es5:
-                    body_out = OutputStream({'beautify':True})
                 body_out.indent()
                 body_out.print('function* js_generator()'), body_out.space(), body_out.print('{')
                 body_out.newline()
@@ -485,12 +482,6 @@ def print_list_comprehension(self, output):
             if is_generator:
                 output.set_indentation(previous_indentation)
                 body_out.newline(), body_out.indent(), body_out.print('}')  # end js_generator
-                if es5:
-                    transpiled = regenerate(body_out.get(), output.options.beautify).replace(/regeneratorRuntime.(wrap|mark)/g, 'ρσ_regenerator.regeneratorRuntime.$1')
-                    if output.options.beautify:
-                        ci = output.make_indent(0)
-                        transpiled = [ci + x for x in transpiled.split('\n')].join('\n')
-                    output.print(transpiled)
                 output.newline(), output.indent()
                 output.spaced('var', 'result', '=', 'js_generator.call(this)')
                 output.end_statement()
