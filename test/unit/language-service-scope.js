@@ -770,6 +770,186 @@ function make_tests(SourceAnalyzer, RS) {
             },
         },
 
+        // ── Return type inference ─────────────────────────────────────────
+
+        {
+            name: "infer_return_type_list_literal",
+            description: "return [] infers return_type = 'list'",
+            run: function () {
+                var m = analyze("def get_items():\n    return []");
+                var sym = find(m.getAllSymbols(), "get_items");
+                assert.ok(sym, "Expected 'get_items' symbol");
+                assert.strictEqual(sym.return_type, "list",
+                    "Expected return_type 'list', got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_dict_literal",
+            description: "return {} infers return_type = 'dict'",
+            run: function () {
+                var m = analyze("def get_map():\n    return {}");
+                var sym = find(m.getAllSymbols(), "get_map");
+                assert.ok(sym, "Expected 'get_map' symbol");
+                assert.strictEqual(sym.return_type, "dict",
+                    "Expected return_type 'dict', got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_string_literal",
+            description: "return 'hello' infers return_type = 'str'",
+            run: function () {
+                var m = analyze("def get_name():\n    return 'hello'");
+                var sym = find(m.getAllSymbols(), "get_name");
+                assert.ok(sym, "Expected 'get_name' symbol");
+                assert.strictEqual(sym.return_type, "str",
+                    "Expected return_type 'str', got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_number_literal",
+            description: "return 42 infers return_type = 'number'",
+            run: function () {
+                var m = analyze("def get_count():\n    return 42");
+                var sym = find(m.getAllSymbols(), "get_count");
+                assert.ok(sym, "Expected 'get_count' symbol");
+                assert.strictEqual(sym.return_type, "number",
+                    "Expected return_type 'number', got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_bool_literal",
+            description: "return True infers return_type = 'bool'",
+            run: function () {
+                var m = analyze("def is_valid():\n    return True");
+                var sym = find(m.getAllSymbols(), "is_valid");
+                assert.ok(sym, "Expected 'is_valid' symbol");
+                assert.strictEqual(sym.return_type, "bool",
+                    "Expected return_type 'bool', got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_constructor_call",
+            description: "return MyClass() infers return_type = 'MyClass'",
+            run: function () {
+                var m = analyze([
+                    "class MyClass:",
+                    "    def __init__(self):",
+                    "        pass",
+                    "def make():",
+                    "    return MyClass()",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "make");
+                assert.ok(sym, "Expected 'make' symbol");
+                assert.strictEqual(sym.return_type, "MyClass",
+                    "Expected return_type 'MyClass', got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_local_variable",
+            description: "return local_var infers type from local variable's inferred_class",
+            run: function () {
+                var m = analyze([
+                    "def get_items():",
+                    "    result = []",
+                    "    return result",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "get_items");
+                assert.ok(sym, "Expected 'get_items' symbol");
+                assert.strictEqual(sym.return_type, "list",
+                    "Expected return_type 'list' via local var, got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_consistent_multiple_returns",
+            description: "Multiple returns of the same type still infer correctly",
+            run: function () {
+                var m = analyze([
+                    "def get_name(flag):",
+                    "    if flag:",
+                    "        return 'yes'",
+                    "    return 'no'",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "get_name");
+                assert.ok(sym, "Expected 'get_name' symbol");
+                assert.strictEqual(sym.return_type, "str",
+                    "Expected return_type 'str' for consistent returns, got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_mixed_returns_no_inference",
+            description: "Mixed return types produce no inference (return_type stays null)",
+            run: function () {
+                var m = analyze([
+                    "def ambiguous(flag):",
+                    "    if flag:",
+                    "        return []",
+                    "    return 'nope'",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "ambiguous");
+                assert.ok(sym, "Expected 'ambiguous' symbol");
+                assert.strictEqual(sym.return_type, null,
+                    "Expected return_type null for mixed types, got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_bare_return_ignored",
+            description: "Bare return (no value) does not block inference from typed returns",
+            run: function () {
+                var m = analyze([
+                    "def maybe_get(flag):",
+                    "    if not flag:",
+                    "        return",
+                    "    return []",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "maybe_get");
+                assert.ok(sym, "Expected 'maybe_get' symbol");
+                assert.strictEqual(sym.return_type, "list",
+                    "Expected return_type 'list' ignoring bare return, got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_explicit_annotation_not_overwritten",
+            description: "An explicit -> annotation is not replaced by inference",
+            run: function () {
+                var m = analyze("def get_name() -> str:\n    return 42");
+                var sym = find(m.getAllSymbols(), "get_name");
+                assert.ok(sym, "Expected 'get_name' symbol");
+                assert.strictEqual(sym.return_type, "str",
+                    "Explicit annotation should win, got: " + sym.return_type);
+            },
+        },
+
+        {
+            name: "infer_return_type_nested_function_not_confused",
+            description: "Returns inside a nested function do not affect the outer function's type",
+            run: function () {
+                var m = analyze([
+                    "def outer():",
+                    "    def inner():",
+                    "        return 'text'",
+                    "    return []",
+                ].join("\n"));
+                var outer = find(m.getAllSymbols(), "outer");
+                var inner = find(m.getAllSymbols(), "inner");
+                assert.ok(outer, "Expected 'outer' symbol");
+                assert.ok(inner, "Expected 'inner' symbol");
+                assert.strictEqual(outer.return_type, "list",
+                    "outer return_type should be 'list', got: " + outer.return_type);
+                assert.strictEqual(inner.return_type, "str",
+                    "inner return_type should be 'str', got: " + inner.return_type);
+            },
+        },
+
     ];
 
     return TESTS;

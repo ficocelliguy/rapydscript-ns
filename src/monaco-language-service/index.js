@@ -36,6 +36,13 @@ class ModelState {
         this._timer    = null;
         this._scopeMap = null;  // most recent ScopeMap for this model
 
+        // Derive the module name from the model URI so this model's content can
+        // be registered in _virtualFiles for cross-file import resolution.
+        // e.g. URI path "/scripts/utils.py" → module name "utils"
+        const uri_path = (model.uri && (model.uri.path || model.uri.fsPath)) || '';
+        const basename = uri_path.split('/').pop() || '';
+        this._module_name = basename.replace(/\.pyj?x?$/, '') || null;
+
         // Run immediately on first attach
         this._schedule(0);
 
@@ -55,6 +62,12 @@ class ModelState {
         const code    = this._model.getValue();
         const opts    = { virtualFiles: service._virtualFiles, stdlibFiles: service._stdlibFiles };
 
+        // Register this model's content in the shared virtualFiles pool so other
+        // open models can resolve cross-file imports from it.
+        if (this._module_name) {
+            service._virtualFiles[this._module_name] = code;
+        }
+
         // Diagnostics (syntax errors + lint markers)
         const markers = service._diagnostics.check(code, {
             ...opts,
@@ -69,6 +82,10 @@ class ModelState {
     dispose() {
         clearTimeout(this._timer);
         this._subscription.dispose();
+        // Remove this model's content from the virtualFiles pool on detach.
+        if (this._module_name) {
+            delete this._service._virtualFiles[this._module_name];
+        }
         // Clear markers when detaching
         this._service._monaco.editor.setModelMarkers(this._model, LANGUAGE_ID, []);
     }

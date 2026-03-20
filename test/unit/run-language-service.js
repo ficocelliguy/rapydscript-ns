@@ -24,6 +24,7 @@ var FILES = [
     "language-service-hover.js",
     "language-service-dts.js",
     "language-service-builtins.js",
+    "language-service-index.js",
     "language-service-bundle.js",
     "web-repl.js",
 ];

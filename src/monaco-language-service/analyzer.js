@@ -47,6 +47,95 @@ function dot_path_from_node(node, RS) {
 }
 
 /**
+ * Infer the type of a single return-value expression.
+ * Returns a type string ('list', 'dict', 'str', 'number', 'bool', or a class name),
+ * or null if the type cannot be determined from this expression alone.
+ *
+ * @param {object}     node   - The AST expression node (return value)
+ * @param {ScopeFrame} scope  - The function's own scope frame (fully populated)
+ * @param {object}     RS     - RapydScript compiler object
+ * @returns {string|null}
+ */
+function infer_expr_type(node, scope, RS) {
+    if (node instanceof RS.AST_Array)  return 'list';
+    if (node instanceof RS.AST_Object) return 'dict';
+    if (node instanceof RS.AST_String) return 'str';
+    if (node instanceof RS.AST_Number) return 'number';
+    if ((RS.AST_True  && node instanceof RS.AST_True) ||
+        (RS.AST_False && node instanceof RS.AST_False)) return 'bool';
+    if (RS.AST_Null && node instanceof RS.AST_Null) return null;  // None → not counted
+
+    if (node instanceof RS.AST_SymbolRef) {
+        const sym = scope ? scope.getSymbol(node.name) : null;
+        return (sym && sym.inferred_class) ? sym.inferred_class : null;
+    }
+
+    if (node instanceof RS.AST_BaseCall && node.expression instanceof RS.AST_SymbolRef) {
+        const name = node.expression.name;
+        // PascalCase → assume class constructor, use name as type
+        if (/^[A-Z]/.test(name)) return name;
+        // Known local function with an already-resolved return_type
+        const sym = scope ? scope.getSymbol(name) : null;
+        if (sym && sym.return_type) return sym.return_type;
+    }
+
+    return null;
+}
+
+/**
+ * Walk a function node's body, collect all return-expression types, and return
+ * the single inferred type if every non-None return agrees on one type.
+ * Skips nested function bodies (their returns don't belong to this function).
+ * Returns null if returns disagree, are unrecognised, or the body has no typed returns.
+ *
+ * @param {object}     func_node  - AST_Lambda node
+ * @param {ScopeFrame} func_scope - The function's own scope frame (already populated)
+ * @param {object}     RS         - RapydScript compiler object
+ * @returns {string|null}
+ */
+function collect_return_type(func_node, func_scope, RS) {
+    const types = new Set();
+    // Use a plain visitor object (same pattern as ScopeBuilder): _visit(node, descend)
+    // receives the node and a closure that walks its children; call descend() to recurse.
+    func_node.walk({
+        _visit: function (node, descend) {
+            // Stop descent into nested functions — their returns are not ours.
+            if (node !== func_node && node instanceof RS.AST_Lambda) return;
+            if (node instanceof RS.AST_Return && node.value) {
+                const t = infer_expr_type(node.value, func_scope, RS);
+                if (t) types.add(t);
+            }
+            if (descend) descend();  // recurse into children
+        },
+    });
+    return types.size === 1 ? [...types][0] : null;
+}
+
+/**
+ * Extract the return type annotation from a function node as a normalized string.
+ * Maps `-> [X]` to 'list', `-> {k: v}` to 'dict', `-> str` to 'str', etc.
+ * Returns null if no annotation or unrecognised shape.
+ * @param {object} func_node
+ * @param {object} RS
+ * @returns {string|null}
+ */
+function extract_return_type(func_node, RS) {
+    const ann = func_node.return_annotation;
+    if (!ann) return null;
+    if (ann instanceof RS.AST_Array) return 'list';
+    if (ann instanceof RS.AST_Object) return 'dict';
+    if (ann instanceof RS.AST_SymbolRef ||
+        (RS.AST_SymbolVar && ann instanceof RS.AST_SymbolVar)) {
+        const n = ann.name;
+        if (n === 'str' || n === 'string') return 'str';
+        if (n === 'int' || n === 'float' || n === 'number') return 'number';
+        if (n === 'bool' || n === 'boolean') return 'bool';
+        return n;  // user-defined class name or 'list'/'dict' spelled out
+    }
+    return null;
+}
+
+/**
  * Collect parameter descriptors from an AST_Lambda node.
  * Handles regular args, positional-only (/), keyword-only (*), *args, and **kwargs.
  * Each entry: { name, is_rest, is_kwargs, is_posonly, is_kwonly, is_separator }
@@ -94,10 +183,11 @@ function extract_params(lambda_node) {
 
 class ScopeBuilder {
     constructor(RS, map) {
-        this._RS          = RS;
-        this._map         = map;
-        this._scopes      = [];   // stack of ScopeFrame
-        this.current_node = null;
+        this._RS                  = RS;
+        this._map                 = map;
+        this._scopes              = [];   // stack of ScopeFrame
+        this.current_node         = null;
+        this._current_from_module = null; // set while inside an AST_Import with argnames
     }
 
     _current_scope() {
@@ -143,6 +233,9 @@ class ScopeBuilder {
             params:         opts.params         || null,
             inferred_class: opts.inferred_class || null,
             dts_call_path:  opts.dts_call_path  || null,
+            return_type:    opts.return_type    || null,
+            source_module:  opts.source_module  || null,
+            original_name:  opts.original_name  || null,
         });
         scope.addSymbol(sym);
         return sym;
@@ -176,6 +269,7 @@ class ScopeBuilder {
                         scope_depth: parent.depth,
                         doc:         extract_doc(node),
                         params:      extract_params(node),
+                        return_type: extract_return_type(node, RS),
                     });
                     parent.addSymbol(sym);
                 }
@@ -239,18 +333,28 @@ class ScopeBuilder {
                 defined_at: pos_from_token(node.start),
             });
 
+        } else if (node instanceof RS.AST_Import && node.argnames) {
+            // `from X import name [as alias], ...` — record module name so children can use it.
+            const mod_node = node.module;
+            this._current_from_module = mod_node
+                ? (mod_node.name || mod_node.value || null)
+                : null;
+
         } else if (node instanceof RS.AST_ImportedVar) {
             // `from X import name` or `from X import name as alias`
-            const name = (node.alias && node.alias.name) ? node.alias.name : node.name;
-            if (name) {
+            const alias = (node.alias && node.alias.name) ? node.alias.name : node.name;
+            if (alias) {
                 this._add_symbol({
-                    name,
-                    kind:       'import',
-                    defined_at: pos_from_token(node.start),
+                    name:          alias,
+                    kind:          'import',
+                    defined_at:    pos_from_token(node.start),
+                    source_module: this._current_from_module || null,
+                    original_name: (node.name !== alias) ? node.name : null,
                 });
             }
 
         } else if (node instanceof RS.AST_Import && !node.argnames) {
+            this._current_from_module = null;
             // `import X` or `import X as Y` (no from-clause)
             const name = (node.alias && node.alias.name)
                 ? node.alias.name
@@ -455,6 +559,24 @@ class ScopeBuilder {
         // ------------------------------------------------------------------
 
         if (cont) cont();
+
+        // ------------------------------------------------------------------
+        // 3b. Post-traversal: infer return type for unannotated functions.
+        //     The function's own scope is fully populated at this point, so
+        //     local variable inferred_class values are available for lookup.
+        // ------------------------------------------------------------------
+
+        if (node instanceof RS.AST_Lambda && this._scopes.length > prev_depth) {
+            const func_scope   = this._current_scope();
+            const parent_frame = func_scope ? func_scope.parent : null;
+            const fname        = node.name ? node.name.name : null;
+            if (fname && parent_frame) {
+                const sym = parent_frame.getSymbol(fname);
+                if (sym && !sym.return_type) {
+                    sym.return_type = collect_return_type(node, func_scope, RS);
+                }
+            }
+        }
 
         // ------------------------------------------------------------------
         // 4. Pop the scope we pushed (if any).

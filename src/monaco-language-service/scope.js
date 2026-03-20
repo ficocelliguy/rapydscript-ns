@@ -30,6 +30,9 @@ export class SymbolInfo {
         this.inferred_class = opts.inferred_class || null;  // 'ClassName' when x = ClassName(...)
         this.dts_call_path  = opts.dts_call_path  || null;  // 'ns.getServer' when x = ns.getServer(...)
         this.type           = null;              // Phase 6: TypeInfo
+        this.return_type    = opts.return_type   || null;  // annotated return type, e.g. 'list', 'str', 'MyClass'
+        this.source_module  = opts.source_module || null;  // module name when kind='import' (from X import Y)
+        this.original_name  = opts.original_name || null;  // pre-alias name for imports (from X import Y as Z → 'Y')
     }
 }
 

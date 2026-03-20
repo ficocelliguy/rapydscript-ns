@@ -45,6 +45,13 @@ export const KEYWORDS = [
  * @returns {{ type: string, objectName?: string, moduleName?: string, prefix: string }}
  */
 export function detect_context(linePrefix) {
+    // `obj.method().attr` — dot access on a call result (single-level call expression).
+    // Must be checked before the plain dot match since `[\w.]+` cannot span `()`.
+    const call_result_match = linePrefix.match(/([\w.]+)\([^)]*\)\.([\w]*)$/);
+    if (call_result_match) {
+        return { type: 'call_result', callPath: call_result_match[1], prefix: call_result_match[2] };
+    }
+
     // `obj.attr` or `obj.sub.attr` — dot access (captures multi-level path)
     const dot_match = linePrefix.match(/([\w.]+)\.([\w]*)$/);
     if (dot_match) {
@@ -265,6 +272,9 @@ export class CompletionEngine {
     getCompletions(scopeMap, position, linePrefix, monacoKind) {
         const ctx = detect_context(linePrefix);
 
+        if (ctx.type === 'call_result') {
+            return { suggestions: this._call_result_completions(position, ctx, monacoKind, scopeMap) };
+        }
         if (ctx.type === 'dot') {
             return { suggestions: this._dot_completions(scopeMap, position, ctx, monacoKind) };
         }
@@ -346,6 +356,82 @@ export class CompletionEngine {
         return items;
     }
 
+    // ---- Return-type helpers -----------------------------------------------
+
+    /**
+     * Analyze a module and return the `return_type` of a named function.
+     * @param {string} func_name
+     * @param {string} module_name
+     * @returns {string|null}
+     */
+    _get_return_type_from_module(func_name, module_name) {
+        const src = this._virtualFiles[module_name] || this._stdlibFiles[module_name];
+        if (!src) return null;
+        let mod_map;
+        try {
+            mod_map = this._analyzer.analyze(src, {});
+        } catch (_e) {
+            return null;
+        }
+        const mod_frame = mod_map.frames.find(f => f.kind === 'module');
+        if (!mod_frame) return null;
+        const fn_sym = mod_frame.getSymbol(func_name);
+        if (fn_sym && fn_sym.return_type) return fn_sym.return_type;
+        return null;
+    }
+
+    /**
+     * Resolve a type name (e.g. from inferred_class) through function return annotations,
+     * including cross-file imports. Returns the resolved type name, or null if unresolvable.
+     * @param {string} name
+     * @param {import('./scope.js').ScopeMap} scopeMap
+     * @returns {string|null}
+     */
+    _resolve_type_through_functions(name, scopeMap) {
+        let sym = null;
+        for (const frame of scopeMap.frames) {
+            const s = frame.getSymbol(name);
+            if (s) { sym = s; break; }
+        }
+        if (!sym) return null;
+
+        if (sym.kind === 'function' || sym.kind === 'method') {
+            // return_type is set by explicit annotation or inferred by the analyzer
+            if (sym.return_type) return sym.return_type;
+            return null;
+        }
+
+        if (sym.kind === 'import' && sym.source_module) {
+            const orig = sym.original_name || sym.name;
+            return this._get_return_type_from_module(orig, sym.source_module);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the member map for a given type name.
+     * Checks builtins, then user class frames. Returns null if unknown.
+     * @param {string} type_name
+     * @param {import('./scope.js').ScopeMap|null} scopeMap
+     * @returns {Map|null}
+     */
+    _get_members_for_type(type_name, scopeMap) {
+        if (!type_name) return null;
+        if (this._builtins) {
+            const m = this._builtins.getTypeMembers(type_name);
+            if (m) return m;
+        }
+        if (scopeMap) {
+            for (const frame of scopeMap.frames) {
+                if (frame.kind === 'class' && frame.name === type_name) {
+                    return frame.symbols;
+                }
+            }
+        }
+        return null;
+    }
+
     // ---- Dot completions ---------------------------------------------------
 
     _dot_completions(scopeMap, position, ctx, monacoKind) {
@@ -413,6 +499,13 @@ export class CompletionEngine {
                 }
             }
 
+            // Resolve class_name through function return type annotations.
+            // e.g. x = getAllServers() → inferred_class='getAllServers' → resolve 'list'
+            if (class_name) {
+                const resolved = this._resolve_type_through_functions(class_name, scopeMap);
+                if (resolved) class_name = resolved;
+            }
+
             if (class_name) {
                 for (const frame of scopeMap.frames) {
                     if (frame.kind === 'class' && frame.name === class_name) {
@@ -433,7 +526,13 @@ export class CompletionEngine {
         // 1.5. Built-in type members — list, str, dict, number.
         //      Used when inferred_class names a built-in type, not a user class.
         if (!scope_matched && this._builtins && obj_sym && obj_sym.inferred_class) {
-            const members = this._builtins.getTypeMembers(obj_sym.inferred_class);
+            // Re-resolve in case inferred_class itself is a function name.
+            let type_name = obj_sym.inferred_class;
+            if (scopeMap) {
+                const resolved = this._resolve_type_through_functions(type_name, scopeMap);
+                if (resolved) type_name = resolved;
+            }
+            const members = this._builtins.getTypeMembers(type_name);
             if (members) {
                 scope_matched = true;
                 for (const [name, member] of members) {
@@ -487,6 +586,76 @@ export class CompletionEngine {
                         if (!seen.has(name)) {
                             seen.add(name);
                             items.push(_dts_member_to_item(member, range, monacoKind));
+                        }
+                    }
+                }
+            }
+        }
+
+        return items;
+    }
+
+    // ---- Call-result dot completions (e.g. ns.self().attr) -----------------
+
+    _call_result_completions(position, ctx, monacoKind, scopeMap) {
+        const range     = word_range(position, ctx.prefix);
+        const items     = [];
+        const seen      = new Set();
+        const call_path = ctx.callPath;
+        const last_dot  = call_path.lastIndexOf('.');
+
+        // --- DTS path (existing logic) ---
+        if (this._dts) {
+            let member_ti = null;
+            if (last_dot > 0) {
+                const object_path = call_path.slice(0, last_dot);
+                const method_name = call_path.slice(last_dot + 1);
+                member_ti = this._dts.getMemberInfo(object_path, method_name);
+            } else {
+                member_ti = this._dts.getGlobal(call_path);
+            }
+            if (member_ti && member_ti.return_type) {
+                const return_ti = this._dts.getGlobal(resolve_first_type(member_ti.return_type));
+                if (return_ti && return_ti.members) {
+                    for (const [name, member] of return_ti.members) {
+                        if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                            seen.add(name);
+                            items.push(_dts_member_to_item(member, range, monacoKind));
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- User-defined function return types (scopeMap) ---
+        if (scopeMap && last_dot < 0) {
+            // Simple call like getAllServers() — look up function in scope
+            let sym = null;
+            for (const frame of scopeMap.frames) {
+                const s = frame.getSymbol(call_path);
+                if (s) { sym = s; break; }
+            }
+            if (sym) {
+                let return_type = null;
+                if (sym.kind === 'function' || sym.kind === 'method') {
+                    return_type = sym.return_type;
+                } else if (sym.kind === 'import' && sym.source_module) {
+                    const orig = sym.original_name || sym.name;
+                    return_type = this._get_return_type_from_module(orig, sym.source_module);
+                }
+                if (return_type) {
+                    const members = this._get_members_for_type(return_type, scopeMap);
+                    if (members) {
+                        for (const [name, member] of members) {
+                            if (!seen.has(name) && (!ctx.prefix || name.startsWith(ctx.prefix))) {
+                                seen.add(name);
+                                // members may be SymbolInfo (class frame) or TypeInfo/BuiltinInfo
+                                const item = member.kind === 'function' || member.kind === 'method' ||
+                                             member.kind === 'variable' || member.kind === 'parameter'
+                                    ? symbol_to_item(member, range, monacoKind, '0')
+                                    : _dts_member_to_item(member, range, monacoKind);
+                                items.push(item);
+                            }
                         }
                     }
                 }

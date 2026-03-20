@@ -2875,6 +2875,41 @@ assrt.equal(fib(15), 610)
     },
 
     {
+        name: "python_flag_truthiness_via_scoped_flags",
+        description: "truthiness flag via scoped_flags wraps if-conditions with ρσ_bool(; plain code does not",
+        run: function() {
+            var src = "if x:\n    pass";
+            var src_inline  = "from __python__ import truthiness\n" + src;
+            var js_inline   = compile(src_inline);
+            var js_flagged  = compile_with_flags(src, { truthiness: true });
+            var js_plain    = compile(src);
+            assert.ok(/if\s*\(ρσ_bool\(/.test(js_inline),
+                "inline import: expected if(ρσ_bool( in: " + js_inline);
+            assert.ok(/if\s*\(ρσ_bool\(/.test(js_flagged),
+                "scoped_flags: expected if(ρσ_bool( in: " + js_flagged);
+            assert.ok(!/if\s*\(ρσ_bool\(/.test(js_plain),
+                "no flag: if(ρσ_bool( should NOT appear in: " + js_plain);
+        },
+    },
+
+    {
+        name: "python_flag_truthiness_via_python_flags_option",
+        description: "truthiness passed as python_flags string to embedded_compiler wraps if-conditions",
+        run: function() {
+            var make_ec = require("../../tools/embedded_compiler.js");
+            var src = "if x:\n    pass";
+            var ec_with = make_ec(RapydScript, baselib, null);
+            var js_with = ec_with.compile(src, { python_flags: "truthiness" });
+            assert.ok(/if\s*\(ρσ_bool\(/.test(js_with),
+                "python_flags='truthiness': expected if(ρσ_bool( in: " + js_with);
+            var ec_without = make_ec(RapydScript, baselib, null);
+            var js_without = ec_without.compile(src, {});
+            assert.ok(!/if\s*\(ρσ_bool\(/.test(js_without),
+                "no python_flags: if(ρσ_bool( should NOT appear in: " + js_without);
+        },
+    },
+
+    {
         name: "python_flag_all_flags_runtime",
         description: "overload_operators + overload_getitem work correctly at runtime via scoped_flags",
         src: [

@@ -1097,6 +1097,186 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
             },
         },
 
+        // ── Return-type inference ─────────────────────────────────────────
+
+        {
+            name: "return_type_local_fn_list_annotation",
+            description: "def fn() -> [str]: — call result completions include list members",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var engine = make_engine({}, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "def getAllServers() -> [str]:",
+                    "    return []",
+                    "pass",
+                ].join("\n"), {});
+
+                // fn().l — call_result context
+                var list = engine.getCompletions(scopeMap, pos(3, 18), "getAllServers().", MockKind);
+                assert_has(list, 'length', 'list.length via call_result return type');
+                assert_has(list, 'append', 'list.append via call_result return type');
+            },
+        },
+
+        {
+            name: "return_type_local_fn_dot_var",
+            description: "x = fn() where fn() -> [str] — x. completions include list members",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var engine = make_engine({}, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "def getAllServers() -> [str]:",
+                    "    return []",
+                    "servers = getAllServers()",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(4, 9), "servers.", MockKind);
+                assert_has(list, 'length', 'list.length on var assigned from annotated fn');
+                assert_has(list, 'append', 'list.append on var assigned from annotated fn');
+            },
+        },
+
+        {
+            name: "return_type_imported_fn_call_result",
+            description: "getAllServers().l — imported fn with -> [str] annotation suggests list members",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var servers_src = [
+                    "def getAllServers() -> [str]:",
+                    "    return []",
+                ].join("\n");
+                var engine = make_engine({ servers: servers_src }, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "from servers import getAllServers",
+                    "pass",
+                ].join("\n"), {});
+
+                // getAllServers().l — call_result context
+                var list = engine.getCompletions(scopeMap, pos(2, 18), "getAllServers().", MockKind);
+                assert_has(list, 'length', 'list.length via cross-file return type (call_result)');
+                assert_has(list, 'append', 'list.append via cross-file return type (call_result)');
+            },
+        },
+
+        {
+            name: "return_type_imported_fn_dot_var",
+            description: "x = getAllServers() from import — x. includes list members",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var servers_src = [
+                    "def getAllServers() -> [str]:",
+                    "    return []",
+                ].join("\n");
+                var engine = make_engine({ servers: servers_src }, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "from servers import getAllServers",
+                    "servers = getAllServers()",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(3, 10), "servers.", MockKind);
+                assert_has(list, 'length', 'list.length on var from cross-file fn');
+                assert_has(list, 'append', 'list.append on var from cross-file fn');
+            },
+        },
+
+        // ── Inferred return type for imported functions (no annotation) ───────
+
+        {
+            name: "return_type_imported_fn_inferred_call_result",
+            description: "imported fn with no annotation, return [] — call result completions include list members",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var servers_src = [
+                    "def getAllServers():",
+                    "    return []",
+                ].join("\n");
+                var engine = make_engine({ servers: servers_src }, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "from servers import getAllServers",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 18), "getAllServers().", MockKind);
+                assert_has(list, 'length', 'list.length via inferred cross-file return type (call_result)');
+                assert_has(list, 'append', 'list.append via inferred cross-file return type (call_result)');
+            },
+        },
+
+        {
+            name: "return_type_imported_fn_inferred_dot_var",
+            description: "x = fn() from import, fn returns [] — x. includes list members",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var servers_src = [
+                    "def getAllServers():",
+                    "    return []",
+                ].join("\n");
+                var engine = make_engine({ servers: servers_src }, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "from servers import getAllServers",
+                    "servers = getAllServers()",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(3, 10), "servers.", MockKind);
+                assert_has(list, 'length', 'list.length on var from inferred cross-file fn');
+                assert_has(list, 'append', 'list.append on var from inferred cross-file fn');
+            },
+        },
+
+        {
+            name: "return_type_imported_fn_inferred_dict",
+            description: "imported fn with return {} — call result completions include dict members",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var utils_src = [
+                    "def get_config():",
+                    "    return {}",
+                ].join("\n");
+                var engine = make_engine({ utils: utils_src }, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "from utils import get_config",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 14), "get_config().", MockKind);
+                assert_has(list, 'keys', 'dict.keys via inferred cross-file return type');
+                assert_has(list, 'values', 'dict.values via inferred cross-file return type');
+            },
+        },
+
+        {
+            name: "return_type_imported_fn_inferred_consistent_branches",
+            description: "imported fn with multiple return [] branches — type still inferred as list",
+            run: function () {
+                var builtins_mod = require(path.join(__dirname, '../../src/monaco-language-service/builtins.js'));
+                var utils_src = [
+                    "def get_items(flag):",
+                    "    if flag:",
+                    "        return []",
+                    "    return []",
+                ].join("\n");
+                var engine = make_engine({ utils: utils_src }, [], null, builtins_mod);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze([
+                    "from utils import get_items",
+                    "pass",
+                ].join("\n"), {});
+
+                var list = engine.getCompletions(scopeMap, pos(2, 12), "get_items().", MockKind);
+                assert_has(list, 'append', 'list.append via inferred multi-branch import');
+            },
+        },
+
     ];
 
     return TESTS;

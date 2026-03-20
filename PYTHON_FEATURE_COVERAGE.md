@@ -25,6 +25,8 @@
 | `str * n` string repetition | Works when `from __python__ import overload_operators` is active |
 | `list * n` / `n * list` | Works with `overload_operators`; returns a proper RapydScript list |
 | `match / case` | Structural pattern matching (Python 3.10) fully supported |
+| Variable type annotations `x: int = 1` | Parsed and ignored (no runtime enforcement); annotated assignments work normally |
+| Ellipsis literal `...` as expression | Parsed as a valid expression; evaluates to JS `undefined` at runtime |
 | Generator `.throw()` | Works via JS generator protocol |
 | Generator `.send()` | Works via `g.next(value)` |
 | `yield from` | Works; return value of sub-generator is not accessible |
@@ -74,6 +76,16 @@
 | `str.expandtabs(tabsize)`           | 🟢 Low                                                                 |
 | `int.bit_length()`                  | 🟢 Low — useful for bit manipulation                                   |
 | `float.is_integer()`                | 🟢 Low                                                                 |
+| `exec(code)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
+| `eval(expr)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
+| `compile()`                         | 🔴 N/A — Python compile/code objects have no JS equivalent            |
+| `__import__(name)`                  | 🟢 Low — not supported; use `import` statement                        |
+| `input(prompt)`                     | 🟢 Low — not built in; use `prompt()` via `v'prompt(...)'`            |
+| `open(path)`                        | 🔴 N/A — no filesystem access in browser context                      |
+| `bytes(x)` / `bytearray(x)`        | 🟢 Low — no built-in bytes type; use `Uint8Array` via verbatim JS     |
+| `memoryview(obj)`                   | 🔴 N/A — no buffer protocol in browser context                        |
+| `object()`                          | 🟢 Low — base `object` type not exposed; use plain `{}` or a class    |
+| `abc` module — `ABC`, `@abstractmethod`, `Protocol` | 🟢 Low — no abc module; no enforcement of abstract methods |
 
 ---
 
@@ -95,6 +107,68 @@
 | `__format__` dunder                           | 🟢 Low — `format()` builtin not defined; `__format__` not dispatched |
 | `__class_getitem__`                           | 🟢 Low — no `MyClass[T]` generic subscript syntax                    |
 | `__init_subclass__` hook                      | 🟢 Low                                                               |
+
+---
+
+## Standard Library Modules
+
+Modules with a `src/lib/` implementation available are marked ✅. All others are absent.
+
+| Module | Status | Notes |
+|---|---|---|
+| `math` | ✅ | Full implementation in `src/lib/math.pyj` |
+| `random` | ✅ | RC4-seeded PRNG in `src/lib/random.pyj` |
+| `re` | ✅ | Regex wrapper in `src/lib/re.pyj`; limited vs full PCRE (no lookbehind, limited unicode, no conditional groups) |
+| `encodings` | ✅ | Base64 and encoding helpers; partial `base64` coverage |
+| `collections` | ✅ | `defaultdict`, `Counter`, `OrderedDict`, `deque` |
+| `functools` | ✅ | `reduce`, `partial`, `wraps`, `lru_cache` |
+| `itertools` | ✅ | Common iteration tools |
+| `numpy` | ✅ | Full numpy-like library in `src/lib/numpy.pyj`; `numpy.random` and `numpy.linalg` sub-modules |
+| `typing` | ❌ | `List`, `Dict`, `Optional`, `Union`, `Tuple`, `Generic`, `TypeVar` — none available |
+| `dataclasses` | ❌ | `@dataclass`, `field()`, `asdict()`, `astuple()` not available |
+| `contextlib` | ❌ | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available |
+| `copy` | ❌ | `copy()` / `deepcopy()` not available |
+| `string` | ❌ | Character constants, `Template`, `Formatter` not available |
+| `json` | ❌ | No Python wrapper; JS `JSON.parse` / `JSON.stringify` work directly via verbatim JS |
+| `datetime` | ❌ | `date`, `time`, `datetime`, `timedelta` not available |
+| `inspect` | ❌ | `signature`, `getmembers`, `isfunction` etc. not available |
+| `asyncio` | ❌ | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await` with JS Promises directly |
+| `enum` | ❌ | `Enum`, `IntEnum`, `Flag` not available |
+| `abc` | ❌ | `ABC`, `abstractmethod` not available |
+| `io` | ❌ | `StringIO`, `BytesIO` not available |
+| `struct` | ❌ | Binary packing/unpacking not available |
+| `hashlib` | ❌ | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS |
+| `hmac` | ❌ | Keyed hashing not available |
+| `base64` | ❌ (partial) | Partial coverage via `encodings` module; no full `base64` module |
+| `urllib` | ❌ | URL parsing/encoding (`urllib.parse`) not available; use JS `URL` API |
+| `html` | ❌ | `escape`, `unescape` not available; use JS DOM APIs |
+| `csv` | ❌ | CSV parsing not available |
+| `textwrap` | ❌ | `wrap`, `fill`, `dedent`, `indent` not available |
+| `pprint` | ❌ | Pretty-printing not available |
+| `logging` | ❌ | Logging framework not available; use `console.*` directly |
+| `unittest` | ❌ | Not available; RapydScript uses a custom test runner (`node bin/rapydscript test`) |
+
+---
+
+## Semantic Differences
+
+Features that exist in RapydScript but behave differently from standard Python:
+
+| Feature | Python Behavior | RapydScript Behavior |
+|---|---|---|
+| Truthiness of `[]` / `{}` | `False` | `True` (JS semantics) unless `from __python__ import truthiness` is active |
+| `is` / `is not` | Object identity | Strict equality `===` / `!==` |
+| `//` floor division on floats | `math.floor(a/b)` always | Correct for integers; uses `Math.floor` (same result for well-behaved floats) |
+| `%` on negative numbers | Python modulo (always non-negative) | JS remainder (can be negative) |
+| `int` / `float` distinction | Separate types | Both are JS `number`; `isinstance(x, int)` and `isinstance(x, float)` use heuristics |
+| `str * n` repetition | Always works | Requires `from __python__ import overload_operators` |
+| `.sort()` / `.pop()` | Standard list methods | Renamed to `.pysort()` / `.pypop()` to avoid shadowing JS array methods |
+| Unbound method references | Methods are unbound by default | Same — but storing a method in a variable without the `bound_methods` compiler flag loses `self` binding |
+| `dict` key ordering | Insertion order guaranteed (3.7+) | Depends on JS engine (V8 preserves insertion order in practice) |
+| `global` / `nonlocal` scoping | Full cross-scope declaration | `global` works for module-level; interactions with `nonlocal` can be confusing in nested closures |
+| `Exception.message` | Not standard; use `.args[0]` | `.message` is the standard attribute (JS `Error` style) |
+| `re` module | Full PCRE (lookbehind, full unicode, conditional groups) | No lookbehind; limited unicode property escapes; no `(?(1)...)` conditional groups |
+| `parenthesized with (A() as a, B() as b):` | Multiple context managers in parenthesized form (3.10+) | Not meaningful in a browser/event-driven context; multi-context `with` without parens works |
 
 ---
 
