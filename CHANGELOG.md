@@ -1,3 +1,34 @@
+version 0.8.0
+=======================
+
+  * Add language service with tab-completion, return type inference, hover tips, and typing exports
+  * Add source maps support for the transpiled js
+  * Add `itertools` standard library module
+  * Add `collections` standard library module
+  * Add `functools` standard library module
+  * Add `numpy` standard library module
+  * Add `async`/`await` support
+  * Add lambda expression support
+  * Add structural pattern matching (`match`/`case`) support
+  * Add starred assignment support (e.g. `a, *b = [1, 2, 3]`)
+  * Add ellipsis operator and subscript tuple support
+  * Add walrus operator (`:=`) support
+  * Add dict merge literal support (`{**a, **b}`)
+  * Add positional-only (`/`) and keyword-only (`*`) parameter separators
+  * Add `@classmethod` decorator support with improved class property access
+  * Add nested comprehension support
+  * Add overloaded operator support
+  * Add Python-style truthiness for empty lists and dicts
+  * Add `super()` support
+  * Add compiler flags to enable optional pythonic behaviors
+  * Add `any()` and `all()` builtins
+  * Add tree shaking support for reduced output size
+  * Add module mode for exporting root-level functions
+  * Add support for virtual imports
+  * Add support for bundling pythonized strings into compiled output
+  * `print` now maps to `console.log`; `window.print` maps to the JS printer dialog
+  * Add custom class mapping support in `dict()`
+
 version 0.7.22
 =======================
 
