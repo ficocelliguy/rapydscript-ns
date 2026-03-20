@@ -1,7 +1,7 @@
 /*
  * test/unit/language-service-bundle.js
  *
- * Verifies that the built web-repl/language-service.js can be loaded as an
+ * Verifies that the built language-service/index.js can be loaded as an
  * ES module without errors (e.g. duplicate top-level declarations).
  *
  * Usage:
@@ -15,11 +15,11 @@ var fs     = require("fs");
 var utils  = require("../../tools/utils");
 var colored = utils.safe_colored;
 
-var bundle_path = path.join(__dirname, "../../web-repl/language-service.js");
+var bundle_path = path.join(__dirname, "../../language-service/index.js");
 
 if (!fs.existsSync(bundle_path)) {
     console.error(colored("SKIP  language_service_bundle_loads", "yellow") +
-        "  –  web-repl/language-service.js not found; run: npm run build:ls");
+        "  –  language-service/index.js not found; run: npm run build:ls");
     process.exit(0);
 }
 
@@ -41,7 +41,7 @@ import(bundle_url).then(function (mod) {
 
     // Test 1: module loads without parse/runtime errors (implicit — we got here)
     pass("language_service_bundle_loads",
-        "web-repl/language-service.js loads as an ES module without errors");
+        "language-service/index.js loads as an ES module without errors");
 
     // Test 2: registerRapydScript is exported
     try {
@@ -75,7 +75,7 @@ import(bundle_url).then(function (mod) {
 
 }).catch(function (e) {
     console.log(colored("FAIL  language_service_bundle_loads", "red") +
-        "  \u2013  web-repl/language-service.js failed to load as an ES module");
+        "  \u2013  language-service/index.js failed to load as an ES module");
     console.log("      " + (e.message || String(e)));
     console.log("");
     console.log(colored("1 test(s) failed.", "red"));

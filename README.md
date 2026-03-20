@@ -2574,7 +2574,7 @@ npm run build:ls
 node tools/build-language-service.js --out path/to/language-service.js
 ```
 
-The output is written to `web-repl/language-service.js` by default.
+The output is written to `language-service/index.js` by default.
 
 ### Basic setup
 
@@ -2769,7 +2769,7 @@ and assembled into the standard `mappings` field.  The implementation lives in
 
 ```bash
 node bin/web-repl-export web-repl          # rebuilds web-repl/rapydscript.js
-node tools/build-language-service.js       # rebuilds web-repl/language-service.js
+node tools/build-language-service.js       # rebuilds language-service/index.js
 ```
 
 ### Running the tests

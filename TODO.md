@@ -2,7 +2,6 @@
 ### libraries
 
 - two space tabs?
-- random ns functions are in type hints for objects
 
 - fix error from vuln report
 - https://socket.dev/npm/package/rapydscript-ns/alerts/0.8.1?tab=dependencies
