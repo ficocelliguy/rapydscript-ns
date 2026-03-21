@@ -950,6 +950,81 @@ function make_tests(SourceAnalyzer, RS) {
             },
         },
 
+        // ── Nested classes ────────────────────────────────────────────────
+
+        {
+            name: "nested_class_creates_inner_frame",
+            description: "A nested class definition creates its own 'class' frame inside the outer class frame",
+            run: function () {
+                var m = analyze([
+                    "class Outer:",
+                    "    class Inner:",
+                    "        def method(self):",
+                    "            pass",
+                ].join("\n"));
+                var cls_frames = m.frames.filter(function (f) { return f.kind === "class"; });
+                assert.ok(cls_frames.length >= 2, "Expected at least 2 class frames (Outer + Inner), got " + cls_frames.length);
+                var names = cls_frames.map(function (f) { return f.name; });
+                assert.ok(names.indexOf("Outer") >= 0, "Expected 'Outer' class frame");
+                assert.ok(names.indexOf("Inner") >= 0, "Expected 'Inner' class frame");
+            },
+        },
+
+        {
+            name: "nested_class_symbol_in_outer_scope",
+            description: "The nested class name appears as a 'class' symbol in the outer class frame",
+            run: function () {
+                var m = analyze([
+                    "class Outer:",
+                    "    class Inner:",
+                    "        pass",
+                ].join("\n"));
+                var outer_frame = m.frames.find(function (f) { return f.kind === "class" && f.name === "Outer"; });
+                assert.ok(outer_frame, "Expected 'Outer' class frame");
+                var inner_sym = outer_frame.getSymbol("Inner");
+                assert.ok(inner_sym, "Expected 'Inner' symbol in Outer's class frame");
+                assert.strictEqual(inner_sym.kind, "class");
+            },
+        },
+
+        {
+            name: "nested_class_methods_in_inner_frame",
+            description: "Methods of the nested class appear in the inner class frame, not the outer one",
+            run: function () {
+                var m = analyze([
+                    "class Outer:",
+                    "    class Inner:",
+                    "        def greet(self):",
+                    "            pass",
+                    "    def do_outer(self):",
+                    "        pass",
+                ].join("\n"));
+                var inner_frame = m.frames.find(function (f) { return f.kind === "class" && f.name === "Inner"; });
+                assert.ok(inner_frame, "Expected 'Inner' class frame");
+                assert.ok(inner_frame.getSymbol("greet"), "Expected 'greet' in Inner frame");
+                var outer_frame = m.frames.find(function (f) { return f.kind === "class" && f.name === "Outer"; });
+                assert.ok(outer_frame, "Expected 'Outer' class frame");
+                assert.ok(!outer_frame.getSymbol("greet"), "'greet' should NOT be in Outer frame");
+                assert.ok(outer_frame.getSymbol("do_outer"), "Expected 'do_outer' in Outer frame");
+            },
+        },
+
+        {
+            name: "nested_class_appears_in_module_scope",
+            description: "The outer class appears in module scope; the inner class does not pollute module scope",
+            run: function () {
+                var m = analyze([
+                    "class Outer:",
+                    "    class Inner:",
+                    "        pass",
+                ].join("\n"));
+                var module_frame = m.frames.find(function (f) { return f.kind === "module"; });
+                assert.ok(module_frame, "Expected module frame");
+                assert.ok(module_frame.getSymbol("Outer"), "Expected 'Outer' in module scope");
+                assert.ok(!module_frame.getSymbol("Inner"), "'Inner' should NOT appear directly in module scope");
+            },
+        },
+
     ];
 
     return TESTS;

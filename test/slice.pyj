@@ -1,0 +1,105 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# slice.pyj — tests for the slice() builtin class.
+# Subscript read/write via a slice object (lst[s], lst[s]=val) requires
+# overload_getitem so that the compiler routes [] through ρσ_getitem.
+
+from __python__ import overload_getitem
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── Construction forms ────────────────────────────────────────────────────────
+
+s1 = slice(5)
+ae(s1.start, None)
+ae(s1.stop,  5)
+ae(s1.step,  None)
+
+s2 = slice(2, 8)
+ae(s2.start, 2)
+ae(s2.stop,  8)
+ae(s2.step,  None)
+
+s3 = slice(1, 9, 2)
+ae(s3.start, 1)
+ae(s3.stop,  9)
+ae(s3.step,  2)
+
+# None values preserved
+sn = slice(None, None, -1)
+ae(sn.start, None)
+ae(sn.stop,  None)
+ae(sn.step,  -1)
+
+# ── indices() ─────────────────────────────────────────────────────────────────
+
+ade(s2.indices(10), [2, 8, 1])
+ade(slice(None, None, 1).indices(5), [0, 5, 1])
+ade(slice(-3, -1).indices(10), [7, 9, 1])
+ade(slice(None, None, -1).indices(5), [4, -1, -1])
+ade(slice(0, 100).indices(10), [0, 10, 1])   # stop clamped to length
+ade(slice(-100, 5).indices(10), [0, 5, 1])   # start clamped to 0
+
+# ── repr / str ────────────────────────────────────────────────────────────────
+
+ae(str(slice(1, 5, None)), 'slice(1, 5, None)')
+ae(str(slice(None, 5, 2)), 'slice(None, 5, 2)')
+ae(str(slice(None, None, None)), 'slice(None, None, None)')
+
+# ── Equality ──────────────────────────────────────────────────────────────────
+
+ok(slice(1, 5) == slice(1, 5))
+ok(not (slice(1, 5) == slice(1, 6)))
+ok(not (slice(1, 5) == slice(0, 5)))
+ok(slice(1, 5, 2) == slice(1, 5, 2))
+ok(not (slice(1, 5, 2) == slice(1, 5, 3)))
+
+# ── isinstance ────────────────────────────────────────────────────────────────
+
+ok(isinstance(slice(1, 5), slice))
+ok(not isinstance(42, slice))
+ok(not isinstance([1, 2, 3], slice))
+
+# ── List subscript read ───────────────────────────────────────────────────────
+
+lst = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+ade(lst[slice(2, 5)],    [2, 3, 4])
+ade(lst[slice(0, 6, 2)], [0, 2, 4])
+ade(lst[slice(None, 4)], [0, 1, 2, 3])
+ade(lst[slice(None)],    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+# Negative step
+ade(lst[slice(5, 1, -1)],        [5, 4, 3, 2])
+ade(lst[slice(None, None, -1)],  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+ade(lst[slice(9, 0, -2)],        [9, 7, 5, 3, 1])
+
+# ── String subscript read ─────────────────────────────────────────────────────
+
+s = 'hello'
+ae(s[slice(1, 4)],        'ell')
+ae(s[slice(None, None, -1)], 'olleh')
+ae(s[slice(0, 5, 2)],     'hlo')
+
+# ── List subscript write ──────────────────────────────────────────────────────
+
+a = [0, 1, 2, 3, 4]
+a[slice(1, 3)] = [10, 20]
+ade(a, [0, 10, 20, 3, 4])
+
+b = [0, 1, 2, 3, 4]
+b[slice(0, 2)] = [99]
+ade(b, [99, 2, 3, 4])
+
+# ── List subscript delete ─────────────────────────────────────────────────────
+
+c = [0, 1, 2, 3, 4]
+del c[slice(1, 3)]
+ade(c, [0, 3, 4])
+
+d = [0, 1, 2, 3, 4]
+del d[slice(0, 1)]
+ade(d, [1, 2, 3, 4])

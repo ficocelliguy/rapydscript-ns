@@ -1416,6 +1416,18 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         bases = v'[]'
         class_parent = None
 
+        # If this class is nested inside another class, register it under its
+        # full dotted path (e.g. "Outer.Inner") in the module-level class scope
+        # (S.classes[0]).  This lets get_class_in_scope() find "Outer.Inner" as
+        # a class and produce a correct AST_New constructor call instead of
+        # treating it as a method call on Outer.
+        outer_class_parts = []
+        for _outer in S.in_class:
+            if _outer:
+                outer_class_parts.push(_outer)
+        if outer_class_parts.length > 0:
+            S.classes[0][outer_class_parts.join('.') + '.' + name.name] = class_details
+
         # read the bases of the class, if any
         if is_("punc", "("):
             S.in_parenthesized_expr = True
@@ -1521,7 +1533,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         visitor = new walker()
 
         for stmt in definition.body:
-            if not is_node_type(stmt, AST_Class):
+            if is_node_type(stmt, AST_Class):
+                # Nested class: include in statements but don't walk through the
+                # class-var mangling visitor (nested classes have their own scope).
+                definition.statements.push(stmt)
+            else:
                 stmt.walk(visitor)
                 definition.statements.push(stmt)
         return definition

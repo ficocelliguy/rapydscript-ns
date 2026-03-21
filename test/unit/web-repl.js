@@ -445,6 +445,116 @@ var TESTS = [
         },
     },
 
+    {
+        name: "nested_class_web_repl",
+        description: "Nested class definitions compile and run correctly via the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Outer:",
+                "    class Inner:",
+                "        def __init__(self, val):",
+                "            self.val = val",
+                "    def __init__(self, v):",
+                "        self.inner = Outer.Inner(v)",
+                "o = Outer(99)",
+                "assrt.equal(o.inner.val, 99)",
+                "assrt.ok(isinstance(o.inner, Outer.Inner))",
+                "assrt.ok(o.Inner is Outer.Inner)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── slice() builtin ───────────────────────────────────────────────────
+
+    {
+        name: "bundle_slice_constructor",
+        description: "slice() constructor stores start/stop/step attributes correctly",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "s1 = slice(5)",
+                "assrt.equal(s1.start, None)",
+                "assrt.equal(s1.stop, 5)",
+                "assrt.equal(s1.step, None)",
+                "s2 = slice(2, 8)",
+                "assrt.equal(s2.start, 2)",
+                "assrt.equal(s2.stop, 8)",
+                "assrt.equal(s2.step, None)",
+                "s3 = slice(1, 9, 2)",
+                "assrt.equal(s3.start, 1)",
+                "assrt.equal(s3.stop, 9)",
+                "assrt.equal(s3.step, 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_slice_subscript",
+        description: "slice object used as list subscript returns the correct sub-list",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_getitem",
+                "lst = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]",
+                "s = slice(2, 5)",
+                "assrt.deepEqual(lst[s], [2, 3, 4])",
+                "assrt.deepEqual(lst[slice(0, 6, 2)], [0, 2, 4])",
+                "assrt.deepEqual(lst[slice(5, 1, -1)], [5, 4, 3, 2])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_slice_indices",
+        description: "slice.indices() returns normalised (start, stop, step) tuple",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "s = slice(2, 8)",
+                "idx = s.indices(10)",
+                "assrt.equal(idx[0], 2)",
+                "assrt.equal(idx[1], 8)",
+                "assrt.equal(idx[2], 1)",
+                "# negative indices normalised",
+                "s2 = slice(-3, -1)",
+                "idx2 = s2.indices(10)",
+                "assrt.equal(idx2[0], 7)",
+                "assrt.equal(idx2[1], 9)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_slice_repr",
+        description: "str(slice(...)) produces the Python-style repr",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.equal(str(slice(1, 5, None)), 'slice(1, 5, None)')",
+                "assrt.equal(str(slice(None, 5, 2)), 'slice(None, 5, 2)')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_slice_isinstance",
+        description: "isinstance(slice(...), slice) returns True in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "s = slice(1, 5)",
+                "assrt.ok(isinstance(s, slice))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

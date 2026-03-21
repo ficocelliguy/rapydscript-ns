@@ -98,6 +98,31 @@ test_throws(IndexError, '{1} {2}', 1)
 test_throws(ValueError, '{1')
 test_interpolation()
 
+# Test format() builtin
+ae('3.14', format(3.14159, '.2f'))
+ae('  42', format(42, '>4d'))
+ae('42  ', format(42, '<4d'))
+ae(' 42 ', format(42, '^4d'))
+ae('0042', format(42, '04d'))
+ae('2a', format(42, 'x'))
+ae('0b101010', format(42, '#b'))
+ae('hello', format('hello'))
+ae('42', format(42))
+ae('None', format(None))
+ae('hello     ', format('hello', '<10'))
+ae('     hello', format('hello', '>10'))
+ae('  hello   ', format('hello', '^10'))
+ae('1.23e+2', format(123.456, '.2e').toLowerCase())
+ae('hello', format('hello world', '.5'))
+
+class FormattableNum:
+    def __init__(self, n):
+        self.n = n
+    def __format__(self, spec):
+        return 'FN:' + format(self.n, spec)
+
+ae('FN:042', format(FormattableNum(42), '03d'))
+
 # Test miscellaneous services
 ae('Abc', str.capitalize('aBC'))
 ae(' 1 ', str.center('1', 3))

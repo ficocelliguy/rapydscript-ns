@@ -1346,6 +1346,20 @@ str.format('{0:02d} {n}', 1, n=2) == '01 2'
 ...
 ```
 
+The `format(value[, spec])` builtin is also supported. It applies the Python
+format-spec mini-language to a single value — the same mini-language that
+follows `:` in f-strings and `str.format()` fields:
+
+```py
+format(42, '08b')     # '00101010'  — zero-padded binary
+format(3.14159, '.2f') # '3.14'     — fixed-point
+format('hi', '>10')   # '        hi' — right-aligned in 10-char field
+format(42)            # '42'        — no spec: same as str(42)
+```
+
+Objects with a `__format__` method are dispatched to it, matching Python's
+protocol exactly.
+
 String predicate methods are also available:
 
 ```py
@@ -1880,6 +1894,65 @@ print(Counter.get_count())  # 2
 
 The `@classmethod` decorator compiles to a method placed directly on the class (not its prototype), with `cls` mapped to `this`. A prototype delegation shim is also generated so instance calls work correctly.
 
+### Nested Classes
+
+A class may be defined inside another class. The nested class becomes an attribute of the outer class (accessible as `Outer.Inner`) and is also reachable via instances (`self.Inner` inside methods). This mirrors Python semantics exactly.
+
+```py
+class Molecule:
+    class Atom:
+        def __init__(self, element):
+            self.element = element
+        def __repr__(self):
+            return 'Atom(' + self.element + ')'
+
+    def __init__(self, elements):
+        self.structure = []
+        for e in elements:
+            self.structure.push(Molecule.Atom(e))
+
+water = Molecule(['H', 'H', 'O'])
+print(len(water.structure))          # 3
+print(water.structure[0].element)    # H
+print(isinstance(water.structure[0], Molecule.Atom))  # True
+```
+
+The nested class is a full class in every respect — it can have its own methods, inherit from other classes, and contain further nested classes:
+
+```py
+class Universe:
+    class Galaxy:
+        class Star:
+            def __init__(self, name):
+                self.name = name
+        def __init__(self, star_name):
+            self.star = Universe.Galaxy.Star(star_name)
+    def __init__(self, star_name):
+        self.galaxy = Universe.Galaxy(star_name)
+
+u = Universe('Sol')
+print(u.galaxy.star.name)                    # Sol
+print(isinstance(u.galaxy.star, Universe.Galaxy.Star))  # True
+```
+
+A nested class may also inherit from classes defined in the outer scope:
+
+```py
+class Animal:
+    def __init__(self, sound):
+        self.sound = sound
+
+class Zoo:
+    class Dog(Animal):
+        def __init__(self):
+            Animal.__init__(self, 'woof')
+
+fido = Zoo.Dog()
+print(fido.sound)             # woof
+print(isinstance(fido, Animal))    # True
+print(isinstance(fido, Zoo.Dog))   # True
+```
+
 ### External Classes
 
 RapydScript will automatically detect classes declared within the same scope (as long as the declaration occurs before use), as well as classes properly imported into the module (each module making use of a certain class should explicitly import the module containing that class). RapydScript will also properly detect native JavaScript classes (String, Array, Date, etc.). Unfortunately, RapydScript has no way of detecting classes from third-party libraries. In those cases, you could use the `new` keyword every time you create an object from such class. Alternatively, you could mark the class as external.
@@ -2029,6 +2102,26 @@ next(it)         # raises StopIteration
 When the iterator is exhausted and no default is given, ``StopIteration``
 is raised — matching standard Python behaviour.
 
+The two-argument form ``iter(callable, sentinel)`` repeatedly calls
+``callable`` (with no arguments) and yields each return value until it equals
+``sentinel``, at which point the iterator stops:
+
+```python
+count = [0]
+def next_val():
+    count[0] += 1
+    return count[0]
+
+list(iter(next_val, 4))   # [1, 2, 3]
+
+for val in iter(next_val, 7):
+    print(val)            # 5, 6
+```
+
+The callable may be any function or object with a ``__call__`` method.
+Sentinel comparison uses strict equality (``===``), matching Python's
+``is``-then-``==`` semantics for the common case of plain values.
+
 Generators
 ------------
 
@@ -2039,18 +2132,19 @@ def f():
 	for i in range(3):
 		yield i
 
-[x for x in f()] == [1, 2, 3]
+[x for x in f()] == [0, 1, 2]
 ```
 
 There is full support for generators including the Python 3, ```yield from```
-syntax. 
+syntax.
 
 Generators create JavaScript iterator objects. For differences between python
-and JavaScript iterators, see the section on iterators above. 
+and JavaScript iterators, see the section on iterators above.
 
-Currently, generators are down-converted to ES 5 switch statements. In the
-future, when ES 6 support is widespread, they will be converted to native
-JavaScript ES 6 generators.
+By default, generators are down-converted to ES 5 switch statements. Pass
+``--js-version 6`` to the compiler (or set ``js_version: 6`` in the embedded
+compiler options) to emit native ES 6 generator functions instead, which are
+smaller and faster.
 
 Modules
 -------
@@ -2191,7 +2285,7 @@ finally:
 ```
 
 You can create your own Exception classes by inheriting from `Exception`, which
-is the JavaScript Error class, for more details on this, see (the MDN documentation)[https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Error]. 
+is the JavaScript Error class, for more details on this, see the [MDN documentation](https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Error).
 
 ```py
 class MyError(Exception):
@@ -2295,11 +2389,12 @@ It is for that reason that I try to keep RapydScript bells and whistles to a min
 	math                # replicates almost all of the functionality from Python's math library
 	re                  # replicates almost all of the functionality from Python's re library
 	random              # replicates most of the functionality from Python's random library
+	numpy               # NumPy-compatible array library (ndarray, ufuncs, numpy.random, numpy.linalg)
 	elementmaker        # easily construct DOM trees
 	aes                 # Implement AES symmetric encryption
 	encodings           # Convert to/from UTF-8 bytearrays, base64 strings and native strings
 	gettext             # Support for internationalization of your RapydScript app
-	operator            # a subset of python;s operator module
+	operator            # a subset of Python's operator module
 	functools           # reduce, partial, wraps, lru_cache, cache, total_ordering, cmp_to_key
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
 	itertools           # count, cycle, repeat, accumulate, chain, compress, dropwhile, filterfalse,
@@ -2417,7 +2512,7 @@ HTML below for an example.
     <head>
         <meta charset="UTF-8">
         <title>Test embedded RapydScript</title>
-        <script charset="UTF-8" src="https://github.com/ficocelliguy/rapydscript-ns/blob/master/web-repl/rapydscript.js"></script>
+        <script charset="UTF-8" src="rapydscript.js"></script>
         <script>
 var compiler = RapydScript.create_embedded_compiler();
 var js = compiler.compile("def hello_world():\n a='RapydScript is cool!'\n print(a)\n alert(a)");
@@ -2511,9 +2606,10 @@ to an experienced Python developer. The most important such gotchas are listed
 below:
 
 - Truthiness in JavaScript is very different from Python. Empty lists and dicts
-  are ``False`` in Python but ``True`` in JavaScript. The compiler could work
-  around that, but not without a significant performance cost, so it is best to
-  just get used to checking the length instead of the object directly.
+  are ``False`` in Python but ``True`` in JavaScript. You can opt in to full
+  Python truthiness semantics (where empty containers are falsy and ``__bool__``
+  is dispatched) with ``from __python__ import truthiness``. Without that flag,
+  test the length explicitly instead of the container directly.
 
 - Operators in JavaScript are very different from Python. ``1 + '1'`` would be
   an error in Python, but results in ``'11'`` in JavaScript. Similarly, ``[1] +

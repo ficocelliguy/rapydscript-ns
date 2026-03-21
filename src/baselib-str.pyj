@@ -829,4 +829,11 @@ define_str_func('zfill', def(width):
 ρσ_str.whitespace   = ' \t\n\r\x0b\x0c'
 
 v'define_str_func = undefined'
-v'var str = ρσ_str, repr = ρσ_repr'
+def ρσ_format(value, spec):
+    if value is not None and value is not undefined and v'typeof value.__format__ === "function"':
+        return value.__format__(spec if spec is not undefined else '')
+    if spec is undefined or spec is '':
+        return ρσ_str(value)
+    return str.format('{:' + spec + '}', value)
+
+v'var str = ρσ_str, repr = ρσ_repr, format = ρσ_format'

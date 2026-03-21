@@ -137,22 +137,61 @@ inc()
 assrt.equal(c.count, 6)
 
 # nested classes
-# not yet fully implemented
-#class Molecule:
-#   class Atom:
-#       def __init__(self, element):
-#           self.element = element
-#
-#   def __init__(self, elements):
-#       self.structure = []
-#       for e in elements:
-#           self.structure.push(Molecule.Atom(e))
-#
-#water = Molecule(['H', "H", 'O'])
-#assrt.equal(len(water.structure), 3)
-#assrt.equal(water.structure[0].element, 'H')
-#for atom in water.structure:
-#   assrt.ok(isinstance(atom, Molecule.Atom))
+class Molecule:
+    class Atom:
+        def __init__(self, element):
+            self.element = element
+        def __repr__(self):
+            return 'Atom(' + self.element + ')'
+
+    def __init__(self, elements):
+        self.structure = []
+        for e in elements:
+            self.structure.push(Molecule.Atom(e))
+
+water = Molecule(['H', 'H', 'O'])
+assrt.equal(len(water.structure), 3)
+assrt.equal(water.structure[0].element, 'H')
+assrt.equal(water.structure[2].element, 'O')
+for atom in water.structure:
+    assrt.ok(isinstance(atom, Molecule.Atom))
+
+# nested class accessible via class reference and via instance attribute
+assrt.ok(Molecule.Atom is water.structure[0].__class__)
+# nested class can also be accessed via instance (self.Inner semantics)
+mol2 = Molecule(['C'])
+assrt.ok(isinstance(mol2.structure[0], mol2.Atom))
+
+# two levels of nesting
+class Universe:
+    class Galaxy:
+        class Star:
+            def __init__(self, name):
+                self.name = name
+        def __init__(self, star_name):
+            self.star = Universe.Galaxy.Star(star_name)
+    def __init__(self, star_name):
+        self.galaxy = Universe.Galaxy(star_name)
+
+u = Universe('Sol')
+assrt.equal(u.galaxy.star.name, 'Sol')
+assrt.ok(isinstance(u.galaxy.star, Universe.Galaxy.Star))
+
+# nested class with inheritance from outer-scope class
+class Animal:
+    def __init__(self, sound):
+        self.sound = sound
+
+class Zoo:
+    class Dog(Animal):
+        def __init__(self):
+            Animal.__init__(self, 'woof')
+
+zoo = Zoo()
+fido = Zoo.Dog()
+assrt.equal(fido.sound, 'woof')
+assrt.ok(isinstance(fido, Animal))
+assrt.ok(isinstance(fido, Zoo.Dog))
 
 # starargs and method decorators
 def negate(fn):

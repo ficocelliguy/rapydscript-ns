@@ -734,6 +734,76 @@ function make_tests(BuiltinsRegistry, BuiltinInfo, HoverEngine, SignatureHelpEng
             },
         },
 
+        // ── slice builtin ─────────────────────────────────────────────────
+
+        {
+            name: "slice_registered_as_class",
+            description: "slice is registered in BuiltinsRegistry with kind='class'",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var bi  = reg.get('slice');
+                assert.ok(bi, 'slice should be registered');
+                assert.strictEqual(bi.name, 'slice');
+                assert.strictEqual(bi.kind, 'class');
+                assert.ok(Array.isArray(bi.params));
+                assert.ok(bi.doc && bi.doc.length > 0, 'slice should have a docstring');
+            },
+        },
+
+        {
+            name: "slice_hover_markdown",
+            description: "slice hover markdown includes signature and doc",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var md  = reg.getHoverMarkdown('slice');
+                assert.ok(md, 'slice should have hover markdown');
+                assert.ok(md.indexOf('slice') !== -1, 'hover should mention slice');
+                assert.ok(md.indexOf('start_or_stop') !== -1, 'hover should mention start_or_stop param');
+            },
+        },
+
+        {
+            name: "slice_in_completions",
+            description: "slice appears in completion list as a built-in class",
+            run: function () {
+                var reg      = new BuiltinsRegistry();
+                var analyzer = new SourceAnalyzer(RS);
+                var engine   = new CompletionEngine(analyzer, {
+                    virtualFiles:    {},
+                    builtinNames:    ['slice'],
+                    builtinsRegistry: reg,
+                });
+                var list = engine.getCompletions(null, pos(1, 6), 'slice', MockKind);
+                var item = list.suggestions.find(function (s) { return s.label === 'slice'; });
+                assert.ok(item, 'slice should appear in completions');
+                assert.strictEqual(item.kind, MockKind.Class, 'slice should have Class kind');
+            },
+        },
+
+        {
+            name: "slice_signature_help",
+            description: "slice signature help returns start_or_stop, stop, step params",
+            run: function () {
+                var reg  = new BuiltinsRegistry();
+                var info = reg.getSignatureInfo('slice');
+                assert.ok(info, 'slice should have signature info');
+                assert.ok(info.label.indexOf('slice') !== -1, 'label should contain slice');
+                assert.ok(info.params.length >= 1, 'should have at least 1 param');
+                assert.strictEqual(info.params[0].label, 'start_or_stop: int');
+            },
+        },
+
+        {
+            name: "slice_in_getNames",
+            description: "slice appears in BuiltinsRegistry.getNames()",
+            run: function () {
+                var reg   = new BuiltinsRegistry();
+                var names = reg.getNames();
+                assert.ok(names.indexOf('slice') !== -1,
+                    'slice should be in getNames(), got: ' + names.join(', '));
+            },
+        },
+
     ];
 
     return TESTS;

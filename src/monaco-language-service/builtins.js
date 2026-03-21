@@ -104,6 +104,11 @@ const STUBS = [
         return_type: 'iterable',
         doc: 'Return an iterator of elements from iterable for which function returns true.' }),
 
+    new BuiltinInfo({ name: 'format',
+        params: [p('value'), p('spec', { type: 'str', optional: true })],
+        return_type: 'str',
+        doc: 'Return value formatted according to the format spec string.\n\nEquivalent to calling `value.__format__(spec)` or applying spec as a `str.format()` format-spec field. The spec mini-language is the same as what follows `:` in f-strings and `str.format()` fields: alignment (`<>^=`), sign (`+-`), width, grouping (`,_`), precision (`.N`), and type (`bcdoxXeEfFgGns%`).\n\nExamples:\n\n    format(42, \'08b\')    # \'00101010\'\n    format(3.14, \'.2f\')  # \'3.14\'\n    format(\'hi\', \'>10\')  # \'        hi\'\n    format(42)           # \'42\'' }),
+
     new BuiltinInfo({ name: 'float', kind: 'class',
         params: [p('x', { optional: true })],
         return_type: 'float',
@@ -150,9 +155,9 @@ const STUBS = [
         doc: 'Return True if cls is a subclass of classinfo. classinfo may be a class or tuple of classes.' }),
 
     new BuiltinInfo({ name: 'iter',
-        params: [p('obj')],
+        params: [p('obj'), p('sentinel', { optional: true })],
         return_type: 'iterator',
-        doc: 'Return an iterator object for obj.' }),
+        doc: 'iter(iterable) → iterator over iterable. iter(callable, sentinel) → calls callable repeatedly until it returns sentinel.' }),
 
     new BuiltinInfo({ name: 'len',
         params: [p('s')],
@@ -218,6 +223,11 @@ const STUBS = [
         params: [p('iterable', { optional: true })],
         return_type: 'set',
         doc: 'Create a new set, optionally populated from an iterable.' }),
+
+    new BuiltinInfo({ name: 'slice', kind: 'class',
+        params: [p('start_or_stop', { type: 'int' }), p('stop', { type: 'int', optional: true }), p('step', { type: 'int', optional: true })],
+        return_type: 'slice',
+        doc: 'Create a slice object representing the set of indices specified by range(start, stop, step).\n\nForms:\n- `slice(stop)` — equivalent to `slice(None, stop, None)`\n- `slice(start, stop)` — equivalent to `slice(start, stop, None)`\n- `slice(start, stop, step)` — full form\n\nAttributes: `.start`, `.stop`, `.step` (each may be `None`).\n\nMethod: `.indices(length)` — returns `(start, stop, step)` normalized for a sequence of the given length.\n\nExample:\n\n    s = slice(1, 5)\n    lst[s]         # same as lst[1:5]\n    s.indices(10)  # (1, 5, 1)' }),
 
     new BuiltinInfo({ name: 'setattr',
         params: [p('obj'), p('name', { type: 'str' }), p('value')],

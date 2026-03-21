@@ -228,6 +228,9 @@ ae(str.isspace('a '),  False)
 ae(str.casefold('Hello World'), 'hello world')
 ae(str.casefold('ABC'),         'abc')
 ae(str.casefold('already'),     'already')
+# Unicode: Latin capital letters with diacritics fold to lowercase equivalents
+ae(str.casefold('ÄÖÜ'), 'äöü')
+ae(str.casefold('ÄÖÜ'), str.casefold('äöü'))
 
 # ── 12. str.removeprefix() / str.removesuffix() ──────────────────────────────
 # STATUS: ✓ WORKS (added in this release)
@@ -937,13 +940,8 @@ ae(_c(), 3)
 # STATUS: ✗ NOT SUPPORTED — no attribute-lookup override.
 
 # ── 50. __format__ dunder ────────────────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — format(obj, spec) is not a defined builtin;
-#         __format__ is not dispatched.
-# SKIP:
-#   class _Fmt:
-#       def __format__(self, spec):
-#           return '<' + spec + '>'
-#   ae(format(_Fmt(), 'test'), '<test>')
+# STATUS: ✓ WORKS — format(obj, spec) dispatches to obj.__format__(spec).
+#         Tested fully in test/str.pyj.
 
 # ── 51. __class_getitem__ ────────────────────────────────────────────────────
 # STATUS: ✗ NOT SUPPORTED — no generic subscript MyClass[T] syntax.
@@ -1087,9 +1085,9 @@ _check_unhashable({1, 2})
 _check_unhashable({'a': 1})
 
 # ── 55. format(value, spec) builtin ──────────────────────────────────────────
-# STATUS: ✗ NOT IMPLEMENTED — format(value, spec) builtin is not defined.
-#         str.format() and f-strings work fine.
-# SKIP:
+# STATUS: ✓ WORKS — format(value, spec) is defined and dispatches to __format__.
+#         Tested fully in test/str.pyj.
+#
 #   ae(format(3.14159, '.2f'), '3.14')
 
 # ── 56. next(iterator[, default]) builtin ────────────────────────────────────
@@ -1132,12 +1130,55 @@ ae(next(g), 200)
 ae(next(g, 'stop'), 'stop')
 
 # ── 57. iter(callable, sentinel) two-arg form ────────────────────────────────
-# STATUS: ✗ NOT IMPLEMENTED — two-argument iter(callable, sentinel) not supported.
-# SKIP:
-#   count = [0]
-#   def counter():
-#       count[0] += 1; return count[0]
-#   ae(list(iter(counter, 3)), [1, 2])
+# Basic usage: collect values until sentinel
+_count57 = [0]
+def _counter57():
+    _count57[0] += 1
+    return _count57[0]
+ade(list(iter(_counter57, 3)), [1, 2])
+# Sentinel never reached: stops at exact match
+_vals57 = ['a', 'b', 'c', None]
+_idx57 = [0]
+def _src57():
+    v = _vals57[_idx57[0]]
+    _idx57[0] += 1
+    return v
+ade(list(iter(_src57, None)), ['a', 'b', 'c'])
+# Sentinel on first call returns empty iterator
+_first57 = [0]
+def _fn57():
+    _first57[0] += 1
+    return 'stop'
+ade(list(iter(_fn57, 'stop')), [])
+# Works with for-loop
+_out57 = []
+_i57 = [0]
+def _seq57():
+    _i57[0] += 1
+    return _i57[0]
+for _v57 in iter(_seq57, 4):
+    _out57.append(_v57)
+ade(_out57, [1, 2, 3])
+# Works with next()
+_j57 = [0]
+def _f57():
+    _j57[0] += 1
+    return _j57[0]
+_it57 = iter(_f57, 5)
+ae(next(_it57), 1)
+ae(next(_it57), 2)
+ae(next(_it57), 3)
+ae(next(_it57), 4)
+ae(next(_it57, 'done'), 'done')
+# Callable object with __call__
+class _Caller57:
+    def __init__(self):
+        self.n = 0
+    def __call__(self):
+        self.n += 1
+        return self.n
+_caller57 = _Caller57()
+ade(list(iter(_caller57, 3)), [1, 2])
 
 # ── 58. slice() as builtin object ────────────────────────────────────────────
 # STATUS: ✗ NOT IMPLEMENTED — slice() constructor is not a builtin.
@@ -1182,3 +1223,52 @@ def _ko(a, *, b):
 
 ade(_ko(1, b=2),   [1, 2])
 ade(_ko(b=2, a=1), [1, 2])
+
+# ── 63. slice() builtin ───────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+# Subscript read/write tests (lst[s], lst[s]=val) are in test/slice.pyj
+# because they require `from __python__ import overload_getitem`.
+
+# Construction forms
+_s1 = slice(5)
+ae(_s1.start, None)
+ae(_s1.stop,  5)
+ae(_s1.step,  None)
+
+_s2 = slice(2, 8)
+ae(_s2.start, 2)
+ae(_s2.stop,  8)
+ae(_s2.step,  None)
+
+_s3 = slice(1, 9, 2)
+ae(_s3.start, 1)
+ae(_s3.stop,  9)
+ae(_s3.step,  2)
+
+# None values preserved
+_sn = slice(None, None, -1)
+ae(_sn.start, None)
+ae(_sn.stop,  None)
+ae(_sn.step,  -1)
+
+# indices() method
+ade(_s2.indices(10), [2, 8, 1])
+ade(slice(None, None, 1).indices(5), [0, 5, 1])
+ade(slice(-3, -1).indices(10), [7, 9, 1])
+ade(slice(None, None, -1).indices(5), [4, -1, -1])
+
+# repr / str
+ae(str(slice(1, 5, None)), 'slice(1, 5, None)')
+ae(str(slice(None, 5, 2)), 'slice(None, 5, 2)')
+
+# Equality
+ok(slice(1, 5) == slice(1, 5))
+ok(not (slice(1, 5) == slice(1, 6)))
+
+# isinstance
+ok(isinstance(slice(1, 5), slice))
+
+# Delete with slice object uses ρσ_delitem (no overload_getitem needed)
+_b = [0, 1, 2, 3, 4]
+del _b[slice(1, 3)]
+ade(_b, [0, 3, 4])

@@ -164,7 +164,22 @@ def ρσ_reversed(iterable):
         return ans
     raise TypeError('reversed() can only be called on arrays or strings')
 
-def ρσ_iter(iterable):
+def ρσ_iter(iterable, sentinel):
+    # Two-argument form: iter(callable, sentinel) — call repeatedly until sentinel is returned
+    if arguments.length >= 2:
+        callable_ = iterable
+        ans = v'{"_callable":callable_,"_sentinel":sentinel,"_done":false}'
+        ans[ρσ_iterator_symbol] = def():
+            return this
+        ans['next'] = def():
+            if this._done:
+                return v"{'done':true}"
+            val = ρσ_callable_call(this._callable)
+            if v'val === this._sentinel':
+                this._done = True
+                return v"{'done':true}"
+            return v"{'done':false,'value':val}"
+        return ans
     # Generate a JavaScript iterator object from iterable
     if jstype(iterable[ρσ_iterator_symbol]) is 'function':
         return iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
@@ -363,6 +378,66 @@ def ρσ_max(*args, **kwargs):
     raise TypeError('expected at least one argument')
 
 
+class ρσ_slice:
+    def __init__(self, start_or_stop, stop, step):
+        if arguments.length is 1:
+            self.start = None
+            self.stop = start_or_stop
+            self.step = None
+        elif arguments.length is 2:
+            self.start = start_or_stop
+            self.stop = stop
+            self.step = None
+        else:
+            self.start = start_or_stop
+            self.stop = stop
+            self.step = step
+
+    def indices(self, length):
+        step = 1 if self.step is None else self.step
+        if step is 0:
+            raise ValueError('slice step cannot be zero')
+        if step > 0:
+            lower = 0
+            upper = length
+            start = lower if self.start is None else self.start
+            stop  = upper if self.stop  is None else self.stop
+        else:
+            lower = -1
+            upper = length - 1
+            start = upper if self.start is None else self.start
+            stop  = lower if self.stop  is None else self.stop
+        # Only clamp values that were explicitly provided (None defaults are already correct).
+        if self.start is not None:
+            if start < 0:
+                start = max(start + length, lower)
+            if start > upper:
+                start = upper
+        if self.stop is not None:
+            if stop < 0:
+                stop = max(stop + length, lower)
+            if stop > upper:
+                stop = upper
+        return start, stop, step
+
+    def __repr__(self):
+        s = 'None' if self.start is None else String(self.start)
+        stop = 'None' if self.stop is None else String(self.stop)
+        step = 'None' if self.step is None else String(self.step)
+        return 'slice(' + s + ', ' + stop + ', ' + step + ')'
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        if not v'other instanceof ρσ_slice':
+            return False
+        return self.start is other.start and self.stop is other.stop and self.step is other.step
+
+    def __hash__(self):
+        raise TypeError("unhashable type: 'slice'")
+
+
 v'var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
 v'var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
 v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod'
@@ -371,3 +446,4 @@ v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, le
 v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next'
 v'var ρσ_Ellipsis = Object.freeze({toString: function(){return "Ellipsis";}, __repr__: function(){return "Ellipsis";}})'
 v'var Ellipsis = ρσ_Ellipsis'
+v'var slice = ρσ_slice'

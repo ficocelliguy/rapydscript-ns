@@ -1,7 +1,7 @@
 # vim:fileencoding=utf-8
 # License: BSD
 
-# globals: exports, console, ρσ_iterator_symbol, ρσ_kwargs_symbol, ρσ_arraylike, ρσ_list_contains, ρσ_list_constructor, ρσ_str, ρσ_int, ρσ_float
+# globals: exports, console, ρσ_iterator_symbol, ρσ_kwargs_symbol, ρσ_arraylike, ρσ_list_contains, ρσ_list_constructor, ρσ_str, ρσ_int, ρσ_float, ρσ_slice
 
 def ρσ_eslice(arr, step, start, end):
     if jstype(arr) is 'string' or v'arr instanceof String':
@@ -179,6 +179,11 @@ def ρσ_interpolate_kwargs_constructor(apply, f, supplied_args):
 def ρσ_getitem(obj, key):
     if obj.__getitem__:
         return obj.__getitem__(key)
+    if v'typeof ρσ_slice !== "undefined" && key instanceof ρσ_slice':
+        return ρσ_eslice(obj,
+            v'(key.step  !== null && key.step  !== undefined) ? key.step  : 1',
+            v'(key.start !== null && key.start !== undefined) ? key.start : undefined',
+            v'(key.stop  !== null && key.stop  !== undefined) ? key.stop  : undefined')
     if jstype(key) is 'number' and key < 0:
         key += obj.length
     return obj[key]
@@ -186,6 +191,10 @@ def ρσ_getitem(obj, key):
 def ρσ_setitem(obj, key, val):
     if obj.__setitem__:
         obj.__setitem__(key, val)
+    elif v'typeof ρσ_slice !== "undefined" && key instanceof ρσ_slice':
+        ρσ_splice(obj, val,
+            v'(key.start !== null && key.start !== undefined) ? key.start : 0',
+            v'(key.stop  !== null && key.stop  !== undefined) ? key.stop  : obj.length')
     else:
         if jstype(key) is 'number' and key < 0:
             key += obj.length
@@ -195,6 +204,11 @@ def ρσ_setitem(obj, key, val):
 def ρσ_delitem(obj, key):
     if obj.__delitem__:
         obj.__delitem__(key)
+    elif v'typeof ρσ_slice !== "undefined" && key instanceof ρσ_slice':
+        ρσ_delslice(obj,
+            v'(key.step  !== null && key.step  !== undefined) ? key.step  : 1',
+            v'(key.start !== null && key.start !== undefined) ? key.start : undefined',
+            v'(key.stop  !== null && key.stop  !== undefined) ? key.stop  : undefined')
     elif jstype(obj.splice) is 'function':
         obj.splice(key, 1)
     else:

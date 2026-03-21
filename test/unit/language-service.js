@@ -763,6 +763,25 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        {
+            name: "slice_builtin_no_undef_error",
+            description: "slice() usage produces no 'Undefined symbol' diagnostic",
+            run: function () {
+                var inst = new Diagnostics(RS);
+                var markers = inst.check([
+                    "s = slice(1, 5)",
+                    "x = [1, 2, 3, 4, 5]",
+                    "ok = isinstance(s, slice)",
+                ].join("\n"));
+                var undef = markers.filter(function (m) {
+                    return m.message.indexOf("Undefined symbol") !== -1 &&
+                           m.message.indexOf("slice") !== -1;
+                });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no 'Undefined symbol: slice' but got: " + JSON.stringify(undef));
+            },
+        },
+
     ];
 
     return TESTS;

@@ -34,7 +34,7 @@ export const BASE_BUILTINS = (
     ' NodeList alert console Node Symbol NamedNodeMap ρσ_eslice ρσ_delslice Number' +
     ' Boolean encodeURIComponent decodeURIComponent setTimeout setInterval' +
     ' setImmediate clearTimeout clearInterval clearImmediate requestAnimationFrame' +
-    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis'
+    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice'
 ).split(' ');
 
 // ---------------------------------------------------------------------------

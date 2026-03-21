@@ -214,7 +214,7 @@ def print_class(output):
                 output.end_statement()
 
         elif is_node_type(stmt, AST_Class):
-            console.error('Nested classes aren\'t supported yet')  # noqa:undef
+            pass  # nested classes are emitted in the statements section below
 
     if not defined_methods['__repr__']:
         define_default_method('__repr__', def():
@@ -271,9 +271,26 @@ def print_class(output):
             output.print(JSON.stringify(create_doctring(self.docstrings)))
         )
 
-    # Other statements in the class context
+    # Other statements in the class context (including nested class definitions)
     for stmt in self.statements:
-        if not is_node_type(stmt, AST_Method):
+        if is_node_type(stmt, AST_Class):
+            # Print the nested class in full, then attach it to the outer class.
+            # Two assignments mirror Python semantics:
+            #   Outer.Inner        — class-level access (Outer.Inner())
+            #   Outer.prototype.Inner — instance-level access (self.Inner() inside methods)
+            output.indent()
+            stmt.print(output)
+            output.newline()
+            nested_name = stmt.name.name
+            output.indent()
+            self.name.print(output)
+            output.print('.' + nested_name + ' = ' + nested_name)
+            output.end_statement()
+            output.indent()
+            self.name.print(output)
+            output.print('.prototype.' + nested_name + ' = ' + nested_name)
+            output.end_statement()
+        elif not is_node_type(stmt, AST_Method):
             output.indent()
             stmt.print(output)
             output.newline()
