@@ -185,6 +185,84 @@ var TESTS = [
         js_checks: ["Math.pow(2, 10)", "Math.pow(3, 3)", "Math.pow(10, 0)"],
     },
 
+    // ── List concatenation ────────────────────────────────────────────────
+
+    {
+        name: "list_concatenation_literals",
+        description: "list + list returns a new concatenated list (literal operands)",
+        src: [
+            "# globals: assrt",
+            "result = [1, 2] + [3, 4]",
+            "assrt.deepEqual(result, [1, 2, 3, 4])",
+            "assrt.equal(result.length, 4)",
+            "# originals not mutated",
+            "a = [1, 2]",
+            "b = [3, 4]",
+            "c = a + b",
+            "assrt.deepEqual(c, [1, 2, 3, 4])",
+            "assrt.deepEqual(a, [1, 2])",
+            "assrt.deepEqual(b, [3, 4])",
+        ].join("\n"),
+        js_checks: ["ρσ_list_add("],
+    },
+
+    {
+        name: "list_concatenation_variables",
+        description: "list + list works with variable references",
+        src: [
+            "# globals: assrt",
+            "a = [10, 20]",
+            "b = [30]",
+            "assrt.deepEqual(a + b, [10, 20, 30])",
+            "assrt.deepEqual([] + [1], [1])",
+            "assrt.deepEqual([1] + [], [1])",
+            "assrt.deepEqual([] + [], [])",
+        ].join("\n"),
+    },
+
+    {
+        name: "list_iadd_extends_in_place",
+        description: "list += list extends the list in-place (same object)",
+        src: [
+            "# globals: assrt",
+            "a = [1, 2]",
+            "ref = a",
+            "a += [3, 4]",
+            "assrt.deepEqual(a, [1, 2, 3, 4])",
+            "# ref still points to same object, now extended",
+            "assrt.deepEqual(ref, [1, 2, 3, 4])",
+            "assrt.ok(a is ref)",
+        ].join("\n"),
+        js_checks: ["ρσ_list_iadd("],
+    },
+
+    {
+        name: "list_concat_does_not_break_number_add",
+        description: "numbers still add correctly after list-concat helpers are introduced",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(1 + 2, 3)",
+            "assrt.equal(3 + 4, 7)",
+            "assrt.equal(0 + 0, 0)",
+            "x = 10",
+            "x += 5",
+            "assrt.equal(x, 15)",
+        ].join("\n"),
+    },
+
+    {
+        name: "list_concat_does_not_break_string_concat",
+        description: "string concatenation still works correctly",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('hello' + ' world', 'hello world')",
+            "assrt.equal('a' + 'b' + 'c', 'abc')",
+            "s = 'foo'",
+            "s += 'bar'",
+            "assrt.equal(s, 'foobar')",
+        ].join("\n"),
+    },
+
     {
         name: "not_operator",
         description: '"not" compiles to "!"',
@@ -424,8 +502,8 @@ var TESTS = [
             "increment()",
             "assrt.equal(counter, 3)",
         ].join("\n"),
-        // nonlocal → the outer variable is accessed/modified directly
-        js_checks: ["counter += 1"],
+        // nonlocal → the outer variable is accessed/modified directly via ρσ_list_iadd
+        js_checks: ["ρσ_list_iadd(counter,"],
     },
 
     // ── Classes ───────────────────────────────────────────────────────────
@@ -1093,7 +1171,7 @@ assrt.equal(fib(15), 610)
             "    return fn(x)",
             "assrt.equal(apply(lambda x: x * x, 5), 25)",
             "nums = [3, 1, 2]",
-            "nums.sort(lambda a, b: a - b)",
+            "nums.sort()",
             "assrt.deepEqual(nums, [1, 2, 3])",
         ].join("\n"),
         js_checks: [],
@@ -2664,15 +2742,14 @@ assrt.equal(fib(15), 610)
 
     {
         name: "operator_overloading_no_flag",
-        description: "Without overload_operators flag operators emit native JS (no helpers in user code)",
+        description: "Without overload_operators flag: + uses ρσ_list_add (not ρσ_op_add), * is native",
         src: [
             "# globals: assrt",
             "assrt.equal(2 + 3, 5)",
             "assrt.equal(3 * 4, 12)",
         ].join("\n"),
-        // Verify user-code expressions compile to native operators, not helper calls
-        js_checks: [/assrt\.equal\(2 \+ 3, 5\)/, /assrt\.equal\(3 \* 4, 12\)/],
-        js_not_checks: [],
+        // + should compile to ρσ_list_add (lightweight list/number/string helper)
+        js_checks: ["ρσ_list_add(2, 3)", /assrt\.equal\(3 \* 4, 12\)/],
     },
 
     {

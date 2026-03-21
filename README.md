@@ -108,9 +108,6 @@ Here are a few features of RapydScript:
 - similar to above, ability to use both, Python's and JavaScript's tutorials (as well as widgets)
 - it's self-hosting, that means the compiler is itself written in RapydScript and compiles into JavaScript
 
-Let's not waste any more time with the introductions, however. The best way to
-learn a new language/framework is to dive in.
-
 
 Installation
 ------------
@@ -357,17 +354,10 @@ math_ops = {
 }
 ```
 
-I'm sure you will agree that the above code is cleaner than declaring 5
-temporary variables first and assigning them to the object literal keys after.
 Note that the example puts the function header (def()) and content on the same
-line. I'll refer to it as function inlining. This is meant as a feature of
-RapydScript to make the code cleaner in cases like the example above. While you
-can use it in longer functions by chaining statements together using `;`, a
-good rule of thumb (to keep your code clean) is if your function needs
-semi-colons ask yourself whether you should be inlining, and if it needs more
-than 2 semi-colons, the answer is probably no (note that you can also use
-semi-colons as newline separators within functions that aren't inlined, as in
-the example in the previous section).
+line (function inlining). This is a feature of RapydScript that can be used
+to make the code cleaner in cases like the example above. You can also use it 
+in longer functions by chaining statements together using `;`.
 
 
 Lambda Expressions
@@ -543,7 +533,7 @@ $(element)\
 	.show()
 ```
 
-Some of you might welcome this feature, some of you might not. RapydScript always aims to make its unique features unobtrusive to regular Python, which means that you don't have to use them if you disagree with them. Recently, we have enhanced this feature to handle `do/while` loops as well:
+This feature handles `do/while` loops as well:
 
 ```js
 a = 0
@@ -646,7 +636,9 @@ into the names optional parameters you specified in the function definition.
 
 Inferred Tuple Packing/Unpacking
 --------------------------------
-Like Python, RapydScript allows inferred tuple packing/unpacking and assignment. While inferred/implicit logic is usually bad, it can sometimes make the code cleaner, and based on the order of statements in the Zen of Python, 'beautiful' takes priority over 'explicit'. For example, if you wanted to swap two variables, the following looks cleaner than explicitly declaring a temporary variable:
+Like Python, RapydScript allows inferred tuple packing/unpacking and assignment. For 
+example, if you wanted to swap two variables, the following is simpler than explicitly 
+declaring a temporary variable:
 
 ```py
 a, b = b, a
@@ -766,20 +758,48 @@ Containers (lists/sets/dicts)
 ### Lists
 
 Lists in RapydScript are almost identical to lists in Python, but are also
-native JavaScript arrays. The only small caveats are that the ``sort()`` and
-``pop()`` methods are renamed to ``pysort()`` and ``pypop()``. This is so that
-you can pass RapydScript lists to external JavaScript libraries without any
-conflicts. Note that even list literals in RapydScript create python like list
-objects, and you can also use the builtin ``list()`` function to create lists
-from other iterable objects, just as you would in python.  You can create a
-RapydScript list from a plain native JavaScript array by using the ``list_wrap()``
-function, like this:
+native JavaScript arrays. The ``sort()`` and ``pop()`` methods behave exactly
+as in Python: ``sort()`` performs a numeric sort (in-place, with optional ``key``
+and ``reverse`` arguments) and ``pop()`` performs a bounds-checked pop (raises
+``IndexError`` for out-of-bounds indices). If you need the native JavaScript
+behavior for interop with external JS libraries, use ``jssort()`` (lexicographic
+sort) and ``jspop()`` (no bounds check, always pops the last element). The old
+``pysort()`` and ``pypop()`` names are kept as backward-compatible aliases.
+
+Note that even list literals in RapydScript create Python-like list objects,
+and you can also use the builtin ``list()`` function to create lists from other
+iterable objects, just as you would in Python. You can create a RapydScript
+list from a plain native JavaScript array by using the ``list_wrap()`` function,
+like this:
 
 ```py
 a = v'[1, 2]'
 pya = list_wrap(a)
  # Now pya is a python like list object that satisfies pya === a
 ```
+
+### List Concatenation
+
+The `+` operator concatenates two lists and returns a new list, exactly as in Python:
+
+```py
+a = [1, 2]
+b = [3, 4]
+c = a + b   # [1, 2, 3, 4]  — a and b are unchanged
+```
+
+The `+=` operator extends a list in-place (the original list object is mutated):
+
+```py
+a = [1, 2]
+ref = a      # ref and a point to the same list
+a += [3, 4]  # mutates a in-place
+print(ref)   # [1, 2, 3, 4]  — ref sees the update
+```
+
+No special flag is required. The `+` operator compiles to a lightweight helper
+(`ρσ_list_add`) that uses `Array.concat` for lists and falls back to native JS
+`+` for numbers and strings.
 
 ### Sets
 
@@ -1711,7 +1731,7 @@ E.a(onclick=def():
 
 Classes
 -------
-This is where RapydScript really starts to shine. JavaScript is known for having really crappy class implementation (it's basically a hack on top of a normal function, most experienced users suggest using external libraries for creating those instead of creating them in pure JavaScript). Luckily RapydScript fixes that. Let's imagine we want a special text field that takes in a user color string and changes color based on it. Let's create such field via a class.
+JavaScript is not known for having excellent class implementation - but RapydScript improves on that. Imagine we want a special text field that takes in a user color string and changes color based on it. Let's create such field via a class:
 
 ```js
 class ColorfulTextField:
@@ -2382,9 +2402,9 @@ Shadowing is preferred in most cases, since it can't accidentally damage outside
 Available Libraries
 -------------------
 
-One of Python's main strengths is the number of libraries available to the developer. This is something very few other `Python-in-a-browser` frameworks understand. In the browser JavaScript is king, and no matter how many libraries the community for the given project will write, the readily-available JavaScript libraries will always outnumber them. This is why RapydScript was designed with JavaScript and DOM integration in mind from the beginning. Indeed, plugging `underscore.js` in place of RapydScript's `stdlib` will work just as well, and some developers may choose to do so, after all, `underscore.js` is very Pythonic and very complete. 
+One of Python's main strengths is the number of libraries available to the developer. The large number of readily-available JavaScript libraries will always outnumber community-made Rapydscript libraries. This is why RapydScript was designed with JS and DOM integration in mind from the beginning. For example, plugging in `lodash` in place of RapydScript's `stdlib` will work fine!
 
-It is for that reason that I try to keep RapydScript bells and whistles to a minimum. RapydScript's main strength is easy integration with JavaScript and DOM, which allows me to stay sane and not rewrite my own versions of the libraries that are already available. That doesn't mean, however, that pythonic libraries can't be written for RapydScript. To prove that, I have implemented lightweight clones of several popular Python libraries and bundled them into RapydScript, you can find them in `src` directory. The following libraries are included:
+ RapydScript's main strength is easy integration with JavaScript and DOM, and easy use of libraries that are already available. That doesn't mean, however, that pythonic libraries can't be written for RapydScript. Rapydscript comes with lightweight clones of several popular Python libraries, which you can find them in `src` directory.
 
 	math                # replicates almost all of the functionality from Python's math library
 	re                  # replicates almost all of the functionality from Python's re library
@@ -2401,12 +2421,12 @@ It is for that reason that I try to keep RapydScript bells and whistles to a min
 	                    # groupby, islice, pairwise, starmap, takewhile, zip_longest,
 	                    # product, permutations, combinations, combinations_with_replacement
 
-For the most part, the logic implemented in these libraries functions identically to the Python versions.  I'd be happy to include more libraries, if other members of the community want to implement them (it's fun to do, `re.pyj` is a good example), but I want to reemphasize that unlike most other Python-to-JavaScript compilers, RapydScript doesn't need them to be complete since there are already tons of available JavaScript libraries that it can use natively.
+For the most part, the logic implemented in these libraries functions identically to the Python versions. I'd be happy to include more libraries, if other members of the community want them. However, unlike most other Python-to-JavaScript compilers, RapydScript doesn't need them to be complete since there are already tons of available JavaScript libraries that it can use natively.
 
 Linter
 ---------
 
-The RapydScript compiler includes its own, built in linter. The linter is
+The RapydScript compiler includes its own, built-in linter. The linter is
 modeled on pyflakes, it catches instances of unused/undefined variables,
 functions, symbols, etc. While this sounds simple, it is surprisingly effective
 in practice. To run the linter:
@@ -2486,13 +2506,12 @@ RapydScript will pick up any classes you declare yourself as well as native
 JavaScript classes. It will not, however, pick up class-like objects created by
 outside frameworks. There are two approaches for dealing with those. One is via
 `@external` decorator, the other is via `new` operator when declaring such
-object. To keep code legible and consistent, I strongly prefer the use of
-`@external` decorator over the `new` operator for several reasons, even if it
-may be more verbose:
+object. The `@external` decorator is recommended over the `new` operator for 
+several reasons, even if it may be more verbose:
 
 - `@external` decorator makes classes declared externally obvious to anyone looking at your code
 - class declaration that uses `@external` decorator can be exported into a reusable module
-- developers are much more likely to forget a single instance of `new` operator when declaring an object than to forget an import, the errors due to omitted `new` keyword are also likely to be more subtle and devious to debug
+- developers are much more likely to forget a single instance of `new` operator when declaring an object than to forget an import. the errors due to omitted `new` keyword are also likely to be more subtle and devious to debug
 
 #### Embedding the RapydScript compiler in your webpage
 

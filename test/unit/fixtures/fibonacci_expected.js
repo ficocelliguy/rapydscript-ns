@@ -30,7 +30,7 @@ var fib = memoize((function() {
         } else if ((n === 1 || typeof n === "object" && ρσ_equals(n, 1))) {
             return 1;
         } else {
-            return fib(n - 1) + fib(n - 2);
+            return ρσ_list_add(fib(n - 1), fib(n - 2));
         }
     };
     if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {

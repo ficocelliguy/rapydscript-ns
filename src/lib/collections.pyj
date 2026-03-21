@@ -353,7 +353,7 @@ class Counter:
 
     def most_common(self, n=None):
         items = [[k, self._data[k]] for k in self._data]
-        items.pysort(key=def(pair): return -pair[1];)
+        items.sort(key=def(pair): return -pair[1];)
         if n is not None:
             return items[:n]
         return items

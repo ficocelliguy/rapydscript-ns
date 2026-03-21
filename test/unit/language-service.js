@@ -782,6 +782,22 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        {
+            name: "list_concat_no_diagnostics",
+            description: "list + list and += produce no diagnostic errors",
+            run: function () {
+                var markers = d().check([
+                    "a = [1, 2]",
+                    "b = [3, 4]",
+                    "c = a + b",
+                    "a += [5, 6]",
+                    "print(c)",
+                    "print(a)",
+                ].join("\n"));
+                assert_count(markers, SEV_ERROR, 0, "list concat");
+            },
+        },
+
     ];
 
     return TESTS;

@@ -499,7 +499,7 @@ _test_raise_from_none()
 # STATUS: ✗ NOT ENFORCED — __slots__ is accepted but does not restrict attrs.
 
 # ── 24. Nested classes ───────────────────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — see comment in test/classes.pyj
+# STATUS: ✓ WORKS — added in commit 44c9802; tested fully in test/classes.pyj
 
 # ── 25. Generator .throw() ───────────────────────────────────────────────────
 # STATUS: ✓ WORKS
@@ -1181,12 +1181,9 @@ _caller57 = _Caller57()
 ade(list(iter(_caller57, 3)), [1, 2])
 
 # ── 58. slice() as builtin object ────────────────────────────────────────────
-# STATUS: ✗ NOT IMPLEMENTED — slice() constructor is not a builtin.
-# SKIP:
-#   s = slice(1, 5, 2)
-#   ae(s.start, 1)
-#   ae(s.stop, 5)
-#   ae(s.step, 2)
+# STATUS: ✓ WORKS — implemented (see item #63 below for full tests).
+# NOTE: This item was previously marked NOT IMPLEMENTED but was added in a
+#       recent release. Full tests live in item #63 and test/slice.pyj.
 
 # ── 59. complex() builtin ────────────────────────────────────────────────────
 # STATUS: ✗ NOT SUPPORTED — no complex number type.

@@ -1,0 +1,326 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# python_compat.pyj
+# Tests for places where RapydScript intentionally differs from Python.
+# Each section documents the Python behavior, the RapydScript behavior, and
+# asserts that RapydScript does what the README says it does.
+
+ae = assrt.equal
+ade = assrt.deepEqual
+ok = assrt.ok
+
+# ── 1. Function argument leniency — too few arguments ────────────────────────
+# Python: raises TypeError("f() missing 1 required positional argument: 'b'")
+# RapydScript: extra parameters are undefined instead of raising TypeError.
+
+def _f_two_args(a, b):
+    return b
+
+ae(_f_two_args(1), undefined)     # b is undefined
+ae(_f_two_args(1, 2), 2)          # normal call still works
+
+def _f_default(a, b=99):
+    return b
+
+ae(_f_default(1), 99)             # default value used when b not passed
+ae(_f_default(1, 7), 7)
+
+# ── 2. Function argument leniency — too many arguments ───────────────────────
+# Python: raises TypeError("f() takes 1 positional argument but 3 were given")
+# RapydScript: extra positional arguments are silently discarded.
+
+def _f_one_arg(a):
+    return a
+
+ae(_f_one_arg(42, 99, 'extra'), 42)   # extras silently ignored
+
+# ── 3. Positional-only parameter enforcement — lenient ───────────────────────
+# Python: greet(name="Alice") raises TypeError when name is positional-only.
+# RapydScript: the named keyword arg is silently ignored; the parameter gets
+# its positional value or undefined if not provided positionally.
+
+def _po_only(a, b, /):
+    return [a, b]
+
+ade(_po_only(1, 2), [1, 2])        # normal positional call works
+
+# Passing 'b' by keyword: keyword is silently ignored, b gets undefined.
+result3 = _po_only(1, b=2)
+ae(result3[0], 1)
+ae(result3[1], undefined)           # named value was silently ignored
+
+# ── 4. Keyword-only parameter enforcement — lenient ──────────────────────────
+# Python: f(1, 2) raises TypeError when b is keyword-only (after bare *).
+# RapydScript: positional value is accepted without error.
+
+def _kw_only(a, *, b=10):
+    return [a, b]
+
+ade(_kw_only(1, b=99), [1, 99])   # normal keyword call works
+ade(_kw_only(1), [1, 10])          # default value used
+
+# Passing keyword-only param positionally: no TypeError in RapydScript.
+# The extra positional arg is silently discarded; b gets its default value.
+# (Python would raise TypeError here.)
+_kw_result = None
+_kw_error = None
+try:
+    _kw_result = _kw_only(1, 99)
+except TypeError as e:
+    _kw_error = e
+ok(_kw_error is None)             # no TypeError raised
+ae(_kw_result[0], 1)
+ae(_kw_result[1], 10)             # default used; positional 99 was discarded
+
+# ── 5. `is` operator — maps to JavaScript === ────────────────────────────────
+# Python: `is` checks object identity (id(a) == id(b)).
+# RapydScript: `is` compiles to ===, which is strict value equality for primitives.
+# Most cases behave identically, but NaN is a notable divergence.
+
+ae(1 is 1, True)
+ae('hello' is 'hello', True)
+ae(None is None, True)
+
+# NaN: RapydScript special-cases `x is NaN` → compiles to isNaN(x).
+# This is a deliberate deviation from `===` to make NaN checks useful.
+# (Plain `NaN === NaN` is always false in JS, so `is NaN` would be useless.)
+ok(42 / 'x' is NaN)         # compiles to: isNaN(42 / 'x') → true
+ok(42 is not NaN)            # compiles to: !isNaN(42) → true
+
+# ── 6. Arithmetic coercion: number + string ───────────────────────────────────
+# Python: 1 + '1' raises TypeError.
+# RapydScript: delegates to JavaScript which coerces 1 to '1', giving '11'.
+
+ae(1 + '1', '11')
+ae('prefix_' + 42, 'prefix_42')
+
+# ── 7. List + list concatenation ─────────────────────────────────────────────
+# Python: [1] + [2] returns [1, 2].
+# RapydScript: list + list returns a new concatenated list (Python semantics).
+# The + operator compiles to ρσ_list_add which uses Array.concat when both sides are arrays.
+
+ade([1] + [2], [1, 2])
+ade([1, 2] + [3, 4], [1, 2, 3, 4])
+
+# Variables holding lists also work:
+_a7 = [1, 2]
+_b7 = [3, 4]
+ade(_a7 + _b7, [1, 2, 3, 4])
+
+# += extends the list in-place (Python semantics — same object is mutated):
+_a8 = [1, 2]
+_b8 = _a8
+_a8 += [3, 4]
+ade(_a8, [1, 2, 3, 4])
+ade(_b8, [1, 2, 3, 4])  # _b8 still points to same object, now extended
+
+# ── 8. Ordering operators on lists — JS string coercion ──────────────────────
+# Python: [10] < [9] compares element-wise → False (10 > 9).
+# RapydScript: < coerces to string → '10' < '9' is True (char comparison).
+# This is a common gotcha: single-element lists with multi-digit numbers.
+
+# RapydScript lists have a Python-style __str__, so [10].toString() = '[10]'.
+# String compare of '[10]' vs '[9]': '[' = '[', then '1' < '9' → [10] < [9] is True.
+ok([10] < [9])       # True in RapydScript (string: '[10]' < '[9]')
+ae([9] < [10], False)  # False   (string: '[9]' > '[10]')
+
+# Compare: Python uses numeric element-wise ordering, so [10] > [9] (10 > 9).
+# RapydScript gives the opposite result for these specific values.
+
+# For correct numeric comparisons, compare elements explicitly:
+ok(10 > 9)           # direct numeric comparison always works
+
+# ── 9. List sort() — Python numeric sort (jssort() for JS lexicographic) ──────
+# list.sort() now does Python-style numeric ordering by default (in-place).
+# list.jssort() gives the native JS sort (lexicographic, for JS interop).
+
+lst_py = [10, 9, 2]
+lst_py.sort()         # Python-style numeric sort
+ade(lst_py, [2, 9, 10])
+
+# sort with key and reverse also work:
+lst_rev = [3, 1, 2]
+lst_rev.sort(reverse=True)
+ade(lst_rev, [3, 2, 1])
+
+# jssort() is the native JS lexicographic sort (for JS interop):
+lst_js = [10, 9, 2]
+lst_js.jssort()       # JS sort: compares as strings '10', '9', '2'
+ade(lst_js, [10, 2, 9])   # lexicographic: '1' < '2' < '9'
+
+# ── 10. List pop() — Python bounds-checked pop (jspop() for JS native) ────────
+# list.pop(i) now behaves like Python: raises IndexError for out-of-bounds index.
+# list.jspop() is the native JS pop — no bounds check, always pops the last element.
+
+lst10 = [1, 2, 3]
+ae(lst10.pop(), 3)      # Python pop: removes and returns last element
+ade(lst10, [1, 2])
+
+lst10b = [1, 2, 3]
+ae(lst10b.pop(0), 1)    # Python pop with index: removes and returns element at 0
+ade(lst10b, [2, 3])
+
+# pop raises IndexError for out-of-bounds:
+_caught10 = False
+try:
+    [1].pop(99)
+except IndexError:
+    _caught10 = True
+ok(_caught10)
+
+# jspop() is the native JS pop — ignores arguments, always pops the last element:
+lst10c = [1, 2, 3]
+ae(lst10c.jspop(), 3)     # JS pop: always removes and returns the last element
+ade(lst10c, [1, 2])
+
+# ── 11. Default dict (JS object) — missing key returns undefined ──────────────
+# Python: d['missing'] raises KeyError.
+# RapydScript (no dict_literals): missing key returns undefined.
+
+d11 = {'a': 1, 'b': 2}
+ae(d11['a'], 1)
+ae(d11['missing'], undefined)    # no KeyError
+
+# With dict_literals, Python behavior is enabled:
+def _test_keyerror():
+    from __python__ import dict_literals, overload_getitem
+    d = {'a': 1}
+    caught = False
+    try:
+        x = d['missing']
+    except KeyError:
+        caught = True
+    ok(caught)
+_test_keyerror()
+
+# ── 12. Default dict — numeric keys auto-converted to strings ─────────────────
+# Python: {1: 'one'} keeps integer key 1.
+# RapydScript JS object: numeric keys become strings. d[1] and d['1'] are the same.
+
+d12 = {}
+d12[1] = 'one'
+ae(d12[1], 'one')
+ae(d12['1'], 'one')    # same slot — number keys coerced to string
+
+# ── 13. Default dict — keys accessible as attributes ─────────────────────────
+# Python dicts: d.foo is always an AttributeError (use d['foo'] or d.get('foo')).
+# RapydScript JS object: d.foo and d['foo'] access the same slot.
+
+d13 = {'hello': 42, 'world': 99}
+ae(d13.hello, 42)
+ae(d13['hello'], 42)
+d13.newkey = 'set via attr'
+ae(d13['newkey'], 'set via attr')
+
+# ── 14. String methods not on string instances by default ─────────────────────
+# Python: 'hello'.strip() works directly on the string.
+# RapydScript (default): Python string methods live on the `str` object,
+# not on string instances. Native JS methods (upper, toLowerCase, etc.) do work.
+
+s14 = '  hello  '
+ae(str.strip(s14), 'hello')       # Python method via str object
+ae(s14.trim(), 'hello')           # JS native trim() works on instances
+
+s14b = 'hello world'
+ae(str.upper(s14b), 'HELLO WORLD')  # Python via str
+ae(s14b.toUpperCase(), 'HELLO WORLD')  # JS native
+
+# After strings(), Python methods work on instances:
+from pythonize import strings
+strings()
+
+ae('  hello  '.strip(), 'hello')
+ae('hello world'.upper(), 'HELLO WORLD')
+
+# ── 15. strings() leaves split() and replace() as JS versions ─────────────────
+# (strings() is active from section 14 above)
+# Python str.split() with no args: splits on any whitespace, strips leading/trailing.
+# JS String.prototype.split() with no args: returns the whole string in a 1-element array.
+
+# Python semantics via str module:
+ade(str.split('a  b'), ['a', 'b'])    # Python split on any whitespace
+ade(str.split('a  b c'), ['a', 'b', 'c'])
+
+# After strings(), .split() is STILL the JS version (by design):
+ade('a  b'.split(), ['a  b'])         # JS: no-arg split = one-element array
+ade('a b'.split(' '), ['a', 'b'])     # JS split with separator still works
+
+# Python str.replace() vs JS String.prototype.replace():
+# Python replaces ALL occurrences by default.
+# JS .replace() with a string pattern only replaces the FIRST occurrence.
+ae(str.replace('aaa', 'a', 'b'), 'bbb')     # Python: replaces all
+ae('aaa'.replace('a', 'b'), 'baa')           # JS: replaces only first
+
+# ── 16. Method binding — not automatic ──────────────────────────────────────
+# Python: bound methods carry a reference to self.
+# RapydScript (default): methods are unbound; extracting a method loses self.
+
+class _Bindable:
+    def __init__(self, value):
+        self.value = value
+    def get_value(self):
+        return self.value if self else None   # guard: self may be falsy if unbound
+
+obj16 = _Bindable(55)
+ae(obj16.get_value(), 55)       # direct call works
+
+unbound = obj16.get_value
+ae(unbound(), None)             # self is not obj16; guard returns None
+
+# With bound_methods flag, extraction works correctly:
+class _AutoBound:
+    from __python__ import bound_methods
+    def __init__(self, value):
+        self.value = value
+    def get_value(self):
+        return self.value
+
+obj16b = _AutoBound(77)
+bound_fn = obj16b.get_value
+ae(bound_fn(), 77)              # self is correctly bound to obj16b
+
+# ── 17. `global` keyword — prefers outer scope over module global ─────────────
+# Python: `global x` inside a nested function always refers to the module-level x.
+# RapydScript: if x also exists in an intermediate outer scope, that outer scope
+# variable is used instead of the module-level one.
+#
+# NOTE: This is a documented incompatibility. The README says:
+#   "if a variable is present both in the outer scope and the global scope,
+#    the variable from the outer scope will be used"
+#
+# SKIP: This behavior is inherently tied to how JavaScript closures work and is
+# difficult to exercise meaningfully in a compiled-to-JS test environment,
+# because the "global" and "outer" scopes collapse to different things
+# depending on context. The behavior is documented but not testable with a
+# simple assertion here without knowing the exact generated JS scope.
+#
+# Example (would be run in a context where x is BOTH a global and a local):
+#   _x17 = 'global_value'
+#   def _outer17():
+#       _x17 = 'outer_value'
+#       def _inner17():
+#           global _x17
+#           return _x17
+#       return _inner17()
+#   # Python: _outer17() == 'global_value' (global keyword forces module level)
+#   # RapydScript: _outer17() == 'outer_value' (outer scope wins)
+
+# ── 18. Truthiness — JS defaults ─────────────────────────────────────────────
+# Tested more fully in python_features.pyj #40, but demonstrating JS defaults here.
+# Without `from __python__ import truthiness`:
+
+_empty_list = []
+_empty_dict = {}
+
+# In JS, empty arrays and objects are truthy:
+ok(_empty_list)     # True (JS truthiness: any object is truthy)
+ok(_empty_dict)     # True (JS truthiness: any object is truthy)
+
+# Enable Python truthiness:
+from __python__ import truthiness
+
+ok(not [])          # False (Python semantics)
+ok(not {})          # False (Python semantics)
+ok([1])             # True
+ok({'a': 1})        # True

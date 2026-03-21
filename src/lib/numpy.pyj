@@ -1055,7 +1055,7 @@ def sort(a, axis=-1):
     a = asarray(a)
     if a.ndim is 1 or axis is None:
         data = a._data.slice()
-        data.sort(def(x, y): return x - y;)
+        data.jssort(def(x, y): return x - y;)
         return ndarray(a.shape.slice(), a.dtype, data, True)
     # 2D sort along last axis (axis=1 or axis=-1)
     if axis < 0:
@@ -1066,7 +1066,7 @@ def sort(a, axis=-1):
     if axis is 1:
         for i in range(rows):
             row = a._data.slice(i * cols, (i + 1) * cols)
-            row.sort(def(x, y): return x - y;)
+            row.jssort(def(x, y): return x - y;)
             for v in row:
                 new_data.push(v)
     elif axis is 0:
@@ -1074,7 +1074,7 @@ def sort(a, axis=-1):
             col = []
             for i in range(rows):
                 col.push(a._data[i * cols + j])
-            col.sort(def(x, y): return x - y;)
+            col.jssort(def(x, y): return x - y;)
             for i in range(rows):
                 new_data[i * cols + j] = col[i]
         if new_data.length is 0:
@@ -1089,14 +1089,14 @@ def argsort(a, axis=-1):
         for i in range(a.size):
             indices.push(i)
         data = a._data.slice()
-        indices.sort(def(i, j): return data[i] - data[j];)
+        indices.jssort(def(i, j): return data[i] - data[j];)
         return ndarray([a.size], 'int32', indices, True)
     # Flatten and sort
     data = a._data.slice()
     indices = []
     for i in range(data.length):
         indices.push(i)
-    indices.sort(def(i, j): return data[i] - data[j];)
+    indices.jssort(def(i, j): return data[i] - data[j];)
     return ndarray([indices.length], 'int32', indices, True)
 
 def searchsorted(a, v, side='left'):
@@ -1157,7 +1157,7 @@ def where(condition, x=None, y=None):
 def median(a, axis=None):
     a = asarray(a)
     data = a._data.slice()
-    data.sort(def(x, y): return x - y;)
+    data.jssort(def(x, y): return x - y;)
     n = data.length
     if n % 2 is 1:
         return data[Math.floor(n / 2)]
@@ -1166,7 +1166,7 @@ def median(a, axis=None):
 def percentile(a, q, axis=None):
     a = asarray(a)
     data = a._data.slice()
-    data.sort(def(x, y): return x - y;)
+    data.jssort(def(x, y): return x - y;)
     n = data.length
     idx = q / 100.0 * (n - 1)
     lo = Math.floor(idx)
@@ -1497,7 +1497,7 @@ def union1d(ar1, ar2):
         if not seen[key]:
             seen[key] = True
             unique.push(v)
-    unique.sort(def(a, b): return a - b;)
+    unique.jssort(def(a, b): return a - b;)
     return ndarray([unique.length], 'float64', unique, True)
 
 def intersect1d(ar1, ar2):
@@ -1513,7 +1513,7 @@ def intersect1d(ar1, ar2):
         if s[key] and not seen[key]:
             seen[key] = True
             result.push(v)
-    result.sort(def(a, b): return a - b;)
+    result.jssort(def(a, b): return a - b;)
     return ndarray([result.length], 'float64', result, True)
 
 def setdiff1d(ar1, ar2):
@@ -1529,7 +1529,7 @@ def setdiff1d(ar1, ar2):
         if not s[key] and not seen[key]:
             seen[key] = True
             result.push(v)
-    result.sort(def(a, b): return a - b;)
+    result.jssort(def(a, b): return a - b;)
     return ndarray([result.length], 'float64', result, True)
 
 def in1d(ar1, ar2):

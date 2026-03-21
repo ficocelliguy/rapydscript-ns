@@ -353,6 +353,21 @@ def ρσ_op_rshift(a, b):
     if b is not None and jstype(b.__rrshift__) is 'function': return b.__rrshift__(a)
     return a >> b
 
+# List-concatenation helpers (always available, no overload_operators required).
+# ρσ_list_add: used for the + operator; creates a new list when both sides are arrays.
+# NOTE: the fallback uses v'a + b' (verbatim JS) to avoid recursive self-compilation.
+def ρσ_list_add(a, b):
+    if Array.isArray(a) and Array.isArray(b):
+        return ρσ_list_constructor(a.concat(b))
+    return v'a + b'
+
+# ρσ_list_iadd: used for +=; extends a in-place when both sides are arrays (Python semantics).
+def ρσ_list_iadd(a, b):
+    if Array.isArray(a) and Array.isArray(b):
+        v'Array.prototype.push.apply(a, b)'
+        return a
+    return v'a + b'
+
 # Unary operator overloading helpers
 def ρσ_op_neg(a):
     if a is not None and jstype(a.__neg__) is 'function': return a.__neg__()

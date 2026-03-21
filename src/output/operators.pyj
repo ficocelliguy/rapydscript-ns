@@ -280,6 +280,12 @@ def print_binary_op(self, output):
         write_smart_equality(self, output)
     elif self.operator is 'instanceof':
         write_instanceof(self.left, self.right, output)
+    elif self.operator is '+':
+        output.print('ρσ_list_add(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
     elif self.operator is '*' and is_node_type(self.left, AST_String):
         self.left.print(output), output.print('.repeat('), self.right.print(output), output.print(')')
     elif self.operator is '===' or self.operator is '!==':
@@ -414,6 +420,14 @@ def print_assign(self, output):
             output.print('(('), self.left.print(output), output.spaced(')', '**', '('), self.right.print(output), output.print('))')
         else:
             output.print('Math.pow('), self.left.print(output), output.comma(), self.right.print(output), output.print(')')
+        return
+    if self.operator is '+=':
+        output.assign(self.left)
+        output.print('ρσ_list_iadd(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
         return
     if self.operator is '=' and self.is_chained():
         left_hand_sides, rhs = self.traverse_chain()

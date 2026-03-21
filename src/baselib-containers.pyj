@@ -140,7 +140,7 @@ def ρσ_list_sort(key=None, reverse=False):
         k = this[i]  # noqa:undef
         keymap.set(k, key(k))
         posmap.set(k, i)
-    this.sort(def (a, b): return mult * ρσ_list_sort_cmp(keymap.get(a), keymap.get(b), posmap.get(a), posmap.get(b));)
+    Array.prototype.sort.call(this, def (a, b): return mult * ρσ_list_sort_cmp(keymap.get(a), keymap.get(b), posmap.get(a), posmap.get(b));)
 
 def ρσ_list_concat():  # ensure concat() returns an object of type list
     ans = Array.prototype.concat.apply(this, arguments)
@@ -190,14 +190,18 @@ def ρσ_list_decorate(ans):
     ans.inspect = ρσ_list_to_string
     ans.extend = ρσ_list_extend
     ans.index = ρσ_list_index
-    ans.pypop = ρσ_list_pop
+    ans.jspop = Array.prototype.pop      # native JS pop (no bounds check, ignores args)
+    ans.pop = ρσ_list_pop                # Python pop (bounds-checked, supports negative index)
+    ans.pypop = ρσ_list_pop              # backward-compat alias for pop
     ans.remove = ρσ_list_remove
     ans.insert = ρσ_list_insert
     ans.copy = ρσ_list_copy
     ans.clear = ρσ_list_clear
     ans.count = ρσ_list_count
     ans.concat = ρσ_list_concat
-    ans.pysort = ρσ_list_sort
+    ans.jssort = Array.prototype.sort    # native JS sort (lexicographic by default)
+    ans.sort = ρσ_list_sort              # Python sort (numeric by default)
+    ans.pysort = ρσ_list_sort            # backward-compat alias for sort
     ans.slice = ρσ_list_slice
     ans.as_array = ρσ_list_as_array
     ans.__len__ = ρσ_list_len
@@ -235,7 +239,7 @@ v'var list = ρσ_list_constructor, list_wrap = ρσ_list_decorate'
 
 def sorted(iterable, key=None, reverse=False):
     ans = ρσ_list_constructor(iterable)
-    ans.pysort(key, reverse)
+    ans.sort(key, reverse)
     return ans
 # }}}
 

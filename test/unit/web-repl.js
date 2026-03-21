@@ -555,6 +555,30 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_list_concatenation",
+        description: "list + list returns a concatenated list in the bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "a = [1, 2]",
+                "b = [3, 4]",
+                "c = a + b",
+                "assrt.deepEqual(c, [1, 2, 3, 4])",
+                "assrt.deepEqual(a, [1, 2])",
+                "assrt.deepEqual(b, [3, 4])",
+                "# iadd extends in-place",
+                "a += [5]",
+                "assrt.deepEqual(a, [1, 2, 5])",
+                "# numbers still work",
+                "assrt.equal(1 + 2, 3)",
+                "# strings still work",
+                "assrt.equal('foo' + 'bar', 'foobar')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------
