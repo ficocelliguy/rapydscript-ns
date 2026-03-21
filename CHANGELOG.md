@@ -1,4 +1,4 @@
-version 0.8.0
+version 0.8.0 - 0.8.3
 =======================
 
   * Add language service with tab-completion, return type inference, hover tips, and typing exports
