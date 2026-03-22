@@ -1688,7 +1688,7 @@ re.match(///
 JSX Support
 -----------
 
-RapydScript supports JSX syntax for building UI components. JSX is identical to standard JSX used with React and other frameworks — the difference is that the surrounding Python-like code is compiled to JavaScript while JSX elements are passed through to the output.
+RapydScript supports JSX syntax for building React UI components. JSX elements compile directly to `React.createElement()` calls, so the output is plain JavaScript — no Babel or JSX transform step is needed.
 
 Enable JSX support with:
 
@@ -1696,9 +1696,18 @@ Enable JSX support with:
 from __python__ import jsx
 ```
 
-When this flag is set, files should be compiled to `.jsx` output (pass `--output myfile.jsx` or rename the output manually). The generated `.jsx` can then be processed by Babel, TypeScript, or any other JSX-aware toolchain.
+### Requirements
 
-### Basic elements
+`React` must be in scope at runtime. How you provide it depends on your environment:
+
+- **Bundler (Vite, webpack, etc.):** `import React from 'react'` at the top of your file (or configure your bundler's global React shim).
+- **CDN / browser script tag:** load React before your compiled script.
+- **Bitburner:** React is already available as a global — no import needed.
+- **RapydScript web REPL:** a minimal React stub is injected automatically so `React.createElement` calls succeed.
+
+### Output format
+
+RapydScript compiles JSX to `React.createElement()` calls. For example:
 
 ```py
 from __python__ import jsx
@@ -1709,15 +1718,17 @@ def Greeting(props):
 
 Compiles to:
 
-```jsx
+```js
 function Greeting(props) {
-    return <h1>Hello, {props.name}!</h1>;
+    return React.createElement("h1", null, "Hello, ", props.name);
 }
 ```
 
+Lowercase tags (`div`, `span`, `h1`, …) become string arguments. Capitalised names and dot-notation (`MyComponent`, `Router.Route`) are passed as references — not strings.
+
 ### Attributes
 
-String attributes, expression attributes, boolean attributes, and hyphenated names all work:
+String, expression, boolean, and hyphenated attribute names all work:
 
 ```py
 from __python__ import jsx
@@ -1736,6 +1747,8 @@ def Form(props):
     )
 ```
 
+Hyphenated names (e.g. `aria-label`, `data-id`) are automatically quoted as object keys: `{"aria-label": "Name"}`. Boolean attributes with no value compile to `true`.
+
 ### Nested elements and expressions
 
 ```py
@@ -1751,7 +1764,7 @@ def UserList(users):
 
 ### Fragments
 
-Use `<>...</>` to return multiple elements without a wrapper:
+Use `<>...</>` to return multiple elements without a wrapper node. Fragments compile to `React.createElement(React.Fragment, null, ...)`:
 
 ```py
 from __python__ import jsx
@@ -1783,9 +1796,11 @@ def Button(props):
     return <button {...props}>Click me</button>
 ```
 
+Compiles to `React.createElement("button", {...props}, "Click me")`.
+
 ### Component tags
 
-Components (capitalized names or dot-notation) work just like in standard JSX:
+Capitalised names and dot-notation are treated as component references (not quoted strings):
 
 ```py
 from __python__ import jsx
@@ -1798,15 +1813,21 @@ def App():
     )
 ```
 
-### Producing `.jsx` output
+Compiles to:
 
-Use the `--output` flag to write a `.jsx` file:
-
-```sh
-rapydscript mycomponent.pyj --output mycomponent.jsx
+```js
+React.createElement(Router.Provider, null,
+    React.createElement(MyComponent, {name: "hello"})
+)
 ```
 
-The resulting `.jsx` file can be processed by your existing bundler (Vite, webpack, etc.) with no changes to your JSX pipeline.
+### Compiling JSX files
+
+Since the output is plain JavaScript, compile to a `.js` file as normal:
+
+```sh
+rapydscript mycomponent.pyj --output mycomponent.js
+```
 
 Creating DOM trees easily
 ---------------------------------

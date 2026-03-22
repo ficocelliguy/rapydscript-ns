@@ -2,52 +2,108 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-from ast import AST_String, is_node_type
+from ast import AST_String, AST_JSXText, AST_JSXSpread, AST_JSXExprContainer, is_node_type
+
+def _is_component_tag(tag):
+    # Components start with uppercase or use dot notation (e.g. Router.Route)
+    first = tag[0]
+    return (first >= 'A' and first <= 'Z') or '.' in tag
+
+def _needs_quoting(name):
+    # Attribute names containing non-identifier chars (e.g. aria-label) need quoting
+    return not v'/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)'
+
+def _print_tag(tag, output):
+    if _is_component_tag(tag):
+        output.print(tag)
+    else:
+        output.print('"')
+        output.print(tag)
+        output.print('"')
+
+def _print_props(props, output):
+    if not props or not props.length:
+        output.print('null')
+        return
+    output.print('{')
+    first = True
+    for prop in props:
+        if not first:
+            output.print(', ')
+        first = False
+        if is_node_type(prop, AST_JSXSpread):
+            output.print('...')
+            prop.expression.print(output)
+        else:
+            if _needs_quoting(prop.name):
+                output.print('"')
+                output.print(prop.name)
+                output.print('"')
+            else:
+                output.print(prop.name)
+            output.print(': ')
+            if prop.value is None:
+                output.print('true')
+            elif is_node_type(prop.value, AST_String):
+                output.print_string(prop.value.value)
+            else:
+                prop.value.print(output)
+    output.print('}')
+
+def _print_children(children, output):
+    for child in children:
+        if is_node_type(child, AST_JSXText):
+            text = child.value.trim()
+            if text:
+                output.print(', ')
+                output.print_string(text)
+        elif is_node_type(child, AST_JSXExprContainer):
+            output.print(', ')
+            child.expression.print(output)
+        else:
+            output.print(', ')
+            child.print(output)
 
 def print_jsx_element(self, output):
-    output.print('<')
-    output.print(self.tag)
-    for prop in self.props:
-        output.print(' ')
-        prop.print(output)
-    if self.self_closing:
-        output.print(' />')
-    else:
-        output.print('>')
-        for child in self.children:
-            child.print(output)
-        output.print('</')
-        output.print(self.tag)
-        output.print('>')
+    output.print('React.createElement(')
+    _print_tag(self.tag, output)
+    output.print(', ')
+    _print_props(self.props, output)
+    if not self.self_closing:
+        _print_children(self.children, output)
+    output.print(')')
 
 def print_jsx_fragment(self, output):
-    output.print('<>')
-    for child in self.children:
-        child.print(output)
-    output.print('</>')
+    output.print('React.createElement(React.Fragment, null')
+    _print_children(self.children, output)
+    output.print(')')
 
 def print_jsx_attribute(self, output):
-    output.print(self.name)
+    # Handled directly by _print_props; kept for completeness
+    if _needs_quoting(self.name):
+        output.print('"')
+        output.print(self.name)
+        output.print('"')
+    else:
+        output.print(self.name)
     if self.value is not None:
-        output.print('=')
+        output.print(': ')
         if is_node_type(self.value, AST_String):
-            output.print('"')
-            output.print(self.value.value)
-            output.print('"')
+            output.print_string(self.value.value)
         else:
-            output.print('{')
             self.value.print(output)
-            output.print('}')
 
 def print_jsx_spread(self, output):
-    output.print('{...')
+    # Handled directly by _print_props; kept for completeness
+    output.print('...')
     self.expression.print(output)
-    output.print('}')
 
 def print_jsx_text(self, output):
-    output.print(self.value)
+    # Handled directly by _print_children; kept for completeness
+    text = self.value.trim()
+    if text:
+        output.print_string(text)
 
 def print_jsx_expr_container(self, output):
-    output.print('{')
+    # Handled directly by _print_children; kept for completeness
     self.expression.print(output)
-    output.print('}')

@@ -27,6 +27,16 @@ var builtin_modules = {
             if(!ctx) ctx = {};
             if (!ctx.sha1sum) ctx.sha1sum = sha1sum;
             if (!ctx.require) ctx.require = require;
+            if (!ctx.React) ctx.React = {
+                Fragment: Symbol('React.Fragment'),
+                createElement: function(type, props) {
+                    var children = Array.prototype.slice.call(arguments, 2);
+                    return {
+                        type: type,
+                        props: Object.assign({children: children.length === 1 ? children[0] : children}, props)
+                    };
+                }
+            };
             Object.keys(ctx).forEach(function(k) { win[k] = ctx[k]; });
             return win;
         },

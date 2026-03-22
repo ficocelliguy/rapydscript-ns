@@ -3012,37 +3012,37 @@ assrt.equal(fib(15), 610)
 
     {
         name: "jsx_basic_element",
-        description: "JSX: basic element compiles to JSX output",
+        description: "JSX: basic element compiles to React.createElement",
         src: [
             "from __python__ import jsx",
             "def render():",
             "    return <div>Hello</div>",
         ].join("\n"),
-        js_checks: ["<div>", "Hello", "</div>"],
+        js_checks: ["React.createElement", '"div"', '"Hello"'],
         skip_run: true,
     },
 
     {
         name: "jsx_self_closing",
-        description: "JSX: self-closing element compiles correctly",
+        description: "JSX: self-closing element compiles to React.createElement",
         src: [
             "from __python__ import jsx",
             "def render():",
             "    return <input type='text' />",
         ].join("\n"),
-        js_checks: ["<input", "/>"],
+        js_checks: ["React.createElement", '"input"', "type"],
         skip_run: true,
     },
 
     {
         name: "jsx_string_attribute",
-        description: "JSX: string attributes are preserved",
+        description: "JSX: string attributes become object properties",
         src: [
             "from __python__ import jsx",
             "def render():",
             '    return <div className="app" id="root">content</div>',
         ].join("\n"),
-        js_checks: ['className="app"', 'id="root"'],
+        js_checks: ["React.createElement", "className", '"app"', "id", '"root"'],
         skip_run: true,
     },
 
@@ -3054,31 +3054,31 @@ assrt.equal(fib(15), 610)
             "def render(isActive):",
             "    return <div disabled={not isActive}>content</div>",
         ].join("\n"),
-        js_checks: ["disabled={", "isActive"],
+        js_checks: ["React.createElement", "disabled", "isActive"],
         skip_run: true,
     },
 
     {
         name: "jsx_boolean_attribute",
-        description: "JSX: boolean attributes (no value) are preserved",
+        description: "JSX: boolean attributes (no value) compile to true",
         src: [
             "from __python__ import jsx",
             "def render():",
             "    return <input disabled />",
         ].join("\n"),
-        js_checks: ["disabled", "/>"],
+        js_checks: ["React.createElement", "disabled", "true"],
         skip_run: true,
     },
 
     {
         name: "jsx_hyphenated_attribute",
-        description: "JSX: hyphenated attribute names like aria-label are preserved",
+        description: "JSX: hyphenated attribute names are quoted as object keys",
         src: [
             "from __python__ import jsx",
             "def render():",
             '    return <button aria-label="Close">X</button>',
         ].join("\n"),
-        js_checks: ['aria-label="Close"'],
+        js_checks: ["React.createElement", '"aria-label"', '"Close"'],
         skip_run: true,
     },
 
@@ -3090,25 +3090,25 @@ assrt.equal(fib(15), 610)
             "def render(count):",
             "    return <h1>Count: {count * 2}</h1>",
         ].join("\n"),
-        js_checks: ["{", "count * 2", "}"],
+        js_checks: ["React.createElement", "count * 2"],
         skip_run: true,
     },
 
     {
         name: "jsx_nested_elements",
-        description: "JSX: nested elements compile correctly",
+        description: "JSX: nested elements produce nested React.createElement calls",
         src: [
             "from __python__ import jsx",
             "def render():",
             "    return <div><span>inner</span></div>",
         ].join("\n"),
-        js_checks: ["<div>", "<span>", "inner", "</span>", "</div>"],
+        js_checks: ["React.createElement", '"div"', '"span"', '"inner"'],
         skip_run: true,
     },
 
     {
         name: "jsx_fragment",
-        description: "JSX: fragments (<>...</>) compile correctly",
+        description: "JSX: fragments (<>...</>) compile to React.Fragment",
         src: [
             "from __python__ import jsx",
             "def render():",
@@ -3117,49 +3117,49 @@ assrt.equal(fib(15), 610)
             "        <span>Second</span>",
             "    </>",
         ].join("\n"),
-        js_checks: ["<>", "<span>First</span>", "<span>Second</span>", "</>"],
+        js_checks: ["React.createElement", "React.Fragment", '"First"', '"Second"'],
         skip_run: true,
     },
 
     {
         name: "jsx_component",
-        description: "JSX: component tags (uppercase) are preserved",
+        description: "JSX: component tags (uppercase) are passed as references",
         src: [
             "from __python__ import jsx",
             "def render():",
             "    return <MyComponent name='test' />",
         ].join("\n"),
-        js_checks: ["<MyComponent", 'name="test"', "/>"],
+        js_checks: ["React.createElement", "MyComponent", "name"],
         skip_run: true,
     },
 
     {
         name: "jsx_dot_component",
-        description: "JSX: dot-notation component tags compile correctly",
+        description: "JSX: dot-notation component tags compile as member expressions",
         src: [
             "from __python__ import jsx",
             "def render():",
             "    return <Router.Route path='/home' />",
         ].join("\n"),
-        js_checks: ["<Router.Route", "/>"],
+        js_checks: ["React.createElement", "Router.Route"],
         skip_run: true,
     },
 
     {
         name: "jsx_spread_attr",
-        description: "JSX: spread attributes {...props} compile correctly",
+        description: "JSX: spread attributes {...props} compile to object spread",
         src: [
             "from __python__ import jsx",
             "def render(props):",
             "    return <div {...props}>content</div>",
         ].join("\n"),
-        js_checks: ["{...props}"],
+        js_checks: ["React.createElement", "...props"],
         skip_run: true,
     },
 
     {
         name: "jsx_multiline",
-        description: "JSX: multi-line JSX compiles correctly",
+        description: "JSX: multi-line JSX compiles to nested React.createElement calls",
         src: [
             "from __python__ import jsx",
             "def render(title, body):",
@@ -3170,7 +3170,7 @@ assrt.equal(fib(15), 610)
             "        </article>",
             "    )",
         ].join("\n"),
-        js_checks: ["<article>", "<h2>", "</h2>", "<p>", "</p>", "</article>"],
+        js_checks: ["React.createElement", '"article"', '"h2"', '"p"', "title", "body"],
         skip_run: true,
     },
 
