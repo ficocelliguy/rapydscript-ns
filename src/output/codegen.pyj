@@ -19,7 +19,8 @@ from ast import (
     AST_Symbol, AST_This, AST_Throw, AST_Toplevel, AST_Try, AST_Unary,
     AST_UnaryPrefix, AST_Undefined, AST_Var, AST_VarDef, AST_Assert,
     AST_Verbatim, AST_While, AST_With, AST_Yield, AST_Await, TreeWalker, AST_Existential,
-    AST_Match, AST_AnnotatedAssign, AST_Super
+    AST_Match, AST_AnnotatedAssign, AST_Super,
+    AST_JSXElement, AST_JSXFragment, AST_JSXAttribute, AST_JSXSpread, AST_JSXText, AST_JSXExprContainer
 )
 from output.exceptions import print_try
 from output.classes import print_class
@@ -34,6 +35,7 @@ from output.operators import (
 )
 from output.functions import print_function, print_function_call
 from output.statements import print_bracketed, first_in_statement, force_statement, print_with, print_assert, print_match, print_annotated_assign
+from output.jsx import print_jsx_element, print_jsx_fragment, print_jsx_attribute, print_jsx_spread, print_jsx_text, print_jsx_expr_container
 from output.utils import make_block, make_num
 
 # -----[ code generators ]-----
@@ -525,3 +527,11 @@ def generate_code():
         output.print(make_num(self.value))
     )
     DEFPRINT(AST_RegExp, print_regexp)
+
+    # -----[ JSX ]-----
+    DEFPRINT(AST_JSXElement, print_jsx_element)
+    DEFPRINT(AST_JSXFragment, print_jsx_fragment)
+    DEFPRINT(AST_JSXAttribute, print_jsx_attribute)
+    DEFPRINT(AST_JSXSpread, print_jsx_spread)
+    DEFPRINT(AST_JSXText, print_jsx_text)
+    DEFPRINT(AST_JSXExprContainer, print_jsx_expr_container)

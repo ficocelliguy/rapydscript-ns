@@ -41,6 +41,7 @@ backwards compatible) features. For more on the forking, [see the bottom of this
 - [Extended Subscript Syntax](#extended-subscript-syntax)
 - [Variable Type Annotations](#variable-type-annotations)
 - [Regular Expressions](#regular-expressions)
+- [JSX Support](#jsx-support)
 - [Creating DOM trees easily](#creating-dom-trees-easily)
 - [Classes](#classes)
   - [External Classes](#external-classes)
@@ -1683,6 +1684,129 @@ re.match(///
   b  # Another comment
   ///, 'ab')
 ```
+
+JSX Support
+-----------
+
+RapydScript supports JSX syntax for building UI components. JSX is identical to standard JSX used with React and other frameworks — the difference is that the surrounding Python-like code is compiled to JavaScript while JSX elements are passed through to the output.
+
+Enable JSX support with:
+
+```py
+from __python__ import jsx
+```
+
+When this flag is set, files should be compiled to `.jsx` output (pass `--output myfile.jsx` or rename the output manually). The generated `.jsx` can then be processed by Babel, TypeScript, or any other JSX-aware toolchain.
+
+### Basic elements
+
+```py
+from __python__ import jsx
+
+def Greeting(props):
+    return <h1>Hello, {props.name}!</h1>
+```
+
+Compiles to:
+
+```jsx
+function Greeting(props) {
+    return <h1>Hello, {props.name}!</h1>;
+}
+```
+
+### Attributes
+
+String attributes, expression attributes, boolean attributes, and hyphenated names all work:
+
+```py
+from __python__ import jsx
+
+def Form(props):
+    return (
+        <form>
+            <input
+                type="text"
+                aria-label="Name"
+                disabled={props.readonly}
+                onChange={props.onChange}
+                required
+            />
+        </form>
+    )
+```
+
+### Nested elements and expressions
+
+```py
+from __python__ import jsx
+
+def UserList(users):
+    return (
+        <ul className="user-list">
+            {[<li key={u.id}>{u.name}</li> for u in users]}
+        </ul>
+    )
+```
+
+### Fragments
+
+Use `<>...</>` to return multiple elements without a wrapper:
+
+```py
+from __python__ import jsx
+
+def TwoItems():
+    return (
+        <>
+            <span>First</span>
+            <span>Second</span>
+        </>
+    )
+```
+
+### Self-closing elements
+
+```py
+from __python__ import jsx
+
+def Avatar(props):
+    return <img src={props.url} alt={props.name} />
+```
+
+### Spread attributes
+
+```py
+from __python__ import jsx
+
+def Button(props):
+    return <button {...props}>Click me</button>
+```
+
+### Component tags
+
+Components (capitalized names or dot-notation) work just like in standard JSX:
+
+```py
+from __python__ import jsx
+
+def App():
+    return (
+        <Router.Provider>
+            <MyComponent name="hello" />
+        </Router.Provider>
+    )
+```
+
+### Producing `.jsx` output
+
+Use the `--output` flag to write a `.jsx` file:
+
+```sh
+rapydscript mycomponent.pyj --output mycomponent.jsx
+```
+
+The resulting `.jsx` file can be processed by your existing bundler (Vite, webpack, etc.) with no changes to your JSX pipeline.
 
 Creating DOM trees easily
 ---------------------------------

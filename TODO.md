@@ -1,9 +1,8 @@
 
 ### libraries
 
-- fix error from vuln report
-- https://socket.dev/npm/package/rapydscript-ns/alerts/0.8.1?tab=dependencies
-- https://snyk.io/test/github/ficocelliguy/rapydscript-ns
+- jsx support -needs testing & integration
+- json parse dictionaries
 
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
 

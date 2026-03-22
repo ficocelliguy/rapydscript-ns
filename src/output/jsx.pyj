@@ -1,0 +1,53 @@
+# vim:fileencoding=utf-8
+# License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
+from __python__ import hash_literals
+
+from ast import AST_String, is_node_type
+
+def print_jsx_element(self, output):
+    output.print('<')
+    output.print(self.tag)
+    for prop in self.props:
+        output.print(' ')
+        prop.print(output)
+    if self.self_closing:
+        output.print(' />')
+    else:
+        output.print('>')
+        for child in self.children:
+            child.print(output)
+        output.print('</')
+        output.print(self.tag)
+        output.print('>')
+
+def print_jsx_fragment(self, output):
+    output.print('<>')
+    for child in self.children:
+        child.print(output)
+    output.print('</>')
+
+def print_jsx_attribute(self, output):
+    output.print(self.name)
+    if self.value is not None:
+        output.print('=')
+        if is_node_type(self.value, AST_String):
+            output.print('"')
+            output.print(self.value.value)
+            output.print('"')
+        else:
+            output.print('{')
+            self.value.print(output)
+            output.print('}')
+
+def print_jsx_spread(self, output):
+    output.print('{...')
+    self.expression.print(output)
+    output.print('}')
+
+def print_jsx_text(self, output):
+    output.print(self.value)
+
+def print_jsx_expr_container(self, output):
+    output.print('{')
+    self.expression.print(output)
+    output.print('}')

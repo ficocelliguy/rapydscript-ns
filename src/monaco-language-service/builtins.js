@@ -169,6 +169,11 @@ const STUBS = [
         return_type: 'list',
         doc: 'Create a list from an iterable, or an empty list.' }),
 
+    new BuiltinInfo({ name: 'next',
+        params: [p('iterator'), p('default', { optional: true })],
+        return_type: 'any',
+        doc: 'Retrieve the next item from an iterator. If the iterator is exhausted, return default; if default is not given, raise StopIteration.' }),
+
     new BuiltinInfo({ name: 'map',
         params: [p('function'), p('iterable'), p('*iterables', { rest: true })],
         return_type: 'iterable',

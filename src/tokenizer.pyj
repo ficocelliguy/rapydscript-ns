@@ -177,6 +177,7 @@ def tokenizer(raw_text, filename):
         'index_or_slice': v'[ false ]',
         'expecting_object_literal_key': False,  # This is set by the parser when it is expecting an object literal key
         'prev_was_comma': False,  # True when the previous token was a ',' — used to detect positional-only '/' separator
+        'jsx_depth': 0,  # >0 when inside JSX children content
     }
     def peek():
         return S.text.charAt(S.pos)
@@ -639,6 +640,23 @@ def tokenizer(raw_text, filename):
         if not ch:
             return token("eof")
 
+        # JSX children mode: when inside JSX content, read raw text until { or <
+        if S.jsx_depth > 0 and ch is not '{' and ch is not '<':
+            result = ""
+            while S.pos < S.text.length:
+                c = S.text.charAt(S.pos)
+                if c is '{' or c is '<':
+                    break
+                if c is '\n':
+                    S.line += 1
+                    S.col = 0
+                    S.newline_before = True
+                else:
+                    S.col += 1
+                result += c
+                S.pos += 1
+            return token("jsx_text", result)
+
         code = ch.charCodeAt(0)
         tmp_ = code
         if tmp_ is 34 or tmp_ is 39:    # double-quote (") or single quote (')
@@ -699,5 +717,16 @@ def tokenizer(raw_text, filename):
         if nc:
             S = nc
         return S
+
+    next_token.jsx_enter = def():
+        S.jsx_depth += 1
+        S.indentation_matters.push(False)
+
+    next_token.jsx_exit = def():
+        if S.jsx_depth > 0:
+            S.jsx_depth -= 1
+            S.indentation_matters.pop()
+        # After < in JSX context, / is always an operator (e.g. </tag>), never a regex
+        S.regex_allowed = False
 
     return next_token

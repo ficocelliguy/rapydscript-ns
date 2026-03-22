@@ -3008,6 +3008,183 @@ assrt.equal(fib(15), 610)
         js_checks: ["ρσ_op_add", "__getitem__"],
     },
 
+    // ── JSX ───────────────────────────────────────────────────────────────
+
+    {
+        name: "jsx_basic_element",
+        description: "JSX: basic element compiles to JSX output",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <div>Hello</div>",
+        ].join("\n"),
+        js_checks: ["<div>", "Hello", "</div>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_self_closing",
+        description: "JSX: self-closing element compiles correctly",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <input type='text' />",
+        ].join("\n"),
+        js_checks: ["<input", "/>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_string_attribute",
+        description: "JSX: string attributes are preserved",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            '    return <div className="app" id="root">content</div>',
+        ].join("\n"),
+        js_checks: ['className="app"', 'id="root"'],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_expression_attribute",
+        description: "JSX: expression attributes compile Python to JS",
+        src: [
+            "from __python__ import jsx",
+            "def render(isActive):",
+            "    return <div disabled={not isActive}>content</div>",
+        ].join("\n"),
+        js_checks: ["disabled={", "isActive"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_boolean_attribute",
+        description: "JSX: boolean attributes (no value) are preserved",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <input disabled />",
+        ].join("\n"),
+        js_checks: ["disabled", "/>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_hyphenated_attribute",
+        description: "JSX: hyphenated attribute names like aria-label are preserved",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            '    return <button aria-label="Close">X</button>',
+        ].join("\n"),
+        js_checks: ['aria-label="Close"'],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_expression_child",
+        description: "JSX: expression children compile Python expressions to JS",
+        src: [
+            "from __python__ import jsx",
+            "def render(count):",
+            "    return <h1>Count: {count * 2}</h1>",
+        ].join("\n"),
+        js_checks: ["{", "count * 2", "}"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_nested_elements",
+        description: "JSX: nested elements compile correctly",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <div><span>inner</span></div>",
+        ].join("\n"),
+        js_checks: ["<div>", "<span>", "inner", "</span>", "</div>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_fragment",
+        description: "JSX: fragments (<>...</>) compile correctly",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <>",
+            "        <span>First</span>",
+            "        <span>Second</span>",
+            "    </>",
+        ].join("\n"),
+        js_checks: ["<>", "<span>First</span>", "<span>Second</span>", "</>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_component",
+        description: "JSX: component tags (uppercase) are preserved",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <MyComponent name='test' />",
+        ].join("\n"),
+        js_checks: ["<MyComponent", 'name="test"', "/>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_dot_component",
+        description: "JSX: dot-notation component tags compile correctly",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <Router.Route path='/home' />",
+        ].join("\n"),
+        js_checks: ["<Router.Route", "/>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_spread_attr",
+        description: "JSX: spread attributes {...props} compile correctly",
+        src: [
+            "from __python__ import jsx",
+            "def render(props):",
+            "    return <div {...props}>content</div>",
+        ].join("\n"),
+        js_checks: ["{...props}"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_multiline",
+        description: "JSX: multi-line JSX compiles correctly",
+        src: [
+            "from __python__ import jsx",
+            "def render(title, body):",
+            "    return (",
+            "        <article>",
+            "            <h2>{title}</h2>",
+            "            <p>{body}</p>",
+            "        </article>",
+            "    )",
+        ].join("\n"),
+        js_checks: ["<article>", "<h2>", "</h2>", "<p>", "</p>", "</article>"],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_no_jsx_without_flag",
+        description: "JSX: < in expression is a comparison without the jsx flag",
+        src: [
+            "# globals: assrt",
+            "x = 5",
+            "assrt.equal(x < 10, True)",
+        ].join("\n"),
+        js_checks: ["x < 10"],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -3074,14 +3251,17 @@ function run_tests(filter) {
         }
 
         // 3 – run the JS; assertions embedded in src catch wrong values
-        try {
-            run_js(js);
-        } catch (e) {
-            failures.push(test.name);
-            var msg = e.stack || String(e);
-            console.log(colored("FAIL  " + test.name, "red") +
-                        " [runtime]\n      " + msg + "\n");
-            return;
+        // (skipped for tests that produce JSX or other non-executable output)
+        if (!test.skip_run) {
+            try {
+                run_js(js);
+            } catch (e) {
+                failures.push(test.name);
+                var msg = e.stack || String(e);
+                console.log(colored("FAIL  " + test.name, "red") +
+                            " [runtime]\n      " + msg + "\n");
+                return;
+            }
         }
 
         console.log(colored("PASS  " + test.name, "green") +

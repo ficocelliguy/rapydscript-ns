@@ -1360,6 +1360,80 @@ class TreeWalker:
             self = p
 # }}}
 
+# JSX nodes {{{
+
+class AST_JSXElement(AST_Node):
+    "A JSX element like <div>...</div> or <Component />"
+    properties = {
+        'tag': "[string] The tag name (e.g. 'div', 'MyComponent')",
+        'props': "[AST_JSXAttribute[]] The props/attributes",
+        'children': "[AST_Node[]] The children",
+        'self_closing': "[bool] Whether self-closing (no children)"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            for prop in self.props:
+                prop._walk(visitor)
+            for child in self.children:
+                child._walk(visitor)
+        )
+
+class AST_JSXFragment(AST_Node):
+    "A JSX fragment <>...</>"
+    properties = {
+        'children': "[AST_Node[]] The children"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            for child in self.children:
+                child._walk(visitor)
+        )
+
+class AST_JSXAttribute(AST_Node):
+    "A JSX attribute like prop='val', prop={expr}, or just prop (boolean)"
+    properties = {
+        'name': "[string] The attribute name",
+        'value': "[AST_Node|null] The value (null for boolean attrs)"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            if self.value:
+                self.value._walk(visitor)
+        )
+
+class AST_JSXSpread(AST_Node):
+    "A JSX spread attribute {...expr}"
+    properties = {
+        'expression': "[AST_Node] The spread expression"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.expression._walk(visitor)
+        )
+
+class AST_JSXText(AST_Node):
+    "Text content inside a JSX element"
+    properties = {
+        'value': "[string] The text content"
+    }
+
+class AST_JSXExprContainer(AST_Node):
+    "A JSX expression container {expr}"
+    properties = {
+        'expression': "[AST_Node] The expression"
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.expression._walk(visitor)
+        )
+
+# }}}
+
 class Found(Exception):
     pass
 

@@ -25,12 +25,13 @@ AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedA
 AST_Match, AST_MatchCase,
 AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
 AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass,
+AST_JSXElement, AST_JSXFragment, AST_JSXAttribute, AST_JSXSpread, AST_JSXText, AST_JSXExprContainer,
 TreeWalker
 )
 from tokenizer import tokenizer, is_token, RESERVED_WORDS
 
 COMPILER_VERSION = '__COMPILER_VERSION__'
-PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True}
+PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True, 'jsx':True}
 
 
 def get_compiler_version():
@@ -2816,6 +2817,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
 
     def maybe_unary(allow_calls):
         start = S.token
+        # JSX: detect <tag or <> in expression position
+        if S.scoped_flags.get('jsx', False) and is_('operator', '<'):
+            nxt = peek()
+            if nxt.type is 'name' or (nxt.type is 'operator' and nxt.value is '>'):
+                return subscripts(read_jsx_element(), allow_calls)
         if is_('operator', '@'):
             if S.parsing_decorator:
                 croak('Nested decorators are not allowed')
@@ -2842,6 +2848,164 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
 
         val = expr_atom(allow_calls)
         return val
+
+    # -----[ JSX parsing ]-----
+
+    def read_jsx_tag_name():
+        # reads a tag name (identifier or dot-separated, e.g. "div", "MyComp", "Foo.Bar")
+        if not is_('name'):
+            croak('Expected JSX tag name')
+        name = S.token.value
+        next()
+        while is_('punc', '.'):
+            next()  # consume .
+            if not is_('name'):
+                croak('Expected identifier after . in JSX tag name')
+            name += '.' + S.token.value
+            next()
+        return name
+
+    def read_jsx_attr_name():
+        # reads an attribute name; hyphens are allowed (e.g. aria-label, data-id)
+        if not is_('name'):
+            croak('Expected JSX attribute name')
+        name = S.token.value
+        next()
+        while is_('operator', '-'):
+            next()  # consume -
+            if not is_('name'):
+                croak('Expected identifier after - in JSX attribute name')
+            name += '-' + S.token.value
+            next()
+        return name
+
+    def read_jsx_attrs():
+        # reads all attributes until > or /> is reached
+        props = []
+        while not is_('operator', '>') and not is_('operator', '/') and not is_('eof'):
+            if is_('punc', '{'):
+                # Spread attribute: {...expr}
+                next()  # consume {
+                if not is_('atom', 'Ellipsis'):
+                    croak('Expected ... in JSX spread attribute')
+                next()  # consume ...
+                expr = expression()
+                expect('}')
+                props.push(new AST_JSXSpread({'expression': expr, 'start': prev(), 'end': prev()}))
+            elif is_('name'):
+                attr_start = S.token
+                name = read_jsx_attr_name()
+                if is_('operator', '='):
+                    next()  # consume =
+                    if is_('string'):
+                        val = new AST_String({'value': S.token.value, 'start': S.token, 'end': S.token, 'quote': S.token.quote})
+                        next()
+                    elif is_('punc', '{'):
+                        next()  # consume {
+                        val = expression()
+                        expect('}')
+                    else:
+                        croak('Expected string or { in JSX attribute value')
+                else:
+                    val = None  # boolean attribute
+                props.push(new AST_JSXAttribute({'name': name, 'value': val, 'start': attr_start, 'end': prev()}))
+            else:
+                unexpected()
+        return props
+
+    def read_jsx_children_loop(close_tag):
+        # S.token is already the first child token (jsx_text, OP(<), PUNC({))
+        # JSX depth is currently >0 (entered before this call)
+        children = []
+        while True:
+            if S.token.type is 'jsx_text':
+                text = S.token.value
+                trimmed = text.trim()
+                if trimmed:
+                    children.push(new AST_JSXText({'value': trimmed, 'start': S.token, 'end': S.token}))
+                next()  # still in JSX mode
+            elif is_('operator', '<'):
+                # Nested element or closing tag: exit JSX mode to tokenize tag content
+                S.input.jsx_exit()
+                next()  # reads what follows < (/ or tag name)
+                if is_('operator', '/'):
+                    # Closing tag
+                    next()  # consume /
+                    if close_tag is None:
+                        # Fragment closing </> — next should be >
+                        if not is_('operator', '>'):
+                            croak('Expected > to close JSX fragment')
+                        return children  # S.token = OP(>), don't consume
+                    else:
+                        if not is_('name'):
+                            croak('Expected closing tag name')
+                        if S.token.value is not close_tag:
+                            croak('JSX closing tag mismatch: expected </' + close_tag + '>, got </' + S.token.value + '>')
+                        next()  # consume tag name
+                        if not is_('operator', '>'):
+                            croak('Expected > in closing JSX tag')
+                        return children  # S.token = OP(>), don't consume
+                else:
+                    # Nested element: S.token is first token of tag (or > for fragment)
+                    child = read_jsx_element_inner()
+                    children.push(child)
+                    # S.token = OP(>) — child's closing >, re-enter JSX mode then consume
+                    S.input.jsx_enter()
+                    next()  # consume child's >, read next sibling in JSX mode
+            elif is_('punc', '{'):
+                # Expression container
+                S.input.jsx_exit()
+                next()  # consume {
+                expr = expression()
+                if not is_('punc', '}'):
+                    croak('Expected } to close JSX expression')
+                # Re-enter JSX mode BEFORE consuming } so next sibling reads in JSX mode
+                S.input.jsx_enter()
+                next()  # consume }, read next sibling in JSX mode
+                children.push(new AST_JSXExprContainer({'expression': expr, 'start': prev(), 'end': prev()}))
+            elif is_('eof'):
+                croak('Unterminated JSX element')
+            else:
+                unexpected()
+
+    def read_jsx_element_inner():
+        # Called when S.token is NAME(tag) or OP(>) for fragment
+        # NOT in JSX mode when entering
+        start = S.prev  # the < token (already consumed)
+        if is_('operator', '>'):
+            # Fragment: <>...</>
+            S.input.jsx_enter()
+            next()  # consume >, first child in JSX mode
+            children = read_jsx_children_loop(None)
+            # S.token = OP(>) — closing >
+            return new AST_JSXFragment({'start': start, 'children': children, 'end': S.token})
+        else:
+            tag = read_jsx_tag_name()
+            props = read_jsx_attrs()
+            if is_('operator', '/'):
+                next()  # consume /
+                # S.token = OP(>) — self-closing
+                return new AST_JSXElement({'start': start, 'tag': tag, 'props': props, 'children': [], 'self_closing': True, 'end': S.token})
+            else:
+                if not is_('operator', '>'):
+                    croak('Expected > or /> in JSX element')
+                S.input.jsx_enter()
+                next()  # consume >, first child in JSX mode
+                children = read_jsx_children_loop(tag)
+                # S.token = OP(>) — closing >
+                return new AST_JSXElement({'start': start, 'tag': tag, 'props': props, 'children': children, 'self_closing': False, 'end': S.token})
+
+    def read_jsx_element():
+        # S.token = OP(<) — the opening <
+        start = S.token
+        next()  # consume <, reads tag name or > for fragment (normal mode)
+        el = read_jsx_element_inner()
+        # S.token = OP(>) — closing >, consume it and return to normal mode
+        next()
+        el.end = prev()
+        return el
+
+    # -----[ end JSX parsing ]-----
 
     def make_unary(ctor, op, expr, is_parenthesized):
         return new ctor({
