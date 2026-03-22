@@ -862,11 +862,33 @@ Object.defineProperties(ρσ_dict.prototype, {
         r = iterator.next()
     return ans
 
+ρσ_dict.prototype.toJSON = def():
+    ans = {}
+    iterator = this.jsmap.entries()
+    r = iterator.next()
+    while not r.done:
+        ans[r.value[0]] = r.value[1]
+        r = iterator.next()
+    return ans
+
 def ρσ_dict_wrap(x):
     ans = new ρσ_dict()
     ans.jsmap = x
     return ans
 
 v'var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap'
+
+v"""(function() {
+    var ρσ_orig_json_parse = JSON.parse;
+    JSON.parse = function(text, reviver) {
+        function dict_reviver(key, value) {
+            if (value !== null && typeof value === "object" && !Array.isArray(value) && !(value instanceof ρσ_dict)) {
+                value = ρσ_dict(value);
+            }
+            return reviver ? reviver.call(this, key, value) : value;
+        }
+        return ρσ_orig_json_parse(text, dict_reviver);
+    };
+})();"""
 
 # }}}

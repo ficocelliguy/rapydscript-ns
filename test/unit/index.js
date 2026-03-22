@@ -3185,6 +3185,117 @@ assrt.equal(fib(15), 610)
         js_checks: ["x < 10"],
     },
 
+    // ── JSON support ─────────────────────────────────────────────────────────
+
+    {
+        name: "json_stringify_dict",
+        description: "JSON.stringify on a Python dict produces valid JSON",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'key': 'value', 'num': 42}",
+            "s = JSON.stringify(d)",
+            "assrt.equal(jstype(s), 'string')",
+            "parsed = JSON.parse(s)",
+            "assrt.ok(isinstance(parsed, dict))",
+            "assrt.equal(parsed.get('key'), 'value')",
+            "assrt.equal(parsed.get('num'), 42)",
+        ].join("\n"),
+    },
+
+    {
+        name: "json_parse_returns_dict",
+        description: "JSON.parse returns ρσ_dict instances for objects",
+        src: [
+            "# globals: assrt",
+            "parsed = JSON.parse('{\"a\": 1, \"b\": 2}')",
+            "assrt.ok(isinstance(parsed, dict))",
+            "assrt.equal(parsed.get('a'), 1)",
+            "assrt.equal(parsed.get('b'), 2)",
+            "assrt.equal(len(parsed), 2)",
+        ].join("\n"),
+    },
+
+    {
+        name: "json_stringify_nested_dict",
+        description: "JSON.stringify and parse handle nested dicts correctly",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "outer = {'inner': {'x': 1, 'y': 2}}",
+            "s = JSON.stringify(outer)",
+            "parsed = JSON.parse(s)",
+            "assrt.ok(isinstance(parsed, dict))",
+            "inner = parsed.get('inner')",
+            "assrt.ok(isinstance(inner, dict))",
+            "assrt.equal(inner.get('x'), 1)",
+            "assrt.equal(inner.get('y'), 2)",
+        ].join("\n"),
+    },
+
+    {
+        name: "json_dict_with_list_values",
+        description: "JSON.stringify/parse handles dicts with list values",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'items': [1, 2, 3], 'name': 'test'}",
+            "s = JSON.stringify(d)",
+            "parsed = JSON.parse(s)",
+            "assrt.ok(isinstance(parsed, dict))",
+            "items = parsed.get('items')",
+            "assrt.ok(Array.isArray(items))",
+            "assrt.equal(items[0], 1)",
+            "assrt.equal(items[2], 3)",
+        ].join("\n"),
+    },
+
+    {
+        name: "json_dict_null_bool_values",
+        description: "JSON.stringify/parse handles None, True, False values",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'a': None, 'b': True, 'c': False}",
+            "s = JSON.stringify(d)",
+            "parsed = JSON.parse(s)",
+            "assrt.ok(isinstance(parsed, dict))",
+            "assrt.equal(parsed.get('a'), None)",
+            "assrt.equal(parsed.get('b'), True)",
+            "assrt.equal(parsed.get('c'), False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "json_parse_array_of_dicts",
+        description: "JSON.parse converts objects inside arrays to dicts",
+        src: [
+            "# globals: assrt",
+            "arr = JSON.parse('[{\"x\": 1}, {\"y\": 2}]')",
+            "assrt.ok(Array.isArray(arr))",
+            "assrt.ok(isinstance(arr[0], dict))",
+            "assrt.ok(isinstance(arr[1], dict))",
+            "assrt.equal(arr[0].get('x'), 1)",
+            "assrt.equal(arr[1].get('y'), 2)",
+        ].join("\n"),
+    },
+
+    {
+        name: "json_roundtrip_dict_comprehension",
+        description: "JSON round-trip works with dict comprehensions",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {str(i): i * i for i in range(4)}",
+            "s = JSON.stringify(d)",
+            "parsed = JSON.parse(s)",
+            "assrt.ok(isinstance(parsed, dict))",
+            "assrt.equal(parsed.get('0'), 0)",
+            "assrt.equal(parsed.get('2'), 4)",
+            "assrt.equal(parsed.get('3'), 9)",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
