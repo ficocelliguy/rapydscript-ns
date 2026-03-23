@@ -12,44 +12,36 @@
 - examples of using js libraries in rapydscript in readme
 
 
-I would like you to add support for [ [List Concatenation (+) Without overload_operators]() ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report.
+I would like you to add support for [ __new__` constructor hook ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report.
 
 ---
 
-### React library example
-
-A simple counter component using `useState`, `useEffect`, and `memo`:
+### `__import__` example
 
 ```python
-from __python__ import jsx
-from react import useState, useEffect, memo
+# Any module used with __import__ must first be statically imported
+# so that it ends up in ρσ_modules at runtime.
+from collections import Counter, deque
 
-def Counter(props):
-    count, setCount = useState(props.initial or 0)
+# Basic: retrieve a module object by name
+collections = __import__('collections')
+c = collections.Counter('mississippi')
+print(c.most_common(3))   # [('s', 4), ('i', 4), ('p', 2)]
 
-    def increment():
-        setCount(count + 1)
+# Dotted name without fromlist → top-level package returned
+# (mirrors Python: __import__('os.path') returns the 'os' module)
+top = __import__('collections')
+print(top is collections)  # True
 
-    def decrement():
-        setCount(count - 1)
+# With fromlist → the named (sub)module is returned directly
+mod = __import__('collections', None, None, ['deque'])
+d = mod.deque([1, 2, 3])
+d.appendleft(0)
+print(list(d))  # [0, 1, 2, 3]
 
-    # Log to console whenever count changes
-    def log_change():
-        print("count is now", count)
-    useEffect(log_change, [count])
-
-    return (
-        <div className="counter">
-            <h2>{props.title}</h2>
-            <button onClick={decrement}>-</button>
-            <span>{count}</span>
-            <button onClick={increment}>+</button>
-        </div>
-    )
-
-# Wrap with memo so it only re-renders when props change
-Counter = memo(Counter)
+# Missing module → ModuleNotFoundError
+try:
+    __import__('no_such_module')
+except ModuleNotFoundError as e:
+    print(e.message)  # No module named 'no_such_module'
 ```
-
-Compiles to plain `React.createElement` calls — no Babel or JSX transform needed.
-

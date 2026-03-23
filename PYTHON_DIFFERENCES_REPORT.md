@@ -47,7 +47,7 @@ and notes which items are covered by tests.
 | 35 | `complex()` / `j` suffix | No complex number type | ✓ Yes | Noted in python_features.pyj #42, #59 (skipped) |
 | 36 | `b'...'` bytes literals | No bytes type; use `encodings` module | ✓ Yes | Noted in python_features.pyj #43 (skipped) |
 | 37 | `except*` (exception groups) | Not supported (Python 3.11+) | ✓ Yes | Noted in python_features.pyj #44 (skipped) |
-| 38 | `__new__` constructor hook | Not supported | ✓ Yes | Noted in python_features.pyj #45 (skipped) |
+| 38 | `__new__` constructor hook | Supported — `def __new__(cls, ...)` with `super().__new__(cls)` | ✓ Yes | Now supported; see unit tests `new_basic`, `new_singleton`, etc. |
 | 39 | `__del__` destructor | Not supported | ✓ Yes | Noted in python_features.pyj #46 (skipped) |
 | 40 | `__hash__` for set/dict membership | Not dispatched; uses JS identity (`===`) | ✓ Yes | Noted in python_features.pyj #47 (skipped) |
 | 41 | `__getattr__`/`__setattr__`/`__delattr__` | Not supported | ✓ Yes | Noted in python_features.pyj #48 (skipped) |

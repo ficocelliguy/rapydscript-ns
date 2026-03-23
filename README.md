@@ -2262,6 +2262,29 @@ print(Counter.get_count())  # 2
 
 The `@classmethod` decorator compiles to a method placed directly on the class (not its prototype), with `cls` mapped to `this`. A prototype delegation shim is also generated so instance calls work correctly.
 
+### `__new__` Constructor Hook
+
+RapydScript supports Python's `__new__` method, which runs *before* `__init__` and controls instance creation. Use it to implement patterns like singletons or alternative constructors:
+
+```py
+class Singleton:
+    _instance = None
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    def __init__(self):
+        pass
+
+a = Singleton()
+b = Singleton()
+assert a is b  # same instance
+```
+
+`super().__new__(cls)` creates a bare instance of `cls` (equivalent to `Object.create(cls.prototype)` in JavaScript). If `__new__` returns an instance of the class, `__init__` is called on it automatically. If it returns something else, `__init__` is skipped.
+
+Class variables accessed via `cls` inside `__new__` are correctly rewritten to `cls.prototype.varname`, matching Python's semantics.
+
 ### Nested Classes
 
 A class may be defined inside another class. The nested class becomes an attribute of the outer class (accessible as `Outer.Inner`) and is also reachable via instances (`self.Inner` inside methods). This mirrors Python semantics exactly.

@@ -1502,6 +1502,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     descriptor['getter' if stmt.is_getter else 'setter'] = stmt
                 elif stmt.name.name is "__init__":
                     definition.init = stmt
+                elif stmt.name.name is "__new__":
+                    definition.has_new = True
+                    class_details.has_new = True
+                    class_details.static['__new__'] = True
+                    stmt.static = True  # suppress var cls = this in display_complex_body
         # find the class variables
         class_var_names = {}
         # Ensure that if a class variable refers to another class variable in
@@ -1731,7 +1736,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 S.in_parenthesized_expr = False
                 a.defaults = defaults
                 a.is_simple_func = not a.starargs and not a.kwargs and not a.has_defaults and not a.bare_star and not a.posonly_count
-                if classmethod_flag and a.length > 0:
+                if (classmethod_flag or (name and name.name is '__new__')) and a.length > 0:
                     cm_cls_arg.push(a[0].name)
                 return a
             )(v'[]'),
@@ -1749,7 +1754,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'body': (def(loop, labels):
                 S.in_class.push(False)
                 cm_pushed = v'[false]'
-                if classmethod_flag and in_class and cm_cls_arg.length > 0:
+                if (classmethod_flag or (name and name.name is '__new__')) and in_class and cm_cls_arg.length > 0:
                     cm_ctx_entry = None
                     for v'var si = S.classes.length - 1; si >= 0; si--':
                         if has_prop(S.classes[si], in_class):
@@ -2631,22 +2636,65 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         S.in_parenthesized_expr = True
         next()
         if not expr.parens and get_class_in_scope(expr):
-            # this is an object being created using a class
-            ret = subscripts(new AST_New({
-                'start': start,
-                'expression': expr,
-                'args': func_call_list(),
-                'end': prev()
-            }), True)
+            c = get_class_in_scope(expr)
+            # Class instantiation
+            args = func_call_list()
+            if c.has_new:
+                # Class defines __new__: call without 'new' so __new__ controls
+                # instantiation (the constructor dispatches via !(this instanceof ...))
+                ret = subscripts(new AST_Call({
+                    'start': start,
+                    'expression': expr,
+                    'args': args,
+                    'end': prev()
+                }), True)
+            else:
+                ret = subscripts(new AST_New({
+                    'start': start,
+                    'expression': expr,
+                    'args': args,
+                    'end': prev()
+                }), True)
             S.in_parenthesized_expr = False
             return ret
-        else:
-            if is_node_type(expr, AST_Dot):
-                if is_node_type(expr.expression, AST_Super):
+        if is_node_type(expr, AST_Dot):
+            if is_node_type(expr.expression, AST_Super):
+                super_node = expr.expression
+                method_name = expr.property
+                method_args = func_call_list()
+                if method_name is '__new__':
+                    if super_node.parent:
+                        # super().__new__(cls, ...) → ρσ_new(parent, cls, ...)
+                        method_args.unshift(super_node.parent)
+                        ret = subscripts(new AST_Call({
+                            'start': start,
+                            'expression': new AST_SymbolRef({
+                                'name': 'ρσ_new',
+                                'start': start,
+                                'end': start
+                            }),
+                            'args': method_args,
+                            'end': prev()
+                        }), True)
+                    else:
+                        # Root class: super().__new__(cls) → ρσ_object_new(cls)
+                        cls_args = v'[]'
+                        if method_args.length > 0:
+                            cls_args.push(method_args[0])
+                        ret = subscripts(new AST_Call({
+                            'start': start,
+                            'expression': new AST_SymbolRef({
+                                'name': 'ρσ_object_new',
+                                'start': start,
+                                'end': start
+                            }),
+                            'args': cls_args,
+                            'end': prev()
+                        }), True)
+                else:
+                    if not super_node.parent:
+                        croak('super() used in a class without a parent class')
                     # super().method(args) → ParentClass.prototype.method.call(this, args)
-                    super_node = expr.expression
-                    method_name = expr.property
-                    method_args = func_call_list()
                     this_node = new AST_This({
                         'name': 'this',
                         'start': start,
@@ -2661,96 +2709,93 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                         'args': method_args,
                         'end': prev()
                     }), True)
-                    S.in_parenthesized_expr = False
-                    return ret
-                c = get_class_in_scope(expr.expression)
-
-            if c:
-                # generate class call
-                funcname = expr
-
-                ret = subscripts(new AST_ClassCall({
-                    'start': start,
-                    "class": expr.expression,
-                    'method': funcname.property,
-                    "static": is_static_method(c, funcname.property),
-                    'args': func_call_list(),
-                    'end': prev()
-                }), True)
                 S.in_parenthesized_expr = False
                 return ret
-            elif is_node_type(expr, AST_SymbolRef):
-                tmp_ = expr.name
-                if tmp_ is "jstype":
-                    ret = new AST_UnaryPrefix({
-                        'start': start,
-                        'operator': "typeof",
-                        'expression': func_call_list()[0],
-                        'end': prev()
-                    })
-                    S.in_parenthesized_expr = False
-                    return ret
-                elif tmp_ is "isinstance":
-                    args = func_call_list()
-                    if args.length is not 2:
-                        croak('isinstance() must be called with exactly two arguments')
-                    ret = new AST_Binary({
-                        'start': start,
-                        'left': args[0],
-                        'operator': 'instanceof',
-                        'right': args[1],
-                        'end': prev()
-                    })
-                    S.in_parenthesized_expr = False
-                    return ret
-                elif tmp_ is "super":
-                    # Find the innermost enclosing class name
-                    current_class = None
-                    for v'var i = S.in_class.length - 1; i >= 0; i--':
-                        if S.in_class[i]:
-                            current_class = S.in_class[i]
-                            break
-                    if not current_class:
-                        croak('super() is only valid inside a class method')
-                    super_args = func_call_list()
-                    parent_expr = None
-                    if super_args.length is 0:
-                        # 0-arg form: use parent of current class
-                        for v'var s = S.classes.length - 1; s >= 0; s--':
-                            if has_prop(S.classes[s], current_class):
-                                parent_expr = S.classes[s][current_class].parent
-                                break
-                        if not parent_expr:
-                            croak('super() used in a class without a parent class')
-                    elif super_args.length is 2:
-                        # 2-arg form: super(ClassName, self) — use parent of ClassName
-                        cls_ref = super_args[0]
-                        cls_info = get_class_in_scope(cls_ref)
-                        if not cls_info or not cls_info.parent:
-                            croak('First argument to super() must be a subclass with a parent')
-                        parent_expr = cls_info.parent
-                    else:
-                        croak('super() takes 0 or 2 arguments (' + super_args.length + ' given)')
-                    super_node = new AST_Super({
-                        'start': start,
-                        'parent': parent_expr,
-                        'class_name': current_class,
-                        'end': prev()
-                    })
-                    S.in_parenthesized_expr = False
-                    # Call subscripts to handle subsequent .method(args) chain
-                    return subscripts(super_node, True)
-
-            # fall-through to basic function call
-            ret = subscripts(new AST_Call({
+            c = get_class_in_scope(expr.expression)
+        if c:
+            # generate class call
+            funcname = expr
+            ret = subscripts(new AST_ClassCall({
                 'start': start,
-                'expression': expr,
+                "class": expr.expression,
+                'method': funcname.property,
+                "static": is_static_method(c, funcname.property),
                 'args': func_call_list(),
-                'end': prev(),
-                'python_truthiness': S.scoped_flags.get('truthiness', False) and is_node_type(expr, AST_SymbolRef)
+                'end': prev()
             }), True)
             S.in_parenthesized_expr = False
             return ret
+        elif is_node_type(expr, AST_SymbolRef):
+            tmp_ = expr.name
+            if tmp_ is "jstype":
+                ret = new AST_UnaryPrefix({
+                    'start': start,
+                    'operator': "typeof",
+                    'expression': func_call_list()[0],
+                    'end': prev()
+                })
+                S.in_parenthesized_expr = False
+                return ret
+            elif tmp_ is "isinstance":
+                args = func_call_list()
+                if args.length is not 2:
+                    croak('isinstance() must be called with exactly two arguments')
+                ret = new AST_Binary({
+                    'start': start,
+                    'left': args[0],
+                    'operator': 'instanceof',
+                    'right': args[1],
+                    'end': prev()
+                })
+                S.in_parenthesized_expr = False
+                return ret
+            elif tmp_ is "super":
+                # Find the innermost enclosing class name
+                current_class = None
+                for v'var i = S.in_class.length - 1; i >= 0; i--':
+                    if S.in_class[i]:
+                        current_class = S.in_class[i]
+                        break
+                if not current_class:
+                    croak('super() is only valid inside a class method')
+                super_args = func_call_list()
+                parent_expr = None
+                if super_args.length is 0:
+                    # 0-arg form: use parent of current class
+                    for v'var s = S.classes.length - 1; s >= 0; s--':
+                        if has_prop(S.classes[s], current_class):
+                            parent_expr = S.classes[s][current_class].parent
+                            break
+                    # parent_expr stays None for root classes; handled at method-call time
+                    # (super().__new__(cls) in a root class → ρσ_object_new(cls))
+                elif super_args.length is 2:
+                    # 2-arg form: super(ClassName, self) — use parent of ClassName
+                    cls_ref = super_args[0]
+                    cls_info = get_class_in_scope(cls_ref)
+                    if not cls_info or not cls_info.parent:
+                        croak('First argument to super() must be a subclass with a parent')
+                    parent_expr = cls_info.parent
+                else:
+                    croak('super() takes 0 or 2 arguments (' + super_args.length + ' given)')
+                super_node = new AST_Super({
+                    'start': start,
+                    'parent': parent_expr,
+                    'class_name': current_class,
+                    'end': prev()
+                })
+                S.in_parenthesized_expr = False
+                # Call subscripts to handle subsequent .method(args) chain
+                return subscripts(super_node, True)
+        # fall-through to basic function call
+        ret = subscripts(new AST_Call({
+            'start': start,
+            'expression': expr,
+            'args': func_call_list(),
+            'end': prev(),
+            'python_truthiness': S.scoped_flags.get('truthiness', False) and is_node_type(expr, AST_SymbolRef)
+        }), True)
+        S.in_parenthesized_expr = False
+        return ret
 
     def get_attr(expr, allow_calls):
         next()

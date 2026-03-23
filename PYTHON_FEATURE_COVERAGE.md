@@ -65,6 +65,8 @@
 | `iter(callable, sentinel)` | Two-argument form calls `callable` (no args) repeatedly until the return value equals `sentinel` (strict `===`). Returns a lazy iterator compatible with `for` loops, `next()`, `list()`, and all iterator consumers. Works with plain functions and callable objects (`__call__`). |
 | `dict \| dict` and `dict \|= dict` (Python 3.9+) | Dict merge via `\|` creates a new merged dict (right-side values win); `\|=` updates in-place. Requires `from __python__ import overload_operators, dict_literals`. |
 | `slice(start, stop[, step])` | Full Python `slice` class: 1-, 2-, and 3-argument forms; `.start`, `.stop`, `.step` attributes; `.indices(length)` → `(start, stop, step)`; `str()` / `repr()`; `isinstance(s, slice)`; equality `==`; use as subscript `lst[s]` (read, write, `del`) all work. |
+| `__import__(name[, globals, locals, fromlist, level])` | Runtime lookup in the compiled module registry (`ρσ_modules`). Without `fromlist` (or empty `fromlist`) returns the top-level package, matching Python's semantics. `ImportError` / `ModuleNotFoundError` raised for unknown modules. **Constraint**: the module must have been statically imported elsewhere in the source so it is present in `ρσ_modules`. |
+| `ImportError`, `ModuleNotFoundError` | Both defined as runtime exception classes; `ModuleNotFoundError` is a subclass of `ImportError` (same as Python 3.6+). |
 
 ---
 
@@ -72,18 +74,17 @@
 
 | Feature                             | Priority                                                               |
 |-------------------------------------|------------------------------------------------------------------------|
-| `complex(real, imag)`               | 🟢 Low — no complex number type                                        |
 | `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access                      |
 | `str.expandtabs(tabsize)`           | 🟢 Low                                                                 |
 | `int.bit_length()`                  | 🟢 Low — useful for bit manipulation                                   |
 | `float.is_integer()`                | 🟢 Low                                                                 |
 | `exec(code)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
 | `eval(expr)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
-| `__import__(name)`                  | 🟢 Low — not supported; use `import` statement                        |
 | `input(prompt)`                     | 🟢 Low — not built in; use `prompt()` via `v'prompt(...)'`            |
 | `bytes(x)` / `bytearray(x)`        | 🟢 Low — no built-in bytes type; use `Uint8Array` via verbatim JS     |
 | `object()`                          | 🟢 Low — base `object` type not exposed; use plain `{}` or a class    |
 | `abc` module — `ABC`, `@abstractmethod`, `Protocol` | 🟢 Low — no abc module; no enforcement of abstract methods |
+| `complex(real, imag)`               | 🟢 Low — no complex number type                                        |
 | `compile()`                         | 🔴 N/A — Python compile/code objects have no JS equivalent            |
 | `memoryview(obj)`                   | 🔴 N/A — no buffer protocol in browser context                        |
 | `open(path)`                        | 🔴 N/A — no filesystem access in browser context                      |
@@ -100,7 +101,6 @@
 | Complex number literals `3+4j`                | 🟢 Low — no `j` suffix; no complex type                              |
 | `b'...'` bytes literals                       | 🟢 Low — no `b` prefix; use the `encodings` module for encoding work |
 | `except*` (exception groups, Python 3.11+)    | 🟢 Low — no parser support                                           |
-| `__new__` constructor hook                    | 🟢 Low — no alternative constructor support                          |
 | `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
 | `__hash__` dunder                             | 🟢 Low — not dispatched; set/dict use `===` object identity          |
 | `__getattr__` / `__setattr__` / `__delattr__` | 🟢 Low — no attribute-access interception                            |

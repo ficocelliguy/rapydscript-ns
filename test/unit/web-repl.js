@@ -792,6 +792,61 @@ var TESTS = [
         },
     },
 
+    // ── __import__() ─────────────────────────────────────────────────────
+
+    {
+        name: "bundle___import__-basic",
+        description: "__import__(name) returns a stdlib module reference in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from collections import Counter",
+                "m = __import__('collections')",
+                // m.Counter should be the same object as the statically-imported Counter
+                "assrt.ok(m.Counter is Counter)",
+                "c = m.Counter('aabb')",
+                "top = c.most_common(1)",
+                "assrt.equal(top[0][0], 'a')",
+                "assrt.equal(top[0][1], 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle___import__-fromlist",
+        description: "__import__ with fromlist returns the exact named module",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from collections import deque",
+                "m = __import__('collections', None, None, ['deque'])",
+                "d = m.deque([1, 2, 3])",
+                "assrt.equal(len(d), 3)",
+                "assrt.equal(d.popleft(), 1)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle___import__-error",
+        description: "__import__ raises ModuleNotFoundError for unknown module in web-repl",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from collections import Counter",
+                "caught = False",
+                "try:",
+                "    __import__('no_such_module')",
+                "except ModuleNotFoundError as e:",
+                "    caught = True",
+                "assrt.ok(caught)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

@@ -682,6 +682,119 @@ var TESTS = [
         ].join("\n"),
     },
 
+    // ── __new__ constructor hook ───────────────────────────────────────────
+
+    {
+        name: "new_basic",
+        description: "__new__ is called before __init__; returns an instance of the class",
+        src: [
+            "# globals: assrt",
+            "order = []",
+            "class Foo:",
+            "    def __new__(cls):",
+            "        order.append('new')",
+            "        return super().__new__(cls)",
+            "    def __init__(self):",
+            "        order.append('init')",
+            "        self.x = 42",
+            "f = Foo()",
+            "assrt.deepEqual(order, ['new', 'init'])",
+            "assrt.equal(f.x, 42)",
+            "assrt.ok(isinstance(f, Foo))",
+        ].join("\n"),
+        js_checks: [
+            "Foo.__new__(Foo, ...arguments)",
+            "ρσ_instance instanceof Foo",
+        ],
+    },
+
+    {
+        name: "new_singleton",
+        description: "__new__ can implement the singleton pattern",
+        src: [
+            "# globals: assrt",
+            "class Singleton:",
+            "    _instance = None",
+            "    def __new__(cls):",
+            "        if cls._instance is None:",
+            "            cls._instance = super().__new__(cls)",
+            "        return cls._instance",
+            "    def __init__(self):",
+            "        pass",
+            "a = Singleton()",
+            "b = Singleton()",
+            "assrt.ok(a is b)",
+            "assrt.ok(isinstance(a, Singleton))",
+        ].join("\n"),
+    },
+
+    {
+        name: "new_returns_other_type",
+        description: "__new__ returning a non-class instance skips __init__",
+        src: [
+            "# globals: assrt",
+            "init_called = [False]",
+            "class MyInt:",
+            "    def __new__(cls, val):",
+            "        return val * 2",
+            "    def __init__(self, val):",
+            "        init_called[0] = True",
+            "result = MyInt(21)",
+            "assrt.equal(result, 42)",
+            "assrt.equal(init_called[0], False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "new_with_args",
+        description: "__new__ receives the same args as __init__",
+        src: [
+            "# globals: assrt",
+            "class Point:",
+            "    def __new__(cls, x, y):",
+            "        instance = super().__new__(cls)",
+            "        instance._raw_x = x",
+            "        return instance",
+            "    def __init__(self, x, y):",
+            "        self.x = x",
+            "        self.y = y",
+            "p = Point(3, 4)",
+            "assrt.equal(p.x, 3)",
+            "assrt.equal(p.y, 4)",
+            "assrt.equal(p._raw_x, 3)",
+            "assrt.ok(isinstance(p, Point))",
+        ].join("\n"),
+    },
+
+    {
+        name: "new_subclass_inherits",
+        description: "__new__ in parent class with subclass override",
+        src: [
+            "# globals: assrt",
+            "class Base:",
+            "    def __new__(cls):",
+            "        instance = super().__new__(cls)",
+            "        instance.created_by = 'Base.__new__'",
+            "        return instance",
+            "    def __init__(self):",
+            "        pass",
+            "class Child(Base):",
+            "    def __new__(cls):",
+            "        instance = super().__new__(cls)",
+            "        instance.child_attr = 'set'",
+            "        return instance",
+            "    def __init__(self):",
+            "        pass",
+            "b = Base()",
+            "assrt.equal(b.created_by, 'Base.__new__')",
+            "c = Child()",
+            "assrt.equal(c.created_by, 'Base.__new__')",
+            "assrt.equal(c.child_attr, 'set')",
+            "assrt.ok(isinstance(c, Child))",
+            "assrt.ok(isinstance(c, Base))",
+        ].join("\n"),
+    },
+
     // ── Verbatim JS ───────────────────────────────────────────────────────
 
     {
@@ -773,6 +886,102 @@ assrt.equal(fib(15), 610)
             ].join("\n"),
         },
         js_checks: ["Circle.prototype", "function double(x)"],
+    },
+
+    // ── __import__() ─────────────────────────────────────────────────────
+
+    {
+        name: "__import__-basic",
+        description: "__import__(name) returns the module object for an already-imported module",
+        src: [
+            "# globals: assrt",
+            "from mymodule import square",
+            "m = __import__('mymodule')",
+            "assrt.equal(m.square(4), 16)",
+            "assrt.equal(m.square(7), 49)",
+        ].join("\n"),
+        virtual_files: {
+            mymodule: [
+                "def square(n):",
+                "    return n * n",
+            ].join("\n"),
+        },
+        js_checks: ["__import__"],
+    },
+
+    {
+        name: "__import__-via-import-stmt",
+        description: "__import__(name) also works when module was loaded via 'import x'",
+        src: [
+            "# globals: assrt",
+            "import myutils",
+            "m = __import__('myutils')",
+            "assrt.equal(m.add(3, 4), 7)",
+        ].join("\n"),
+        virtual_files: {
+            myutils: [
+                "def add(a, b):",
+                "    return a + b",
+            ].join("\n"),
+        },
+    },
+
+    {
+        name: "__import__-dotted-no-fromlist",
+        description: "__import__('pkg.sub') without fromlist returns the top-level package",
+        src: [
+            "# globals: assrt",
+            "from pkg.utils import helper",
+            "top = __import__('pkg.utils')",
+            "assrt.equal(top.name, 'pkg')",
+        ].join("\n"),
+        virtual_files: {
+            "pkg": "name = 'pkg'",     // pkg/__init__.pyj content; key is "pkg"
+            "pkg/utils": [
+                "def helper():",
+                "    return 99",
+            ].join("\n"),
+        },
+    },
+
+    {
+        name: "__import__-dotted-with-fromlist",
+        description: "__import__('pkg.sub', fromlist=['fn']) returns the submodule",
+        src: [
+            "# globals: assrt",
+            "from pkg.utils import helper",
+            "sub = __import__('pkg.utils', None, None, ['helper'])",
+            "assrt.equal(sub.helper(), 99)",
+        ].join("\n"),
+        virtual_files: {
+            "pkg": "",                  // pkg/__init__.pyj; key is "pkg"
+            "pkg/utils": [
+                "def helper():",
+                "    return 99",
+            ].join("\n"),
+        },
+    },
+
+    {
+        name: "__import__-error-on-missing",
+        description: "__import__ raises ModuleNotFoundError for a module not in ρσ_modules",
+        src: [
+            "# globals: assrt",
+            "from mymod import fn",
+            "caught = False",
+            "try:",
+            "    __import__('does_not_exist')",
+            "except ModuleNotFoundError as e:",
+            "    caught = True",
+            "    assrt.equal(e.message, \"No module named 'does_not_exist'\")",
+            "assrt.ok(caught)",
+        ].join("\n"),
+        virtual_files: {
+            mymod: [
+                "def fn():",
+                "    return 1",
+            ].join("\n"),
+        },
     },
 
     // ── Walrus operator (:=) ──────────────────────────────────────────────

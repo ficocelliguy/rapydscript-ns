@@ -44,11 +44,11 @@ export const BASE_BUILTINS = (
     ' isNaN JSON Math list set list_wrap ρσ_modules require bool int bin' +
     ' float iter Error EvalError set_wrap frozenset RangeError ReferenceError SyntaxError' +
     ' str TypeError URIError Exception AssertionError IndexError AttributeError KeyError' +
-    ' ValueError ZeroDivisionError map hex filter zip dict dict_wrap UnicodeDecodeError HTMLCollection' +
+    ' ValueError ZeroDivisionError ImportError ModuleNotFoundError StopIteration map hex filter zip dict dict_wrap UnicodeDecodeError HTMLCollection' +
     ' NodeList alert console Node Symbol NamedNodeMap ρσ_eslice ρσ_delslice Number' +
     ' Boolean encodeURIComponent decodeURIComponent setTimeout setInterval' +
     ' setImmediate clearTimeout clearInterval clearImmediate requestAnimationFrame' +
-    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next'
+    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next __import__ ρσ_new ρσ_object_new'
 ).split(' ');
 
 // ---------------------------------------------------------------------------

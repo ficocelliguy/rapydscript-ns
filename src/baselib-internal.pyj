@@ -87,6 +87,14 @@ def ρσ_extends(child, parent):
     child.prototype.constructor = child
     Object.setPrototypeOf(child, parent)
 
+def ρσ_object_new(cls):
+    return v'Object.create(cls.prototype)'
+
+def ρσ_new(parent, cls):
+    if parent and jstype(parent.__new__) is 'function':
+        return parent.__new__.apply(parent, v'Array.prototype.slice.call(arguments, 1)')
+    return v'Object.create(cls.prototype)'
+
 ρσ_in = (def ():
     if jstype(Map) is 'function' and jstype(Set) is 'function':
         return def(val, arr):

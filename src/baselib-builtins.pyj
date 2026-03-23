@@ -282,6 +282,23 @@ def ρσ_hasattr(obj, name):
 def ρσ_get_module(name):
     return ρσ_modules[name]
 
+def ρσ__import__(name, globals, locals, fromlist, level):
+    # Return the module from the already-compiled ρσ_modules registry.
+    # Like Python: without fromlist (or empty fromlist) returns the top-level
+    # package; with a non-empty fromlist returns the named (possibly dotted) module.
+    # NOTE: the module must have been statically imported elsewhere in the source;
+    # __import__ only provides a runtime reference to an already-compiled module.
+    if v'typeof ρσ_modules' is 'undefined':
+        raise ImportError('No module named \'' + name + '\'')
+    if fromlist is not undefined and fromlist is not None and fromlist.length:
+        lookup = name
+    else:
+        lookup = name.split('.')[0]
+    module = ρσ_modules[lookup]
+    if module is undefined:
+        raise ModuleNotFoundError('No module named \'' + lookup + '\'')
+    return module
+
 def ρσ_pow(x, y, z):
     ans = Math.pow(x, y)
     if z is not undefined:
@@ -440,7 +457,7 @@ class ρσ_slice:
 
 v'var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
 v'var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
-v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod'
+v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__'
 v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round'
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'
 v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next'

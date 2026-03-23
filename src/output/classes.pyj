@@ -82,8 +82,46 @@ def print_class(output):
         output.with_block(def():
             output.indent()
             cname = self.name.name
-            output.print('if (!(this instanceof ' + cname + ')) return new ' + cname + '(...arguments);')
-            output.newline()
+            if self.has_new:
+                # When __new__ is defined, call it to get the instance
+                output.print('if (!(this instanceof ' + cname + '))')
+                output.space()
+                output.with_block(def():
+                    output.indent()
+                    output.print('var ρσ_instance = ')
+                    self.name.print(output)
+                    output.print('.__new__(')
+                    self.name.print(output)
+                    output.print(', ...arguments)')
+                    output.end_statement()
+                    output.indent()
+                    output.print('if (ρσ_instance instanceof ')
+                    self.name.print(output)
+                    output.print(')')
+                    output.space()
+                    output.with_block(def():
+                        output.indent()
+                        output.spaced('if', '(ρσ_instance.ρσ_object_id', '===', 'undefined)', 'Object.defineProperty(ρσ_instance,', '"ρσ_object_id",', '{"value":++ρσ_object_counter})')
+                        output.end_statement()
+                        if self.bound.length:
+                            output.indent()
+                            self.name.print(output), output.print('.prototype.__bind_methods__ && ')
+                            self.name.print(output), output.print('.prototype.__bind_methods__.call(ρσ_instance)')
+                            output.end_statement()
+                        output.indent()
+                        self.name.print(output)
+                        output.print('.prototype.__init__.apply(ρσ_instance'), output.comma(), output.print('arguments)')
+                        output.end_statement()
+                    )
+                    output.newline()
+                    output.indent()
+                    output.print('return ρσ_instance')
+                    output.end_statement()
+                )
+                output.newline()
+            else:
+                output.print('if (!(this instanceof ' + cname + ')) return new ' + cname + '(...arguments);')
+                output.newline()
             output.indent()
             output.spaced('if', '(this.ρσ_object_id', '===', 'undefined)', 'Object.defineProperty(this,', '"ρσ_object_id",', '{"value":++ρσ_object_counter})')
             output.end_statement()

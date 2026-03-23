@@ -38,3 +38,9 @@ class ZeroDivisionError(Exception):
 
 class StopIteration(Exception):
     pass
+
+class ImportError(Exception):
+    pass
+
+class ModuleNotFoundError(ImportError):
+    pass
