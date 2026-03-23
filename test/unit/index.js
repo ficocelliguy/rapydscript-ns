@@ -3185,6 +3185,563 @@ assrt.equal(fib(15), 610)
         js_checks: ["x < 10"],
     },
 
+    // ── JSX whitespace and HTML entity handling ──────────────────────────────
+
+    {
+        name: "jsx_nbsp_entity",
+        description: "JSX: &nbsp; is decoded to a non-breaking space (U+00A0) in the JS string",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>Hello&nbsp;World</p>",
+        ].join("\n"),
+        js_checks: [/Hello[\u00a0]World/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_amp_entity",
+        description: "JSX: &amp; is decoded to & in the JS string",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>a &amp; b</p>",
+        ].join("\n"),
+        js_checks: [/"a & b"/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_lt_gt_entities",
+        description: "JSX: &lt; and &gt; are decoded to < and > in the JS string",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>1 &lt; 2 &gt; 0</p>",
+        ].join("\n"),
+        js_checks: [/"1 < 2 > 0"/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_quot_entity",
+        description: "JSX: &quot; is decoded to \" in the JS string",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>&quot;quoted&quot;</p>",
+        ].join("\n"),
+        js_checks: [/null, "\\\"quoted\\\""\)/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_numeric_entity_decimal",
+        description: "JSX: decimal numeric entity &#160; is decoded to U+00A0",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>a&#160;b</p>",
+        ].join("\n"),
+        js_checks: [/a[\u00a0]b/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_numeric_entity_hex",
+        description: "JSX: hex numeric entity &#x00A0; is decoded to U+00A0",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>a&#x00A0;b</p>",
+        ].join("\n"),
+        js_checks: [/a[\u00a0]b/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_no_double_decode",
+        description: "JSX: &amp;lt; decodes to &lt; (not <), entities decoded in one pass",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>&amp;lt;</p>",
+        ].join("\n"),
+        js_checks: [/"&lt;"/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_inline_spaces_preserved",
+        description: "JSX: spaces within inline text are preserved",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <p>Hello World</p>",
+        ].join("\n"),
+        js_checks: [/"Hello World"/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_multiline_whitespace_collapsed",
+        description: "JSX: whitespace-only lines between tags are dropped; text lines are preserved",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return (",
+            "        <p>",
+            "            Hello World",
+            "        </p>",
+            "    )",
+        ].join("\n"),
+        js_checks: [/"Hello World"/],
+        skip_run: true,
+    },
+
+    {
+        name: "jsx_single_space_same_line",
+        description: "JSX: a single space on its own between same-line tags is preserved",
+        src: [
+            "from __python__ import jsx",
+            "def render():",
+            "    return <span>a </span>",
+        ].join("\n"),
+        js_checks: [/"a "/],
+        skip_run: true,
+    },
+
+    // ── React standard library ───────────────────────────────────────────────
+
+    {
+        name: "react_import_usestate",
+        description: "react lib: from react import useState compiles to React.useState reference",
+        src: [
+            "from react import useState",
+            "def Counter():",
+            "    count, setCount = useState(0)",
+            "    return count",
+        ].join("\n"),
+        js_checks: ["React.useState", "useState"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_import_multiple_hooks",
+        description: "react lib: multiple hook imports each resolve to React.*",
+        src: [
+            "from react import useState, useEffect, useMemo, useRef, useCallback",
+            "def Component(items):",
+            "    count, setCount = useState(0)",
+            "    ref = useRef(None)",
+            "    result = useMemo(def(): return items.length;, [items])",
+            "    def cb():",
+            "        setCount(count + 1)",
+            "    fn = useCallback(cb, [count])",
+            "    useEffect(def(): pass;, [])",
+            "    return count",
+        ].join("\n"),
+        js_checks: [
+            "React.useState", "React.useEffect", "React.useMemo",
+            "React.useRef", "React.useCallback",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_jsx_functional_component",
+        description: "react lib: functional component with useState and JSX",
+        src: [
+            "from __python__ import jsx",
+            "from react import useState",
+            "def Counter():",
+            "    count, setCount = useState(0)",
+            "    def increment():",
+            "        setCount(count + 1)",
+            "    return <button onClick={increment}>{count}</button>",
+        ].join("\n"),
+        js_checks: [
+            "React.useState", "React.createElement",
+            '"button"', "increment", "count",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_effect",
+        description: "react lib: useEffect with deps array compiles correctly",
+        src: [
+            "from react import useState, useEffect",
+            "def Timer():",
+            "    count, setCount = useState(0)",
+            "    def tick():",
+            "        setCount(count + 1)",
+            "    useEffect(tick, [count])",
+            "    return count",
+        ].join("\n"),
+        js_checks: ["React.useState", "React.useEffect", "tick", "count"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_context",
+        description: "react lib: createContext and useContext compile correctly",
+        src: [
+            "from react import createContext, useContext",
+            "ThemeContext = createContext('light')",
+            "def ThemedButton():",
+            "    theme = useContext(ThemeContext)",
+            "    return theme",
+        ].join("\n"),
+        js_checks: [
+            "React.createContext", "React.useContext",
+            "ThemeContext", "light",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_reducer",
+        description: "react lib: useReducer with action dispatch compiles correctly",
+        src: [
+            "from react import useReducer",
+            "def reducer(state, action):",
+            "    if action.type == 'increment':",
+            "        return state + 1",
+            "    return state",
+            "def Counter():",
+            "    state, dispatch = useReducer(reducer, 0)",
+            "    return state",
+        ].join("\n"),
+        js_checks: ["React.useReducer", "reducer", "dispatch"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_ref",
+        description: "react lib: useRef for DOM reference compiles correctly",
+        src: [
+            "from __python__ import jsx",
+            "from react import useRef",
+            "def FocusInput():",
+            "    inputRef = useRef(None)",
+            "    def handleClick():",
+            "        inputRef.current.focus()",
+            "    return <input ref={inputRef} />",
+        ].join("\n"),
+        js_checks: [
+            "React.useRef", "inputRef", "current",
+            "React.createElement", '"input"',
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_memo_wrapper",
+        description: "react lib: memo() wraps a component to prevent re-renders",
+        src: [
+            "from __python__ import jsx",
+            "from react import memo",
+            "def Row(props):",
+            "    return <div>{props.label}</div>",
+            "MemoRow = memo(Row)",
+        ].join("\n"),
+        js_checks: ["React.memo", "Row", "MemoRow"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_create_context",
+        description: "react lib: createContext creates a context object",
+        src: [
+            "from react import createContext",
+            "UserContext = createContext(None)",
+        ].join("\n"),
+        js_checks: ["React.createContext", "UserContext"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_forward_ref",
+        description: "react lib: forwardRef passes ref to child component",
+        src: [
+            "from __python__ import jsx",
+            "from react import forwardRef",
+            "def FancyInput(props, ref):",
+            "    return <input ref={ref} />",
+            "FancyInputWithRef = forwardRef(FancyInput)",
+        ].join("\n"),
+        js_checks: ["React.forwardRef", "FancyInput", "FancyInputWithRef"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_fragment_import",
+        description: "react lib: Fragment import can be used as a component tag",
+        src: [
+            "from __python__ import jsx",
+            "from react import Fragment",
+            "def TwoItems():",
+            "    return <Fragment><span>A</span><span>B</span></Fragment>",
+        ].join("\n"),
+        js_checks: ["React.Fragment", "React.createElement", '"span"'],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_id",
+        description: "react lib: useId (React 18) compiles correctly",
+        src: [
+            "from react import useId",
+            "def LabeledInput():",
+            "    id = useId()",
+            "    return id",
+        ].join("\n"),
+        js_checks: ["React.useId", "useId"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_transition",
+        description: "react lib: useTransition (React 18) compiles correctly",
+        src: [
+            "from react import useState, useTransition",
+            "def SearchInput():",
+            "    isPending, startTransition = useTransition()",
+            "    query, setQuery = useState('')",
+            "    def handleChange(e):",
+            "        startTransition(def(): setQuery(e.target.value);)",
+            "    return isPending",
+        ].join("\n"),
+        js_checks: ["React.useTransition", "React.useState", "startTransition"],
+        skip_run: true,
+    },
+
+    {
+        name: "react_class_component",
+        description: "react lib: class component importing Component base class",
+        src: [
+            "from __python__ import jsx",
+            "from react import Component",
+            "class Greeter(Component):",
+            "    def render(self):",
+            "        return <h1>Hello, {self.props.name}</h1>",
+        ].join("\n"),
+        js_checks: [
+            "React.Component", "Greeter", "render",
+            "React.createElement", '"h1"',
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_jsx_list_rendering",
+        description: "react lib: list comprehension renders JSX list of elements",
+        src: [
+            "from __python__ import jsx",
+            "from react import useState",
+            "def TodoList():",
+            "    items, setItems = useState(['a', 'b', 'c'])",
+            "    return (",
+            "        <ul>",
+            "            {[<li key={i}>{item}</li> for i, item in enumerate(items)]}",
+            "        </ul>",
+            "    )",
+        ].join("\n"),
+        js_checks: [
+            "React.useState", "React.createElement",
+            '"ul"', '"li"', "enumerate",
+        ],
+        skip_run: true,
+    },
+
+    // Binding-pattern tests: verify that imported names are wired to React.* in
+    // the compiled output via both the module export and the var binding.
+
+    {
+        name: "react_binding_memo",
+        description: "react lib: memo is exported from module as React.memo and bound via var",
+        src: [
+            "from react import memo",
+            "def A(): return 1",
+            "B = memo(A)",
+        ].join("\n"),
+        // module init: ρσ_modules.react.memo = <something>; and React.memo assignment
+        // import binding: var memo = ρσ_modules.react.memo
+        js_checks: [
+            "React.memo",
+            "ρσ_modules.react.memo",
+            "var memo",
+            "memo(A)",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_binding_usestate",
+        description: "react lib: useState is exported from module as React.useState and bound via var",
+        src: [
+            "from react import useState",
+            "def C():",
+            "    n, setN = useState(0)",
+            "    return n",
+        ].join("\n"),
+        js_checks: [
+            "React.useState",
+            "ρσ_modules.react.useState",
+            "var useState",
+            "useState(0)",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_binding_useeffect",
+        description: "react lib: useEffect is exported from module as React.useEffect and bound via var",
+        src: [
+            "from react import useEffect",
+            "def D():",
+            "    def run(): pass",
+            "    useEffect(run, [])",
+        ].join("\n"),
+        js_checks: [
+            "React.useEffect",
+            "ρσ_modules.react.useEffect",
+            "var useEffect",
+            "useEffect(run",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_binding_forwardref",
+        description: "react lib: forwardRef is exported from module as React.forwardRef and bound via var",
+        src: [
+            "from __python__ import jsx",
+            "from react import forwardRef",
+            "FancyInput = forwardRef(def(props, ref): return <input ref={ref}/>;)",
+        ].join("\n"),
+        js_checks: [
+            "React.forwardRef",
+            "ρσ_modules.react.forwardRef",
+            "var forwardRef",
+            "forwardRef(",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_binding_all_hooks",
+        description: "react lib: every imported hook produces a var binding to ρσ_modules.react.*",
+        src: [
+            "from react import useState, useEffect, useContext, useReducer, useCallback, useMemo, useRef, useLayoutEffect, useId",
+        ].join("\n"),
+        js_checks: [
+            "React.useState", "React.useEffect", "React.useContext",
+            "React.useReducer", "React.useCallback", "React.useMemo",
+            "React.useRef", "React.useLayoutEffect", "React.useId",
+            "var useState", "var useEffect", "var useContext",
+            "var useReducer", "var useCallback", "var useMemo",
+            "var useRef", "var useLayoutEffect", "var useId",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_counter_example",
+        description: "react lib: full counter component from TODO example compiles correctly",
+        src: [
+            "from __python__ import jsx",
+            "from react import useState, useEffect, memo",
+            "def Counter(props):",
+            "    count, setCount = useState(props.initial or 0)",
+            "    def increment():",
+            "        setCount(count + 1)",
+            "    def decrement():",
+            "        setCount(count - 1)",
+            "    def log_change():",
+            "        pass",
+            "    useEffect(log_change, [count])",
+            "    return (",
+            "        <div className='counter'>",
+            "            <h2>{props.title}</h2>",
+            "            <button onClick={decrement}>-</button>",
+            "            <span>{count}</span>",
+            "            <button onClick={increment}>+</button>",
+            "        </div>",
+            "    )",
+            "Counter = memo(Counter)",
+        ].join("\n"),
+        js_checks: [
+            // hooks are wired correctly
+            "React.useState", "React.useEffect", "React.memo",
+            "var useState", "var useEffect", "var memo",
+            // JSX output
+            "React.createElement", '"div"', '"button"', '"span"', '"h2"',
+            // logic
+            "increment", "decrement", "count",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_lazy_suspense",
+        description: "react lib: lazy and Suspense compile correctly",
+        src: [
+            "from __python__ import jsx",
+            "from react import lazy, Suspense",
+            "def Fallback():",
+            "    return <div>Loading...</div>",
+            "def App():",
+            "    return <Suspense fallback={<Fallback/>}></Suspense>",
+        ].join("\n"),
+        js_checks: [
+            "React.lazy", "React.Suspense",
+            "var lazy", "var Suspense",
+            "React.createElement",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_callback_deps",
+        description: "react lib: useCallback dependency array passes through correctly",
+        src: [
+            "from react import useState, useCallback",
+            "def Form():",
+            "    value, setValue = useState('')",
+            "    def onChange(e):",
+            "        setValue(e.target.value)",
+            "    handler = useCallback(onChange, [value])",
+            "    return handler",
+        ].join("\n"),
+        js_checks: [
+            "React.useCallback", "React.useState",
+            "var useCallback", "var useState",
+            "useCallback(onChange",
+        ],
+        skip_run: true,
+    },
+
+    {
+        name: "react_use_memo_deps",
+        description: "react lib: useMemo dependency array passes through correctly",
+        src: [
+            "from react import useState, useMemo",
+            "def Expensive(items):",
+            "    count, setCount = useState(0)",
+            "    def compute(): return items.length * count",
+            "    result = useMemo(compute, [items, count])",
+            "    return result",
+        ].join("\n"),
+        js_checks: [
+            "React.useMemo", "React.useState",
+            "var useMemo", "var useState",
+            "useMemo(compute",
+        ],
+        skip_run: true,
+    },
+
     // ── JSON support ─────────────────────────────────────────────────────────
 
     {

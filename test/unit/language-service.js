@@ -929,6 +929,38 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        {
+            name: "stdlib_react_hooks_no_errors",
+            description: "Importing and using React hooks and utilities produces no errors",
+            run: function () {
+                var markers = d().check([
+                    "from react import useState, useEffect, useRef, useCallback, useMemo",
+                    "from react import useContext, useReducer, useId, useTransition",
+                    "from react import Component, PureComponent, Fragment",
+                    "from react import createElement, createContext, createRef, memo, lazy",
+                    "from react import forwardRef, cloneElement, isValidElement",
+                    "count, setCount = useState(0)",
+                    "ref = useRef(None)",
+                    "ref2 = createRef()",
+                    "ctx = createContext(None)",
+                    "cb = useCallback(lambda: None, [])",
+                    "val = useMemo(lambda: 42, [])",
+                    "id_ = useId()",
+                    "el = createElement('div', None)",
+                    "valid = isValidElement(el)",
+                    "print(count, setCount, ref, ref2, ctx, cb, val, id_, el, valid)",
+                    "print(Component, PureComponent, Fragment, forwardRef, cloneElement)",
+                    "print(useEffect, useContext, useReducer, useTransition, memo, lazy)",
+                ].join("\n"),
+                    { virtualFiles: { sentinel: "x = 1" } }
+                );
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for react imports and usage, got: " +
+                    JSON.stringify(errors.map(function (m) { return m.message; })));
+            },
+        },
+
         // ── STDLIB_MODULES coverage (filesystem-driven) ───────────────────
         //
         // These tests read src/lib/ at runtime and cross-check against
@@ -986,7 +1018,7 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
 
         {
             name: "stdlib_new_lib_file_no_bad_import",
-            description: "Every .pyj module in src/lib/ can be imported without a bad-import error when virtualFiles are present",
+            description: "Every .pyj module in src/lib/ produces zero error-severity markers when imported with virtualFiles present",
             run: function () {
                 var lib_names = get_lib_module_names();
                 lib_names.forEach(function (mod) {
@@ -994,13 +1026,17 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
                         "from " + mod + " import x\nprint(x)",
                         { virtualFiles: { sentinel: "x = 1" } }
                     );
-                    var bad = markers.filter(function (m) {
-                        return m.message.indexOf('Unknown module') !== -1;
+                    // Check for ANY error-severity marker, not just bad-import.
+                    // This catches: bad-import ('Unknown module'), import-err, syntax-err,
+                    // and any other error category that might arise for a new lib file.
+                    var errors = markers.filter(function (m) {
+                        return m.severity === SEV_ERROR;
                     });
-                    assert.deepStrictEqual(bad, [],
+                    assert.deepStrictEqual(errors, [],
                         "src/lib/" + mod + ".pyj exists but 'from " + mod + " import x' " +
-                        "produces a bad-import error — add '" + mod + "' to STDLIB_MODULES " +
-                        "in diagnostics.js"
+                        "produces error markers — if this is a bad-import, add '" + mod +
+                        "' to STDLIB_MODULES in diagnostics.js. Markers: " +
+                        JSON.stringify(errors.map(function (m) { return m.message; }))
                     );
                 });
             },

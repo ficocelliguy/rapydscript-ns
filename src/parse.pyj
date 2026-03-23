@@ -2920,9 +2920,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         while True:
             if S.token.type is 'jsx_text':
                 text = S.token.value
-                trimmed = text.trim()
-                if trimmed:
-                    children.push(new AST_JSXText({'value': trimmed, 'start': S.token, 'end': S.token}))
+                children.push(new AST_JSXText({'value': text, 'start': S.token, 'end': S.token}))
                 next()  # still in JSX mode
             elif is_('operator', '<'):
                 # Nested element or closing tag: exit JSX mode to tokenize tag content

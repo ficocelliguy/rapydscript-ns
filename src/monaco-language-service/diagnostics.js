@@ -28,7 +28,7 @@ const MESSAGES = {
 export const STDLIB_MODULES = [
     'aes', 'collections', 'elementmaker', 'encodings', 'functools',
     'gettext', 'itertools', 'math', 'numpy', 'operator', 'pythonize',
-    'random', 're', 'traceback', 'uuid',
+    'random', 're', 'react', 'traceback', 'uuid',
     // Pseudo-modules for language feature flags (from __python__ import ...)
     '__python__', '__builtins__',
 ];

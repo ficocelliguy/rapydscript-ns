@@ -13,6 +13,61 @@ def _needs_quoting(name):
     # Attribute names containing non-identifier chars (e.g. aria-label) need quoting
     return not v'/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)'
 
+def _decode_html_entities(text):
+    # Decode HTML entities in a single pass to avoid double-decoding (e.g. &amp;lt; -> &lt;)
+    return text.replace(/&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z]+));/g, def(match, hex, dec, name):
+        if hex:
+            return String.fromCharCode(parseInt(hex, 16))
+        if dec:
+            return String.fromCharCode(parseInt(dec, 10))
+        if name is 'amp':
+            return '&'
+        if name is 'lt':
+            return '<'
+        if name is 'gt':
+            return '>'
+        if name is 'quot':
+            return '"'
+        if name is 'apos':
+            return "'"
+        if name is 'nbsp':
+            return '\u00a0'
+        return match
+    )
+
+def _normalize_jsx_whitespace(text):
+    # Implements the Babel JSX whitespace algorithm:
+    # - Split by newlines; trim leading whitespace from all lines except the first,
+    #   trailing whitespace from all lines except the last.
+    # - Lines that are empty after trimming are dropped.
+    # - Remaining non-empty lines are joined; each line except the last non-empty
+    #   gets a trailing space to separate it from the next.
+    lines = text.split('\n')
+    last_non_empty = -1
+    for i in range(lines.length):
+        if /[^ \t]/.test(lines[i]):
+            last_non_empty = i
+    result = ''
+    for i in range(lines.length):
+        line = lines[i].replace(/\t/g, ' ')
+        is_first = (i is 0)
+        is_last = (i is lines.length - 1)
+        if not is_first:
+            line = line.replace(/^[ ]+/, '')
+        if not is_last:
+            line = line.replace(/[ ]+$/, '')
+        if line:
+            if i is not last_non_empty:
+                line += ' '
+            result += line
+    return result
+
+def _process_jsx_text(text):
+    text = _normalize_jsx_whitespace(text)
+    if text:
+        text = _decode_html_entities(text)
+    return text
+
 def _print_tag(tag, output):
     if _is_component_tag(tag):
         output.print(tag)
@@ -53,7 +108,7 @@ def _print_props(props, output):
 def _print_children(children, output):
     for child in children:
         if is_node_type(child, AST_JSXText):
-            text = child.value.trim()
+            text = _process_jsx_text(child.value)
             if text:
                 output.print(', ')
                 output.print_string(text)
@@ -100,7 +155,7 @@ def print_jsx_spread(self, output):
 
 def print_jsx_text(self, output):
     # Handled directly by _print_children; kept for completeness
-    text = self.value.trim()
+    text = _process_jsx_text(self.value)
     if text:
         output.print_string(text)
 

@@ -1829,6 +1829,209 @@ Since the output is plain JavaScript, compile to a `.js` file as normal:
 rapydscript mycomponent.pyj --output mycomponent.js
 ```
 
+React Standard Library
+-----------------------
+
+RapydScript ships a `react` standard library module that re-exports every standard React hook and utility under their familiar Python-friendly names.  Import the pieces you need and the compiler will resolve each name to the corresponding `React.*` property at compile time.
+
+### Importing hooks
+
+```py
+from __python__ import jsx
+from react import useState, useEffect, useCallback, useMemo, useRef
+
+def Counter():
+    count, setCount = useState(0)
+
+    def increment():
+        setCount(count + 1)
+
+    return <button onClick={increment}>{count}</button>
+```
+
+Compiles to:
+
+```js
+var useState = React.useState;
+// ...
+function Counter() {
+    var [count, setCount] = React.useState(0);
+    function increment() {
+        setCount(count + 1);
+    }
+    return React.createElement("button", {onClick: increment}, count);
+}
+```
+
+Tuple unpacking works naturally because `React.useState` returns a two-element array — `count, setCount = useState(0)` compiles to the ES6 destructuring `var [count, setCount] = React.useState(0)`.
+
+### Available exports
+
+**Hooks (React 16.8+)**
+
+| Import name | React API |
+|---|---|
+| `useState` | `React.useState` |
+| `useEffect` | `React.useEffect` |
+| `useContext` | `React.useContext` |
+| `useReducer` | `React.useReducer` |
+| `useCallback` | `React.useCallback` |
+| `useMemo` | `React.useMemo` |
+| `useRef` | `React.useRef` |
+| `useImperativeHandle` | `React.useImperativeHandle` |
+| `useLayoutEffect` | `React.useLayoutEffect` |
+| `useDebugValue` | `React.useDebugValue` |
+
+**Hooks (React 18+)**
+
+| Import name | React API |
+|---|---|
+| `useId` | `React.useId` |
+| `useTransition` | `React.useTransition` |
+| `useDeferredValue` | `React.useDeferredValue` |
+| `useSyncExternalStore` | `React.useSyncExternalStore` |
+| `useInsertionEffect` | `React.useInsertionEffect` |
+
+**Core classes and elements**
+
+| Import name | React API |
+|---|---|
+| `Component` | `React.Component` |
+| `PureComponent` | `React.PureComponent` |
+| `Fragment` | `React.Fragment` |
+| `StrictMode` | `React.StrictMode` |
+| `Suspense` | `React.Suspense` |
+| `Profiler` | `React.Profiler` |
+
+**Utilities**
+
+| Import name | React API |
+|---|---|
+| `createElement` | `React.createElement` |
+| `cloneElement` | `React.cloneElement` |
+| `createContext` | `React.createContext` |
+| `createRef` | `React.createRef` |
+| `forwardRef` | `React.forwardRef` |
+| `isValidElement` | `React.isValidElement` |
+| `memo` | `React.memo` |
+| `lazy` | `React.lazy` |
+
+### Common patterns
+
+**useEffect with cleanup**
+
+```py
+from react import useState, useEffect
+
+def Timer():
+    count, setCount = useState(0)
+    def setup():
+        interval = setInterval(def(): setCount(count + 1);, 1000)
+        def cleanup():
+            clearInterval(interval)
+        return cleanup
+    useEffect(setup, [count])
+    return count
+```
+
+**useReducer**
+
+```py
+from react import useReducer
+
+def reducer(state, action):
+    if action.type == 'increment':
+        return state + 1
+    if action.type == 'decrement':
+        return state - 1
+    return state
+
+def Counter():
+    state, dispatch = useReducer(reducer, 0)
+    def inc():
+        dispatch({'type': 'increment'})
+    return state
+```
+
+**useContext**
+
+```py
+from react import createContext, useContext
+
+ThemeContext = createContext('light')
+
+def ThemedButton():
+    theme = useContext(ThemeContext)
+    return theme
+```
+
+**useRef**
+
+```py
+from __python__ import jsx
+from react import useRef
+
+def FocusInput():
+    inputRef = useRef(None)
+    def handleClick():
+        inputRef.current.focus()
+    return <input ref={inputRef} />
+```
+
+**memo**
+
+```py
+from __python__ import jsx
+from react import memo
+
+def Row(props):
+    return <li>{props.label}</li>
+
+MemoRow = memo(Row)
+```
+
+**forwardRef**
+
+```py
+from __python__ import jsx
+from react import forwardRef
+
+def FancyInput(props, ref):
+    return <input ref={ref} placeholder={props.placeholder} />
+
+FancyInputWithRef = forwardRef(FancyInput)
+```
+
+**Class component**
+
+You can extend `React.Component` directly without importing it, or import `Component` from the `react` module:
+
+```py
+from __python__ import jsx
+from react import Component
+
+class Greeter(Component):
+    def render(self):
+        return <h1>Hello, {self.props.name}!</h1>
+```
+
+**useTransition (React 18)**
+
+```py
+from react import useState, useTransition
+
+def SearchInput():
+    isPending, startTransition = useTransition()
+    query, setQuery = useState('')
+    def handleChange(e):
+        startTransition(def(): setQuery(e.target.value);)
+    return isPending
+```
+
+### Requirements
+
+The `react` module does not bundle React itself — it provides compile-time name bindings only.  `React` must be available as a global variable at runtime, exactly as described in the [JSX Requirements](#requirements) section above.
+
 Creating DOM trees easily
 ---------------------------------
 

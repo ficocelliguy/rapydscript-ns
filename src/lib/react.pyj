@@ -1,0 +1,74 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript bindings for React.
+#
+# Supported: all standard hooks (useState, useEffect, useContext, useReducer,
+# useCallback, useMemo, useRef, useImperativeHandle, useLayoutEffect,
+# useDebugValue, useId, useTransition, useDeferredValue), core classes
+# (Component, PureComponent), special elements (Fragment, StrictMode,
+# Suspense, Profiler), and utilities (createElement, cloneElement,
+# createContext, createRef, forwardRef, isValidElement, memo, lazy).
+#
+# Requires React to be available as a global variable.  Load it via a CDN
+# <script> tag, a bundler global shim, or any other mechanism before your
+# compiled script runs.
+#
+# Usage:
+#   from __python__ import jsx
+#   from react import useState, useEffect, useRef
+#
+#   def Counter():
+#       count, setCount = useState(0)
+#       def handleClick():
+#           setCount(count + 1)
+#       return <button onClick={handleClick}>{count}</button>
+#
+# For class components extend React.Component directly (no import needed):
+#
+#   class MyComponent(React.Component):
+#       def render(self):
+#           return <div>{self.props.title}</div>
+
+# ── Hooks (React 16.8+) ───────────────────────────────────────────────────────
+
+useState             = React.useState
+useEffect            = React.useEffect
+useContext           = React.useContext
+useReducer           = React.useReducer
+useCallback          = React.useCallback
+useMemo              = React.useMemo
+useRef               = React.useRef
+useImperativeHandle  = React.useImperativeHandle
+useLayoutEffect      = React.useLayoutEffect
+useDebugValue        = React.useDebugValue
+
+# ── Hooks (React 18+) ────────────────────────────────────────────────────────
+
+useId                = React.useId
+useTransition        = React.useTransition
+useDeferredValue     = React.useDeferredValue
+useSyncExternalStore = React.useSyncExternalStore
+useInsertionEffect   = React.useInsertionEffect
+
+# ── Core classes ─────────────────────────────────────────────────────────────
+
+Component            = React.Component
+PureComponent        = React.PureComponent
+
+# ── Special elements ─────────────────────────────────────────────────────────
+
+Fragment             = React.Fragment
+StrictMode           = React.StrictMode
+Suspense             = React.Suspense
+Profiler             = React.Profiler
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+
+createElement        = React.createElement
+cloneElement         = React.cloneElement
+createContext        = React.createContext
+createRef            = React.createRef
+forwardRef           = React.forwardRef
+isValidElement       = React.isValidElement
+memo                 = React.memo
+lazy                 = React.lazy

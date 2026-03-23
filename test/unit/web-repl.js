@@ -119,6 +119,70 @@ function run_js(js) {
     });
 }
 
+// Minimal React stub — mirrors the one in web-repl/env.js so that compiled
+// code that imports from the react library can run in a plain Node vm context.
+var REACT_STUB = (function () {
+    var Fragment = Symbol("React.Fragment");
+    function createElement(type, props) {
+        var children = Array.prototype.slice.call(arguments, 2);
+        return { type: type, props: Object.assign({ children: children.length === 1 ? children[0] : children }, props) };
+    }
+    function useState(initial) {
+        var s = typeof initial === "function" ? initial() : initial;
+        return [s, function (v) { s = typeof v === "function" ? v(s) : v; }];
+    }
+    function useEffect(fn)    { fn(); }
+    function useLayoutEffect(fn) { fn(); }
+    function useMemo(fn)      { return fn(); }
+    function useCallback(fn)  { return fn; }
+    function useRef(initial)  { return { current: initial }; }
+    function useContext(ctx)  { return ctx && ctx._currentValue !== undefined ? ctx._currentValue : undefined; }
+    function useReducer(reducer, initial) { return [initial, function (a) {}]; }
+    function useImperativeHandle(ref, create) { if (ref) ref.current = create(); }
+    function useDebugValue() {}
+    function useId() { return ":r" + (Math.random() * 1e9 | 0) + ":"; }
+    function useTransition() { return [false, function (fn) { fn(); }]; }
+    function useDeferredValue(v) { return v; }
+    function useSyncExternalStore(sub, get) { return get(); }
+    function useInsertionEffect(fn) { fn(); }
+    function createContext(def) { return { _currentValue: def }; }
+    function createRef() { return { current: null }; }
+    function forwardRef(render) { return function (props) { return render(props, null); }; }
+    function memo(C)  { return C; }
+    function lazy(f)  { return f; }
+    function cloneElement(el, props) { return Object.assign({}, el, { props: Object.assign({}, el.props, props) }); }
+    function isValidElement(o) { return o !== null && typeof o === "object" && o.type !== undefined; }
+    function Component() {}
+    Component.prototype.setState = function (u) { this.state = Object.assign({}, this.state, typeof u === "function" ? u(this.state) : u); };
+    function PureComponent() {}
+    PureComponent.prototype = Object.create(Component.prototype);
+    PureComponent.prototype.constructor = PureComponent;
+    return {
+        Fragment: Fragment, createElement: createElement,
+        useState: useState, useEffect: useEffect, useLayoutEffect: useLayoutEffect,
+        useMemo: useMemo, useCallback: useCallback, useRef: useRef,
+        useContext: useContext, useReducer: useReducer,
+        useImperativeHandle: useImperativeHandle, useDebugValue: useDebugValue,
+        useId: useId, useTransition: useTransition, useDeferredValue: useDeferredValue,
+        useSyncExternalStore: useSyncExternalStore, useInsertionEffect: useInsertionEffect,
+        createContext: createContext, createRef: createRef, forwardRef: forwardRef,
+        memo: memo, lazy: lazy, cloneElement: cloneElement, isValidElement: isValidElement,
+        Component: Component, PureComponent: PureComponent,
+        StrictMode: {}, Suspense: {}, Profiler: {},
+    };
+})();
+
+// Run compiled JS in a vm context that also has a React stub available.
+function run_js_with_react(js) {
+    return vm.runInNewContext(js, {
+        __name__          : "<test>",
+        console           : console,
+        assrt             : assert,
+        ρσ_last_exception : undefined,
+        React             : REACT_STUB,
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -576,6 +640,155 @@ var TESTS = [
                 "assrt.equal('foo' + 'bar', 'foobar')",
             ].join("\n"));
             run_js(js);
+        },
+    },
+
+    // ── React stub tests ─────────────────────────────────────────────────────
+    // These tests require a React mock in the vm context because the compiled
+    // react.pyj module initialises with `React.*` references at load time.
+
+    {
+        name: "bundle_react_stub_memo",
+        description: "web-repl React stub: memo() returns its argument (identity wrapper)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import memo",
+                "def MyComp(props): return props.x",
+                "Memoised = memo(MyComp)",
+                "assrt.equal(Memoised, MyComp)",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_usestate",
+        description: "web-repl React stub: useState returns [initialValue, setter]",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import useState",
+                "state, setState = useState(42)",
+                "assrt.equal(state, 42)",
+                "assrt.equal(jstype(setState), 'function')",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_useeffect",
+        description: "web-repl React stub: useEffect calls its callback immediately",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import useEffect",
+                "ran = [False]",
+                "def effect(): ran[0] = True",
+                "useEffect(effect, [])",
+                "assrt.ok(ran[0])",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_usememo",
+        description: "web-repl React stub: useMemo returns the computed value",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import useMemo",
+                "result = useMemo(def(): return 6 * 7;, [])",
+                "assrt.equal(result, 42)",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_useref",
+        description: "web-repl React stub: useRef returns {current: initialValue}",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import useRef",
+                "ref = useRef(None)",
+                "assrt.equal(ref.current, None)",
+                "ref.current = 'hello'",
+                "assrt.equal(ref.current, 'hello')",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_usereducer",
+        description: "web-repl React stub: useReducer returns [initialState, dispatch]",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import useReducer",
+                "def reducer(state, action):",
+                "    if action == 'inc': return state + 1",
+                "    return state",
+                "state, dispatch = useReducer(reducer, 0)",
+                "assrt.equal(state, 0)",
+                "assrt.equal(jstype(dispatch), 'function')",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_createcontext",
+        description: "web-repl React stub: createContext returns a context with default value",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import createContext, useContext",
+                "ThemeCtx = createContext('dark')",
+                "theme = useContext(ThemeCtx)",
+                "assrt.equal(theme, 'dark')",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_forwardref",
+        description: "web-repl React stub: forwardRef wraps the render function",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from react import forwardRef",
+                "def render(props, ref): return props.x",
+                "FancyInput = forwardRef(render)",
+                "assrt.equal(jstype(FancyInput), 'function')",
+                "assrt.equal(FancyInput({'x': 99}), 99)",
+            ].join("\n"));
+            run_js_with_react(js);
+        },
+    },
+
+    {
+        name: "bundle_react_stub_jsx_and_memo",
+        description: "web-repl React stub: JSX component wrapped with memo compiles and runs",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import jsx",
+                "from react import useState, memo",
+                "def Counter(props):",
+                "    count, setCount = useState(props.initial or 0)",
+                "    return <span>{count}</span>",
+                "MemoCounter = memo(Counter)",
+                "assrt.equal(jstype(MemoCounter), 'function')",
+                "el = MemoCounter({'initial': 7})",
+                "assrt.equal(el.type, 'span')",
+            ].join("\n"));
+            run_js_with_react(js);
         },
     },
 
