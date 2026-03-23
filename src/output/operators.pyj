@@ -13,6 +13,11 @@ from output.loops import unpack_tuple
 def print_getattr(self, output, skip_expression):  # AST_Dot
     if not skip_expression:
         expr = self.expression
+        # Redirect JSON.parse → ρσ_json_parse so RapydScript code gets dict-aware
+        # parsing without polluting the global JSON.parse for other JS on the page.
+        if is_node_type(expr, AST_SymbolRef) and expr.name == 'JSON' and self.property == 'parse':
+            output.print('ρσ_json_parse')
+            return
         expr.print(output)
     if is_node_type(expr, AST_Number) and expr.value >= 0:
         if not /[xa-f.]/i.test(output.last()):

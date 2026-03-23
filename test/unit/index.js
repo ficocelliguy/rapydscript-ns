@@ -3214,6 +3214,8 @@ assrt.equal(fib(15), 610)
             "assrt.equal(parsed.get('b'), 2)",
             "assrt.equal(len(parsed), 2)",
         ].join("\n"),
+        // JSON.parse in RapydScript must compile to ρσ_json_parse (not the native global)
+        js_checks: ["ρσ_json_parse"],
     },
 
     {

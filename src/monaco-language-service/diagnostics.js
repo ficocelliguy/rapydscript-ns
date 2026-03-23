@@ -22,6 +22,20 @@ const MESSAGES = {
     'dup-method':     'The method "{name}" was defined previously at line: {line}',
 };
 
+// Built-in stdlib modules that are always available in RapydScript (bundled
+// with the compiler from src/lib/).  These should never produce 'Unknown module'
+// errors regardless of what virtualFiles or stdlibFiles are configured.
+export const STDLIB_MODULES = [
+    'aes', 'collections', 'elementmaker', 'encodings', 'functools',
+    'gettext', 'itertools', 'math', 'numpy', 'operator', 'pythonize',
+    'random', 're', 'traceback', 'uuid',
+    // Pseudo-modules for language feature flags (from __python__ import ...)
+    '__python__', '__builtins__',
+];
+
+const _STDLIB_MODULE_SET = Object.create(null);
+STDLIB_MODULES.forEach(m => { _STDLIB_MODULE_SET[m] = true; });
+
 // Symbols always available in RapydScript (from tools/lint.js BUILTINS list).
 export const BASE_BUILTINS = (
     'this self window document chr ord iterator_symbol print len range dir' +
@@ -681,6 +695,8 @@ export class Diagnostics {
         const sf = options.stdlibFiles;
         if ((vf && Object.keys(vf).length > 0) || (sf && Object.keys(sf).length > 0)) {
             knownModules = Object.create(null);
+            // Always include built-in stdlib so they never produce bad-import errors.
+            Object.assign(knownModules, _STDLIB_MODULE_SET);
             if (vf) Object.keys(vf).forEach(k => { knownModules[k] = true; });
             if (sf) Object.keys(sf).forEach(k => { knownModules[k] = true; });
         }

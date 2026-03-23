@@ -878,17 +878,14 @@ def ρσ_dict_wrap(x):
 
 v'var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap'
 
-v"""(function() {
-    var ρσ_orig_json_parse = JSON.parse;
-    JSON.parse = function(text, reviver) {
-        function dict_reviver(key, value) {
-            if (value !== null && typeof value === "object" && !Array.isArray(value) && !(value instanceof ρσ_dict)) {
-                value = ρσ_dict(value);
-            }
-            return reviver ? reviver.call(this, key, value) : value;
+v"""var ρσ_json_parse = function(text, reviver) {
+    function dict_reviver(key, value) {
+        if (value !== null && typeof value === "object" && !Array.isArray(value) && !(value instanceof ρσ_dict)) {
+            value = ρσ_dict(value);
         }
-        return ρσ_orig_json_parse(text, dict_reviver);
-    };
-})();"""
+        return reviver ? reviver.call(this, key, value) : value;
+    }
+    return JSON.parse(text, dict_reviver);
+};"""
 
 # }}}

@@ -10,6 +10,7 @@
 "use strict";
 
 var assert         = require("assert");
+var fs             = require("fs");
 var path           = require("path");
 var url            = require("url");
 var compiler_module = require("../../tools/compiler");
@@ -55,7 +56,20 @@ function assert_line(markers, line, label) {
 //   description {string}  – what is exercised
 //   run(d)                – receives a Diagnostics instance; throws on failure
 
-function make_tests(Diagnostics, RS) {
+// Path to src/lib/ relative to this test file — used for coverage checks.
+var LIB_DIR = path.join(__dirname, "../../src/lib");
+
+/**
+ * Return the module names of all .pyj files currently in src/lib/.
+ * Excludes cache files (.pyj-cached) and any non-.pyj entries.
+ */
+function get_lib_module_names() {
+    return fs.readdirSync(LIB_DIR)
+        .filter(function (f) { return f.endsWith(".pyj") && !f.endsWith(".pyj-cached"); })
+        .map(function (f) { return f.replace(/\.pyj$/, ""); });
+}
+
+function make_tests(Diagnostics, RS, STDLIB_MODULES) {
 
     function d(extras) { return new Diagnostics(RS, extras); }
 
@@ -798,6 +812,200 @@ function make_tests(Diagnostics, RS) {
             },
         },
 
+        // ── Stdlib import recognition ──────────────────────────────────────
+
+        {
+            name: "stdlib_collections_no_bad_import",
+            description: "from collections import defaultdict produces no bad-import error when virtualFiles are present",
+            run: function () {
+                // A virtualFile being present activates the knownModules registry.
+                // Before the fix, 'collections' was not in knownModules and was
+                // flagged as 'Unknown module'.
+                var markers = d().check(
+                    "from collections import defaultdict\nd = defaultdict(list)\nd['x'].append(1)",
+                    { virtualFiles: { mymod: "def foo(): pass" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.deepStrictEqual(bad, [],
+                    "Expected no 'Unknown module' for stdlib collections, got: " + JSON.stringify(bad));
+            },
+        },
+
+        {
+            name: "stdlib_all_modules_no_bad_import",
+            description: "All bundled stdlib modules produce no bad-import error when a module registry is active",
+            run: function () {
+                var stdlib_mods = [
+                    'aes', 'collections', 'elementmaker', 'encodings', 'functools',
+                    'gettext', 'itertools', 'math', 'numpy', 'operator', 'pythonize',
+                    'random', 're', 'traceback', 'uuid',
+                ];
+                stdlib_mods.forEach(function (mod) {
+                    var markers = d().check(
+                        "from " + mod + " import x\nprint(x)",
+                        { virtualFiles: { mymod: "def foo(): pass" } }
+                    );
+                    var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                    assert.deepStrictEqual(bad, [],
+                        "Expected no 'Unknown module' for stdlib '" + mod + "', got: " + JSON.stringify(bad));
+                });
+            },
+        },
+
+        {
+            name: "stdlib_python_pseudo_module_no_bad_import",
+            description: "from __python__ import overload_operators produces no bad-import error when virtualFiles are present",
+            run: function () {
+                var markers = d().check(
+                    "from __python__ import overload_operators\nclass V:\n    def __add__(self, o): return V()\nV()",
+                    { virtualFiles: { mymod: "def foo(): pass" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.deepStrictEqual(bad, [],
+                    "Expected no 'Unknown module' for __python__ pseudo-module, got: " + JSON.stringify(bad));
+            },
+        },
+
+        {
+            name: "stdlib_unknown_still_flagged",
+            description: "A genuinely unknown module is still flagged as bad-import when registry is active",
+            run: function () {
+                var markers = d().check(
+                    "from definitely_not_a_stdlib_module import foo\nprint(foo())",
+                    { virtualFiles: { mymod: "def bar(): pass" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.ok(bad.length >= 1,
+                    "Expected at least one 'Unknown module' for a genuinely unknown module, got: " + JSON.stringify(markers));
+            },
+        },
+
+        {
+            name: "stdlib_collections_all_classes",
+            description: "Importing all collections classes produces no errors",
+            run: function () {
+                var markers = d().check([
+                    "from collections import defaultdict, Counter, OrderedDict, deque, namedtuple",
+                    "d = defaultdict(list)",
+                    "c = Counter([1, 2, 2, 3])",
+                    "od = OrderedDict()",
+                    "dq = deque([1, 2, 3])",
+                    "Point = namedtuple('Point', 'x y')",
+                    "print(d, c, od, dq, Point)",
+                ].join("\n"),
+                    { virtualFiles: { mymod: "def foo(): pass" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.deepStrictEqual(bad, [],
+                    "Expected no bad-import for collections classes, got: " + JSON.stringify(bad));
+            },
+        },
+
+        {
+            name: "stdlib_math_no_bad_import",
+            description: "from math import sqrt, pi, floor, ceil produces no bad-import",
+            run: function () {
+                var markers = d().check(
+                    "from math import sqrt, pi, floor, ceil\nprint(sqrt(pi), floor(3.7), ceil(3.2))",
+                    { virtualFiles: { mymod: "x = 1" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.deepStrictEqual(bad, [],
+                    "Expected no bad-import for math, got: " + JSON.stringify(bad));
+            },
+        },
+
+        {
+            name: "stdlib_functools_no_bad_import",
+            description: "from functools import reduce, partial produces no bad-import",
+            run: function () {
+                var markers = d().check(
+                    "from functools import reduce, partial\nadd = partial(lambda a, b: a + b, 1)\nprint(reduce(lambda a, b: a + b, [1, 2, 3]))",
+                    { virtualFiles: { mymod: "x = 1" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.deepStrictEqual(bad, [],
+                    "Expected no bad-import for functools, got: " + JSON.stringify(bad));
+            },
+        },
+
+        // ── STDLIB_MODULES coverage (filesystem-driven) ───────────────────
+        //
+        // These tests read src/lib/ at runtime and cross-check against
+        // STDLIB_MODULES so that any future .pyj file addition that is
+        // not reflected in the constant causes an immediate test failure.
+
+        {
+            name: "stdlib_modules_covers_all_lib_files",
+            description: "Every .pyj file in src/lib/ has its module name listed in STDLIB_MODULES",
+            run: function () {
+                if (!STDLIB_MODULES) {
+                    // Graceful skip when called without the constant (shouldn't happen)
+                    throw new Error("STDLIB_MODULES was not passed to make_tests()");
+                }
+                var lib_names   = get_lib_module_names();
+                var stdlib_set  = Object.create(null);
+                STDLIB_MODULES.forEach(function (m) { stdlib_set[m] = true; });
+
+                var missing = lib_names.filter(function (name) {
+                    return !stdlib_set[name];
+                });
+
+                assert.deepStrictEqual(missing, [],
+                    "The following src/lib/ modules are missing from STDLIB_MODULES " +
+                    "in diagnostics.js — add them to avoid false 'Unknown module' IDE errors:\n  " +
+                    missing.join(", ")
+                );
+            },
+        },
+
+        {
+            name: "stdlib_modules_no_phantom_entries",
+            description: "Every non-pseudo entry in STDLIB_MODULES corresponds to an actual src/lib/*.pyj file",
+            run: function () {
+                if (!STDLIB_MODULES) {
+                    throw new Error("STDLIB_MODULES was not passed to make_tests()");
+                }
+                // Pseudo-modules that do not have a corresponding .pyj file are OK.
+                var PSEUDO = { '__python__': true, '__builtins__': true };
+
+                var lib_set   = Object.create(null);
+                get_lib_module_names().forEach(function (n) { lib_set[n] = true; });
+
+                var phantom = STDLIB_MODULES.filter(function (m) {
+                    return !PSEUDO[m] && !lib_set[m];
+                });
+
+                assert.deepStrictEqual(phantom, [],
+                    "The following STDLIB_MODULES entries have no matching src/lib/*.pyj file — " +
+                    "remove them from STDLIB_MODULES or add the missing library:\n  " +
+                    phantom.join(", ")
+                );
+            },
+        },
+
+        {
+            name: "stdlib_new_lib_file_no_bad_import",
+            description: "Every .pyj module in src/lib/ can be imported without a bad-import error when virtualFiles are present",
+            run: function () {
+                var lib_names = get_lib_module_names();
+                lib_names.forEach(function (mod) {
+                    var markers = d().check(
+                        "from " + mod + " import x\nprint(x)",
+                        { virtualFiles: { sentinel: "x = 1" } }
+                    );
+                    var bad = markers.filter(function (m) {
+                        return m.message.indexOf('Unknown module') !== -1;
+                    });
+                    assert.deepStrictEqual(bad, [],
+                        "src/lib/" + mod + ".pyj exists but 'from " + mod + " import x' " +
+                        "produces a bad-import error — add '" + mod + "' to STDLIB_MODULES " +
+                        "in diagnostics.js"
+                    );
+                });
+            },
+        },
+
     ];
 
     return TESTS;
@@ -852,9 +1060,10 @@ var diagnostics_path = url.pathToFileURL(
 var filter = process.argv[2] || null;
 
 import(diagnostics_path).then(function (mod) {
-    var Diagnostics = mod.Diagnostics;
-    var RS          = compiler_module.create_compiler();
-    var TESTS       = make_tests(Diagnostics, RS);
+    var Diagnostics    = mod.Diagnostics;
+    var STDLIB_MODULES = mod.STDLIB_MODULES;
+    var RS             = compiler_module.create_compiler();
+    var TESTS          = make_tests(Diagnostics, RS, STDLIB_MODULES);
     run_tests(TESTS, filter);
 }).catch(function (e) {
     console.error(colored("Failed to load language service module:", "red"), e);
