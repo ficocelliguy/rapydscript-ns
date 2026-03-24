@@ -61,6 +61,7 @@
 | `issubclass(cls, classinfo)` | Checks prototype chain; `classinfo` may be a class or tuple of classes; every class is a subclass of itself; raises `TypeError` for non-class arguments. |
 | `hash(obj)` and `__hash__` dunder | Numbers hash by value (int identity, float → int form if whole); strings use djb2; `None` → 0; booleans → 0/1; `def __hash__(self)` in a class is dispatched by `hash()`; class instances without `__hash__` get a stable identity hash; defining `__eq__` without `__hash__` makes the class unhashable (Python semantics — `hash()` raises `TypeError`); `list`, `set`, `dict` raise `TypeError`. |
 | `__getattr__` / `__setattr__` / `__delattr__` / `__getattribute__` dunders | Full attribute-access interception via JS `Proxy`. Classes defining any of these automatically wrap instances. `__getattr__` is called only for missing attributes; `__getattribute__` overrides all lookups; `__setattr__` intercepts every assignment (including those in `__init__`); `__delattr__` intercepts `del obj.attr`. Use `object.__setattr__(self, name, value)` / `object.__getattribute__(self, name)` / `object.__delattr__(self, name)` (compiled to `ρσ_object_setattr` / `ρσ_object_getattr` / `ρσ_object_delattr`) to bypass the hooks and avoid infinite recursion. Subclasses automatically inherit proxy wrapping. Requires a JS environment that supports `Proxy`; gracefully degrades to plain attribute access in environments without `Proxy`. |
+| `__class_getitem__` dunder | `Class[item]` dispatches at compile time to `Class.__class_getitem__(item)`. Behaves as an implicit `@classmethod`: `cls` is bound to the calling class. Subclasses inherit `__class_getitem__` and receive the subclass as `cls`. Multi-argument subscripts (`Class[A, B]`) are passed as a JS array. |
 | `next(iterator[, default])` | Advances a JS-protocol iterator (`{done, value}`); returns `default` when exhausted if provided, otherwise raises `StopIteration`. Works with `iter()`, `range()`, `enumerate()`, generators, and any object with a `.next()` or `__next__()` method. |
 | `StopIteration` exception | Defined as a builtin exception class; raised by `next()` when an iterator is exhausted and no default is given. |
 | `iter(callable, sentinel)` | Two-argument form calls `callable` (no args) repeatedly until the return value equals `sentinel` (strict `===`). Returns a lazy iterator compatible with `for` loops, `next()`, `list()`, and all iterator consumers. Works with plain functions and callable objects (`__call__`). |
@@ -104,7 +105,7 @@
 | `except*` (exception groups, Python 3.11+)    | 🟢 Low — no parser support                                           |
 | `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
 | `__format__` dunder                           | 🟢 Low — `format()` builtin not defined; `__format__` not dispatched |
-| `__class_getitem__`                           | 🟢 Low — no `MyClass[T]` generic subscript syntax                    |
+| ~~`__class_getitem__`~~                       | ✅ Now supported — see Fully Supported section                       |
 | `__init_subclass__` hook                      | 🟢 Low                                                               |
 
 ---

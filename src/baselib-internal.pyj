@@ -193,6 +193,8 @@ def ρσ_interpolate_kwargs_constructor(apply, f, supplied_args):
     return this
 
 def ρσ_getitem(obj, key):
+    if v'typeof obj === "function"' and obj.__class_getitem__:
+        return obj.__class_getitem__(key)
     if obj.__getitem__:
         return obj.__getitem__(key)
     if v'typeof ρσ_slice !== "undefined" && key instanceof ρσ_slice':

@@ -1507,6 +1507,9 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     class_details.has_new = True
                     class_details.static['__new__'] = True
                     stmt.static = True  # suppress var cls = this in display_complex_body
+                elif stmt.name.name is "__class_getitem__":
+                    stmt.is_classmethod = True
+                    class_details.classmethod['__class_getitem__'] = True
                 elif stmt.name.name in ['__getattr__', '__setattr__', '__delattr__', '__getattribute__']:
                     definition.has_attr_dunders = True
                     class_details.has_attr_dunders = True
@@ -1745,7 +1748,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 S.in_parenthesized_expr = False
                 a.defaults = defaults
                 a.is_simple_func = not a.starargs and not a.kwargs and not a.has_defaults and not a.bare_star and not a.posonly_count
-                if (classmethod_flag or (name and name.name is '__new__')) and a.length > 0:
+                if (classmethod_flag or (name and (name.name is '__new__' or name.name is '__class_getitem__'))) and a.length > 0:
                     cm_cls_arg.push(a[0].name)
                 return a
             )(v'[]'),
@@ -1763,7 +1766,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'body': (def(loop, labels):
                 S.in_class.push(False)
                 cm_pushed = v'[false]'
-                if (classmethod_flag or (name and name.name is '__new__')) and in_class and cm_cls_arg.length > 0:
+                if (classmethod_flag or (name and (name.name is '__new__' or name.name is '__class_getitem__'))) and in_class and cm_cls_arg.length > 0:
                     cm_ctx_entry = None
                     for v'var si = S.classes.length - 1; si >= 0; si--':
                         if has_prop(S.classes[si], in_class):
@@ -2617,6 +2620,20 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 multi_arr = new AST_Array({'start': start, 'elements': multi_items, 'end': prev()})
                 multi_arr.is_subscript_tuple = True
                 prop = multi_arr
+            # __class_getitem__: Class[item] → Class.__class_getitem__(item)
+            cls_info = get_class_in_scope(expr)
+            if cls_info and is_static_method(cls_info, '__class_getitem__'):
+                return subscripts(new AST_Call({
+                    'start': start,
+                    'expression': new AST_Dot({
+                        'start': start,
+                        'expression': expr,
+                        'property': '__class_getitem__',
+                        'end': prev()
+                    }),
+                    'args': [prop],
+                    'end': prev()
+                }), allow_calls)
             if is_py_sub:
                 assignment = None
                 assign_operator = ''

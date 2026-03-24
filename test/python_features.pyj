@@ -944,12 +944,25 @@ ae(_c(), 3)
 #         Tested fully in test/str.pyj.
 
 # ── 51. __class_getitem__ ────────────────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — no generic subscript MyClass[T] syntax.
-# SKIP:
-#   class _Box:
-#       def __class_getitem__(cls, item):
-#           return cls
-#   ok(_Box[int] is _Box)
+# STATUS: ✓ WORKS — Class[item] dispatches to __class_getitem__(cls, item).
+#         Subclasses inherit __class_getitem__; cls is set to the calling class.
+
+class _Box51:
+    def __class_getitem__(cls, item):
+        return cls
+
+ok(_Box51[int] is _Box51)
+
+class _BoxNamed51:
+    def __class_getitem__(cls, item):
+        return cls.__name__ + '[' + str(item) + ']'
+
+ok(_BoxNamed51[42] == '_BoxNamed51[42]')
+
+class _BoxChild51(_BoxNamed51):
+    pass
+
+ok(_BoxChild51[99] == '_BoxChild51[99]')
 
 # ── 52. __init_subclass__ ────────────────────────────────────────────────────
 # STATUS: ✗ NOT SUPPORTED — no subclass hook.

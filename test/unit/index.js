@@ -4338,6 +4338,79 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── __class_getitem__ ─────────────────────────────────────────────────
+
+    {
+        name: "class_getitem_basic",
+        description: "Class[item] calls __class_getitem__(cls, item) and returns the result",
+        src: [
+            "# globals: assrt",
+            "class Box:",
+            "    def __class_getitem__(cls, item):",
+            "        return cls.__name__ + '[' + str(item) + ']'",
+            "assrt.equal(Box[42], 'Box[42]')",
+            "assrt.equal(Box['x'], 'Box[x]')",
+        ].join("\n"),
+        js_checks: ["Box.__class_getitem__("],
+    },
+
+    {
+        name: "class_getitem_cls_is_class",
+        description: "__class_getitem__ receives the class as cls; can return it",
+        src: [
+            "# globals: assrt",
+            "class Stack:",
+            "    def __class_getitem__(cls, item):",
+            "        return cls",
+            "assrt.ok(Stack[int] is Stack)",
+            "assrt.ok(Stack[str] is Stack)",
+        ].join("\n"),
+    },
+
+    {
+        name: "class_getitem_subclass_inherits",
+        description: "subclass without __class_getitem__ inherits it from parent; cls is the subclass",
+        src: [
+            "# globals: assrt",
+            "class Base:",
+            "    def __class_getitem__(cls, item):",
+            "        return cls.__name__ + '<' + str(item) + '>'",
+            "class Child(Base):",
+            "    pass",
+            "assrt.equal(Base[42], 'Base<42>')",
+            "assrt.equal(Child[42], 'Child<42>')",
+        ].join("\n"),
+    },
+
+    {
+        name: "class_getitem_subclass_overrides",
+        description: "subclass can override __class_getitem__",
+        src: [
+            "# globals: assrt",
+            "class Base:",
+            "    def __class_getitem__(cls, item):",
+            "        return 'base'",
+            "class Child(Base):",
+            "    def __class_getitem__(cls, item):",
+            "        return 'child'",
+            "assrt.equal(Base[1], 'base')",
+            "assrt.equal(Child[1], 'child')",
+        ].join("\n"),
+    },
+
+    {
+        name: "class_getitem_classvar",
+        description: "__class_getitem__ can access class variables via cls",
+        src: [
+            "# globals: assrt",
+            "class Tagged:",
+            "    prefix = 'Tag'",
+            "    def __class_getitem__(cls, item):",
+            "        return cls.prefix + ':' + str(item)",
+            "assrt.equal(Tagged['int'], 'Tag:int')",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

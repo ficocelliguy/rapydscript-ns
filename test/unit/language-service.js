@@ -1112,6 +1112,41 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "class_getitem_no_errors",
+            description: "__class_getitem__ method in a class produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Box:",
+                    "    def __class_getitem__(cls, item):",
+                    "        return cls.__name__ + '[' + str(item) + ']'",
+                    "result = Box[42]",
+                    "print(result)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "class_getitem_subclass_no_errors",
+            description: "subclass inheriting __class_getitem__ produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Base:",
+                    "    def __class_getitem__(cls, item):",
+                    "        return cls",
+                    "class Child(Base):",
+                    "    pass",
+                    "x = Child[int]",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
             name: "attr_dunders_object_bypass_no_errors",
             description: "object.__setattr__/object.__getattribute__/object.__delattr__ produce no error markers",
             run: function () {

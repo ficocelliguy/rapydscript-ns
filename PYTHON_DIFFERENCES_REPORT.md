@@ -52,7 +52,7 @@ and notes which items are covered by tests.
 | 40 | `__hash__` for set/dict membership | Not dispatched; uses JS identity (`===`) | ✓ Yes | Noted in python_features.pyj #47 (skipped) |
 | 41 | `__getattr__`/`__setattr__`/`__delattr__` | Not supported | ✓ Yes | Noted in python_features.pyj #48 (skipped) |
 | 42 | `__getattribute__` | Not supported | ✓ Yes | Noted in python_features.pyj #49 |
-| 43 | `__class_getitem__` | Not supported | ✓ Yes | Noted in python_features.pyj #51 (skipped) |
+| 43 | `__class_getitem__` | Supported — `Class[item]` compiles to `Class.__class_getitem__(item)` at compile time; implicit classmethod, subclasses inherit with correct `cls` | ✓ Yes | Now supported; see unit tests `class_getitem_*` |
 | 44 | `__init_subclass__` | Not supported | ✓ Yes | Noted in python_features.pyj #52 (skipped) |
 
 ---

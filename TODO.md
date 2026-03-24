@@ -140,3 +140,28 @@ r.required_x = None   # ValueError: required_x cannot be None
 del r.required_y
 print(r.required_y)   # None  (attribute gone, __getattr__ returns default)
 ```
+
+---
+
+### `__class_getitem__` example
+
+```python
+# __class_getitem__ enables subscript notation on a class itself.
+# Useful for generic-style type hints and factory patterns.
+
+class TypedList:
+    prefix = 'TypedList'
+
+    def __class_getitem__(cls, item):
+        # Returns a descriptor string like "TypedList[int]"
+        return cls.prefix + '[' + item.__name__ + ']'
+
+print(TypedList[int])   # TypedList[int]
+print(TypedList[str])   # TypedList[str]
+
+# Subclasses inherit __class_getitem__; cls is the actual subclass.
+class StrictList(TypedList):
+    prefix = 'StrictList'
+
+print(StrictList[float])  # StrictList[float]
+```

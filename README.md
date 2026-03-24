@@ -2345,6 +2345,37 @@ assert a is b  # same instance
 
 Class variables accessed via `cls` inside `__new__` are correctly rewritten to `cls.prototype.varname`, matching Python's semantics.
 
+### `__class_getitem__`
+
+RapydScript supports Python's `__class_getitem__` hook, which enables subscript syntax on a class itself (`MyClass[item]`).  Define `__class_getitem__(cls, item)` in a class body to intercept `ClassName[x]`:
+
+```py
+class Box:
+    def __class_getitem__(cls, item):
+        return cls.__name__ + '[' + str(item) + ']'
+
+print(Box[int])   # Box[<class 'int'>]
+print(Box['str']) # Box[str]
+```
+
+`__class_getitem__` is an implicit `@classmethod`: the compiler strips `cls` from the JS parameter list and maps it to `this`, so calling `Box[item]` compiles to `Box.__class_getitem__(item)` with `this = Box`.
+
+Subclasses inherit `__class_getitem__` from their parent and receive the subclass as `cls`:
+
+```py
+class Base:
+    def __class_getitem__(cls, item):
+        return cls.__name__ + '<' + str(item) + '>'
+
+class Child(Base):
+    pass
+
+print(Base[42])   # Base<42>
+print(Child[42])  # Child<42>
+```
+
+Class variables declared in the class body are accessible via `cls.varname` inside `__class_getitem__`, just as with `@classmethod`.
+
 ### Nested Classes
 
 A class may be defined inside another class. The nested class becomes an attribute of the outer class (accessible as `Outer.Inner`) and is also reachable via instances (`self.Inner` inside methods). This mirrors Python semantics exactly.
