@@ -125,14 +125,32 @@ def print_class(output):
             output.indent()
             output.spaced('if', '(this.ρσ_object_id', '===', 'undefined)', 'Object.defineProperty(this,', '"ρσ_object_id",', '{"value":++ρσ_object_counter})')
             output.end_statement()
-            if self.bound.length:
+            if self.has_attr_dunders:
+                # Wrap in a Proxy so __getattr__/__setattr__/__delattr__/__getattribute__ are triggered.
                 output.indent()
-                self.name.print(output), output.print(".prototype.__bind_methods__.call(this)")
+                output.print('var ρσ_proxy = ρσ_JS_Proxy ? new ρσ_JS_Proxy(this, ρσ_attr_proxy_handler) : this')
                 output.end_statement()
-            output.indent()
-            self.name.print(output)
-            output.print(".prototype.__init__.apply(this"), output.comma(), output.print('arguments)')
-            output.end_statement()
+                if self.bound.length:
+                    output.indent()
+                    self.name.print(output), output.print(".prototype.__bind_methods__ && ")
+                    self.name.print(output), output.print(".prototype.__bind_methods__.call(ρσ_proxy)")
+                    output.end_statement()
+                output.indent()
+                self.name.print(output)
+                output.print(".prototype.__init__.apply(ρσ_proxy"), output.comma(), output.print('arguments)')
+                output.end_statement()
+                output.indent()
+                output.print('return ρσ_proxy')
+                output.end_statement()
+            else:
+                if self.bound.length:
+                    output.indent()
+                    self.name.print(output), output.print(".prototype.__bind_methods__.call(this)")
+                    output.end_statement()
+                output.indent()
+                self.name.print(output)
+                output.print(".prototype.__init__.apply(this"), output.comma(), output.print('arguments)')
+                output.end_statement()
         )
 
     decorators = self.decorators or v'[]'
@@ -272,6 +290,13 @@ def print_class(output):
             output.spaced('return', 'this.__repr__()')
             output.end_statement()
         )
+
+    # Python semantics: defining __eq__ without __hash__ makes the class unhashable
+    if defined_methods['__eq__'] and not defined_methods['__hash__']:
+        output.indent()
+        self.name.print(output)
+        output.print('.prototype.__hash__ = null')
+        output.end_statement()
 
     # Multiple inheritance
     add_hidden_property('__bases__', def():

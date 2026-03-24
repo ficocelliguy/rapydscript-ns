@@ -806,9 +806,9 @@ No special flag is required. The `+` operator compiles to a lightweight helper
 
 Sets in RapydScript are identical to those in python. You can create them using
 set literals or comprehensions and all set operations are supported. You can
-store any object in a set, the only caveat is that RapydScript does not support
-the ``__hash__()`` method, so if you store an arbitrary object as opposed to a
-primitive type, object equality will be via the ``is`` operator.
+store any object in a set. For primitive types (strings, numbers) the value is
+used for equality; for class instances, object identity (``is``) is used by
+default unless the class defines a ``__hash__`` method.
 
 Note that sets are not a subclass of the ES 6 JavaScript Set object, however,
 they do use this object as a backend, when available. You can create a set from
@@ -836,8 +836,8 @@ a in s  # True
 [1, 2] in s # False
 ```
 
-This is because, as noted above, object equality is via the ```is```
-operator, not hashes.
+This is because list identity (not value) determines set membership for mutable
+objects. Define ``__hash__`` on your own classes to control set/dict membership.
 
 ### Dicts
 
@@ -1174,7 +1174,8 @@ semantics:
 | other `float` | derived from the bit pattern |
 | `str` | djb2 algorithm — stable within a process |
 | object with `__hash__` | dispatches to `__hash__()` |
-| class instance | stable identity hash (assigned on first call) |
+| class instance (no `__hash__`) | stable identity hash (assigned on first call) |
+| class with `__eq__` but no `__hash__` | `TypeError` (unhashable — Python semantics) |
 | `list` | `TypeError: unhashable type: 'list'` |
 | `set` | `TypeError: unhashable type: 'set'` |
 | `dict` | `TypeError: unhashable type: 'dict'` |
@@ -1194,7 +1195,66 @@ class Point:
         return self.x * 31 + self.y
 
 hash(Point(1, 2))  # 33
+
+# Python semantics: __eq__ without __hash__ → unhashable
+class Bar:
+    def __eq__(self, other):
+        return True
+hash(Bar())  # TypeError: unhashable type: 'Bar'
 ```
+
+### Attribute-Access Dunders
+
+RapydScript supports the four Python attribute-interception hooks:
+`__getattr__`, `__setattr__`, `__delattr__`, and `__getattribute__`.
+When a class defines any of them, instances are automatically wrapped in a
+JavaScript `Proxy` that routes attribute access through the hooks — including
+accesses that occur inside `__init__`.
+
+| Hook | When called |
+|---|---|
+| `__getattr__(self, name)` | Fallback — only called when normal lookup finds nothing |
+| `__setattr__(self, name, value)` | Every attribute assignment (including `self.x = …` in `__init__`) |
+| `__delattr__(self, name)` | Every `del obj.attr` |
+| `__getattribute__(self, name)` | Every attribute read (overrides normal lookup) |
+
+To bypass the hooks from within the hook itself (avoiding infinite recursion),
+use the `object.*` bypass functions:
+
+| Python idiom | Compiled form | Effect |
+|---|---|---|
+| `object.__setattr__(self, name, val)` | `ρσ_object_setattr(self, name, val)` | Set attribute directly, bypassing `__setattr__` |
+| `object.__getattribute__(self, name)` | `ρσ_object_getattr(self, name)` | Read attribute directly, bypassing `__getattribute__` |
+| `object.__delattr__(self, name)` | `ρσ_object_delattr(self, name)` | Delete attribute directly, bypassing `__delattr__` |
+
+Subclasses automatically inherit proxy wrapping from their parent class — if
+`Base` defines `__getattr__`, all `Child(Base)` instances are also Proxy-wrapped.
+
+```py
+class Validated:
+    """Reject negative values at assignment time."""
+    def __setattr__(self, name, value):
+        if jstype(value) is 'number' and value < 0:
+            raise ValueError(name + ' must be non-negative')
+        object.__setattr__(self, name, value)
+
+v = Validated()
+v.x = 5    # ok
+v.x = -1   # ValueError: x must be non-negative
+
+class AttrProxy:
+    """Log every attribute read."""
+    def __init__(self):
+        object.__setattr__(self, '_log', [])
+
+    def __getattribute__(self, name):
+        self._log.append(name)          # self._log goes through __getattribute__ too!
+        return object.__getattribute__(self, name)
+```
+
+> **Proxy support required** — The hooks rely on `Proxy`, which is available
+> in all modern browsers and Node.js ≥ 6. In environments that lack `Proxy`
+> the class still works, but the hooks are silently bypassed.
 
 Loops
 -----

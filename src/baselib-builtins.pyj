@@ -339,6 +339,7 @@ def ρσ_hash(obj):
         }
         return ρσ_h;
     }'''
+    v'if (obj.__hash__ === null) throw new TypeError("unhashable type: \'" + (obj.constructor && obj.constructor.name ? obj.constructor.name : "object") + "\'")'
     v'if (typeof obj.__hash__ === "function") return obj.__hash__()'
     v'if (Array.isArray(obj)) throw new TypeError("unhashable type: \'list\'")'
     v'if (typeof ρσ_set === "function" && obj instanceof ρσ_set) throw new TypeError("unhashable type: \'set\'")'

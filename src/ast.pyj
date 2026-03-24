@@ -601,6 +601,7 @@ class AST_Class(AST_Scope):
         'dynamic_properties': '[dict] map of dynamic property names to property descriptors of the form {getter:AST_Method, setter:AST_Method',
         'classvars': '[dict] map containing all class variables as keys, to be used to easily test for existence of a class variable',
         'has_new': "[boolean] true if the class defines a __new__ method",
+        'has_attr_dunders': "[boolean] true if the class defines any of __getattr__/__setattr__/__delattr__/__getattribute__",
     }
 
     def _walk(self, visitor):

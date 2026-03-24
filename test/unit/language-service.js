@@ -1017,6 +1017,46 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "hash_dunder_no_errors",
+            description: "__hash__ method in a class produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Hashable:",
+                    "    def __init__(self, v):",
+                    "        self.v = v",
+                    "    def __hash__(self):",
+                    "        return hash(self.v)",
+                    "h = Hashable(42)",
+                    "result = hash(h)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "hash_eq_and_hash_no_errors",
+            description: "class with both __eq__ and __hash__ produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Key:",
+                    "    def __init__(self, v):",
+                    "        self.v = v",
+                    "    def __eq__(self, other):",
+                    "        return self.v == other.v",
+                    "    def __hash__(self):",
+                    "        return hash(self.v)",
+                    "k = Key(1)",
+                    "h = hash(k)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
             name: "stdlib_new_lib_file_no_bad_import",
             description: "Every .pyj module in src/lib/ produces zero error-severity markers when imported with virtualFiles present",
             run: function () {
@@ -1039,6 +1079,58 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
                         JSON.stringify(errors.map(function (m) { return m.message; }))
                     );
                 });
+            },
+        },
+
+        // ── __getattr__ / __setattr__ / __delattr__ / __getattribute__ ────────
+
+        {
+            name: "attr_dunders_no_errors",
+            description: "Classes with __getattr__/__setattr__/__delattr__/__getattribute__ produce no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Bag:",
+                    "    def __init__(self):",
+                    "        self.data = {}",
+                    "    def __getattr__(self, name):",
+                    "        return 'missing_' + name",
+                    "    def __setattr__(self, name, value):",
+                    "        object.__setattr__(self, name, value)",
+                    "    def __delattr__(self, name):",
+                    "        object.__delattr__(self, name)",
+                    "    def __getattribute__(self, name):",
+                    "        return object.__getattribute__(self, name)",
+                    "b = Bag()",
+                    "x = b.foo",
+                    "b.bar = 1",
+                    "del b.bar",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "attr_dunders_object_bypass_no_errors",
+            description: "object.__setattr__/object.__getattribute__/object.__delattr__ produce no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Validated:",
+                    "    def __setattr__(self, name, value):",
+                    "        if jstype(value) is 'number' and value < 0:",
+                    "            raise ValueError('negative')",
+                    "        object.__setattr__(self, name, value)",
+                    "    def __getattribute__(self, name):",
+                    "        return object.__getattribute__(self, name)",
+                    "    def __delattr__(self, name):",
+                    "        object.__delattr__(self, name)",
+                    "v = Validated()",
+                    "v.x = 5",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
             },
         },
 

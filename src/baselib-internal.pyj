@@ -474,3 +474,75 @@ def ρσ_instanceof():
                         break
                     cls = p.constructor
     return False
+
+# ── Attribute-dunder support (__getattr__ / __setattr__ / __delattr__ / __getattribute__) ──
+# We use a JavaScript Proxy to intercept attribute access/assignment/deletion on class instances
+# that define any of the four attribute dunders.
+
+# Cache the JS Proxy constructor with a ρσ_ name to avoid collisions with user-defined 'Proxy' classes.
+ρσ_JS_Proxy = v'typeof Proxy === "function" ? Proxy : null'
+
+# Symbol (or fallback string key) used to retrieve the raw underlying target from a wrapped proxy.
+ρσ_proxy_target_symbol = v'typeof Symbol === "function" ? Symbol("ρσ_proxy_target") : "__ρσ_proxy_target__"'
+
+ρσ_attr_proxy_handler = {
+    'get': def(target, prop, receiver):
+        # Always expose the raw target via the sentinel key (used by ρσ_object_* helpers).
+        if prop is ρσ_proxy_target_symbol:
+            return target
+        # Pass through JS symbols (Symbol.iterator, Symbol.toPrimitive, etc.) unchanged.
+        if jstype(prop) is 'symbol':
+            return v'Reflect.get(target, prop, receiver)'
+        # __getattribute__ overrides every attribute lookup (except itself, to avoid infinite recursion).
+        if jstype(target.__getattribute__) is 'function' and prop is not '__getattribute__':
+            try:
+                return target.__getattribute__.call(receiver, prop)
+            except AttributeError:
+                # AttributeError from __getattribute__ → try __getattr__ fallback.
+                if jstype(target.__getattr__) is 'function':
+                    return target.__getattr__.call(receiver, prop)
+                raise
+        # Normal property lookup via prototype chain.
+        val = v'Reflect.get(target, prop, receiver)'
+        # __getattr__ is only called when the attribute is genuinely missing.
+        if val is undefined and jstype(target.__getattr__) is 'function' and not v'(prop in target)':
+            return target.__getattr__.call(receiver, prop)
+        return val
+    ,
+    'set': def(target, prop, value, receiver):
+        if jstype(target.__setattr__) is 'function':
+            target.__setattr__.call(receiver, prop, value)
+            return True
+        # Pass 'target' as receiver (not proxy) to avoid infinite recursion through the Proxy set trap.
+        return v'Reflect.set(target, prop, value, target)'
+    ,
+    'deleteProperty': def(target, prop):
+        if jstype(target.__delattr__) is 'function':
+            # deleteProperty has no receiver; pass target as 'this'.
+            # Inside __delattr__, use ρσ_object_delattr(self, name) for a direct delete.
+            target.__delattr__.call(target, prop)
+            return True
+        return v'Reflect.deleteProperty(target, prop)'
+}
+
+def ρσ_object_setattr(obj, name, value):
+    # Bypass __setattr__ and set directly on the underlying object.
+    # Use this inside __setattr__ to avoid infinite recursion (like object.__setattr__ in Python).
+    target = obj[ρσ_proxy_target_symbol]
+    if target is undefined:
+        target = obj
+    v'target[name] = value'
+
+def ρσ_object_getattr(obj, name):
+    # Bypass __getattribute__ and read directly from the underlying object.
+    target = obj[ρσ_proxy_target_symbol]
+    if target is undefined:
+        target = obj
+    return target[name]
+
+def ρσ_object_delattr(obj, name):
+    # Bypass __delattr__ and delete directly from the underlying object.
+    target = obj[ρσ_proxy_target_symbol]
+    if target is undefined:
+        target = obj
+    v'delete target[name]'

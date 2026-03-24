@@ -1507,6 +1507,15 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     class_details.has_new = True
                     class_details.static['__new__'] = True
                     stmt.static = True  # suppress var cls = this in display_complex_body
+                elif stmt.name.name in ['__getattr__', '__setattr__', '__delattr__', '__getattribute__']:
+                    definition.has_attr_dunders = True
+                    class_details.has_attr_dunders = True
+        # Propagate has_attr_dunders from parent classes so subclasses are also Proxy-wrapped.
+        if not definition.has_attr_dunders and definition.parent:
+            parent_details = get_class_in_scope(definition.parent)
+            if parent_details and parent_details.has_attr_dunders:
+                definition.has_attr_dunders = True
+                class_details.has_attr_dunders = True
         # find the class variables
         class_var_names = {}
         # Ensure that if a class variable refers to another class variable in
@@ -2709,6 +2718,28 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                         'args': method_args,
                         'end': prev()
                     }), True)
+                S.in_parenthesized_expr = False
+                return ret
+            # Intercept object.__setattr__/object.__getattribute__/object.__delattr__
+            # and compile them to the appropriate bypass helpers.
+            if (is_node_type(expr.expression, AST_SymbolRef) and
+                    expr.expression.name is 'object' and
+                    expr.property in ['__setattr__', '__getattribute__', '__delattr__']):
+                helper_name = (
+                    'ρσ_object_setattr' if expr.property is '__setattr__' else
+                    ('ρσ_object_getattr' if expr.property is '__getattribute__' else 'ρσ_object_delattr')
+                )
+                args = func_call_list()
+                ret = subscripts(new AST_Call({
+                    'start': start,
+                    'expression': new AST_SymbolRef({
+                        'name': helper_name,
+                        'start': start,
+                        'end': start
+                    }),
+                    'args': args,
+                    'end': prev()
+                }), True)
                 S.in_parenthesized_expr = False
                 return ret
             c = get_class_in_scope(expr.expression)
