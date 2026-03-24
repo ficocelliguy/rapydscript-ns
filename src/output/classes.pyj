@@ -319,6 +319,43 @@ def print_class(output):
     output.print('.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true})')
     output.end_statement()
 
+    # __init_subclass__ hook: call after identity properties so cls.__name__ is correct
+    if self.parent:
+        output.indent()
+        output.print('if (typeof ')
+        self.parent.print(output)
+        output.print('.__init_subclass__ === "function")')
+        output.space()
+        kws = self.class_kwargs
+        if kws and kws.length:
+            output.with_block(def():
+                output.indent()
+                output.print('var ρσ_isc_kw = {')
+                for v'var ρσ_kwi = 0; ρσ_kwi < kws.length; ρσ_kwi++':
+                    if ρσ_kwi > 0:
+                        output.comma()
+                    output.print(kws[ρσ_kwi][0].name + ':')
+                    output.space()
+                    kws[ρσ_kwi][1].print(output)
+                output.print('}')
+                output.end_statement()
+                output.indent()
+                output.print('ρσ_isc_kw[ρσ_kwargs_symbol] = true')
+                output.end_statement()
+                output.indent()
+                self.parent.print(output)
+                output.print('.__init_subclass__.call(')
+                self.name.print(output)
+                output.print(', ρσ_isc_kw)')
+                output.end_statement()
+            )
+        else:
+            self.parent.print(output)
+            output.print('.__init_subclass__.call(')
+            self.name.print(output)
+            output.print(')')
+            output.end_statement()
+
     if self.bases.length > 1:
         output.indent()
         output.print("ρσ_mixin(")

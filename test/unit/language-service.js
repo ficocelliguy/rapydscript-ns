@@ -1147,6 +1147,82 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "init_subclass_no_errors",
+            description: "__init_subclass__ method in a class produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "log = []",
+                    "class Base:",
+                    "    def __init_subclass__(cls, **kwargs):",
+                    "        log.append(cls.__name__)",
+                    "class Child(Base):",
+                    "    pass",
+                    "print(log)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "init_subclass_kwargs_no_errors",
+            description: "__init_subclass__ with class kwargs produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "class Base:",
+                    "    def __init_subclass__(cls, tag=None, **kwargs):",
+                    "        cls._tag = tag",
+                    "class Child(Base, tag='hello'):",
+                    "    pass",
+                    "print(Child._tag)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "except_star_no_errors",
+            description: "except* syntax and ExceptionGroup produce no error markers",
+            run: function () {
+                var markers = d().check([
+                    'eg = ExceptionGroup("mixed", [ValueError("v"), TypeError("t")])',
+                    "val_msgs = []",
+                    "try:",
+                    "    raise eg",
+                    "except* ValueError as g:",
+                    "    for e in g.exceptions:",
+                    "        val_msgs.append(str(e))",
+                    "except* TypeError as g:",
+                    "    pass",
+                    "print(val_msgs)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "except_star_var_bound_no_errors",
+            description: "the as-variable in except* is correctly bound in the language service",
+            run: function () {
+                var markers = d().check([
+                    "try:",
+                    '    raise ExceptionGroup("eg", [ValueError("v")])',
+                    "except* ValueError as grp:",
+                    "    x = len(grp.exceptions)",
+                    "    print(x)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
             name: "attr_dunders_object_bypass_no_errors",
             description: "object.__setattr__/object.__getattribute__/object.__delattr__ produce no error markers",
             run: function () {
@@ -1162,6 +1238,41 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
                     "        object.__delattr__(self, name)",
                     "v = Validated()",
                     "v.x = 5",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        // ── * and ** unpacking operators ─────────────────────────────────────
+        {
+            name: "list_spread_no_errors",
+            description: "list spread [*a, 1, *b] produces no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "a = [1, 2]",
+                    "b = [3, 4]",
+                    "c = [*a, 0, *b]",
+                    "d2 = [*c]",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "set_spread_no_errors",
+            description: "set spread {*a, 1} and function **expr produce no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "a = [1, 2, 3]",
+                    "s = {*a, 4}",
+                    "opts = {'x': 10}",
+                    "def f(x=0):",
+                    "    return x",
+                    "f(**opts)",
                 ].join("\n"));
                 var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
                 assert.deepStrictEqual(errors, [],

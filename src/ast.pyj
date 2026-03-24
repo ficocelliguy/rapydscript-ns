@@ -602,6 +602,7 @@ class AST_Class(AST_Scope):
         'classvars': '[dict] map containing all class variables as keys, to be used to easily test for existence of a class variable',
         'has_new': "[boolean] true if the class defines a __new__ method",
         'has_attr_dunders': "[boolean] true if the class defines any of __getattr__/__setattr__/__delattr__/__getattribute__",
+        'class_kwargs': "[array] keyword arguments from class header (e.g. class C(Base, key=val):) as [[key_node, value_node], ...]",
     }
 
     def _walk(self, visitor):
@@ -612,6 +613,9 @@ class AST_Class(AST_Scope):
             self.name._walk(visitor)
             walk_body(self, visitor)
             if (self.parent) self.parent._walk(visitor)
+            if self.class_kwargs:
+                for kw in self.class_kwargs:
+                    kw[1]._walk(visitor)
         )
 
 class AST_Method(AST_Lambda):
@@ -727,7 +731,8 @@ class AST_Except(AST_Block):
     "An `except` node for RapydScript, which resides inside the catch block"
     properties = {
         'argname': "[AST_SymbolCatch] symbol for the exception",
-        'errors': "[AST_SymbolVar*] error classes to catch in this block"
+        'errors': "[AST_SymbolVar*] error classes to catch in this block",
+        'is_star': '[bool] True for except* (exception group) clauses',
     }
 
     def _walk(self, visitor):
@@ -1161,6 +1166,17 @@ class AST_ObjectSpread(AST_Node):
     def _walk(self, visitor):
         return visitor._visit(self, def():
             self.value._walk(visitor)
+        )
+
+class AST_Spread(AST_Node):
+    "A *expr spread item inside a list or set literal: [1, *a, 2]"
+    properties = {
+        'expression': "[AST_Node] the expression being spread",
+    }
+
+    def _walk(self, visitor):
+        return visitor._visit(self, def():
+            self.expression._walk(visitor)
         )
 
 class AST_Set(AST_Node):

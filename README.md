@@ -886,6 +886,63 @@ a = {1:1, 2:2}
 isinstance(a, dict) == False # a is a normal JavaScript object
 ```
 
+### List spread literals
+
+RapydScript supports Python's `*expr` spread syntax inside list literals.
+One or more `*expr` items can appear anywhere, interleaved with ordinary
+elements:
+
+```py
+a = [1, 2, 3]
+b = [4, 5]
+
+# Spread at the end
+result = [0, *a]            # [0, 1, 2, 3]
+
+# Spread in the middle
+result = [0, *a, *b, 6]     # [0, 1, 2, 3, 4, 5, 6]
+
+# Copy a list
+copy = [*a]                 # [1, 2, 3]
+
+# Unpack a string
+chars = [*'hello']          # ['h', 'e', 'l', 'l', 'o']
+```
+
+Spread works on any iterable (lists, strings, generators, `range()`).
+The result is always a new Python list.  Translates to JavaScript's
+`[...expr]` spread syntax.
+
+### Set spread literals
+
+The same `*expr` syntax works inside set literals `{...}`:
+
+```py
+a = [1, 2, 3]
+b = [3, 4, 5]
+
+s = {*a, *b}                # set([1, 2, 3, 4, 5]) — duplicates removed
+s2 = {*a, 10}               # set([1, 2, 3, 10])
+```
+
+Translates to `ρσ_set([...a, ...b])`.
+
+### `**expr` in function calls
+
+`**expr` in a function call now accepts any expression, not just a plain
+variable name:
+
+```py
+def f(x=0, y=0):
+    return x + y
+
+opts = {'x': 10, 'y': 20}
+f(**opts)                   # 30  (variable — always worked)
+f(**{'x': 1, 'y': 2})      # 3   (dict literal)
+f(**cfg.defaults)           # uses attribute access result
+f(**get_opts())             # uses function call result
+```
+
 ### Dict merge literals
 
 RapydScript supports Python's `{**d1, **d2}` dict merge (spread) syntax.
@@ -2376,6 +2433,63 @@ print(Child[42])  # Child<42>
 
 Class variables declared in the class body are accessible via `cls.varname` inside `__class_getitem__`, just as with `@classmethod`.
 
+### `__init_subclass__`
+
+`__init_subclass__` is a hook that is called automatically on a base class whenever a subclass is created.  It is an implicit `@classmethod`: the compiler strips `cls` from the JS signature and maps it to `this`, so `cls` receives the newly-created subclass.
+
+```py
+class PluginBase:
+    _plugins = []
+
+    def __init_subclass__(cls, **kwargs):
+        PluginBase._plugins.append(cls)
+
+class AudioPlugin(PluginBase):
+    pass
+
+class VideoPlugin(PluginBase):
+    pass
+
+print(len(PluginBase._plugins))     # 2
+print(PluginBase._plugins[0].__name__)  # AudioPlugin
+```
+
+Keyword arguments written in the class header are forwarded to `__init_subclass__`:
+
+```py
+class Base:
+    def __init_subclass__(cls, required=False, **kwargs):
+        cls._required = required
+
+class Strict(Base, required=True):
+    pass
+
+class Loose(Base):
+    pass
+
+print(Strict._required)   # True
+print(Loose._required)    # False
+```
+
+Use `super().__init_subclass__(**kwargs)` to propagate the hook up the hierarchy:
+
+```py
+class GrandParent:
+    def __init_subclass__(cls, **kwargs):
+        cls._from_grandparent = True
+
+class Parent(GrandParent):
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)   # propagates to GrandParent
+
+class Child(Parent):
+    pass
+
+print(Child._from_grandparent)   # True
+```
+
+The hook is called after the subclass is fully set up (including `__name__`, `__qualname__`, and `__module__`), so `cls.__name__` is always the correct subclass name inside the hook.
+
 ### Nested Classes
 
 A class may be defined inside another class. The nested class becomes an attribute of the outer class (accessible as `Outer.Inner`) and is also reachable via instances (`self.Inner` inside methods). This mirrors Python semantics exactly.
@@ -2811,6 +2925,45 @@ except SomeInternalError:
 ```
 
 Basically, `try/except/finally` in RapydScript works very similar to the way it does in Python 3.
+
+### Exception Groups (`except*`, Python 3.11+)
+
+RapydScript supports exception groups via the `ExceptionGroup` class and `except*` syntax. An `ExceptionGroup` bundles multiple exceptions under a single message:
+
+```py
+eg = ExceptionGroup("network errors", [
+    TimeoutError("host A timed out"),
+    TimeoutError("host B timed out"),
+    ValueError("bad address"),
+])
+raise eg
+```
+
+Use `except*` to handle exceptions by type — each handler receives a sub-group containing only the matching exceptions:
+
+```py
+try:
+    fetch_all()
+except* TimeoutError as group:
+    for e in group.exceptions:
+        print("timeout:", e)
+except* ValueError as group:
+    print("bad input:", group.exceptions[0])
+```
+
+- Each `except*` clause sees the exceptions not already matched by earlier clauses.
+- Any unmatched exceptions are automatically re-raised as a new `ExceptionGroup`.
+- A bare `except*:` (no type) catches all remaining exceptions.
+- You cannot mix `except` and `except*` in the same `try` block.
+- Plain (non-group) exceptions can also be caught with `except*`; the variable is bound to the exception itself rather than a sub-group.
+
+`ExceptionGroup` also provides `subgroup(condition)` and `split(condition)` for programmatic filtering, where `condition` is either an exception class or a predicate function:
+
+```py
+eg = ExceptionGroup("mixed", [ValueError("v"), TypeError("t")])
+ve_group = eg.subgroup(ValueError)          # ExceptionGroup of just ValueErrors
+matched, rest = eg.split(ValueError)        # (ve_group, te_group)
+```
 
 Scope Control
 -------------

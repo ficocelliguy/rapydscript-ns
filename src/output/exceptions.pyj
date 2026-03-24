@@ -2,7 +2,7 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-from output.statements import print_bracketed
+from output.statements import print_bracketed, display_body
 
 
 def print_try(self, output):
@@ -28,6 +28,10 @@ def print_try(self, output):
 
 
 def print_catch(self, output):
+    # Dispatch to except* handler when any clause is an exception group handler
+    if self.body.length and self.body[0].is_star:
+        print_catch_star(self, output)
+        return
     output.print("catch")
     output.space()
     output.with_parens(def():
@@ -79,6 +83,98 @@ def print_catch(self, output):
                 output.semicolon()
                 output.newline()
             )
+        output.newline()
+    )
+
+
+def _eg_type_cond(errors, varname):
+    # Build a JS condition string testing varname against each error type
+    parts = []
+    for err in errors:
+        if err.name is 'Exception':
+            parts.push(varname + " instanceof Error")
+        else:
+            parts.push(varname + " instanceof " + err.name)
+    return parts.join(" || ")
+
+
+def print_catch_star(self, output):
+    output.print("catch")
+    output.space()
+    output.with_parens(def():
+        output.print("ρσ_Exception")
+    )
+    output.space()
+    output.with_block(def():
+        output.indent()
+        output.spaced('ρσ_last_exception', '=', 'ρσ_Exception'), output.end_statement()
+
+        # Normalise: wrap non-ExceptionGroup exception into a one-element array
+        output.indent()
+        output.print("var ρσ_eg_exceptions = (ρσ_Exception instanceof ExceptionGroup) ? ρσ_Exception.exceptions.slice() : [ρσ_Exception]")
+        output.semicolon(), output.newline()
+        output.indent()
+        output.print("var ρσ_eg_raised = []")
+        output.semicolon(), output.newline()
+
+        for ei, exception in enumerate(self.body):
+            idx = str(ei)
+            if exception.errors.length:
+                cond = _eg_type_cond(exception.errors, "ρσ_et")
+                output.indent()
+                output.print("var ρσ_eg_matched_" + idx + " = ρσ_eg_exceptions.filter(function(ρσ_et) { return " + cond + "; })")
+                output.semicolon(), output.newline()
+                output.indent()
+                output.print("ρσ_eg_exceptions = ρσ_eg_exceptions.filter(function(ρσ_et) { return !(" + cond + "); })")
+                output.semicolon(), output.newline()
+            else:
+                # Bare except*: take all remaining
+                output.indent()
+                output.print("var ρσ_eg_matched_" + idx + " = ρσ_eg_exceptions.slice()")
+                output.semicolon(), output.newline()
+                output.indent()
+                output.print("ρσ_eg_exceptions = []")
+                output.semicolon(), output.newline()
+
+            output.indent()
+            output.print("if (ρσ_eg_matched_" + idx + ".length > 0)")
+            output.space()
+            output.with_block(def():
+                if exception.argname:
+                    output.indent()
+                    output.print("var ")
+                    output.assign(exception.argname)
+                    output.print("(ρσ_Exception instanceof ExceptionGroup) ? new ExceptionGroup(ρσ_Exception.message, ρσ_eg_matched_" + idx + ") : ρσ_eg_matched_" + idx + "[0]")
+                    output.semicolon(), output.newline()
+                output.indent()
+                output.print("try")
+                output.space()
+                output.with_block(def():
+                    display_body(exception.body, False, output)
+                )
+                output.print(" catch (ρσ_eg_exc_" + idx + ")")
+                output.space()
+                output.with_block(def():
+                    output.indent()
+                    output.print("ρσ_eg_raised.push(ρσ_eg_exc_" + idx + ")")
+                    output.semicolon(), output.newline()
+                )
+                output.newline()
+            )
+            output.newline()
+
+        # Re-raise unmatched exceptions and any raised by handlers
+        output.indent()
+        output.print("var ρσ_eg_unhandled = ρσ_eg_exceptions.concat(ρσ_eg_raised)")
+        output.semicolon(), output.newline()
+        output.indent()
+        output.print("if (ρσ_eg_unhandled.length > 0)")
+        output.space()
+        output.with_block(def():
+            output.indent()
+            output.print("throw (ρσ_eg_unhandled.length === 1 && !(ρσ_Exception instanceof ExceptionGroup)) ? ρσ_eg_unhandled[0] : new ExceptionGroup((ρσ_Exception instanceof ExceptionGroup) ? ρσ_Exception.message : \"unhandled exceptions\", ρσ_eg_unhandled)")
+            output.semicolon(), output.newline()
+        )
         output.newline()
     )
 

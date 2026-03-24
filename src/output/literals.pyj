@@ -2,7 +2,7 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-from ast import AST_Binary, AST_ObjectSpread, is_node_type
+from ast import AST_Binary, AST_ObjectSpread, AST_Spread, AST_SetItem, is_node_type
 
 def print_array(self, output):
     output.print('ρσ_list_decorate')
@@ -15,7 +15,11 @@ def print_array(self, output):
             for i, exp in enumerate(a):
                 if i:
                     output.comma()
-                exp.print(output)
+                if is_node_type(exp, AST_Spread):
+                    output.print('...')
+                    exp.expression.print(output)
+                else:
+                    exp.print(output)
             if len_ > 0:
                 output.space()
         )
@@ -78,6 +82,28 @@ def print_object(self, output):
             output.print("Object.create(null)" if self.is_jshash else '{}')
 
 def print_set(self, output):
+    # Check for spread items: {*a, 1, 2, *b}
+    has_spread = False
+    for item in self.items:
+        if is_node_type(item, AST_Spread):
+            has_spread = True
+            break
+    if has_spread:
+        # Compile as ρσ_set([...a, 1, 2, ...b])
+        output.print('ρσ_set')
+        output.with_parens(def():
+            output.with_square(def():
+                for i, item in enumerate(self.items):
+                    if i:
+                        output.comma()
+                    if is_node_type(item, AST_Spread):
+                        output.print('...')
+                        item.expression.print(output)
+                    else:
+                        item.value.print(output)
+            )
+        )
+        return
     if self.items.length is 0:
         output.print('ρσ_set()')
         return

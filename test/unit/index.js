@@ -4411,6 +4411,352 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── __init_subclass__ hook ────────────────────────────────────────────
+
+    {
+        name: "init_subclass_basic",
+        description: "__init_subclass__ is called when a subclass is created",
+        src: [
+            "# globals: assrt",
+            "log = []",
+            "class Base:",
+            "    def __init_subclass__(cls, **kwargs):",
+            "        log.append(cls.__name__)",
+            "class Child(Base):",
+            "    pass",
+            "class GrandChild(Child):",
+            "    pass",
+            "assrt.deepEqual(log, ['Child', 'GrandChild'])",
+        ].join("\n"),
+        js_checks: ['.__init_subclass__.call(Child)', '.__init_subclass__.call(GrandChild)'],
+    },
+
+    {
+        name: "init_subclass_cls_is_subclass",
+        description: "__init_subclass__ receives the subclass as cls",
+        src: [
+            "# globals: assrt",
+            "received = []",
+            "class Base:",
+            "    def __init_subclass__(cls, **kwargs):",
+            "        received.append(cls)",
+            "class Child(Base):",
+            "    pass",
+            "assrt.equal(received.length, 1)",
+            "assrt.equal(received[0], Child)",
+        ].join("\n"),
+    },
+
+    {
+        name: "init_subclass_kwargs",
+        description: "keyword arguments from class header are passed to __init_subclass__",
+        src: [
+            "# globals: assrt",
+            "log = []",
+            "class Base:",
+            "    def __init_subclass__(cls, tag=None, **kwargs):",
+            "        log.append(tag)",
+            "class Child(Base, tag='alpha'):",
+            "    pass",
+            "class Other(Base, tag='beta'):",
+            "    pass",
+            "assrt.deepEqual(log, ['alpha', 'beta'])",
+        ].join("\n"),
+        js_checks: ["ρσ_isc_kw"],
+    },
+
+    {
+        name: "init_subclass_super_chain",
+        description: "super().__init_subclass__ propagates to grandparent",
+        src: [
+            "# globals: assrt",
+            "calls = []",
+            "class GrandParent:",
+            "    def __init_subclass__(cls, **kwargs):",
+            "        calls.append('GrandParent:' + cls.__name__)",
+            "class Parent(GrandParent):",
+            "    def __init_subclass__(cls, **kwargs):",
+            "        super().__init_subclass__(**kwargs)",
+            "        calls.append('Parent:' + cls.__name__)",
+            "class Child(Parent):",
+            "    pass",
+            "assrt.deepEqual(calls, ['GrandParent:Parent', 'GrandParent:Child', 'Parent:Child'])",
+        ].join("\n"),
+    },
+
+    {
+        name: "init_subclass_set_classvar",
+        description: "__init_subclass__ can set class variables on the subclass",
+        src: [
+            "# globals: assrt",
+            "class Registry:",
+            "    _registry = []",
+            "    def __init_subclass__(cls, **kwargs):",
+            "        cls._registered = True",
+            "        Registry._registry.append(cls.__name__)",
+            "class A(Registry):",
+            "    pass",
+            "class B(Registry):",
+            "    pass",
+            "assrt.equal(A._registered, True)",
+            "assrt.equal(B._registered, True)",
+            "assrt.deepEqual(Registry._registry, ['A', 'B'])",
+        ].join("\n"),
+    },
+
+    {
+        name: "init_subclass_no_hook_no_call",
+        description: "no __init_subclass__ defined: class definition works normally",
+        src: [
+            "# globals: assrt",
+            "class Base:",
+            "    pass",
+            "class Child(Base):",
+            "    pass",
+            "c = Child()",
+            "assrt.ok(isinstance(c, Child))",
+        ].join("\n"),
+    },
+
+    // ── except* / ExceptionGroup ──────────────────────────────────────────
+
+    {
+        name: "except_star_basic",
+        description: "except* catches matching exceptions from an ExceptionGroup",
+        src: [
+            "# globals: assrt",
+            'eg = ExceptionGroup("errors", [ValueError("bad"), ValueError("again")])',
+            "caught_ve = []",
+            "try:",
+            "    raise eg",
+            "except* ValueError as g:",
+            "    for e in g.exceptions:",
+            "        caught_ve.append(str(e))",
+            "assrt.equal(len(caught_ve), 2)",
+            'assrt.ok(caught_ve[0].indexOf("bad") >= 0)',
+            'assrt.ok(caught_ve[1].indexOf("again") >= 0)',
+        ].join("\n"),
+        js_checks: ["ExceptionGroup", "ρσ_eg_exceptions"],
+    },
+
+    {
+        name: "except_star_multiple_handlers",
+        description: "multiple except* clauses each receive their matching sub-group",
+        src: [
+            "# globals: assrt",
+            'eg = ExceptionGroup("mixed", [ValueError("v1"), TypeError("t1"), ValueError("v2")])',
+            "val_count = 0",
+            "type_count = 0",
+            "try:",
+            "    raise eg",
+            "except* ValueError as g:",
+            "    val_count = len(g.exceptions)",
+            "except* TypeError as g:",
+            "    type_count = len(g.exceptions)",
+            "assrt.equal(val_count, 2)",
+            "assrt.equal(type_count, 1)",
+        ].join("\n"),
+    },
+
+    {
+        name: "except_star_unmatched_reraise",
+        description: "unmatched exceptions from an ExceptionGroup are re-raised",
+        src: [
+            "# globals: assrt",
+            'eg = ExceptionGroup("mixed", [ValueError("v"), KeyError("k")])',
+            "caught = False",
+            "reraised = False",
+            "try:",
+            "    try:",
+            "        raise eg",
+            "    except* ValueError as g:",
+            "        caught = True",
+            "except ExceptionGroup as outer:",
+            "    reraised = True",
+            "    assrt.equal(len(outer.exceptions), 1)",
+            "    assrt.ok(isinstance(outer.exceptions[0], KeyError))",
+            "assrt.ok(caught)",
+            "assrt.ok(reraised)",
+        ].join("\n"),
+    },
+
+    {
+        name: "except_star_non_group",
+        description: "except* also handles a plain (non-ExceptionGroup) exception",
+        src: [
+            "# globals: assrt",
+            "caught = False",
+            "try:",
+            '    raise ValueError("plain")',
+            "except* ValueError as g:",
+            "    caught = True",
+            "    assrt.ok(isinstance(g, ValueError))",
+            "assrt.ok(caught)",
+        ].join("\n"),
+    },
+
+    {
+        name: "except_star_bare",
+        description: "bare except* catches all remaining exceptions",
+        src: [
+            "# globals: assrt",
+            'eg = ExceptionGroup("all", [ValueError("v"), TypeError("t")])',
+            "total = 0",
+            "try:",
+            "    raise eg",
+            "except* as g:",
+            "    total = len(g.exceptions)",
+            "assrt.equal(total, 2)",
+        ].join("\n"),
+    },
+
+    {
+        name: "except_star_exception_group_class",
+        description: "ExceptionGroup class has correct attributes and subgroup/split methods",
+        src: [
+            "# globals: assrt",
+            'eg = ExceptionGroup("demo", [ValueError("v"), TypeError("t"), ValueError("v2")])',
+            "assrt.equal(eg.message, 'demo')",
+            "assrt.equal(len(eg.exceptions), 3)",
+            "sub = eg.subgroup(ValueError)",
+            "assrt.equal(len(sub.exceptions), 2)",
+            "parts = eg.split(ValueError)",
+            "assrt.equal(len(parts[0].exceptions), 2)",
+            "assrt.equal(len(parts[1].exceptions), 1)",
+        ].join("\n"),
+    },
+
+    // ── * and ** unpacking operators ──────────────────────────────────────────
+
+    {
+        name: "list_spread_basic",
+        description: "list spread: [*a, 1, 2] flattens iterable into a new list",
+        src: [
+            "# globals: assrt",
+            "a = [1, 2, 3]",
+            "b = [*a, 4, 5]",
+            "assrt.deepEqual(b, [1, 2, 3, 4, 5])",
+        ].join("\n"),
+        js_checks: [/\.\.\./],
+    },
+
+    {
+        name: "list_spread_middle",
+        description: "list spread: spread in the middle and at both ends",
+        src: [
+            "# globals: assrt",
+            "a = [2, 3]",
+            "b = [1, *a, 4]",
+            "assrt.deepEqual(b, [1, 2, 3, 4])",
+            "x = [10, 20]",
+            "y = [30, 40]",
+            "z = [*x, *y]",
+            "assrt.deepEqual(z, [10, 20, 30, 40])",
+        ].join("\n"),
+    },
+
+    {
+        name: "list_spread_string",
+        description: "list spread: *string unpacks characters",
+        src: [
+            "# globals: assrt",
+            "chars = [*'abc', 'd']",
+            "assrt.deepEqual(chars, ['a', 'b', 'c', 'd'])",
+        ].join("\n"),
+    },
+
+    {
+        name: "list_spread_first",
+        description: "list spread: spread as the very first element",
+        src: [
+            "# globals: assrt",
+            "a = [1, 2]",
+            "b = [*a, 3]",
+            "assrt.deepEqual(b, [1, 2, 3])",
+            "c = [*a]",
+            "assrt.deepEqual(c, [1, 2])",
+        ].join("\n"),
+    },
+
+    {
+        name: "set_spread_basic",
+        description: "set spread: {*a, 1} builds a set from iterable and literals",
+        src: [
+            "# globals: assrt",
+            "a = [1, 2, 3]",
+            "s = {*a, 4}",
+            "assrt.ok(isinstance(s, set))",
+            "assrt.equal(len(s), 4)",
+            "assrt.ok(s.has(1))",
+            "assrt.ok(s.has(4))",
+        ].join("\n"),
+        js_checks: ["ρσ_set(["],
+    },
+
+    {
+        name: "set_spread_multiple",
+        description: "set spread: multiple spreads merge iterables into a set",
+        src: [
+            "# globals: assrt",
+            "a = [1, 2]",
+            "b = [3, 4]",
+            "s = {*a, *b}",
+            "assrt.equal(len(s), 4)",
+            "assrt.ok(s.has(2))",
+            "assrt.ok(s.has(3))",
+        ].join("\n"),
+    },
+
+    {
+        name: "kwargs_spread_expr",
+        description: "**expr in function call accepts arbitrary expression, not just symbol",
+        src: [
+            "# globals: assrt",
+            "def f(a=0, b=0, c=0):",
+            "    return a + b + c",
+            "opts = {'a': 1, 'b': 2, 'c': 3}",
+            "assrt.equal(f(**opts), 6)",
+        ].join("\n"),
+    },
+
+    {
+        name: "kwargs_spread_getattr",
+        description: "**obj.attr in function call spreads attribute access result",
+        src: [
+            "# globals: assrt",
+            "class Cfg:",
+            "    params = {'x': 10, 'y': 20}",
+            "def add(x=0, y=0):",
+            "    return x + y",
+            "assrt.equal(add(**Cfg.params), 30)",
+        ].join("\n"),
+    },
+
+    {
+        name: "star_in_call_existing",
+        description: "*args in function call: existing behaviour still works",
+        src: [
+            "# globals: assrt",
+            "def f(a, b, c):",
+            "    return a + b + c",
+            "args = [1, 2, 3]",
+            "assrt.equal(f(*args), 6)",
+        ].join("\n"),
+    },
+
+    {
+        name: "list_spread_is_list",
+        description: "result of [*a] is a proper Python list with list methods",
+        src: [
+            "# globals: assrt",
+            "a = [1, 2]",
+            "b = [*a, 3]",
+            "assrt.ok(isinstance(b, list))",
+            "b.append(4)",
+            "assrt.equal(len(b), 4)",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

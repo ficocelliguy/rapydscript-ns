@@ -44,3 +44,41 @@ class ImportError(Exception):
 
 class ModuleNotFoundError(ImportError):
     pass
+
+def _is_exc_class(obj):
+    # True when obj is an Error subclass (or Error itself), not a plain predicate function
+    return jstype(obj) is 'function' and (obj is Error or (obj.prototype and isinstance(obj.prototype, Error)))
+
+
+class ExceptionGroup(Exception):
+
+    def __init__(self, message, exceptions):
+        Exception.__init__(self, message)
+        self.exceptions = exceptions if exceptions else []
+
+    def subgroup(self, condition):
+        if _is_exc_class(condition):
+            matched = [e for e in self.exceptions if isinstance(e, condition)]
+        elif callable(condition):
+            matched = [e for e in self.exceptions if condition(e)]
+        else:
+            matched = [e for e in self.exceptions if isinstance(e, condition)]
+        return ExceptionGroup(self.message, matched) if matched else None
+
+    def split(self, condition):
+        if _is_exc_class(condition):
+            matched = [e for e in self.exceptions if isinstance(e, condition)]
+            rest = [e for e in self.exceptions if not isinstance(e, condition)]
+        elif callable(condition):
+            matched = [e for e in self.exceptions if condition(e)]
+            rest = [e for e in self.exceptions if not condition(e)]
+        else:
+            matched = [e for e in self.exceptions if isinstance(e, condition)]
+            rest = [e for e in self.exceptions if not isinstance(e, condition)]
+        return [
+            ExceptionGroup(self.message, matched) if matched else None,
+            ExceptionGroup(self.message, rest) if rest else None
+        ]
+
+    def __repr__(self):
+        return 'ExceptionGroup(' + repr(self.message) + ', ' + repr(self.exceptions) + ')'

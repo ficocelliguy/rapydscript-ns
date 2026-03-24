@@ -21,7 +21,7 @@ AST_SymbolCatch, AST_SymbolDefun, AST_SymbolFunarg,
 AST_SymbolLambda, AST_SymbolNonlocal, AST_SymbolRef, AST_SymbolVar, AST_This,
 AST_Throw, AST_Toplevel, AST_True, AST_Try, AST_UnaryPrefix,
 AST_Undefined, AST_Var, AST_VarDef, AST_Verbatim, AST_While, AST_With, AST_WithClause,
-AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, AST_Super, AST_Starred, is_node_type,
+AST_Yield, AST_Await, AST_Assert, AST_Existential, AST_NamedExpr, AST_AnnotatedAssign, AST_Super, AST_Starred, AST_Spread, is_node_type,
 AST_Match, AST_MatchCase,
 AST_MatchWildcard, AST_MatchCapture, AST_MatchLiteral, AST_MatchOr,
 AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass,
@@ -1415,6 +1415,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'provisional_classvars': {},
         }
         bases = v'[]'
+        class_kwargs = v'[]'
         class_parent = None
 
         # If this class is nested inside another class, register it under its
@@ -1438,10 +1439,14 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     S.in_parenthesized_expr = False
                     next()
                     break
-                a = expr_atom(False)
-                if class_parent is None:
-                    class_parent = a
-                bases.push(a)
+                a = expression(False)
+                if is_node_type(a, AST_Assign):
+                    # key=value → class keyword argument for __init_subclass__
+                    class_kwargs.push([a.left, a.right])
+                else:
+                    if class_parent is None:
+                        class_parent = a
+                    bases.push(a)
                 if is_('punc', ','):
                     next()
                     continue
@@ -1456,6 +1461,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'dynamic_properties': Object.create(None),
             'parent': class_parent,
             'bases': bases,
+            'class_kwargs': class_kwargs,
             'localvars': [],
             'classvars': class_details.classvars,
             'static': class_details.static,
@@ -1510,6 +1516,9 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 elif stmt.name.name is "__class_getitem__":
                     stmt.is_classmethod = True
                     class_details.classmethod['__class_getitem__'] = True
+                elif stmt.name.name is "__init_subclass__":
+                    stmt.is_classmethod = True
+                    class_details.classmethod['__init_subclass__'] = True
                 elif stmt.name.name in ['__getattr__', '__setattr__', '__delattr__', '__getattribute__']:
                     definition.has_attr_dunders = True
                     class_details.has_attr_dunders = True
@@ -1748,7 +1757,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 S.in_parenthesized_expr = False
                 a.defaults = defaults
                 a.is_simple_func = not a.starargs and not a.kwargs and not a.has_defaults and not a.bare_star and not a.posonly_count
-                if (classmethod_flag or (name and (name.name is '__new__' or name.name is '__class_getitem__'))) and a.length > 0:
+                if (classmethod_flag or (name and (name.name is '__new__' or name.name is '__class_getitem__' or name.name is '__init_subclass__'))) and a.length > 0:
                     cm_cls_arg.push(a[0].name)
                 return a
             )(v'[]'),
@@ -1766,7 +1775,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'body': (def(loop, labels):
                 S.in_class.push(False)
                 cm_pushed = v'[false]'
-                if (classmethod_flag or (name and (name.name is '__new__' or name.name is '__class_getitem__'))) and in_class and cm_cls_arg.length > 0:
+                if (classmethod_flag or (name and (name.name is '__new__' or name.name is '__class_getitem__' or name.name is '__init_subclass__'))) and in_class and cm_cls_arg.length > 0:
                     cm_ctx_entry = None
                     for v'var si = S.classes.length - 1; si >= 0; si--':
                         if has_prop(S.classes[si], in_class):
@@ -1996,9 +2005,18 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         bcatch = v'[]'
         bfinally = None
         belse = None
+        has_star = None  # None = not yet seen, True/False = seen star/non-star
         while is_("keyword", "except"):
             start = S.token
             next()
+            is_star = False
+            if is_("operator", "*"):
+                is_star = True
+                next()
+            if has_star is None:
+                has_star = is_star
+            elif has_star is not is_star:
+                croak("Cannot mix 'except' and 'except*' in the same try statement")
             exceptions = []
             if not is_("punc", ":") and not is_("keyword", "as"):
                 # Accept both: except TypeError, ValueError:
@@ -2024,6 +2042,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'start': start,
                 'argname': name,
                 'errors': exceptions,
+                'is_star': is_star,
                 'body': block_(),
                 'end': prev()
             }))
@@ -2266,6 +2285,13 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             if is_("operator", "*") and func_call:
                 saw_starargs = True
                 next()
+            elif is_("operator", "*") and not func_call:
+                # Spread element in list literal: [1, *a, 2]
+                start = S.token
+                next()
+                spread_expr = expression(False)
+                a.push(new AST_Spread({'start': start, 'expression': spread_expr, 'end': prev()}))
+                continue
 
             if is_("punc", ",") and allow_empty:
                 a.push(new AST_Hole({
@@ -2312,7 +2338,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 a.starargs = True
             elif is_('operator', '**'):
                 next()
-                a.kwarg_items.push(as_symbol(AST_SymbolRef, False))
+                a.kwarg_items.push(expression(False))
                 a.starargs = True
             else:
                 arg = expression(False)
@@ -2336,10 +2362,17 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         expect("[")
         expr = []
         if not is_("punc", "]"):
-            expr.push(expression(False))
-            if is_("keyword", "for"):
-                # list comprehension
-                return read_comprehension(new AST_ListComprehension({'statement': expr[0]}), ']')
+            if is_("operator", "*"):
+                # Spread as first element — no list comprehension possible
+                start = S.token
+                next()
+                spread_expr = expression(False)
+                expr.push(new AST_Spread({'start': start, 'expression': spread_expr, 'end': prev()}))
+            else:
+                expr.push(expression(False))
+                if is_("keyword", "for"):
+                    # list comprehension
+                    return read_comprehension(new AST_ListComprehension({'statement': expr[0]}), ']')
 
             if not is_("punc", "]"):
                 expect(",")
@@ -2374,6 +2407,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 }))
                 has_non_const_keys = True
                 continue
+            if is_('operator', '*'):
+                # Must be a set literal with spread as first item: {*a, ...}
+                next()
+                spread_expr = expression(False)
+                spread_node = new AST_Spread({'start': start, 'expression': spread_expr, 'end': prev()})
+                return _read_set_items([spread_node], start)
             ctx = S.input.context()
             orig = ctx.expecting_object_literal_key
             ctx.expecting_object_literal_key = True
@@ -2406,18 +2445,25 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'is_jshash': is_jshash,
         })
 
-    def set_(start, end, expr):
-        ostart = start
-        a = [new AST_SetItem({'start':start, 'end':end, 'value':expr})]
+    def _read_set_items(a, ostart):
+        "Read remaining items of a set literal into a (handles * spread)"
         while not is_("punc", "}"):
             expect(",")
-            start = S.token
+            item_start = S.token
             if is_("punc", "}"):
                 # allow trailing comma
                 break
-            a.push(new AST_SetItem({'start':start, 'value':expression(False), 'end':prev()}))
+            if is_("operator", "*"):
+                next()
+                spread_expr = expression(False)
+                a.push(new AST_Spread({'start': item_start, 'expression': spread_expr, 'end': prev()}))
+            else:
+                a.push(new AST_SetItem({'start': item_start, 'value': expression(False), 'end': prev()}))
         next()
-        return new AST_Set({'items':a, 'start':ostart, 'end':prev()})
+        return new AST_Set({'items': a, 'start': ostart, 'end': prev()})
+
+    def set_(start, end, expr):
+        return _read_set_items([new AST_SetItem({'start':start, 'end':end, 'value':expr})], start)
 
     def _read_comp_conditions():
         # Read zero or more consecutive `if` conditions, combining them with &&.
@@ -2721,6 +2767,9 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     if not super_node.parent:
                         croak('super() used in a class without a parent class')
                     # super().method(args) → ParentClass.prototype.method.call(this, args)
+                    # But for classmethods/static methods, use ParentClass.method.call(this, args)
+                    parent_cls_info = get_class_in_scope(super_node.parent)
+                    super_is_static = parent_cls_info and is_static_method(parent_cls_info, method_name)
                     this_node = new AST_This({
                         'name': 'this',
                         'start': start,
@@ -2731,7 +2780,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                         'start': start,
                         'class': super_node.parent,
                         'method': method_name,
-                        'static': False,
+                        'static': super_is_static or False,
                         'args': method_args,
                         'end': prev()
                     }), True)

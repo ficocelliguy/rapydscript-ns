@@ -3,6 +3,10 @@
 
 - jsx support -needs testing & integration - spaces support?
 
+- the tuple type not recognized
+- copy class
+- pythonFlags documentation for registerRapydScript
+
 - collections not recognized in editor - check other libraries too
 
 - omit_function_metadata breaks imports - it needs to be changed to only affect imported modules, maybe?
@@ -164,4 +168,101 @@ class StrictList(TypedList):
     prefix = 'StrictList'
 
 print(StrictList[float])  # StrictList[float]
+```
+
+
+---
+
+### `__init_subclass__` example
+
+```python
+# __init_subclass__ is called whenever a class is subclassed.
+# Use it to register subclasses, enforce contracts, or attach metadata.
+
+class Handler:
+    _registry = {}
+
+    def __init_subclass__(cls, event=None, **kwargs):
+        if event:
+            Handler._registry[event] = cls
+
+class ClickHandler(Handler, event='click'):
+    def handle(self):
+        return 'click!'
+
+class HoverHandler(Handler, event='hover'):
+    def handle(self):
+        return 'hover!'
+
+# Lookup by event name
+h = Handler._registry['click']()
+print(h.handle())   # click!
+
+print(list(Handler._registry.keys()))  # ['click', 'hover']
+```
+
+
+---
+
+### `except*` / `ExceptionGroup` example
+
+```python
+# ExceptionGroup bundles multiple exceptions under one raise.
+# except* dispatches to each handler based on exception type.
+# Unmatched exceptions are automatically re-raised.
+
+def fetch_all(urls):
+    errors = []
+    for url in urls:
+        try:
+            pass  # ... fetch url ...
+        except ValueError as e:
+            errors.append(e)
+        except TimeoutError as e:
+            errors.append(e)
+    if errors:
+        raise ExceptionGroup("fetch errors", errors)
+
+try:
+    fetch_all(["http://a", "http://b"])
+except* ValueError as grp:
+    print("Bad URLs:", len(grp.exceptions))
+    for e in grp.exceptions:
+        print(" -", e)
+except* TimeoutError as grp:
+    print("Timeouts:", len(grp.exceptions))
+
+# ExceptionGroup also supports programmatic filtering:
+eg = ExceptionGroup("mixed", [ValueError("v1"), TypeError("t1"), ValueError("v2")])
+ve_only = eg.subgroup(ValueError)          # ExceptionGroup with just the two ValueErrors
+matched, rest = eg.split(ValueError)       # ([ve1, ve2], [te1]) as sub-groups
+print(matched.exceptions)                  # [ValueError('v1'), ValueError('v2')]
+```
+
+### `*` / `**` unpacking example
+
+```python
+# Merge several configuration sources using * and ** unpacking
+
+defaults = {'debug': False, 'timeout': 30, 'retries': 3}
+overrides = {'timeout': 10}
+
+# ** unpacking: merge dicts into a function call (any expression works)
+def connect(debug=False, timeout=30, retries=3):
+    return {'debug': debug, 'timeout': timeout, 'retries': retries}
+
+cfg = connect(**{**defaults, **overrides})   # timeout=10 wins
+print(cfg['timeout'])   # 10
+
+# * unpacking: build a flat list from multiple iterables
+hosts_a = ['web1', 'web2']
+hosts_b = ['db1', 'db2']
+all_hosts = [*hosts_a, 'cache1', *hosts_b]
+print(all_hosts)        # ['web1', 'web2', 'cache1', 'db1', 'db2']
+
+# * unpacking in a set literal removes duplicates
+tags_a = ['python', 'web', 'fast']
+tags_b = ['web', 'async', 'fast']
+unique_tags = {*tags_a, *tags_b}
+print(len(unique_tags))  # 4  (duplicates 'web' and 'fast' collapsed)
 ```
