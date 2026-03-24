@@ -1,0 +1,120 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's copy standard library.
+#
+# Supported: copy, deepcopy
+# Classes may define __copy__() and __deepcopy__(memo) for custom behaviour.
+
+
+def _is_primitive(x):
+    t = jstype(x)
+    return x is None or t is 'number' or t is 'boolean' or t is 'string' or t is 'undefined'
+
+
+def copy(x):
+    """Return a shallow copy of x.
+
+    For immutable primitives (numbers, strings, booleans, None) the object
+    itself is returned unchanged.  For containers a new container of the same
+    type is created whose top-level items are the same objects as in the
+    original.
+
+    Dispatch order:
+      1. Primitive → return as-is.
+      2. ``__copy__`` method → call and return.
+      3. list  → ``list(x)`` (slice).
+      4. set   → ``set(x)``.
+      5. frozenset → ``frozenset(x)``.
+      6. dict (ρσ_dict) → ``x.copy()``.
+      7. Plain JS object (constructor is Object or null-proto) → Object.assign.
+      8. Other object (class instance) → Object.create + Object.assign.
+    """
+    if _is_primitive(x):
+        return x
+    if jstype(x.__copy__) is 'function':
+        return x.__copy__()
+    if Array.isArray(x):
+        return list(x)
+    if isinstance(x, set):
+        return set(x)
+    if isinstance(x, frozenset):
+        return frozenset(x)
+    if isinstance(x, dict):
+        return x.copy()
+    proto = Object.getPrototypeOf(x)
+    if x.constructor is Object or proto is None:
+        return Object.assign({}, x)
+    # Class instance: create a same-prototype object and copy own properties.
+    result = Object.create(proto)
+    Object.assign(result, x)
+    return result
+
+
+def deepcopy(x, memo=None):
+    """Return a deep (recursive) copy of x.
+
+    Circular references are handled via the *memo* mapping (a JS Map), which
+    stores already-copied objects so that they are only copied once.
+
+    Dispatch order (same structure as ``copy`` but recursive):
+      1. Primitive → return as-is.
+      2. Memo hit → return the previously copied object.
+      3. ``__deepcopy__(memo)`` method → call and return.
+      4. list        → recurse into elements.
+      5. set         → recurse into elements, build new set.
+      6. frozenset   → recurse into elements, build new frozenset.
+      7. dict        → recurse into keys and values.
+      8. Plain JS object → recurse into own-enumerable properties.
+      9. Class instance  → recurse into own-enumerable properties.
+    """
+    if memo is None:
+        memo = v'new Map()'
+    if _is_primitive(x):
+        return x
+    if memo.has(x):
+        return memo.get(x)
+    if jstype(x.__deepcopy__) is 'function':
+        result = x.__deepcopy__(memo)
+        memo.set(x, result)
+        return result
+    if Array.isArray(x):
+        result = []
+        memo.set(x, result)
+        for i in range(x.length):
+            result.push(deepcopy(x[i], memo))
+        return result
+    if isinstance(x, set):
+        result = set()
+        memo.set(x, result)
+        iterator = x[ρσ_iterator_symbol]()
+        r = iterator.next()
+        while not r.done:
+            result.add(deepcopy(r.value, memo))
+            r = iterator.next()
+        return result
+    if isinstance(x, frozenset):
+        items = []
+        iterator = x[ρσ_iterator_symbol]()
+        r = iterator.next()
+        while not r.done:
+            items.push(deepcopy(r.value, memo))
+            r = iterator.next()
+        result = frozenset(items)
+        memo.set(x, result)
+        return result
+    if isinstance(x, dict):
+        result = dict()
+        memo.set(x, result)
+        iterator = x.items()
+        r = iterator.next()
+        while not r.done:
+            result.set(deepcopy(r.value[0], memo), deepcopy(r.value[1], memo))
+            r = iterator.next()
+        return result
+    proto = Object.getPrototypeOf(x)
+    result = Object.create(proto)
+    memo.set(x, result)
+    keys = Object.keys(x)
+    for i in range(keys.length):
+        result[keys[i]] = deepcopy(x[keys[i]], memo)
+    return result

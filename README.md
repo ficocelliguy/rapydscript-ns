@@ -1730,6 +1730,7 @@ can annotate a variable with a type hint, with or without an initial value:
 x: int = 42
 name: str = "Alice"
 items: list = [1, 2, 3]
+coords: tuple = (10, 20)
 
 # Annotation only: declares the type without assigning a value
 count: int
@@ -3032,6 +3033,7 @@ One of Python's main strengths is the number of libraries available to the devel
 	operator            # a subset of Python's operator module
 	functools           # reduce, partial, wraps, lru_cache, cache, total_ordering, cmp_to_key
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
+	copy                # copy (shallow), deepcopy; honours __copy__ / __deepcopy__ hooks
 	itertools           # count, cycle, repeat, accumulate, chain, compress, dropwhile, filterfalse,
 	                    # groupby, islice, pairwise, starmap, takewhile, zip_longest,
 	                    # product, permutations, combinations, combinations_with_replacement
@@ -3276,6 +3278,31 @@ below:
   should use a scoped flag. See the section on dictionaries above for details.
 
 
+Python Flags
+------------
+
+Python flags are scoped compiler directives that opt in to stricter Python
+semantics or language features.  In source code they are written as:
+
+```py
+from __python__ import flag_name
+```
+
+At the top level they take effect for the rest of the file; inside a function
+or class body they apply only to that scope.  Prefix a flag with `no_` to turn
+it off in a nested scope.
+
+| Flag | Description |
+|---|---|
+| `dict_literals` | `{k: v}` literals create Python `dict` objects instead of plain JS objects. |
+| `overload_getitem` | `obj[key]` dispatches to `__getitem__` / `__setitem__` / `__delitem__` on objects that define them. |
+| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. |
+| `truthiness` | Boolean tests and `bool()` dispatch to `__bool__` and treat empty containers as falsy, matching Python semantics. |
+| `bound_methods` | Method references (`obj.method`) are automatically bound to their object, so they can be passed as callbacks without losing `self`. |
+| `hash_literals` | `{k: v}` creates a Python `dict` (alias for `dict_literals`; kept for backward compatibility). |
+| `jsx` | Enable JSX syntax (`<Tag attr={expr}>children</Tag>`). Required for files that contain JSX elements. |
+
+
 Monaco Language Service
 -----------------------
 
@@ -3337,9 +3364,11 @@ when the editor is torn down.
 | `compiler` | object | — | **Required.** The `window.RapydScript` compiler bundle. |
 | `parseDelay` | number | `300` | Debounce delay (ms) before re-checking after an edit. |
 | `virtualFiles` | `{name: source}` | `{}` | Virtual modules available to `import` statements. |
+| `stdlibFiles` | `{name: source}` | `{}` | Like `virtualFiles` but treated as stdlib — always available and never produce bad-import warnings. |
 | `dtsFiles` | `[{name, content}]` | `[]` | TypeScript `.d.ts` files loaded at startup. |
 | `loadDts` | `(name) => Promise<string>` | — | Async callback for lazy-loading `.d.ts` content on demand. |
 | `extraBuiltins` | `{name: true}` | `{}` | Extra global names that suppress undefined-symbol warnings. |
+| `pythonFlags` | string | — | Comma-separated Python flags to enable globally (e.g. `"dict_literals,overload_getitem"`). See [Python Flags](#python-flags) above. |
 
 ### Runtime API
 
@@ -3358,6 +3387,9 @@ service.loadDts('lib.dom').then(function () { console.log('DOM types loaded'); }
 
 // Suppress undefined-symbol warnings for additional global names
 service.addGlobals(['myFrameworkGlobal', '$']);
+
+// Get the most recently built scope map for a Monaco model (null if not yet analysed)
+var scopeMap = service.getScopeMap(editorModel);
 
 // Tear down all Monaco providers and event listeners
 service.dispose();
@@ -3482,6 +3514,13 @@ original `.py` file with working breakpoints and correct error stack frames.
 | `keep_docstrings` | bool | `false` | Keep docstrings in the output. |
 | `js_version` | number | `6` | Target ECMAScript version (5 or 6). |
 | `private_scope` | bool | `false` | Wrap the output in an IIFE. |
+| `python_flags` | string | — | Comma-separated Python flags to enable for this compilation (e.g. `"dict_literals,overload_operators"`). See [Python Flags](#python-flags) above. Flags set here override any inherited from a previous `compile()` call on a streaming compiler. |
+| `virtual_files` | `{name: source}` | — | Map of module-name → RapydScript source for modules importable via `import`. Only used when the underlying streaming compiler was created with a virtual-file context (as `web_repl()` does). |
+| `discard_asserts` | bool | `false` | Strip all `assert` statements from the output. |
+| `omit_function_metadata` | bool | `false` | Omit per-function metadata (e.g. argument names) from the output for smaller bundles. |
+| `write_name` | bool | `false` | Emit a `var __name__ = "…"` assignment at the top of the output. |
+| `tree_shake` | bool | `false` | Remove unused imported names from the output (requires stdlib imports). |
+| `filename` | string | `'<input>'` | Source filename embedded in the source map and used in error messages. |
 
 **How it works**
 

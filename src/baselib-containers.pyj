@@ -243,6 +243,26 @@ def sorted(iterable, key=None, reverse=False):
     return ans
 # }}}
 
+# tuple {{{
+def ρσ_tuple_constructor(iterable):
+    if iterable is undefined:
+        return v'[]'
+    if ρσ_arraylike(iterable):
+        return Array.prototype.slice.call(iterable)
+    if jstype(iterable[ρσ_iterator_symbol]) is 'function':
+        iterator = iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
+        ans = []
+        result = iterator.next()
+        while not result.done:
+            ans.push(result.value)
+            result = iterator.next()
+        return ans
+    return Object.keys(iterable)
+
+ρσ_tuple_constructor.__name__ = 'tuple'
+v'var tuple = ρσ_tuple_constructor'
+# }}}
+
 # set {{{
 v'var ρσ_global_object_id = 0, ρσ_set_implementation'
 

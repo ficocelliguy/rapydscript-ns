@@ -836,7 +836,7 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             description: "All bundled stdlib modules produce no bad-import error when a module registry is active",
             run: function () {
                 var stdlib_mods = [
-                    'aes', 'collections', 'elementmaker', 'encodings', 'functools',
+                    'aes', 'collections', 'copy', 'elementmaker', 'encodings', 'functools',
                     'gettext', 'itertools', 'math', 'numpy', 'operator', 'pythonize',
                     'random', 're', 'traceback', 'uuid',
                 ];
@@ -912,6 +912,45 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
                 var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
                 assert.deepStrictEqual(bad, [],
                     "Expected no bad-import for math, got: " + JSON.stringify(bad));
+            },
+        },
+
+        {
+            name: "copy_no_bad_import",
+            description: "from copy import copy, deepcopy produces no bad-import error",
+            run: function () {
+                var markers = d().check(
+                    "from copy import copy, deepcopy\na = [1, 2, 3]\nb = copy(a)\nc = deepcopy(a)\nprint(b, c)",
+                    { virtualFiles: { sentinel: "x = 1" } }
+                );
+                var bad = markers.filter(function (m) { return m.message.indexOf('Unknown module') !== -1; });
+                assert.deepStrictEqual(bad, [],
+                    "Expected no bad-import for copy module, got: " + JSON.stringify(bad));
+            },
+        },
+
+        {
+            name: "copy_symbols_no_undef",
+            description: "copy and deepcopy are not flagged as undefined after import",
+            run: function () {
+                var markers = d().check([
+                    "from copy import copy, deepcopy",
+                    "class Pt:",
+                    "    def __init__(self, x, y):",
+                    "        self.x = x",
+                    "        self.y = y",
+                    "    def __copy__(self):",
+                    "        return Pt(self.x, self.y)",
+                    "    def __deepcopy__(self, memo):",
+                    "        return Pt(self.x, self.y)",
+                    "p = Pt(1, 2)",
+                    "q = copy(p)",
+                    "r = deepcopy(p)",
+                    "print(q.x, r.y)",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.message.indexOf('Undefined symbol') !== -1; });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no undef errors, got: " + JSON.stringify(undef));
             },
         },
 
@@ -1273,6 +1312,38 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
                     "def f(x=0):",
                     "    return x",
                     "f(**opts)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        // ── tuple type ────────────────────────────────────────────────────────
+
+        {
+            name: "tuple_annotation_no_undef",
+            description: "tuple used as a variable or argument type annotation produces no undefined-symbol errors",
+            run: function () {
+                var markers = d().check([
+                    "def swap(pair: tuple) -> tuple:",
+                    "    return (pair[1], pair[0])",
+                    "coords: tuple = (3, 4)",
+                    "result = swap(coords)",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.message.indexOf("Undefined symbol") !== -1; });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no 'Undefined symbol' errors but got: " + JSON.stringify(undef));
+            },
+        },
+
+        {
+            name: "tuple_runtime_no_errors",
+            description: "calling tuple() at runtime produces no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "t = tuple([1, 2, 3])",
+                    "x = t[0]",
                 ].join("\n"));
                 var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
                 assert.deepStrictEqual(errors, [],

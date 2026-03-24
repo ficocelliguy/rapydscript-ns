@@ -3,9 +3,6 @@
 
 - jsx support -needs testing & integration - spaces support?
 
-- the tuple type not recognized
-- copy class
-- pythonFlags documentation for registerRapydScript
 
 - collections not recognized in editor - check other libraries too
 
@@ -16,7 +13,7 @@
 - examples of using js libraries in rapydscript in readme
 
 
-I would like you to add support for [ `__getattr__` / `__setattr__` / `__delattr__` / `__getattribute__`    ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature.
+I would like you to add support for [ `__getattr__` / `__setattr__` / `__delattr__` / `__getattribute__`    ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 ---
 
@@ -265,4 +262,67 @@ tags_a = ['python', 'web', 'fast']
 tags_b = ['web', 'async', 'fast']
 unique_tags = {*tags_a, *tags_b}
 print(len(unique_tags))  # 4  (duplicates 'web' and 'fast' collapsed)
+```
+
+# tuple type annotation
+
+```python
+# tuple as a type annotation for variables and function arguments
+def clamp(val: int, bounds: tuple) -> int:
+    lo, hi = bounds
+    return max(lo, min(hi, val))
+
+range_limits: tuple = (0, 100)
+print(clamp(150, range_limits))  # 100
+print(clamp(-5,  range_limits))  # 0
+
+# tuple() constructor works like list() but returns a plain array
+chars = tuple("hello")
+print(chars[0])  # h
+print(len(chars))  # 5
+```
+
+---
+
+### `copy` module example
+
+```python
+# copy.copy() makes a shallow copy; copy.deepcopy() makes a fully independent one.
+from copy import copy, deepcopy
+
+# --- shallow copy ---
+original = [1, [2, 3], [4, 5]]
+shallow  = copy(original)
+
+shallow.append(99)           # does not affect original
+shallow[1].append(0)         # DOES affect original (same inner list)
+
+print(len(original))         # 3  (99 not added here)
+print(original[1])           # [2, 3, 0]  (shared inner list mutated)
+
+# --- deep copy ---
+matrix = [[1, 2], [3, 4]]
+deep   = deepcopy(matrix)
+
+deep[0].append(99)
+print(matrix[0])             # [1, 2]  (completely independent)
+
+# --- custom hooks ---
+class Vector:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __copy__(self):
+        return Vector(self.x, self.y)
+
+    def __deepcopy__(self, memo):
+        return Vector(self.x, self.y)
+
+v  = Vector(3, 4)
+v2 = copy(v)
+v3 = deepcopy(v)
+
+print(v2.x, v2.y)            # 3 4
+print(v2 is v)               # False
 ```

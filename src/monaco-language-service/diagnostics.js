@@ -26,7 +26,7 @@ const MESSAGES = {
 // with the compiler from src/lib/).  These should never produce 'Unknown module'
 // errors regardless of what virtualFiles or stdlibFiles are configured.
 export const STDLIB_MODULES = [
-    'aes', 'collections', 'elementmaker', 'encodings', 'functools',
+    'aes', 'collections', 'copy', 'elementmaker', 'encodings', 'functools',
     'gettext', 'itertools', 'math', 'numpy', 'operator', 'pythonize',
     'random', 're', 'react', 'traceback', 'uuid',
     // Pseudo-modules for language feature flags (from __python__ import ...)
@@ -48,7 +48,7 @@ export const BASE_BUILTINS = (
     ' NodeList alert console Node Symbol NamedNodeMap ρσ_eslice ρσ_delslice Number' +
     ' Boolean encodeURIComponent decodeURIComponent setTimeout setInterval' +
     ' setImmediate clearTimeout clearInterval clearImmediate requestAnimationFrame' +
-    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next __import__ ρσ_new ρσ_object_new hash ρσ_object_setattr ρσ_object_getattr ρσ_object_delattr ExceptionGroup BaseExceptionGroup'
+    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next __import__ ρσ_new ρσ_object_new hash ρσ_object_setattr ρσ_object_getattr ρσ_object_delattr ExceptionGroup BaseExceptionGroup tuple'
 ).split(' ');
 
 // ---------------------------------------------------------------------------
@@ -398,7 +398,13 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
     };
 
     this.handle_symbol_funarg = function() {
-        this.add_binding(this.current_node.name);
+        const node = this.current_node;
+        this.add_binding(node.name);
+        // Suppress undefined-symbol errors for type names used in argument
+        // annotations: `def foo(x: MyType):` — MyType is a hint, not a ref.
+        if (node.annotation instanceof RS.AST_SymbolRef) {
+            node.annotation.lint_visited = true;
+        }
     };
 
     this.handle_comprehension = function() {

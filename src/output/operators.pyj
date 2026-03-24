@@ -5,7 +5,7 @@ from ast import (
     AST_Array, AST_Assign, AST_BaseCall, AST_Binary, AST_Conditional,
     AST_ItemAccess, AST_NamedExpr, AST_Number, AST_Object, AST_Return, AST_Seq, AST_Set,
     AST_SimpleStatement, AST_Statement, AST_String, AST_Sub, AST_Symbol,
-    AST_SymbolRef, AST_Starred, AST_Unary, is_node_type
+    AST_SymbolRef, AST_Starred, AST_Unary, AST_AnnotatedAssign, is_node_type
 )
 from output.loops import unpack_tuple
 
@@ -487,7 +487,8 @@ def print_seq(output):
     or is_node_type(p, AST_Return)
     or is_node_type(p, AST_Array)
     or is_node_type(p, AST_BaseCall)
-    or is_node_type(p, AST_SimpleStatement):
+    or is_node_type(p, AST_SimpleStatement)
+    or is_node_type(p, AST_AnnotatedAssign):
         output.with_square(print_seq)
     else:
         print_seq()

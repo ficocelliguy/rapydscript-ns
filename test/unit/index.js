@@ -4744,6 +4744,80 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── tuple type ────────────────────────────────────────────────────────────
+
+    {
+        name: "tuple_from_list",
+        description: "tuple() converts a list to a plain array",
+        src: [
+            "# globals: assrt",
+            "t = tuple([1, 2, 3])",
+            "assrt.equal(t[0], 1)",
+            "assrt.equal(t[1], 2)",
+            "assrt.equal(t[2], 3)",
+            "assrt.equal(len(t), 3)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_from_string",
+        description: "tuple() converts a string to an array of characters",
+        src: [
+            "# globals: assrt",
+            "t = tuple('abc')",
+            "assrt.equal(t[0], 'a')",
+            "assrt.equal(t[1], 'b')",
+            "assrt.equal(t[2], 'c')",
+            "assrt.equal(len(t), 3)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_empty",
+        description: "tuple() with no args returns an empty array",
+        src: [
+            "# globals: assrt",
+            "t = tuple()",
+            "assrt.equal(len(t), 0)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_annotation_variable",
+        description: "tuple used as a variable type annotation with paren notation compiles and runs",
+        src: [
+            "# globals: assrt",
+            "coords: tuple = (10, 20)",
+            "assrt.equal(coords[0], 10)",
+            "assrt.equal(coords[1], 20)",
+        ].join("\n"),
+        js_checks: ["coords = [10, 20]"],
+    },
+
+    {
+        name: "tuple_annotation_function_arg",
+        description: "tuple used as a function argument type annotation works",
+        src: [
+            "# globals: assrt",
+            "def first(t: tuple):",
+            "    return t[0]",
+            "assrt.equal(first([7, 8, 9]), 7)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_iterable",
+        description: "tuple() result is iterable with for-in",
+        src: [
+            "# globals: assrt",
+            "t = tuple([10, 20, 30])",
+            "total = 0",
+            "for v in t:",
+            "    total += v",
+            "assrt.equal(total, 60)",
+        ].join("\n"),
+    },
+
     {
         name: "list_spread_is_list",
         description: "result of [*a] is a proper Python list with list methods",
@@ -4754,6 +4828,204 @@ assrt.equal(fib(15), 610)
             "assrt.ok(isinstance(b, list))",
             "b.append(4)",
             "assrt.equal(len(b), 4)",
+        ].join("\n"),
+    },
+
+    // ── copy ──────────────────────────────────────────────────────────────
+
+    {
+        name: "copy_primitives",
+        description: "copy.copy returns primitives unchanged",
+        src: [
+            "# globals: assrt",
+            "from copy import copy",
+            "assrt.equal(copy(42), 42)",
+            "assrt.equal(copy('hello'), 'hello')",
+            "assrt.equal(copy(True), True)",
+            "assrt.equal(copy(None), None)",
+        ].join("\n"),
+    },
+
+    {
+        name: "copy_list_shallow",
+        description: "copy.copy of a list returns a shallow copy",
+        src: [
+            "# globals: assrt",
+            "from copy import copy",
+            "orig = [1, [2, 3], 4]",
+            "c = copy(orig)",
+            "assrt.equal(len(c), 3)",
+            "assrt.equal(c[0], 1)",
+            // shallow: inner list is the same object
+            "assrt.ok(c[1] is orig[1])",
+            // modifying the copy does not affect the original
+            "c.append(5)",
+            "assrt.equal(len(orig), 3)",
+            "assrt.equal(len(c), 4)",
+        ].join("\n"),
+    },
+
+    {
+        name: "copy_dict_shallow",
+        description: "copy.copy of a dict returns a shallow copy",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals, overload_getitem",
+            "from copy import copy",
+            "inner = [99]",
+            "orig = {'a': 1, 'b': inner}",
+            "c = copy(orig)",
+            "assrt.equal(c['a'], 1)",
+            // shallow: inner list is the same object
+            "assrt.ok(c['b'] is orig['b'])",
+            "c['x'] = 100",
+            "assrt.ok(not ('x' in orig))",
+        ].join("\n"),
+    },
+
+    {
+        name: "copy_set_shallow",
+        description: "copy.copy of a set returns an independent copy",
+        src: [
+            "# globals: assrt",
+            "from copy import copy",
+            "orig = {1, 2, 3}",
+            "c = copy(orig)",
+            "assrt.equal(len(c), 3)",
+            "c.add(4)",
+            "assrt.equal(len(orig), 3)",
+            "assrt.equal(len(c), 4)",
+        ].join("\n"),
+    },
+
+    {
+        name: "copy_class_instance_shallow",
+        description: "copy.copy of a class instance is shallow",
+        src: [
+            "# globals: assrt",
+            "from copy import copy",
+            "class Point:",
+            "    def __init__(self, x, y):",
+            "        self.x = x",
+            "        self.y = y",
+            "p = Point(1, 2)",
+            "p.data = [10, 20]",
+            "q = copy(p)",
+            "assrt.equal(q.x, 1)",
+            "assrt.equal(q.y, 2)",
+            "assrt.ok(q is not p)",
+            // shallow: mutable attribute is the same object
+            "assrt.ok(q.data is p.data)",
+        ].join("\n"),
+    },
+
+    {
+        name: "copy_custom_copy_hook",
+        description: "__copy__ method is called by copy.copy",
+        src: [
+            "# globals: assrt",
+            "from copy import copy",
+            "class MyObj:",
+            "    def __init__(self, val):",
+            "        self.val = val",
+            "        self.copy_called = False",
+            "    def __copy__(self):",
+            "        result = MyObj(self.val * 2)",
+            "        return result",
+            "obj = MyObj(5)",
+            "c = copy(obj)",
+            "assrt.equal(c.val, 10)",
+        ].join("\n"),
+    },
+
+    {
+        name: "deepcopy_list_nested",
+        description: "copy.deepcopy of a list with nested lists returns independent copies",
+        src: [
+            "# globals: assrt",
+            "from copy import deepcopy",
+            "orig = [1, [2, 3], [4, [5, 6]]]",
+            "d = deepcopy(orig)",
+            "assrt.equal(d[0], 1)",
+            "assrt.equal(d[1][0], 2)",
+            "assrt.equal(d[2][1][0], 5)",
+            // deep: inner lists are different objects
+            "assrt.ok(d[1] is not orig[1])",
+            "assrt.ok(d[2][1] is not orig[2][1])",
+            // mutating copy does not affect original
+            "d[1].append(99)",
+            "assrt.equal(len(orig[1]), 2)",
+        ].join("\n"),
+    },
+
+    {
+        name: "deepcopy_dict_nested",
+        description: "copy.deepcopy of a dict with nested dicts returns independent copies",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals, overload_getitem",
+            "from copy import deepcopy",
+            "orig = {'a': {'x': 1}, 'b': [2, 3]}",
+            "d = deepcopy(orig)",
+            "assrt.equal(d['a']['x'], 1)",
+            "assrt.ok(d['a'] is not orig['a'])",
+            "assrt.ok(d['b'] is not orig['b'])",
+            "d['a']['x'] = 99",
+            "assrt.equal(orig['a']['x'], 1)",
+        ].join("\n"),
+    },
+
+    {
+        name: "deepcopy_circular",
+        description: "copy.deepcopy handles circular references without infinite recursion",
+        src: [
+            "# globals: assrt",
+            "from copy import deepcopy",
+            "a = [1, 2]",
+            "a.push(a)   # circular reference",
+            "b = deepcopy(a)",
+            "assrt.equal(b[0], 1)",
+            "assrt.equal(b[1], 2)",
+            "assrt.ok(b[2] is b)",  // circularity preserved in the copy
+            "assrt.ok(b is not a)",
+        ].join("\n"),
+    },
+
+    {
+        name: "deepcopy_custom_hook",
+        description: "__deepcopy__(memo) method is called by copy.deepcopy",
+        src: [
+            "# globals: assrt",
+            "from copy import deepcopy",
+            "class Node:",
+            "    def __init__(self, val):",
+            "        self.val = val",
+            "        self.children = []",
+            "    def __deepcopy__(self, memo):",
+            "        result = Node(self.val * 10)",
+            "        return result",
+            "n = Node(7)",
+            "m = deepcopy(n)",
+            "assrt.equal(m.val, 70)",
+            "assrt.ok(m is not n)",
+        ].join("\n"),
+    },
+
+    {
+        name: "deepcopy_class_instance",
+        description: "copy.deepcopy of a class instance deeply copies instance attributes",
+        src: [
+            "# globals: assrt",
+            "from copy import deepcopy",
+            "class Box:",
+            "    def __init__(self, items):",
+            "        self.items = items",
+            "b = Box([1, 2, 3])",
+            "c = deepcopy(b)",
+            "assrt.ok(c is not b)",
+            "assrt.ok(c.items is not b.items)",
+            "c.items.append(4)",
+            "assrt.equal(len(b.items), 3)",
         ].join("\n"),
     },
 

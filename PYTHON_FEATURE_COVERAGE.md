@@ -131,7 +131,7 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `typing`      | ❌           | `List`, `Dict`, `Optional`, `Union`, `Tuple`, `Generic`, `TypeVar` — none available           |
 | `dataclasses` | ❌           | `@dataclass`, `field()`, `asdict()`, `astuple()` not available                                |
 | `contextlib`  | ❌           | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available                |
-| `copy`        | ❌           | `copy()` / `deepcopy()` not available                                                         |
+| `copy`        | ✅           | `copy()` shallow copy and `deepcopy()` (circular-ref-safe via memo Map); `__copy__` / `__deepcopy__(memo)` hooks honoured; handles list, set, frozenset, dict, class instances, and plain JS objects |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
 | `json`        | ❌           | No Python wrapper; JS `JSON.parse` / `JSON.stringify` work directly via verbatim JS           |
 | `datetime`    | ❌           | `date`, `time`, `datetime`, `timedelta` not available                                         |
