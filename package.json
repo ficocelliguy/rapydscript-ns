@@ -2,7 +2,7 @@
   "name": "rapydscript-ns",
   "description": "Pythonic JavaScript that doesn't suck",
   "homepage": "https://github.com/ficocelliguy/rapydscript-ns",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "license": "BSD-2-Clause",
   "engines": {
     "node": ">=0.12.0"

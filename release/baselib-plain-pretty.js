@@ -1,23 +1,48 @@
-var ρσ_len;
+let ρσ_len;
 function ρσ_bool(val) {
-    return !!val;
+    if (val === null || val === undefined) return false;
+    var ρσ_bool_t = typeof val;
+    if (ρσ_bool_t === "boolean") return val;
+    if (ρσ_bool_t === "number") return val !== 0;
+    if (ρσ_bool_t === "string") return val.length > 0;
+    if (ρσ_bool_t === "function") return true;
+    if (val.constructor && val.constructor.prototype === val) return true;
+    if (typeof val.__bool__ === "function") return !!val.__bool__();
+    if (Array.isArray(val)) return val.length > 0;
+    if (typeof val.__len__ === "function") return val.__len__() > 0;
+    if ((typeof Set === "function" && val instanceof Set) || (typeof Map === "function" && val instanceof Map)) return val.size > 0;
+    if (!val.constructor || val.constructor === Object) return Object.keys(val).length > 0;
+    return true;
 };
 if (!ρσ_bool.__argnames__) Object.defineProperties(ρσ_bool, {
     __argnames__ : {value: ["val"]},
     __module__ : {value: "__main__"}
 });
 
+ρσ_bool.__name__ = "bool";
 function ρσ_print() {
-    var parts;
+    var kwargs = arguments[arguments.length-1];
+    if (kwargs === null || typeof kwargs !== "object" || kwargs [ρσ_kwargs_symbol] !== true) kwargs = {};
+    var args = Array.prototype.slice.call(arguments, 0);
+    if (kwargs !== null && typeof kwargs === "object" && kwargs [ρσ_kwargs_symbol] === true) args.pop();
+    kwargs = ρσ_kwargs_to_dict(kwargs);
+    var sep, parts, a;
     if (typeof console === "object") {
-        parts = [];
-        for (var i = 0; i < arguments.length; i++) {
-            parts.push(ρσ_str(arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i]));
-        }
-        console.log(parts.join(" "));
+        sep = (kwargs.sep !== undefined) ? kwargs.sep : " ";
+        parts = (function() {
+            var ρσ_Iter = ρσ_Iterable(args), ρσ_Result = [], a;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                a = ρσ_Iter[ρσ_Index];
+                ρσ_Result.push(ρσ_str(a));
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+        console.log(parts.join(sep));
     }
 };
-if (!ρσ_print.__module__) Object.defineProperties(ρσ_print, {
+if (!ρσ_print.__handles_kwarg_interpolation__) Object.defineProperties(ρσ_print, {
+    __handles_kwarg_interpolation__ : {value: true},
     __module__ : {value: "__main__"}
 });
 
@@ -29,7 +54,7 @@ function ρσ_int(val, base) {
         ans = parseInt(val, base || 10);
     }
     if (isNaN(ans)) {
-        throw new ValueError("Invalid literal for int with base " + (base || 10) + ": " + val);
+        throw new ValueError(ρσ_list_add(ρσ_list_add(ρσ_list_add("Invalid literal for int with base ", (base || 10)), ": "), val));
     }
     return ans;
 };
@@ -38,6 +63,7 @@ if (!ρσ_int.__argnames__) Object.defineProperties(ρσ_int, {
     __module__ : {value: "__main__"}
 });
 
+ρσ_int.__name__ = "int";
 function ρσ_float(val) {
     var ans;
     if (typeof val === "number") {
@@ -46,7 +72,7 @@ function ρσ_float(val) {
         ans = parseFloat(val);
     }
     if (isNaN(ans)) {
-        throw new ValueError("Could not convert string to float: " + arguments[0]);
+        throw new ValueError(ρσ_list_add("Could not convert string to float: ", arguments[0]));
     }
     return ans;
 };
@@ -55,6 +81,7 @@ if (!ρσ_float.__argnames__) Object.defineProperties(ρσ_float, {
     __module__ : {value: "__main__"}
 });
 
+ρσ_float.__name__ = "float";
 function ρσ_arraylike_creator() {
     var names;
     names = "Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".split(" ");
@@ -125,7 +152,7 @@ function ρσ_ord(x) {
     if (55296 <= ans && ans <= 56319) {
         second = x.charCodeAt(1);
         if (56320 <= second && second <= 57343) {
-            return (ans - 55296) * 1024 + second - 56320 + 65536;
+            return ρσ_list_add(ρσ_list_add((ans - 55296) * 1024, second) - 56320, 65536);
         }
         throw new TypeError("string is missing the low surrogate char");
     }
@@ -141,7 +168,7 @@ function ρσ_chr(code) {
         return String.fromCharCode(code);
     }
     code -= 65536;
-    return String.fromCharCode(55296 + (code >> 10), 56320 + (code & 1023));
+    return String.fromCharCode(ρσ_list_add(55296, (code >> 10)), ρσ_list_add(56320, (code & 1023)));
 };
 if (!ρσ_chr.__argnames__) Object.defineProperties(ρσ_chr, {
     __argnames__ : {value: ["code"]},
@@ -149,10 +176,39 @@ if (!ρσ_chr.__argnames__) Object.defineProperties(ρσ_chr, {
 });
 
 function ρσ_callable(x) {
-    return typeof x === "function";
+    return typeof x === "function" || (x !== null && x !== undefined && typeof x.__call__ === "function");
 };
 if (!ρσ_callable.__argnames__) Object.defineProperties(ρσ_callable, {
     __argnames__ : {value: ["x"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_callable_call(fn) {
+    var args;
+    args = Array.prototype.slice.call(arguments, 1);
+    if (fn !== null && fn !== undefined && typeof fn.__call__ === "function") {
+        return fn.__call__.apply(fn, args);
+    }
+    if (typeof fn === "function") {
+        return fn.apply(undefined, args);
+    }
+    throw new TypeError("object is not callable");
+};
+if (!ρσ_callable_call.__argnames__) Object.defineProperties(ρσ_callable_call, {
+    __argnames__ : {value: ["fn"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_round(x, ndigits) {
+    var factor;
+    if (ndigits === undefined || ndigits === 0) {
+        return Math.round(x);
+    }
+    factor = Math.pow(10, ndigits);
+    return Math.round(x * factor) / factor;
+};
+if (!ρσ_round.__argnames__) Object.defineProperties(ρσ_round, {
+    __argnames__ : {value: ["x", "ndigits"]},
     __module__ : {value: "__main__"}
 });
 
@@ -163,9 +219,9 @@ function ρσ_bin(x) {
     }
     ans = x.toString(2);
     if (ans[0] === "-") {
-        ans = "-" + "0b" + ans.slice(1);
+        ans = ρσ_list_add(ρσ_list_add("-", "0b"), ans.slice(1));
     } else {
-        ans = "0b" + ans;
+        ans = ρσ_list_add("0b", ans);
     }
     return ans;
 };
@@ -181,9 +237,9 @@ function ρσ_hex(x) {
     }
     ans = x.toString(16);
     if (ans[0] === "-") {
-        ans = "-" + "0x" + ans.slice(1);
+        ans = ρσ_list_add(ρσ_list_add("-", "0x"), ans.slice(1));
     } else {
-        ans = "0x" + ans;
+        ans = ρσ_list_add("0x", ans);
     }
     return ans;
 };
@@ -192,9 +248,14 @@ if (!ρσ_hex.__argnames__) Object.defineProperties(ρσ_hex, {
     __module__ : {value: "__main__"}
 });
 
-function ρσ_enumerate(iterable) {
-    var ans, iterator;
-    ans = {"_i":-1};
+function ρσ_enumerate(iterable, start) {
+    var offset, ans, iterator;
+    offset = (start === undefined) ? 0 : start;
+    ans = (function(){
+        var ρσ_d = {};
+        ρσ_d["_i"] = offset - 1;
+        return ρσ_d;
+    }).call(this);
     ans[ρσ_iterator_symbol] = (function() {
         var ρσ_anonfunc = function () {
             return this;
@@ -207,9 +268,16 @@ function ρσ_enumerate(iterable) {
     if (ρσ_arraylike(iterable)) {
         ans["next"] = (function() {
             var ρσ_anonfunc = function () {
-                this._i += 1;
-                if (this._i < iterable.length) {
-                    return {'done':false, 'value':[this._i, iterable[this._i]]};
+                var idx;
+                this._i = ρσ_list_iadd(this._i, 1);
+                idx = this._i - offset;
+                if (idx < iterable.length) {
+                    return (function(){
+                        var ρσ_d = {};
+                        ρσ_d["done"] = false;
+                        ρσ_d["value"] = ρσ_list_decorate([ this._i, iterable[(typeof idx === "number" && idx < 0) ? iterable.length + idx : idx] ]);
+                        return ρσ_d;
+                    }).call(this);
                 }
                 return {'done':true};
             };
@@ -230,8 +298,13 @@ function ρσ_enumerate(iterable) {
                 if (r.done) {
                     return {'done':true};
                 }
-                this._i += 1;
-                return {'done':false, 'value':[this._i, r.value]};
+                this._i = ρσ_list_iadd(this._i, 1);
+                return (function(){
+                    var ρσ_d = {};
+                    ρσ_d["done"] = false;
+                    ρσ_d["value"] = ρσ_list_decorate([ this._i, r.value ]);
+                    return ρσ_d;
+                }).call(this);
             };
             if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
                 __module__ : {value: "__main__"}
@@ -240,10 +313,10 @@ function ρσ_enumerate(iterable) {
         })();
         return ans;
     }
-    return ρσ_enumerate(Object.keys(iterable));
+    return ρσ_enumerate(Object.keys(iterable), start);
 };
 if (!ρσ_enumerate.__argnames__) Object.defineProperties(ρσ_enumerate, {
-    __argnames__ : {value: ["iterable"]},
+    __argnames__ : {value: ["iterable", "start"]},
     __module__ : {value: "__main__"}
 });
 
@@ -282,8 +355,40 @@ if (!ρσ_reversed.__argnames__) Object.defineProperties(ρσ_reversed, {
     __module__ : {value: "__main__"}
 });
 
-function ρσ_iter(iterable) {
-    var ans;
+function ρσ_iter(iterable, sentinel) {
+    var callable_, ans;
+    if (arguments.length >= 2) {
+        callable_ = iterable;
+        ans = {"_callable":callable_,"_sentinel":sentinel,"_done":false};
+        ans[ρσ_iterator_symbol] = (function() {
+            var ρσ_anonfunc = function () {
+                return this;
+            };
+            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                __module__ : {value: "__main__"}
+            });
+            return ρσ_anonfunc;
+        })();
+        ans["next"] = (function() {
+            var ρσ_anonfunc = function () {
+                var val;
+                if (this._done) {
+                    return {'done':true};
+                }
+                val = ρσ_callable_call(this._callable);
+                if (val === this._sentinel) {
+                    this._done = true;
+                    return {'done':true};
+                }
+                return {'done':false,'value':val};
+            };
+            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                __module__ : {value: "__main__"}
+            });
+            return ρσ_anonfunc;
+        })();
+        return ans;
+    }
     if (typeof iterable[ρσ_iterator_symbol] === "function") {
         return (typeof Map === "function" && iterable instanceof Map) ? iterable.keys() : iterable[ρσ_iterator_symbol]();
     }
@@ -300,7 +405,7 @@ function ρσ_iter(iterable) {
         })();
         ans["next"] = (function() {
             var ρσ_anonfunc = function () {
-                this._i += 1;
+                this._i = ρσ_list_iadd(this._i, 1);
                 if (this._i < iterable.length) {
                     return {'done':false, 'value':iterable[this._i]};
                 }
@@ -316,14 +421,14 @@ function ρσ_iter(iterable) {
     return ρσ_iter(Object.keys(iterable));
 };
 if (!ρσ_iter.__argnames__) Object.defineProperties(ρσ_iter, {
-    __argnames__ : {value: ["iterable"]},
+    __argnames__ : {value: ["iterable", "sentinel"]},
     __module__ : {value: "__main__"}
 });
 
 function ρσ_range_next(step, length) {
     var ρσ_unpack;
-    this._i += step;
-    this._idx += 1;
+    this._i = ρσ_list_iadd(this._i, step);
+    this._idx = ρσ_list_iadd(this._idx, 1);
     if (this._idx >= length) {
         ρσ_unpack = [this.__i, -1];
         this._i = ρσ_unpack[0];
@@ -404,7 +509,7 @@ function ρσ_range(start, stop, step) {
     })();
     ans.__repr__ = (function() {
         var ρσ_anonfunc = function () {
-            return "range(" + ρσ_str.format("{}", start) + ", " + ρσ_str.format("{}", stop) + ", " + ρσ_str.format("{}", step) + ")";
+            return ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("range(", ρσ_str.format("{}", start)), ", "), ρσ_str.format("{}", stop)), ", "), ρσ_str.format("{}", step)), ")");
         };
         if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
             __module__ : {value: "__main__"}
@@ -456,7 +561,7 @@ function ρσ_getattr(obj, name, defval) {
         ρσ_last_exception = ρσ_Exception;
         if (ρσ_Exception instanceof TypeError) {
             if (defval === undefined) {
-                throw new AttributeError("The attribute " + name + " is not present");
+                throw new AttributeError(ρσ_list_add(ρσ_list_add("The attribute ", name), " is not present"));
             }
             return defval;
         } else {
@@ -465,7 +570,7 @@ function ρσ_getattr(obj, name, defval) {
     }
     if (ret === undefined && !(name in obj)) {
         if (defval === undefined) {
-            throw new AttributeError("The attribute " + name + " is not present");
+            throw new AttributeError(ρσ_list_add(ρσ_list_add("The attribute ", name), " is not present"));
         }
         ret = defval;
     }
@@ -540,6 +645,27 @@ if (!ρσ_get_module.__argnames__) Object.defineProperties(ρσ_get_module, {
     __module__ : {value: "__main__"}
 });
 
+function ρσ__import__(name, globals, locals, fromlist, level) {
+    var lookup, module;
+    if (typeof ρσ_modules === "undefined") {
+        throw ImportError(ρσ_list_add(ρσ_list_add("No module named '", name), "'"));
+    }
+    if (fromlist !== undefined && fromlist !== null && fromlist.length) {
+        lookup = name;
+    } else {
+        lookup = name.split(".")[0];
+    }
+    module = ρσ_modules[(typeof lookup === "number" && lookup < 0) ? ρσ_modules.length + lookup : lookup];
+    if (module === undefined) {
+        throw ModuleNotFoundError(ρσ_list_add(ρσ_list_add("No module named '", lookup), "'"));
+    }
+    return module;
+};
+if (!ρσ__import__.__argnames__) Object.defineProperties(ρσ__import__, {
+    __argnames__ : {value: ["name", "globals", "locals", "fromlist", "level"]},
+    __module__ : {value: "__main__"}
+});
+
 function ρσ_pow(x, y, z) {
     var ans;
     ans = Math.pow(x, y);
@@ -561,6 +687,101 @@ if (!ρσ_type.__argnames__) Object.defineProperties(ρσ_type, {
     __module__ : {value: "__main__"}
 });
 
+function ρσ_issubclass(cls, base) {
+    var b;
+    if (Array.isArray(base)) {
+        var ρσ_Iter0 = ρσ_Iterable(base);
+        for (var ρσ_Index0 = 0; ρσ_Index0 < ρσ_Iter0.length; ρσ_Index0++) {
+            b = ρσ_Iter0[ρσ_Index0];
+            if (ρσ_issubclass(cls, b)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (typeof cls !== "function") {
+        throw new TypeError("issubclass() arg 1 must be a class");
+    }
+    if (typeof base !== "function") {
+        throw new TypeError("issubclass() arg 2 must be a class");
+    }
+    if (cls === base) {
+        return true;
+    }
+    var proto = cls.prototype; while (proto !== null && proto !== undefined) { if (proto === base.prototype) return true; proto = Object.getPrototypeOf(proto); };
+    return false;
+};
+if (!ρσ_issubclass.__argnames__) Object.defineProperties(ρσ_issubclass, {
+    __argnames__ : {value: ["cls", "base"]},
+    __module__ : {value: "__main__"}
+});
+
+var ρσ_hash_id_counter = 0;
+function ρσ_hash(obj) {
+    var ρσ_t = typeof obj;
+    if (obj === null || obj === undefined) return 0;
+    if (ρσ_t === "boolean") return obj ? 1 : 0;
+    if (ρσ_t === "number") { return (obj === Math.floor(obj)) ? (obj | 0) : ((obj * 2654435761) | 0); };
+    if (ρσ_t === "string") {
+        var ρσ_h = 5381;
+        for (var ρσ_i = 0; ρσ_i < obj.length; ρσ_i++) {
+            ρσ_h = (((ρσ_h << 5) + ρσ_h) ^ obj.charCodeAt(ρσ_i)) | 0;
+        }
+        return ρσ_h;
+    };
+    if (obj.__hash__ === null) throw new TypeError("unhashable type: '" + (obj.constructor && obj.constructor.name ? obj.constructor.name : "object") + "'");
+    if (typeof obj.__hash__ === "function") return obj.__hash__();
+    if (Array.isArray(obj)) throw new TypeError("unhashable type: 'list'");
+    if (typeof ρσ_set === "function" && obj instanceof ρσ_set) throw new TypeError("unhashable type: 'set'");
+    if (typeof Set === "function" && obj instanceof Set) throw new TypeError("unhashable type: 'set'");
+    if (typeof ρσ_dict === "function" && obj instanceof ρσ_dict) throw new TypeError("unhashable type: 'dict'");
+    if (typeof Map === "function" && obj instanceof Map) throw new TypeError("unhashable type: 'dict'");
+    if (!obj.constructor || obj.constructor === Object) throw new TypeError("unhashable type: 'dict'");
+    if (obj.ρσ_object_id === undefined) obj.ρσ_object_id = ++ρσ_hash_id_counter;
+    return obj.ρσ_object_id;
+};
+if (!ρσ_hash.__argnames__) Object.defineProperties(ρσ_hash, {
+    __argnames__ : {value: ["obj"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_next(iterator, defval) {
+    var r;
+    if (iterator === null || iterator === undefined) {
+        throw new TypeError("object is not an iterator");
+    }
+    if (typeof iterator.next === "function") {
+        r = iterator.next();
+        if (r.done) {
+            if (arguments.length > 1) {
+                return defval;
+            }
+            throw StopIteration();
+        }
+        return r.value;
+    }
+    if (typeof iterator.__next__ === "function") {
+        try {
+            return iterator.__next__();
+        } catch (ρσ_Exception) {
+            ρσ_last_exception = ρσ_Exception;
+            if (ρσ_Exception instanceof StopIteration) {
+                if (arguments.length > 1) {
+                    return defval;
+                }
+                throw ρσ_Exception;
+            } else {
+                throw ρσ_Exception;
+            }
+        }
+    }
+    throw new TypeError("object is not an iterator");
+};
+if (!ρσ_next.__argnames__) Object.defineProperties(ρσ_next, {
+    __argnames__ : {value: ["iterator", "defval"]},
+    __module__ : {value: "__main__"}
+});
+
 function ρσ_divmod(x, y) {
     var d;
     if (y === 0) {
@@ -579,6 +800,7 @@ function ρσ_max() {
     if (kwargs === null || typeof kwargs !== "object" || kwargs [ρσ_kwargs_symbol] !== true) kwargs = {};
     var args = Array.prototype.slice.call(arguments, 0);
     if (kwargs !== null && typeof kwargs === "object" && kwargs [ρσ_kwargs_symbol] === true) args.pop();
+    kwargs = ρσ_kwargs_to_dict(kwargs);
     var args, x;
     if (args.length === 0) {
         if (kwargs.defval !== undefined) {
@@ -616,12 +838,124 @@ if (!ρσ_max.__handles_kwarg_interpolation__) Object.defineProperties(ρσ_max,
     __module__ : {value: "__main__"}
 });
 
+function ρσ_slice() {
+    if (!(this instanceof ρσ_slice)) return new ρσ_slice(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ρσ_slice.prototype.__init__.apply(this, arguments);
+}
+ρσ_slice.prototype.__init__ = function __init__(start_or_stop, stop, step) {
+    var self = this;
+    if (arguments.length === 1) {
+        self.start = null;
+        self.stop = start_or_stop;
+        self.step = null;
+    } else if (arguments.length === 2) {
+        self.start = start_or_stop;
+        self.stop = stop;
+        self.step = null;
+    } else {
+        self.start = start_or_stop;
+        self.stop = stop;
+        self.step = step;
+    }
+};
+if (!ρσ_slice.prototype.__init__.__argnames__) Object.defineProperties(ρσ_slice.prototype.__init__, {
+    __argnames__ : {value: ["start_or_stop", "stop", "step"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_slice.__argnames__ = ρσ_slice.prototype.__init__.__argnames__;
+ρσ_slice.__handles_kwarg_interpolation__ = ρσ_slice.prototype.__init__.__handles_kwarg_interpolation__;
+ρσ_slice.prototype.indices = function indices(length) {
+    var self = this;
+    var step, lower, upper, start, stop;
+    step = (self.step === null) ? 1 : self.step;
+    if (step === 0) {
+        throw new ValueError("slice step cannot be zero");
+    }
+    if (step > 0) {
+        lower = 0;
+        upper = length;
+        start = (self.start === null) ? lower : self.start;
+        stop = (self.stop === null) ? upper : self.stop;
+    } else {
+        lower = -1;
+        upper = length - 1;
+        start = (self.start === null) ? upper : self.start;
+        stop = (self.stop === null) ? lower : self.stop;
+    }
+    if (self.start !== null) {
+        if (start < 0) {
+            start = max(ρσ_list_add(start, length), lower);
+        }
+        if (start > upper) {
+            start = upper;
+        }
+    }
+    if (self.stop !== null) {
+        if (stop < 0) {
+            stop = max(ρσ_list_add(stop, length), lower);
+        }
+        if (stop > upper) {
+            stop = upper;
+        }
+    }
+    return [start, stop, step];
+};
+if (!ρσ_slice.prototype.indices.__argnames__) Object.defineProperties(ρσ_slice.prototype.indices, {
+    __argnames__ : {value: ["length"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_slice.prototype.__repr__ = function __repr__() {
+    var self = this;
+    var s, stop, step;
+    s = (self.start === null) ? "None" : new String(self.start);
+    stop = (self.stop === null) ? "None" : new String(self.stop);
+    step = (self.step === null) ? "None" : new String(self.step);
+    return ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("slice(", s), ", "), stop), ", "), step), ")");
+};
+if (!ρσ_slice.prototype.__repr__.__module__) Object.defineProperties(ρσ_slice.prototype.__repr__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_slice.prototype.__str__ = function __str__() {
+    var self = this;
+    return self.__repr__();
+};
+if (!ρσ_slice.prototype.__str__.__module__) Object.defineProperties(ρσ_slice.prototype.__str__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_slice.prototype.__eq__ = function __eq__(other) {
+    var self = this;
+    if (!other instanceof ρσ_slice) {
+        return false;
+    }
+    return self.start === other.start && self.stop === other.stop && self.step === other.step;
+};
+if (!ρσ_slice.prototype.__eq__.__argnames__) Object.defineProperties(ρσ_slice.prototype.__eq__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_slice.prototype.__hash__ = function __hash__() {
+    var self = this;
+    throw new TypeError("unhashable type: 'slice'");
+};
+if (!ρσ_slice.prototype.__hash__.__module__) Object.defineProperties(ρσ_slice.prototype.__hash__, {
+    __module__ : {value: "__main__"}
+});
+Object.defineProperty(ρσ_slice.prototype, "__bases__", {value: []});
+ρσ_slice.__name__ = "ρσ_slice";
+ρσ_slice.__qualname__ = "ρσ_slice";
+ρσ_slice.__module__ = "__main__";
+Object.defineProperty(ρσ_slice.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+
 var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type;
 var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike;
-var print = ρσ_print, id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod;
-var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable;
+var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__;
+var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round;
 var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len;
-var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr;function ρσ_equals(a, b) {
+var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next;
+var ρσ_Ellipsis = Object.freeze({toString: function(){return "Ellipsis";}, __repr__: function(){return "Ellipsis";}});
+var Ellipsis = ρσ_Ellipsis;
+var slice = ρσ_slice;function ρσ_equals(a, b) {
     var ρσ_unpack, akeys, bkeys, key;
     if (a === b) {
         return true;
@@ -687,9 +1021,9 @@ function ρσ_list_extend(iterable) {
     var start, iterator, result;
     if (Array.isArray(iterable) || typeof iterable === "string") {
         start = this.length;
-        this.length += iterable.length;
+        this.length = ρσ_list_iadd(this.length, iterable.length);
         for (var i = 0; i < iterable.length; i++) {
-            (ρσ_expr_temp = this)[ρσ_bound_index(start + i, ρσ_expr_temp)] = iterable[(typeof i === "number" && i < 0) ? iterable.length + i : i];
+            (ρσ_expr_temp = this)[ρσ_bound_index(ρσ_list_add(start, i), ρσ_expr_temp)] = iterable[(typeof i === "number" && i < 0) ? iterable.length + i : i];
         }
     } else {
         iterator = (typeof Map === "function" && iterable instanceof Map) ? iterable.keys() : iterable[ρσ_iterator_symbol]();
@@ -706,30 +1040,25 @@ if (!ρσ_list_extend.__argnames__) Object.defineProperties(ρσ_list_extend, {
 });
 
 function ρσ_list_index(val, start, stop) {
-    var idx;
     start = start || 0;
     if (start < 0) {
-        start = this.length + start;
+        start = ρσ_list_add(this.length, start);
     }
     if (start < 0) {
-        throw new ValueError(val + " is not in list");
+        throw new ValueError(ρσ_list_add(val, " is not in list"));
     }
     if (stop === undefined) {
-        idx = this.indexOf(val, start);
-        if (idx === -1) {
-            throw new ValueError(val + " is not in list");
-        }
-        return idx;
+        stop = this.length;
     }
     if (stop < 0) {
-        stop = this.length + stop;
+        stop = ρσ_list_add(this.length, stop);
     }
     for (var i = start; i < stop; i++) {
         if (((ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] === val || typeof (ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] === "object" && ρσ_equals((ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i], val))) {
             return i;
         }
     }
-    throw new ValueError(val + " is not in list");
+    throw new ValueError(ρσ_list_add(val, " is not in list"));
 };
 if (!ρσ_list_index.__argnames__) Object.defineProperties(ρσ_list_index, {
     __argnames__ : {value: ["val", "start", "stop"]},
@@ -756,12 +1085,13 @@ if (!ρσ_list_pop.__argnames__) Object.defineProperties(ρσ_list_pop, {
 });
 
 function ρσ_list_remove(value) {
-    var idx;
-    idx = this.indexOf(value);
-    if (idx === -1) {
-        throw new ValueError(value + " not in list");
+    for (var i = 0; i < this.length; i++) {
+        if (((ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] === value || typeof (ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] === "object" && ρσ_equals((ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i], value))) {
+            this.splice(i, 1);
+            return;
+        }
     }
-    this.splice(idx, 1);
+    throw new ValueError(ρσ_list_add(value, " not in list"));
 };
 if (!ρσ_list_remove.__argnames__) Object.defineProperties(ρσ_list_remove, {
     __argnames__ : {value: ["value"]},
@@ -769,7 +1099,7 @@ if (!ρσ_list_remove.__argnames__) Object.defineProperties(ρσ_list_remove, {
 });
 
 function ρσ_list_to_string() {
-    return "[" + this.join(", ") + "]";
+    return ρσ_list_add(ρσ_list_add("[", this.join(", ")), "]");
 };
 if (!ρσ_list_to_string.__module__) Object.defineProperties(ρσ_list_to_string, {
     __module__ : {value: "__main__"}
@@ -777,7 +1107,7 @@ if (!ρσ_list_to_string.__module__) Object.defineProperties(ρσ_list_to_string
 
 function ρσ_list_insert(index, val) {
     if (index < 0) {
-        index += this.length;
+        index = ρσ_list_iadd(index, this.length);
     }
     index = min(this.length, max(index, 0));
     if (index === 0) {
@@ -818,7 +1148,7 @@ if (!ρσ_list_as_array.__module__) Object.defineProperties(ρσ_list_as_array, 
 function ρσ_list_count(value) {
     return this.reduce((function() {
         var ρσ_anonfunc = function (n, val) {
-            return n + (val === value);
+            return ρσ_list_add(n, (val === value));
         };
         if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
             __argnames__ : {value: ["n", "val"]},
@@ -880,7 +1210,7 @@ function ρσ_list_sort() {
         keymap.set(k, key(k));
         posmap.set(k, i);
     }
-    this.sort((function() {
+    Array.prototype.sort.call(this, (function() {
         var ρσ_anonfunc = function (a, b) {
             return mult * ρσ_list_sort_cmp(keymap.get(a), keymap.get(b), posmap.get(a), posmap.get(b));
         };
@@ -927,7 +1257,7 @@ function ρσ_list_iterator(value) {
         ρσ_d["_list"] = self;
         ρσ_d["next"] = (function() {
             var ρσ_anonfunc = function () {
-                this._i += 1;
+                this._i = ρσ_list_iadd(this._i, 1);
                 if (this._i >= this._list.length) {
                     return (function(){
                         var ρσ_d = {};
@@ -1000,6 +1330,8 @@ function ρσ_list_decorate(ans) {
     ans.inspect = ρσ_list_to_string;
     ans.extend = ρσ_list_extend;
     ans.index = ρσ_list_index;
+    ans.jspop = Array.prototype.pop;
+    ans.pop = ρσ_list_pop;
     ans.pypop = ρσ_list_pop;
     ans.remove = ρσ_list_remove;
     ans.insert = ρσ_list_insert;
@@ -1007,6 +1339,8 @@ function ρσ_list_decorate(ans) {
     ans.clear = ρσ_list_clear;
     ans.count = ρσ_list_count;
     ans.concat = ρσ_list_concat;
+    ans.jssort = Array.prototype.sort;
+    ans.sort = ρσ_list_sort;
     ans.pysort = ρσ_list_sort;
     ans.slice = ρσ_list_slice;
     ans.as_array = ρσ_list_as_array;
@@ -1069,7 +1403,7 @@ function sorted() {
     }
     var ans;
     ans = ρσ_list_constructor(iterable);
-    ans.pysort(key, reverse);
+    ans.sort(key, reverse);
     return ans;
 };
 if (!sorted.__defaults__) Object.defineProperties(sorted, {
@@ -1079,12 +1413,39 @@ if (!sorted.__defaults__) Object.defineProperties(sorted, {
     __module__ : {value: "__main__"}
 });
 
+function ρσ_tuple_constructor(iterable) {
+    var iterator, ans, result;
+    if (iterable === undefined) {
+        return [];
+    }
+    if (ρσ_arraylike(iterable)) {
+        return Array.prototype.slice.call(iterable);
+    }
+    if (typeof iterable[ρσ_iterator_symbol] === "function") {
+        iterator = (typeof Map === "function" && iterable instanceof Map) ? iterable.keys() : iterable[ρσ_iterator_symbol]();
+        ans = ρσ_list_decorate([]);
+        result = iterator.next();
+        while (!result.done) {
+            ans.push(result.value);
+            result = iterator.next();
+        }
+        return ans;
+    }
+    return Object.keys(iterable);
+};
+if (!ρσ_tuple_constructor.__argnames__) Object.defineProperties(ρσ_tuple_constructor, {
+    __argnames__ : {value: ["iterable"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_tuple_constructor.__name__ = "tuple";
+var tuple = ρσ_tuple_constructor;
 var ρσ_global_object_id = 0, ρσ_set_implementation;
 function ρσ_set_keyfor(x) {
     var t, ans;
     t = typeof x;
     if (t === "string" || t === "number" || t === "boolean") {
-        return "_" + t[0] + x;
+        return ρσ_list_add(ρσ_list_add("_", t[0]), x);
     }
     if (x === null) {
         return "__!@#$0";
@@ -1118,7 +1479,7 @@ if (!ρσ_set_polyfill.__module__) Object.defineProperties(ρσ_set_polyfill, {
         var key;
         key = ρσ_set_keyfor(x);
         if (!Object.prototype.hasOwnProperty.call(this._store, key)) {
-            this.size += 1;
+            this.size = ρσ_list_iadd(this.size, 1);
             (ρσ_expr_temp = this._store)[(typeof key === "number" && key < 0) ? ρσ_expr_temp.length + key : key] = x;
         }
         return this;
@@ -1182,7 +1543,7 @@ if (!ρσ_set_polyfill.__module__) Object.defineProperties(ρσ_set_polyfill, {
         })();
         ans["next"] = (function() {
             var ρσ_anonfunc = function () {
-                this._i += 1;
+                this._i = ρσ_list_iadd(this._i, 1);
                 if (this._i >= this._keys.length) {
                     return {'done': true};
                 }
@@ -1591,7 +1952,7 @@ Object.defineProperties(ρσ_set.prototype, (function(){
 })();
 ρσ_set.prototype.toString = ρσ_set.prototype.__repr__ = ρσ_set.prototype.__str__ = ρσ_set.prototype.inspect = (function() {
     var ρσ_anonfunc = function () {
-        return "{" + list(this).join(", ") + "}";
+        return ρσ_list_add(ρσ_list_add("{", list(this).join(", ")), "}");
     };
     if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
         __module__ : {value: "__main__"}
@@ -1601,7 +1962,7 @@ Object.defineProperties(ρσ_set.prototype, (function(){
 ρσ_set.prototype.__eq__ = (function() {
     var ρσ_anonfunc = function (other) {
         var iterator, r;
-        if (!other instanceof this.constructor) {
+        if (!other || !other.jsset) {
             return false;
         }
         if (other.size !== this.size) {
@@ -1638,6 +1999,295 @@ if (!ρσ_set_wrap.__argnames__) Object.defineProperties(ρσ_set_wrap, {
 });
 
 var set = ρσ_set, set_wrap = ρσ_set_wrap;
+function ρσ_frozenset(iterable) {
+    var ans, s, iterator, result, keys;
+    if (this instanceof ρσ_frozenset) {
+        this.jsset = new ρσ_set_implementation;
+        ans = this;
+        if (iterable === undefined) {
+            return ans;
+        }
+        s = ans.jsset;
+        if (ρσ_arraylike(iterable)) {
+            for (var i = 0; i < iterable.length; i++) {
+                s.add(iterable[(typeof i === "number" && i < 0) ? iterable.length + i : i]);
+            }
+        } else if (typeof iterable[ρσ_iterator_symbol] === "function") {
+            iterator = (typeof Map === "function" && iterable instanceof Map) ? iterable.keys() : iterable[ρσ_iterator_symbol]();
+            result = iterator.next();
+            while (!result.done) {
+                s.add(result.value);
+                result = iterator.next();
+            }
+        } else {
+            keys = Object.keys(iterable);
+            for (var j=0; j < keys.length; j++) {
+                s.add(keys[(typeof j === "number" && j < 0) ? keys.length + j : j]);
+            }
+        }
+        return ans;
+    } else {
+        return new ρσ_frozenset(iterable);
+    }
+};
+if (!ρσ_frozenset.__argnames__) Object.defineProperties(ρσ_frozenset, {
+    __argnames__ : {value: ["iterable"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_frozenset.prototype.__name__ = "frozenset";
+Object.defineProperties(ρσ_frozenset.prototype, (function(){
+    var ρσ_d = {};
+    ρσ_d["length"] = (function(){
+        var ρσ_d = {};
+        ρσ_d["get"] = (function() {
+            var ρσ_anonfunc = function () {
+                return this.jsset.size;
+            };
+            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                __module__ : {value: "__main__"}
+            });
+            return ρσ_anonfunc;
+        })();
+        return ρσ_d;
+    }).call(this);
+    ρσ_d["size"] = (function(){
+        var ρσ_d = {};
+        ρσ_d["get"] = (function() {
+            var ρσ_anonfunc = function () {
+                return this.jsset.size;
+            };
+            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                __module__ : {value: "__main__"}
+            });
+            return ρσ_anonfunc;
+        })();
+        return ρσ_d;
+    }).call(this);
+    return ρσ_d;
+}).call(this));
+ρσ_frozenset.prototype.__len__ = (function() {
+    var ρσ_anonfunc = function () {
+        return this.jsset.size;
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.has = ρσ_frozenset.prototype.__contains__ = (function() {
+    var ρσ_anonfunc = function (x) {
+        return this.jsset.has(x);
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["x"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.copy = (function() {
+    var ρσ_anonfunc = function () {
+        return ρσ_frozenset(this);
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype[ρσ_iterator_symbol] = (function() {
+    var ρσ_anonfunc = function () {
+        return this.jsset.values();
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.difference = (function() {
+    var ρσ_anonfunc = function () {
+        var ans, s, iterator, r, x, has;
+        ans = new ρσ_frozenset;
+        s = ans.jsset;
+        iterator = this.jsset.values();
+        r = iterator.next();
+        while (!r.done) {
+            x = r.value;
+            has = false;
+            for (var i = 0; i < arguments.length; i++) {
+                if (arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i].has(x)) {
+                    has = true;
+                    break;
+                }
+            }
+            if (!has) {
+                s.add(x);
+            }
+            r = iterator.next();
+        }
+        return ans;
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.intersection = (function() {
+    var ρσ_anonfunc = function () {
+        var ans, s, iterator, r, x, has;
+        ans = new ρσ_frozenset;
+        s = ans.jsset;
+        iterator = this.jsset.values();
+        r = iterator.next();
+        while (!r.done) {
+            x = r.value;
+            has = true;
+            for (var i = 0; i < arguments.length; i++) {
+                if (!arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i].has(x)) {
+                    has = false;
+                    break;
+                }
+            }
+            if (has) {
+                s.add(x);
+            }
+            r = iterator.next();
+        }
+        return ans;
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.isdisjoint = (function() {
+    var ρσ_anonfunc = function (other) {
+        var iterator, r, x;
+        iterator = this.jsset.values();
+        r = iterator.next();
+        while (!r.done) {
+            x = r.value;
+            if (other.has(x)) {
+                return false;
+            }
+            r = iterator.next();
+        }
+        return true;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["other"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.issubset = (function() {
+    var ρσ_anonfunc = function (other) {
+        var iterator, r, x;
+        iterator = this.jsset.values();
+        r = iterator.next();
+        while (!r.done) {
+            x = r.value;
+            if (!other.has(x)) {
+                return false;
+            }
+            r = iterator.next();
+        }
+        return true;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["other"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.issuperset = (function() {
+    var ρσ_anonfunc = function (other) {
+        var s, iterator, r, x;
+        s = this.jsset;
+        iterator = other[ρσ_iterator_symbol]();
+        r = iterator.next();
+        while (!r.done) {
+            x = r.value;
+            if (!s.has(x)) {
+                return false;
+            }
+            r = iterator.next();
+        }
+        return true;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["other"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.symmetric_difference = (function() {
+    var ρσ_anonfunc = function (other) {
+        return this.union(other).difference(this.intersection(other));
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["other"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.union = (function() {
+    var ρσ_anonfunc = function () {
+        var ans, s, iterator, r;
+        ans = ρσ_frozenset(this);
+        s = ans.jsset;
+        for (var i=0; i < arguments.length; i++) {
+            iterator = arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i][ρσ_iterator_symbol]();
+            r = iterator.next();
+            while (!r.done) {
+                s.add(r.value);
+                r = iterator.next();
+            }
+        }
+        return ans;
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.toString = ρσ_frozenset.prototype.__repr__ = ρσ_frozenset.prototype.__str__ = ρσ_frozenset.prototype.inspect = (function() {
+    var ρσ_anonfunc = function () {
+        return ρσ_list_add(ρσ_list_add("frozenset({", list(this).join(", ")), "})");
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_frozenset.prototype.__eq__ = (function() {
+    var ρσ_anonfunc = function (other) {
+        var iterator, r;
+        if (!other || !other.jsset) {
+            return false;
+        }
+        if (other.size !== this.size) {
+            return false;
+        }
+        if (other.size === 0) {
+            return true;
+        }
+        iterator = other[ρσ_iterator_symbol]();
+        r = iterator.next();
+        while (!r.done) {
+            if (!this.has(r.value)) {
+                return false;
+            }
+            r = iterator.next();
+        }
+        return true;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["other"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+var frozenset = ρσ_frozenset;
 var ρσ_dict_implementation;
 function ρσ_dict_polyfill() {
     this._store = {};
@@ -1652,7 +2302,7 @@ if (!ρσ_dict_polyfill.__module__) Object.defineProperties(ρσ_dict_polyfill, 
         var key;
         key = ρσ_set_keyfor(x);
         if (!Object.prototype.hasOwnProperty.call(this._store, key)) {
-            this.size += 1;
+            this.size = ρσ_list_iadd(this.size, 1);
         }
         (ρσ_expr_temp = this._store)[(typeof key === "number" && key < 0) ? ρσ_expr_temp.length + key : key] = [x, value];
         return this;
@@ -1735,7 +2385,7 @@ if (!ρσ_dict_polyfill.__module__) Object.defineProperties(ρσ_dict_polyfill, 
         })();
         ans["next"] = (function() {
             var ρσ_anonfunc = function () {
-                this._i += 1;
+                this._i = ρσ_list_iadd(this._i, 1);
                 if (this._i >= this._keys.length) {
                     return {'done': true};
                 }
@@ -1769,7 +2419,7 @@ if (!ρσ_dict_polyfill.__module__) Object.defineProperties(ρσ_dict_polyfill, 
         })();
         ans["next"] = (function() {
             var ρσ_anonfunc = function () {
-                this._i += 1;
+                this._i = ρσ_list_iadd(this._i, 1);
                 if (this._i >= this._keys.length) {
                     return {'done': true};
                 }
@@ -1803,7 +2453,7 @@ if (!ρσ_dict_polyfill.__module__) Object.defineProperties(ρσ_dict_polyfill, 
         })();
         ans["next"] = (function() {
             var ρσ_anonfunc = function () {
-                this._i += 1;
+                this._i = ρσ_list_iadd(this._i, 1);
                 if (this._i >= this._keys.length) {
                     return {'done': true};
                 }
@@ -1822,6 +2472,21 @@ if (!ρσ_dict_polyfill.__module__) Object.defineProperties(ρσ_dict_polyfill, 
     });
     return ρσ_anonfunc;
 })();
+ρσ_dict_polyfill.prototype.forEach = (function() {
+    var ρσ_anonfunc = function (callback) {
+        var keys, entry;
+        keys = Object.keys(this._store);
+        for (var ρσ_fi = 0; ρσ_fi < keys.length; ρσ_fi++) {
+            entry = (ρσ_expr_temp = this._store)[ρσ_bound_index(keys[ρσ_bound_index(ρσ_fi, keys)], ρσ_expr_temp)];
+            callback(entry[1], entry[0], this);
+        }
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["callback"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
 if (typeof Map !== "function" || typeof Map.prototype.delete !== "function") {
     ρσ_dict_implementation = ρσ_dict_polyfill;
 } else {
@@ -1831,6 +2496,7 @@ function ρσ_dict() {
     var iterable = ( 0 === arguments.length-1 && arguments[arguments.length-1] !== null && typeof arguments[arguments.length-1] === "object" && arguments[arguments.length-1] [ρσ_kwargs_symbol] === true) ? undefined : arguments[0];
     var kw = arguments[arguments.length-1];
     if (kw === null || typeof kw !== "object" || kw [ρσ_kwargs_symbol] !== true) kw = {};
+    kw = ρσ_kwargs_to_dict(kw);
     if (this instanceof ρσ_dict) {
         this.jsmap = new ρσ_dict_implementation;
         if (iterable !== undefined) {
@@ -1977,7 +2643,7 @@ Object.defineProperties(ρσ_dict.prototype, (function(){
         var ans;
         ans = this.jsmap.get(key);
         if (ans === undefined && !this.jsmap.has(key)) {
-            throw new KeyError(key + "");
+            throw new KeyError(ρσ_list_add(key, ""));
         }
         return ans;
     };
@@ -2002,7 +2668,7 @@ Object.defineProperties(ρσ_dict.prototype, (function(){
     });
     return ρσ_anonfunc;
 })();
-ρσ_dict.prototype.set_default = (function() {
+ρσ_dict.prototype.set_default = ρσ_dict.prototype.setdefault = (function() {
     var ρσ_anonfunc = function (key, defval) {
         var j;
         j = this.jsmap;
@@ -2088,7 +2754,7 @@ Object.defineProperties(ρσ_dict.prototype, (function(){
 })();
 ρσ_dict.prototype.update = (function() {
     var ρσ_anonfunc = function () {
-        var m, iterable, iterator, result, keys;
+        var m, iterable, iterator, result, pairs, keys;
         if (arguments.length === 0) {
             return;
         }
@@ -2111,6 +2777,11 @@ Object.defineProperties(ρσ_dict.prototype, (function(){
             while (!result.done) {
                 m.set(result.value[0], result.value[1]);
                 result = iterator.next();
+            }
+        } else if (typeof iterable.items === "function" && !Array.isArray(iterable)) {
+            pairs = iterable.items();
+            for (var k2 = 0; k2 < pairs.length; k2++) {
+                m.set(pairs[(typeof k2 === "number" && k2 < 0) ? pairs.length + k2 : k2][0], pairs[(typeof k2 === "number" && k2 < 0) ? pairs.length + k2 : k2][1]);
             }
         } else if (typeof iterable[ρσ_iterator_symbol] === "function") {
             iterator = iterable[ρσ_iterator_symbol]();
@@ -2143,10 +2814,10 @@ Object.defineProperties(ρσ_dict.prototype, (function(){
         iterator = this.jsmap.entries();
         r = iterator.next();
         while (!r.done) {
-            entries.push(ρσ_repr(r.value[0]) + ": " + ρσ_repr(r.value[1]));
+            entries.push(ρσ_list_add(ρσ_list_add(ρσ_repr(r.value[0]), ": "), ρσ_repr(r.value[1])));
             r = iterator.next();
         }
-        return "{" + entries.join(", ") + "}";
+        return ρσ_list_add(ρσ_list_add("{", entries.join(", ")), "}");
     };
     if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
         __module__ : {value: "__main__"}
@@ -2182,6 +2853,30 @@ Object.defineProperties(ρσ_dict.prototype, (function(){
     });
     return ρσ_anonfunc;
 })();
+ρσ_dict.prototype.__or__ = (function() {
+    var ρσ_anonfunc = function (other) {
+        var result;
+        result = ρσ_dict(this);
+        result.update(other);
+        return result;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["other"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_dict.prototype.__ior__ = (function() {
+    var ρσ_anonfunc = function (other) {
+        this.update(other);
+        return this;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["other"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
 ρσ_dict.prototype.as_object = (function() {
     var ρσ_anonfunc = function (other) {
         var ans, iterator, r;
@@ -2200,6 +2895,23 @@ Object.defineProperties(ρσ_dict.prototype, (function(){
     });
     return ρσ_anonfunc;
 })();
+ρσ_dict.prototype.toJSON = (function() {
+    var ρσ_anonfunc = function () {
+        var ans, iterator, r;
+        ans = {};
+        iterator = this.jsmap.entries();
+        r = iterator.next();
+        while (!r.done) {
+            ans[ρσ_bound_index(r.value[0], ans)] = r.value[1];
+            r = iterator.next();
+        }
+        return ans;
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
 function ρσ_dict_wrap(x) {
     var ans;
     ans = new ρσ_dict;
@@ -2211,10 +2923,73 @@ if (!ρσ_dict_wrap.__argnames__) Object.defineProperties(ρσ_dict_wrap, {
     __module__ : {value: "__main__"}
 });
 
-var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap;// }}}
-var NameError;
+var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap;
+
+function ρσ_kwargs_to_dict(kw) {
+    // Augment the plain kwargs object with non-enumerable Python dict methods so
+    // that kw.items(), kw.keys(), kw.values() work in user code, while plain
+    // property access (kw.propname) and Object.keys(kw) are unaffected.
+    //
+    // items/keys/values return dual-mode arrays: they support both Array indexing
+    // (for ρσ_dict.prototype.update which does pairs[i]) and iterator protocol
+    // (for `for k, v in kw.items():` which calls .next()).
+    function _make_seq(arr) {
+        arr._ρσ_i = 0;
+        arr.next = function() {
+            return this._ρσ_i < this.length
+                ? {done: false, value: this[this._ρσ_i++]}
+                : {done: true, value: undefined};
+        };
+        arr[ρσ_iterator_symbol] = function() { this._ρσ_i = 0; return this; };
+        return arr;
+    }
+    function _def(name, fn) {
+        if (!Object.prototype.hasOwnProperty.call(kw, name)) {
+            Object.defineProperty(kw, name, {value: fn, configurable: true, writable: true, enumerable: false});
+        }
+    }
+    _def("items", function() {
+        var ks = Object.keys(kw), arr = [], i;
+        for (i = 0; i < ks.length; i++) arr.push([ks[i], kw[ks[i]]]);
+        return _make_seq(arr);
+    });
+    _def("entries", kw.items);
+    _def("keys", function() {
+        return _make_seq(Object.keys(kw).slice());
+    });
+    _def("values", function() {
+        var ks = Object.keys(kw), arr = [], i;
+        for (i = 0; i < ks.length; i++) arr.push(kw[ks[i]]);
+        return _make_seq(arr);
+    });
+    _def("get", function(k, d) {
+        return Object.prototype.hasOwnProperty.call(kw, k) ? kw[k] : (d !== undefined ? d : null);
+    });
+    _def("__contains__", function(k) { return Object.prototype.hasOwnProperty.call(kw, k); });
+    _def("has", function(k) { return Object.prototype.hasOwnProperty.call(kw, k); });
+    _def("__len__", function() { return Object.keys(kw).length; });
+    kw[ρσ_iterator_symbol] = function() {
+        var ks = Object.keys(kw), i = 0;
+        return {next: function() {
+            return i < ks.length ? {done: false, value: ks[i++]} : {done: true, value: undefined};
+        }};
+    };
+    return kw;
+}
+;
+var ρσ_json_parse = function(text, reviver) {
+    function dict_reviver(key, value) {
+        if (value !== null && typeof value === "object" && !Array.isArray(value) && !(value instanceof ρσ_dict)) {
+            value = ρσ_dict(value);
+        }
+        return reviver ? reviver.call(this, key, value) : value;
+    }
+    return JSON.parse(text, dict_reviver);
+};;// }}}
+let NameError;
 NameError = ReferenceError;
 function Exception() {
+    if (!(this instanceof Exception)) return new Exception(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     Exception.prototype.__init__.apply(this, arguments);
 }
@@ -2233,7 +3008,7 @@ Exception.__argnames__ = Exception.prototype.__init__.__argnames__;
 Exception.__handles_kwarg_interpolation__ = Exception.prototype.__init__.__handles_kwarg_interpolation__;
 Exception.prototype.__repr__ = function __repr__() {
     var self = this;
-    return self.name + ": " + self.message;
+    return ρσ_list_add(ρσ_list_add(self.name, ": "), self.message);
 };
 if (!Exception.prototype.__repr__.__module__) Object.defineProperties(Exception.prototype.__repr__, {
     __module__ : {value: "__main__"}
@@ -2243,8 +3018,14 @@ Exception.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(Exception.prototype, "__bases__", {value: [Error]});
+Exception.__name__ = "Exception";
+Exception.__qualname__ = "Exception";
+Exception.__module__ = "__main__";
+Object.defineProperty(Exception.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Error.__init_subclass__ === "function") Error.__init_subclass__.call(Exception);
 
 function AttributeError() {
+    if (!(this instanceof AttributeError)) return new AttributeError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     AttributeError.prototype.__init__.apply(this, arguments);
 }
@@ -2261,9 +3042,15 @@ AttributeError.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(AttributeError.prototype, "__bases__", {value: [Exception]});
+AttributeError.__name__ = "AttributeError";
+AttributeError.__qualname__ = "AttributeError";
+AttributeError.__module__ = "__main__";
+Object.defineProperty(AttributeError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(AttributeError);
 
 
 function IndexError() {
+    if (!(this instanceof IndexError)) return new IndexError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     IndexError.prototype.__init__.apply(this, arguments);
 }
@@ -2280,9 +3067,15 @@ IndexError.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(IndexError.prototype, "__bases__", {value: [Exception]});
+IndexError.__name__ = "IndexError";
+IndexError.__qualname__ = "IndexError";
+IndexError.__module__ = "__main__";
+Object.defineProperty(IndexError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(IndexError);
 
 
 function KeyError() {
+    if (!(this instanceof KeyError)) return new KeyError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     KeyError.prototype.__init__.apply(this, arguments);
 }
@@ -2299,9 +3092,15 @@ KeyError.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(KeyError.prototype, "__bases__", {value: [Exception]});
+KeyError.__name__ = "KeyError";
+KeyError.__qualname__ = "KeyError";
+KeyError.__module__ = "__main__";
+Object.defineProperty(KeyError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(KeyError);
 
 
 function ValueError() {
+    if (!(this instanceof ValueError)) return new ValueError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     ValueError.prototype.__init__.apply(this, arguments);
 }
@@ -2318,9 +3117,15 @@ ValueError.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(ValueError.prototype, "__bases__", {value: [Exception]});
+ValueError.__name__ = "ValueError";
+ValueError.__qualname__ = "ValueError";
+ValueError.__module__ = "__main__";
+Object.defineProperty(ValueError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ValueError);
 
 
 function UnicodeDecodeError() {
+    if (!(this instanceof UnicodeDecodeError)) return new UnicodeDecodeError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     UnicodeDecodeError.prototype.__init__.apply(this, arguments);
 }
@@ -2337,9 +3142,15 @@ UnicodeDecodeError.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(UnicodeDecodeError.prototype, "__bases__", {value: [Exception]});
+UnicodeDecodeError.__name__ = "UnicodeDecodeError";
+UnicodeDecodeError.__qualname__ = "UnicodeDecodeError";
+UnicodeDecodeError.__module__ = "__main__";
+Object.defineProperty(UnicodeDecodeError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(UnicodeDecodeError);
 
 
 function AssertionError() {
+    if (!(this instanceof AssertionError)) return new AssertionError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     AssertionError.prototype.__init__.apply(this, arguments);
 }
@@ -2356,9 +3167,15 @@ AssertionError.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(AssertionError.prototype, "__bases__", {value: [Exception]});
+AssertionError.__name__ = "AssertionError";
+AssertionError.__qualname__ = "AssertionError";
+AssertionError.__module__ = "__main__";
+Object.defineProperty(AssertionError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(AssertionError);
 
 
 function ZeroDivisionError() {
+    if (!(this instanceof ZeroDivisionError)) return new ZeroDivisionError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     ZeroDivisionError.prototype.__init__.apply(this, arguments);
 }
@@ -2375,8 +3192,256 @@ ZeroDivisionError.prototype.__str__ = function __str__ () {
 return this.__repr__();
 };
 Object.defineProperty(ZeroDivisionError.prototype, "__bases__", {value: [Exception]});
+ZeroDivisionError.__name__ = "ZeroDivisionError";
+ZeroDivisionError.__qualname__ = "ZeroDivisionError";
+ZeroDivisionError.__module__ = "__main__";
+Object.defineProperty(ZeroDivisionError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ZeroDivisionError);
 
-var ρσ_in, ρσ_desugar_kwargs, ρσ_exists;
+
+function StopIteration() {
+    if (!(this instanceof StopIteration)) return new StopIteration(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    StopIteration.prototype.__init__.apply(this, arguments);
+}
+ρσ_extends(StopIteration, Exception);
+StopIteration.prototype.__init__ = function __init__ () {
+    Exception.prototype.__init__ && Exception.prototype.__init__.apply(this, arguments);
+};
+StopIteration.prototype.__repr__ = function __repr__ () {
+    if(Exception.prototype.__repr__) return Exception.prototype.__repr__.call(this);
+    return "<" + __name__ + "." + this.constructor.name + " #" + this.ρσ_object_id + ">";
+};
+StopIteration.prototype.__str__ = function __str__ () {
+    if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
+return this.__repr__();
+};
+Object.defineProperty(StopIteration.prototype, "__bases__", {value: [Exception]});
+StopIteration.__name__ = "StopIteration";
+StopIteration.__qualname__ = "StopIteration";
+StopIteration.__module__ = "__main__";
+Object.defineProperty(StopIteration.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(StopIteration);
+
+
+function ImportError() {
+    if (!(this instanceof ImportError)) return new ImportError(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ImportError.prototype.__init__.apply(this, arguments);
+}
+ρσ_extends(ImportError, Exception);
+ImportError.prototype.__init__ = function __init__ () {
+    Exception.prototype.__init__ && Exception.prototype.__init__.apply(this, arguments);
+};
+ImportError.prototype.__repr__ = function __repr__ () {
+    if(Exception.prototype.__repr__) return Exception.prototype.__repr__.call(this);
+    return "<" + __name__ + "." + this.constructor.name + " #" + this.ρσ_object_id + ">";
+};
+ImportError.prototype.__str__ = function __str__ () {
+    if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
+return this.__repr__();
+};
+Object.defineProperty(ImportError.prototype, "__bases__", {value: [Exception]});
+ImportError.__name__ = "ImportError";
+ImportError.__qualname__ = "ImportError";
+ImportError.__module__ = "__main__";
+Object.defineProperty(ImportError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ImportError);
+
+
+function ModuleNotFoundError() {
+    if (!(this instanceof ModuleNotFoundError)) return new ModuleNotFoundError(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ModuleNotFoundError.prototype.__init__.apply(this, arguments);
+}
+ρσ_extends(ModuleNotFoundError, ImportError);
+ModuleNotFoundError.prototype.__init__ = function __init__ () {
+    ImportError.prototype.__init__ && ImportError.prototype.__init__.apply(this, arguments);
+};
+ModuleNotFoundError.prototype.__repr__ = function __repr__ () {
+    if(ImportError.prototype.__repr__) return ImportError.prototype.__repr__.call(this);
+    return "<" + __name__ + "." + this.constructor.name + " #" + this.ρσ_object_id + ">";
+};
+ModuleNotFoundError.prototype.__str__ = function __str__ () {
+    if(ImportError.prototype.__str__) return ImportError.prototype.__str__.call(this);
+return this.__repr__();
+};
+Object.defineProperty(ModuleNotFoundError.prototype, "__bases__", {value: [ImportError]});
+ModuleNotFoundError.__name__ = "ModuleNotFoundError";
+ModuleNotFoundError.__qualname__ = "ModuleNotFoundError";
+ModuleNotFoundError.__module__ = "__main__";
+Object.defineProperty(ModuleNotFoundError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof ImportError.__init_subclass__ === "function") ImportError.__init_subclass__.call(ModuleNotFoundError);
+
+
+function _is_exc_class(obj) {
+    return typeof obj === "function" && (obj === Error || obj.prototype && ρσ_instanceof(obj.prototype, Error));
+};
+if (!_is_exc_class.__argnames__) Object.defineProperties(_is_exc_class, {
+    __argnames__ : {value: ["obj"]},
+    __module__ : {value: "__main__"}
+});
+
+function ExceptionGroup() {
+    if (!(this instanceof ExceptionGroup)) return new ExceptionGroup(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ExceptionGroup.prototype.__init__.apply(this, arguments);
+}
+ρσ_extends(ExceptionGroup, Exception);
+ExceptionGroup.prototype.__init__ = function __init__(message, exceptions) {
+    var self = this;
+    Exception.prototype.__init__.call(self, message);
+    self.exceptions = (exceptions) ? exceptions : ρσ_list_decorate([]);
+};
+if (!ExceptionGroup.prototype.__init__.__argnames__) Object.defineProperties(ExceptionGroup.prototype.__init__, {
+    __argnames__ : {value: ["message", "exceptions"]},
+    __module__ : {value: "__main__"}
+});
+ExceptionGroup.__argnames__ = ExceptionGroup.prototype.__init__.__argnames__;
+ExceptionGroup.__handles_kwarg_interpolation__ = ExceptionGroup.prototype.__init__.__handles_kwarg_interpolation__;
+ExceptionGroup.prototype.subgroup = function subgroup(condition) {
+    var self = this;
+    var matched, e;
+    if (_is_exc_class(condition)) {
+        matched = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (ρσ_instanceof(e, condition)) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+    } else if (callable(condition)) {
+        matched = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (condition(e)) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+    } else {
+        matched = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (ρσ_instanceof(e, condition)) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+    }
+    return (matched) ? new ExceptionGroup(self.message, matched) : null;
+};
+if (!ExceptionGroup.prototype.subgroup.__argnames__) Object.defineProperties(ExceptionGroup.prototype.subgroup, {
+    __argnames__ : {value: ["condition"]},
+    __module__ : {value: "__main__"}
+});
+ExceptionGroup.prototype.split = function split(condition) {
+    var self = this;
+    var matched, e, rest;
+    if (_is_exc_class(condition)) {
+        matched = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (ρσ_instanceof(e, condition)) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+        rest = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (!(ρσ_instanceof(e, condition))) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+    } else if (callable(condition)) {
+        matched = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (condition(e)) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+        rest = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (!condition(e)) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+    } else {
+        matched = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (ρσ_instanceof(e, condition)) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+        rest = (function() {
+            var ρσ_Iter = ρσ_Iterable(self.exceptions), ρσ_Result = [], e;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                e = ρσ_Iter[ρσ_Index];
+                if (!(ρσ_instanceof(e, condition))) {
+                    ρσ_Result.push(e);
+                }
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+    }
+    return ρσ_list_decorate([ (matched) ? new ExceptionGroup(self.message, matched) : null, (rest) ? new ExceptionGroup(self.message, rest) : null ]);
+};
+if (!ExceptionGroup.prototype.split.__argnames__) Object.defineProperties(ExceptionGroup.prototype.split, {
+    __argnames__ : {value: ["condition"]},
+    __module__ : {value: "__main__"}
+});
+ExceptionGroup.prototype.__repr__ = function __repr__() {
+    var self = this;
+    return ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("ExceptionGroup(", repr(self.message)), ", "), repr(self.exceptions)), ")");
+};
+if (!ExceptionGroup.prototype.__repr__.__module__) Object.defineProperties(ExceptionGroup.prototype.__repr__, {
+    __module__ : {value: "__main__"}
+});
+ExceptionGroup.prototype.__str__ = function __str__ () {
+    if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
+return this.__repr__();
+};
+Object.defineProperty(ExceptionGroup.prototype, "__bases__", {value: [Exception]});
+ExceptionGroup.__name__ = "ExceptionGroup";
+ExceptionGroup.__qualname__ = "ExceptionGroup";
+ExceptionGroup.__module__ = "__main__";
+Object.defineProperty(ExceptionGroup.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ExceptionGroup);
+let ρσ_in, ρσ_desugar_kwargs, ρσ_exists, ρσ_JS_Proxy, ρσ_proxy_target_symbol, ρσ_attr_proxy_handler;
 function ρσ_eslice(arr, step, start, end) {
     var is_string;
     if (typeof arr === "string" || arr instanceof String) {
@@ -2505,12 +3570,56 @@ if (!ρσ_unpack_asarray.__argnames__) Object.defineProperties(ρσ_unpack_asarr
     __module__ : {value: "__main__"}
 });
 
+function ρσ_unpack_starred_asarray(iterable) {
+    var ans, iterator, result;
+    if (typeof iterable === "string" || iterable instanceof String) {
+        return iterable.split("");
+    }
+    if (ρσ_arraylike(iterable)) {
+        return iterable;
+    }
+    ans = [];
+    if (typeof iterable[ρσ_iterator_symbol] === "function") {
+        iterator = (typeof Map === "function" && iterable instanceof Map) ? iterable.keys() : iterable[ρσ_iterator_symbol]();
+        result = iterator.next();
+        while (!result.done) {
+            ans.push(result.value);
+            result = iterator.next();
+        }
+    }
+    return ans;
+};
+if (!ρσ_unpack_starred_asarray.__argnames__) Object.defineProperties(ρσ_unpack_starred_asarray, {
+    __argnames__ : {value: ["iterable"]},
+    __module__ : {value: "__main__"}
+});
+
 function ρσ_extends(child, parent) {
     child.prototype = Object.create(parent.prototype);
     child.prototype.constructor = child;
+    Object.setPrototypeOf(child, parent);
 };
 if (!ρσ_extends.__argnames__) Object.defineProperties(ρσ_extends, {
     __argnames__ : {value: ["child", "parent"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_object_new(cls) {
+    return Object.create(cls.prototype);
+};
+if (!ρσ_object_new.__argnames__) Object.defineProperties(ρσ_object_new, {
+    __argnames__ : {value: ["cls"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_new(parent, cls) {
+    if (parent && typeof parent.__new__ === "function") {
+        return parent.__new__.apply(parent, Array.prototype.slice.call(arguments, 1));
+    }
+    return Object.create(cls.prototype);
+};
+if (!ρσ_new.__argnames__) Object.defineProperties(ρσ_new, {
+    __argnames__ : {value: ["parent", "cls"]},
     __module__ : {value: "__main__"}
 });
 
@@ -2592,11 +3701,16 @@ if (!ρσ_Iterable.__argnames__) Object.defineProperties(ρσ_Iterable, {
         if (typeof Object.assign === "function") {
             return (function() {
                 var ρσ_anonfunc = function () {
-                    var ans;
+                    var ans, arg;
                     ans = Object.create(null);
                     ans[ρσ_kwargs_symbol] = true;
                     for (var i = 0; i < arguments.length; i++) {
-                        Object.assign(ans, arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i]);
+                        arg = arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i];
+                        if (arg && arg.jsmap && typeof arg.jsmap.forEach === "function") {
+                            arg.jsmap.forEach(function(v, k) { ans[k] = v; });
+                        } else {
+                            Object.assign(ans, arg);
+                        }
                     }
                     return ans;
                 };
@@ -2608,13 +3722,18 @@ if (!ρσ_Iterable.__argnames__) Object.defineProperties(ρσ_Iterable, {
         }
         return (function() {
             var ρσ_anonfunc = function () {
-                var ans, keys;
+                var ans, arg, keys;
                 ans = Object.create(null);
                 ans[ρσ_kwargs_symbol] = true;
                 for (var i = 0; i < arguments.length; i++) {
-                    keys = Object.keys(arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i]);
-                    for (var j = 0; j < keys.length; j++) {
-                        ans[ρσ_bound_index(keys[(typeof j === "number" && j < 0) ? keys.length + j : j], ans)] = (ρσ_expr_temp = arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i])[ρσ_bound_index(keys[(typeof j === "number" && j < 0) ? keys.length + j : j], ρσ_expr_temp)];
+                    arg = arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i];
+                    if (arg && arg.jsmap && typeof arg.jsmap.forEach === "function") {
+                        arg.jsmap.forEach(function(v, k) { ans[k] = v; });
+                    } else {
+                        keys = Object.keys(arg);
+                        for (var j = 0; j < keys.length; j++) {
+                            ans[ρσ_bound_index(keys[(typeof j === "number" && j < 0) ? keys.length + j : j], ans)] = arg[ρσ_bound_index(keys[(typeof j === "number" && j < 0) ? keys.length + j : j], arg)];
+                        }
                     }
                 }
                 return ans;
@@ -2638,7 +3757,7 @@ function ρσ_interpolate_kwargs(f, supplied_args) {
     has_prop = Object.prototype.hasOwnProperty;
     kwobj = supplied_args.pop();
     if (f.__handles_kwarg_interpolation__) {
-        args = new Array(Math.max(supplied_args.length, f.__argnames__.length) + 1);
+        args = new Array(ρσ_list_add(Math.max(supplied_args.length, f.__argnames__.length), 1));
         args[args.length-1] = kwobj;
         for (var i = 0; i < args.length - 1; i++) {
             if (i < f.__argnames__.length) {
@@ -2682,11 +3801,17 @@ if (!ρσ_interpolate_kwargs_constructor.__argnames__) Object.defineProperties(�
 });
 
 function ρσ_getitem(obj, key) {
+    if (typeof obj === "function" && obj.__class_getitem__) {
+        return obj.__class_getitem__(key);
+    }
     if (obj.__getitem__) {
         return obj.__getitem__(key);
     }
+    if (typeof ρσ_slice !== "undefined" && key instanceof ρσ_slice) {
+        return ρσ_eslice(obj, (key.step  !== null && key.step  !== undefined) ? key.step  : 1, (key.start !== null && key.start !== undefined) ? key.start : undefined, (key.stop  !== null && key.stop  !== undefined) ? key.stop  : undefined);
+    }
     if (typeof key === "number" && key < 0) {
-        key += obj.length;
+        key = ρσ_list_iadd(key, obj.length);
     }
     return obj[(typeof key === "number" && key < 0) ? obj.length + key : key];
 };
@@ -2698,12 +3823,15 @@ if (!ρσ_getitem.__argnames__) Object.defineProperties(ρσ_getitem, {
 function ρσ_setitem(obj, key, val) {
     if (obj.__setitem__) {
         obj.__setitem__(key, val);
+    } else if (typeof ρσ_slice !== "undefined" && key instanceof ρσ_slice) {
+        ρσ_splice(obj, val, (key.start !== null && key.start !== undefined) ? key.start : 0, (key.stop  !== null && key.stop  !== undefined) ? key.stop  : obj.length);
     } else {
         if (typeof key === "number" && key < 0) {
-            key += obj.length;
+            key = ρσ_list_iadd(key, obj.length);
         }
         obj[(typeof key === "number" && key < 0) ? obj.length + key : key] = val;
     }
+    return val;
 };
 if (!ρσ_setitem.__argnames__) Object.defineProperties(ρσ_setitem, {
     __argnames__ : {value: ["obj", "key", "val"]},
@@ -2713,11 +3841,13 @@ if (!ρσ_setitem.__argnames__) Object.defineProperties(ρσ_setitem, {
 function ρσ_delitem(obj, key) {
     if (obj.__delitem__) {
         obj.__delitem__(key);
+    } else if (typeof ρσ_slice !== "undefined" && key instanceof ρσ_slice) {
+        ρσ_delslice(obj, (key.step  !== null && key.step  !== undefined) ? key.step  : 1, (key.start !== null && key.start !== undefined) ? key.start : undefined, (key.stop  !== null && key.stop  !== undefined) ? key.stop  : undefined);
     } else if (typeof obj.splice === "function") {
         obj.splice(key, 1);
     } else {
         if (typeof key === "number" && key < 0) {
-            key += obj.length;
+            key = ρσ_list_iadd(key, obj.length);
         }
         delete obj[key];
     }
@@ -2729,7 +3859,7 @@ if (!ρσ_delitem.__argnames__) Object.defineProperties(ρσ_delitem, {
 
 function ρσ_bound_index(idx, arr) {
     if (typeof idx === "number" && idx < 0) {
-        idx += arr.length;
+        idx = ρσ_list_iadd(idx, arr.length);
     }
     return idx;
 };
@@ -2741,13 +3871,13 @@ if (!ρσ_bound_index.__argnames__) Object.defineProperties(ρσ_bound_index, {
 function ρσ_splice(arr, val, start, end) {
     start = start || 0;
     if (start < 0) {
-        start += arr.length;
+        start = ρσ_list_iadd(start, arr.length);
     }
     if (end === undefined) {
         end = arr.length;
     }
     if (end < 0) {
-        end += arr.length;
+        end = ρσ_list_iadd(end, arr.length);
     }
     Array.prototype.splice.apply(arr, [start, end - start].concat(val));
 };
@@ -2872,6 +4002,383 @@ if (!ρσ_mixin.__module__) Object.defineProperties(ρσ_mixin, {
     __module__ : {value: "__main__"}
 });
 
+function ρσ_op_add(a, b) {
+    if (a !== null && typeof a.__add__ === "function") {
+        return a.__add__(b);
+    }
+    if (b !== null && typeof b.__radd__ === "function") {
+        return b.__radd__(a);
+    }
+    return ρσ_list_add(a, b);
+};
+if (!ρσ_op_add.__argnames__) Object.defineProperties(ρσ_op_add, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_sub(a, b) {
+    if (a !== null && typeof a.__sub__ === "function") {
+        return a.__sub__(b);
+    }
+    if (b !== null && typeof b.__rsub__ === "function") {
+        return b.__rsub__(a);
+    }
+    return a - b;
+};
+if (!ρσ_op_sub.__argnames__) Object.defineProperties(ρσ_op_sub, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_mul(a, b) {
+    var result;
+    if (a !== null && typeof a.__mul__ === "function") {
+        return a.__mul__(b);
+    }
+    if (b !== null && typeof b.__rmul__ === "function") {
+        return b.__rmul__(a);
+    }
+    if ((typeof a === "string" || a instanceof String) && typeof b === "number") {
+        return a.repeat(b);
+    }
+    if ((typeof b === "string" || b instanceof String) && typeof a === "number") {
+        return b.repeat(a);
+    }
+    if (Array.isArray(a) && typeof b === "number") {
+        result = [];
+        for (var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++) {
+            result = result.concat(a);
+        }
+        return ρσ_list_constructor(result);
+    }
+    if (Array.isArray(b) && typeof a === "number") {
+        result = [];
+        for (var ρσ_mi = 0; ρσ_mi < a; ρσ_mi++) {
+            result = result.concat(b);
+        }
+        return ρσ_list_constructor(result);
+    }
+    return a * b;
+};
+if (!ρσ_op_mul.__argnames__) Object.defineProperties(ρσ_op_mul, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_truediv(a, b) {
+    if (a !== null && typeof a.__truediv__ === "function") {
+        return a.__truediv__(b);
+    }
+    if (b !== null && typeof b.__rtruediv__ === "function") {
+        return b.__rtruediv__(a);
+    }
+    return a / b;
+};
+if (!ρσ_op_truediv.__argnames__) Object.defineProperties(ρσ_op_truediv, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_floordiv(a, b) {
+    if (a !== null && typeof a.__floordiv__ === "function") {
+        return a.__floordiv__(b);
+    }
+    if (b !== null && typeof b.__rfloordiv__ === "function") {
+        return b.__rfloordiv__(a);
+    }
+    return Math.floor(a / b);
+};
+if (!ρσ_op_floordiv.__argnames__) Object.defineProperties(ρσ_op_floordiv, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_mod(a, b) {
+    if (a !== null && typeof a.__mod__ === "function") {
+        return a.__mod__(b);
+    }
+    if (b !== null && typeof b.__rmod__ === "function") {
+        return b.__rmod__(a);
+    }
+    return a % b;
+};
+if (!ρσ_op_mod.__argnames__) Object.defineProperties(ρσ_op_mod, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_pow(a, b) {
+    if (a !== null && typeof a.__pow__ === "function") {
+        return a.__pow__(b);
+    }
+    if (b !== null && typeof b.__rpow__ === "function") {
+        return b.__rpow__(a);
+    }
+    return Math.pow(a, b);
+};
+if (!ρσ_op_pow.__argnames__) Object.defineProperties(ρσ_op_pow, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_and(a, b) {
+    if (a !== null && typeof a.__and__ === "function") {
+        return a.__and__(b);
+    }
+    if (b !== null && typeof b.__rand__ === "function") {
+        return b.__rand__(a);
+    }
+    return a & b;
+};
+if (!ρσ_op_and.__argnames__) Object.defineProperties(ρσ_op_and, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_or(a, b) {
+    if (a !== null && typeof a.__or__ === "function") {
+        return a.__or__(b);
+    }
+    if (b !== null && typeof b.__ror__ === "function") {
+        return b.__ror__(a);
+    }
+    return a | b;
+};
+if (!ρσ_op_or.__argnames__) Object.defineProperties(ρσ_op_or, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_xor(a, b) {
+    if (a !== null && typeof a.__xor__ === "function") {
+        return a.__xor__(b);
+    }
+    if (b !== null && typeof b.__rxor__ === "function") {
+        return b.__rxor__(a);
+    }
+    return a ^ b;
+};
+if (!ρσ_op_xor.__argnames__) Object.defineProperties(ρσ_op_xor, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_lshift(a, b) {
+    if (a !== null && typeof a.__lshift__ === "function") {
+        return a.__lshift__(b);
+    }
+    if (b !== null && typeof b.__rlshift__ === "function") {
+        return b.__rlshift__(a);
+    }
+    return a << b;
+};
+if (!ρσ_op_lshift.__argnames__) Object.defineProperties(ρσ_op_lshift, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_rshift(a, b) {
+    if (a !== null && typeof a.__rshift__ === "function") {
+        return a.__rshift__(b);
+    }
+    if (b !== null && typeof b.__rrshift__ === "function") {
+        return b.__rrshift__(a);
+    }
+    return a >> b;
+};
+if (!ρσ_op_rshift.__argnames__) Object.defineProperties(ρσ_op_rshift, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_list_add(a, b) {
+    if (Array.isArray(a) && Array.isArray(b)) {
+        return ρσ_list_constructor(a.concat(b));
+    }
+    return a + b;
+};
+if (!ρσ_list_add.__argnames__) Object.defineProperties(ρσ_list_add, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_list_iadd(a, b) {
+    if (Array.isArray(a) && Array.isArray(b)) {
+        Array.prototype.push.apply(a, b);
+        return a;
+    }
+    return a + b;
+};
+if (!ρσ_list_iadd.__argnames__) Object.defineProperties(ρσ_list_iadd, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_neg(a) {
+    if (a !== null && typeof a.__neg__ === "function") {
+        return a.__neg__();
+    }
+    return -a;
+};
+if (!ρσ_op_neg.__argnames__) Object.defineProperties(ρσ_op_neg, {
+    __argnames__ : {value: ["a"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_pos(a) {
+    if (a !== null && typeof a.__pos__ === "function") {
+        return a.__pos__();
+    }
+    return +a;
+};
+if (!ρσ_op_pos.__argnames__) Object.defineProperties(ρσ_op_pos, {
+    __argnames__ : {value: ["a"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_invert(a) {
+    if (a !== null && typeof a.__invert__ === "function") {
+        return a.__invert__();
+    }
+    return ~a;
+};
+if (!ρσ_op_invert.__argnames__) Object.defineProperties(ρσ_op_invert, {
+    __argnames__ : {value: ["a"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_iadd(a, b) {
+    if (a !== null && typeof a.__iadd__ === "function") {
+        return a.__iadd__(b);
+    }
+    return ρσ_op_add(a, b);
+};
+if (!ρσ_op_iadd.__argnames__) Object.defineProperties(ρσ_op_iadd, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_isub(a, b) {
+    if (a !== null && typeof a.__isub__ === "function") {
+        return a.__isub__(b);
+    }
+    return ρσ_op_sub(a, b);
+};
+if (!ρσ_op_isub.__argnames__) Object.defineProperties(ρσ_op_isub, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_imul(a, b) {
+    if (a !== null && typeof a.__imul__ === "function") {
+        return a.__imul__(b);
+    }
+    return ρσ_op_mul(a, b);
+};
+if (!ρσ_op_imul.__argnames__) Object.defineProperties(ρσ_op_imul, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_itruediv(a, b) {
+    if (a !== null && typeof a.__itruediv__ === "function") {
+        return a.__itruediv__(b);
+    }
+    return ρσ_op_truediv(a, b);
+};
+if (!ρσ_op_itruediv.__argnames__) Object.defineProperties(ρσ_op_itruediv, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_ifloordiv(a, b) {
+    if (a !== null && typeof a.__ifloordiv__ === "function") {
+        return a.__ifloordiv__(b);
+    }
+    return ρσ_op_floordiv(a, b);
+};
+if (!ρσ_op_ifloordiv.__argnames__) Object.defineProperties(ρσ_op_ifloordiv, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_imod(a, b) {
+    if (a !== null && typeof a.__imod__ === "function") {
+        return a.__imod__(b);
+    }
+    return ρσ_op_mod(a, b);
+};
+if (!ρσ_op_imod.__argnames__) Object.defineProperties(ρσ_op_imod, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_ipow(a, b) {
+    if (a !== null && typeof a.__ipow__ === "function") {
+        return a.__ipow__(b);
+    }
+    return ρσ_op_pow(a, b);
+};
+if (!ρσ_op_ipow.__argnames__) Object.defineProperties(ρσ_op_ipow, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_iand(a, b) {
+    if (a !== null && typeof a.__iand__ === "function") {
+        return a.__iand__(b);
+    }
+    return ρσ_op_and(a, b);
+};
+if (!ρσ_op_iand.__argnames__) Object.defineProperties(ρσ_op_iand, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_ior(a, b) {
+    if (a !== null && typeof a.__ior__ === "function") {
+        return a.__ior__(b);
+    }
+    return ρσ_op_or(a, b);
+};
+if (!ρσ_op_ior.__argnames__) Object.defineProperties(ρσ_op_ior, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_ixor(a, b) {
+    if (a !== null && typeof a.__ixor__ === "function") {
+        return a.__ixor__(b);
+    }
+    return ρσ_op_xor(a, b);
+};
+if (!ρσ_op_ixor.__argnames__) Object.defineProperties(ρσ_op_ixor, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_ilshift(a, b) {
+    if (a !== null && typeof a.__ilshift__ === "function") {
+        return a.__ilshift__(b);
+    }
+    return ρσ_op_lshift(a, b);
+};
+if (!ρσ_op_ilshift.__argnames__) Object.defineProperties(ρσ_op_ilshift, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_irshift(a, b) {
+    if (a !== null && typeof a.__irshift__ === "function") {
+        return a.__irshift__(b);
+    }
+    return ρσ_op_rshift(a, b);
+};
+if (!ρσ_op_irshift.__argnames__) Object.defineProperties(ρσ_op_irshift, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
 function ρσ_instanceof() {
     var obj, bases, q, cls, p;
     obj = arguments[0];
@@ -2917,12 +4424,121 @@ function ρσ_instanceof() {
 if (!ρσ_instanceof.__module__) Object.defineProperties(ρσ_instanceof, {
     __module__ : {value: "__main__"}
 });
+
+ρσ_JS_Proxy = typeof Proxy === "function" ? Proxy : null;
+ρσ_proxy_target_symbol = typeof Symbol === "function" ? Symbol("ρσ_proxy_target") : "__ρσ_proxy_target__";
+ρσ_attr_proxy_handler = (function(){
+    var ρσ_d = {};
+    ρσ_d["get"] = (function() {
+        var ρσ_anonfunc = function (target, prop, receiver) {
+            var val;
+            if (prop === ρσ_proxy_target_symbol) {
+                return target;
+            }
+            if (typeof prop === "symbol") {
+                return Reflect.get(target, prop, receiver);
+            }
+            if (typeof target.__getattribute__ === "function" && prop !== "__getattribute__") {
+                try {
+                    return target.__getattribute__.call(receiver, prop);
+                } catch (ρσ_Exception) {
+                    ρσ_last_exception = ρσ_Exception;
+                    if (ρσ_Exception instanceof AttributeError) {
+                        if (typeof target.__getattr__ === "function") {
+                            return target.__getattr__.call(receiver, prop);
+                        }
+                        throw ρσ_Exception;
+                    } else {
+                        throw ρσ_Exception;
+                    }
+                }
+            }
+            val = Reflect.get(target, prop, receiver);
+            if (val === undefined && typeof target.__getattr__ === "function" && !(prop in target)) {
+                return target.__getattr__.call(receiver, prop);
+            }
+            return val;
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop", "receiver"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    ρσ_d["set"] = (function() {
+        var ρσ_anonfunc = function (target, prop, value, receiver) {
+            if (typeof target.__setattr__ === "function") {
+                target.__setattr__.call(receiver, prop, value);
+                return true;
+            }
+            return Reflect.set(target, prop, value, target);
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop", "value", "receiver"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    ρσ_d["deleteProperty"] = (function() {
+        var ρσ_anonfunc = function (target, prop) {
+            if (typeof target.__delattr__ === "function") {
+                target.__delattr__.call(target, prop);
+                return true;
+            }
+            return Reflect.deleteProperty(target, prop);
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    return ρσ_d;
+}).call(this);
+function ρσ_object_setattr(obj, name, value) {
+    var target;
+    target = obj[ρσ_proxy_target_symbol];
+    if (target === undefined) {
+        target = obj;
+    }
+    target[name] = value;
+};
+if (!ρσ_object_setattr.__argnames__) Object.defineProperties(ρσ_object_setattr, {
+    __argnames__ : {value: ["obj", "name", "value"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_object_getattr(obj, name) {
+    var target;
+    target = obj[ρσ_proxy_target_symbol];
+    if (target === undefined) {
+        target = obj;
+    }
+    return target[(typeof name === "number" && name < 0) ? target.length + name : name];
+};
+if (!ρσ_object_getattr.__argnames__) Object.defineProperties(ρσ_object_getattr, {
+    __argnames__ : {value: ["obj", "name"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_object_delattr(obj, name) {
+    var target;
+    target = obj[ρσ_proxy_target_symbol];
+    if (target === undefined) {
+        target = obj;
+    }
+    delete target[name];
+};
+if (!ρσ_object_delattr.__argnames__) Object.defineProperties(ρσ_object_delattr, {
+    __argnames__ : {value: ["obj", "name"]},
+    __module__ : {value: "__main__"}
+});
 function sum(iterable, start) {
     var ans, iterator, r;
     if (Array.isArray(iterable)) {
         return iterable.reduce((function() {
             var ρσ_anonfunc = function (prev, cur) {
-                return prev + cur;
+                return ρσ_list_add(prev, cur);
             };
             if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
                 __argnames__ : {value: ["prev", "cur"]},
@@ -2935,7 +4551,7 @@ function sum(iterable, start) {
     iterator = iter(iterable);
     r = iterator.next();
     while (!r.done) {
-        ans += r.value;
+        ans = ρσ_list_iadd(ans, r.value);
         r = iterator.next();
     }
     return ans;
@@ -3064,13 +4680,22 @@ if (!zip.__module__) Object.defineProperties(zip, {
 });
 
 function any(iterable) {
-    var i;
-    var ρσ_Iter0 = ρσ_Iterable(iterable);
-    for (var ρσ_Index0 = 0; ρσ_Index0 < ρσ_Iter0.length; ρσ_Index0++) {
-        i = ρσ_Iter0[ρσ_Index0];
-        if (i) {
+    var iterator, r;
+    if (Array.isArray(iterable) || typeof iterable === "string") {
+        for (var i = 0; i < iterable.length; i++) {
+            if (iterable[(typeof i === "number" && i < 0) ? iterable.length + i : i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+    iterator = iter(iterable);
+    r = iterator.next();
+    while (!r.done) {
+        if (r.value) {
             return true;
         }
+        r = iterator.next();
     }
     return false;
 };
@@ -3080,13 +4705,22 @@ if (!any.__argnames__) Object.defineProperties(any, {
 });
 
 function all(iterable) {
-    var i;
-    var ρσ_Iter1 = ρσ_Iterable(iterable);
-    for (var ρσ_Index1 = 0; ρσ_Index1 < ρσ_Iter1.length; ρσ_Index1++) {
-        i = ρσ_Iter1[ρσ_Index1];
-        if (!i) {
+    var iterator, r;
+    if (Array.isArray(iterable) || typeof iterable === "string") {
+        for (var i = 0; i < iterable.length; i++) {
+            if (!iterable[(typeof i === "number" && i < 0) ? iterable.length + i : i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    iterator = iter(iterable);
+    r = iterator.next();
+    while (!r.done) {
+        if (!r.value) {
             return false;
         }
+        r = iterator.next();
     }
     return true;
 };
@@ -3094,7 +4728,7 @@ if (!all.__argnames__) Object.defineProperties(all, {
     __argnames__ : {value: ["iterable"]},
     __module__ : {value: "__main__"}
 });
-var decimal_sep, define_str_func, ρσ_unpack, ρσ_orig_split, ρσ_orig_replace;
+let decimal_sep, define_str_func, ρσ_unpack, ρσ_orig_split, ρσ_orig_replace;
 decimal_sep = 1.1.toLocaleString()[1];
 function ρσ_repr_js_builtin(x, as_array) {
     var ans, b, keys, key;
@@ -3109,10 +4743,10 @@ function ρσ_repr_js_builtin(x, as_array) {
         keys = Object.keys(x);
         for (var k = 0; k < keys.length; k++) {
             key = keys[(typeof k === "number" && k < 0) ? keys.length + k : k];
-            ans.push(JSON.stringify(key) + ":" + ρσ_repr(x[(typeof key === "number" && key < 0) ? x.length + key : key]));
+            ans.push(ρσ_list_add(ρσ_list_add(JSON.stringify(key), ":"), ρσ_repr(x[(typeof key === "number" && key < 0) ? x.length + key : key])));
         }
     }
-    return b[0] + ans.join(", ") + b[1];
+    return ρσ_list_add(ρσ_list_add(b[0], ans.join(", ")), b[1]);
 };
 if (!ρσ_repr_js_builtin.__argnames__) Object.defineProperties(ρσ_repr_js_builtin, {
     __argnames__ : {value: ["x", "as_array"]},
@@ -3128,14 +4762,14 @@ function ρσ_html_element_to_string(elem) {
         if (attr.specified) {
             val = attr.value;
             if (val.length > 10) {
-                val = val.slice(0, 15) + "...";
+                val = ρσ_list_add(val.slice(0, 15), "...");
             }
             val = JSON.stringify(val);
-            attrs.push("" + ρσ_str.format("{}", attr.name) + "=" + ρσ_str.format("{}", val) + "");
+            attrs.push(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("", ρσ_str.format("{}", attr.name)), "="), ρσ_str.format("{}", val)), ""));
         }
     }
-    attrs = (attrs.length) ? " " + attrs.join(" ") : "";
-    ans = "<" + ρσ_str.format("{}", elem.tagName) + "" + ρσ_str.format("{}", attrs) + ">";
+    attrs = (attrs.length) ? ρσ_list_add(" ", attrs.join(" ")) : "";
+    ans = ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("<", ρσ_str.format("{}", elem.tagName)), ""), ρσ_str.format("{}", attrs)), ">");
     return ans;
 };
 if (!ρσ_html_element_to_string.__argnames__) Object.defineProperties(ρσ_html_element_to_string, {
@@ -3165,7 +4799,7 @@ function ρσ_repr(x) {
     } else {
         name = Object.prototype.toString.call(x).slice(8, -1);
         if (ρσ_not_equals("Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".indexOf(name), -1)) {
-            return name + "([" + x.map((function() {
+            return ρσ_list_add(ρσ_list_add(ρσ_list_add(name, "(["), x.map((function() {
                 var ρσ_anonfunc = function (i) {
                     return str.format("0x{:02x}", i);
                 };
@@ -3174,7 +4808,7 @@ function ρσ_repr(x) {
                     __module__ : {value: "__main__"}
                 });
                 return ρσ_anonfunc;
-            })()).join(", ") + "])";
+            })()).join(", ")), "])");
         }
         if (typeof HTMLElement !== "undefined" && x instanceof HTMLElement) {
             ans = ρσ_html_element_to_string(x);
@@ -3192,7 +4826,7 @@ function ρσ_repr(x) {
             } 
         }
     }
-    return ans + "";
+    return ρσ_list_add(ans, "");
 };
 if (!ρσ_repr.__argnames__) Object.defineProperties(ρσ_repr, {
     __argnames__ : {value: ["x"]},
@@ -3219,7 +4853,7 @@ function ρσ_str(x) {
     } else if (typeof x.toString === "function") {
         name = Object.prototype.toString.call(x).slice(8, -1);
         if (ρσ_not_equals("Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".indexOf(name), -1)) {
-            return name + "([" + x.map((function() {
+            return ρσ_list_add(ρσ_list_add(ρσ_list_add(name, "(["), x.map((function() {
                 var ρσ_anonfunc = function (i) {
                     return str.format("0x{:02x}", i);
                 };
@@ -3228,7 +4862,7 @@ function ρσ_str(x) {
                     __module__ : {value: "__main__"}
                 });
                 return ρσ_anonfunc;
-            })()).join(", ") + "])";
+            })()).join(", ")), "])");
         }
         if (typeof HTMLElement !== "undefined" && x instanceof HTMLElement) {
             ans = ρσ_html_element_to_string(x);
@@ -3241,7 +4875,7 @@ function ρσ_str(x) {
     } else if (typeof x === "object" && !x.toString) {
         ans = ρσ_repr_js_builtin(x);
     }
-    return ans + "";
+    return ρσ_list_add(ans, "");
 };
 if (!ρσ_str.__argnames__) Object.defineProperties(ρσ_str, {
     __argnames__ : {value: ["x"]},
@@ -3319,7 +4953,7 @@ define_str_func("format", (function() {
                     if (!Object.prototype.hasOwnProperty.call(kwargs, key)) {
                         return "";
                     }
-                    return "" + kwargs[(typeof key === "number" && key < 0) ? kwargs.length + key : key];
+                    return ρσ_list_add("", kwargs[(typeof key === "number" && key < 0) ? kwargs.length + key : key]);
                 };
                 if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
                     __argnames__ : {value: ["match", "key"]},
@@ -3436,12 +5070,12 @@ define_str_func("format", (function() {
                     if (ftype === "b") {
                         value = (value >>> 0).toString(2);
                         if (fhash) {
-                            value = "0b" + value;
+                            value = ρσ_list_add("0b", value);
                         }
                     } else if (ftype === "c") {
                         if (value > 65535) {
                             code = value - 65536;
-                            value = String.fromCharCode(55296 + (code >> 10), 56320 + (code & 1023));
+                            value = String.fromCharCode(ρσ_list_add(55296, (code >> 10)), ρσ_list_add(56320, (code & 1023)));
                         } else {
                             value = String.fromCharCode(value);
                         }
@@ -3454,13 +5088,13 @@ define_str_func("format", (function() {
                     } else if (ftype === "o") {
                         value = value.toString(8);
                         if (fhash) {
-                            value = "0o" + value;
+                            value = ρσ_list_add("0o", value);
                         }
                     } else if (lftype === "x") {
                         value = value.toString(16);
                         value = (ftype === "x") ? value.toLowerCase() : value.toUpperCase();
                         if (fhash) {
-                            value = "0x" + value;
+                            value = ρσ_list_add("0x", value);
                         }
                     }
                 }
@@ -3476,7 +5110,7 @@ define_str_func("format", (function() {
                     value = (ftype === "F") ? value.toUpperCase() : value.toLowerCase();
                 } else if (lftype === "%") {
                     value *= 100;
-                    value = safe_fixed(value, prec, comma) + "%";
+                    value = ρσ_list_add(safe_fixed(value, prec, comma), "%");
                 } else if (lftype === "g") {
                     prec = max(1, prec);
                     exp = parseInt(split(value.toExponential(prec - 1).toLowerCase(), "e")[1], 10);
@@ -3501,17 +5135,17 @@ define_str_func("format", (function() {
                     }
                     value = safe_comma(value, comma);
                 }
-                value += "";
+                value = ρσ_list_iadd(value, "");
                 if (!isNaN(precision)) {
                     value = value.slice(0, precision);
                 }
             }
-            value += "";
+            value = ρσ_list_iadd(value, "");
             if (is_numeric && sign) {
                 nval = Number(value);
                 is_positive = !isNaN(nval) && nval >= 0;
                 if (is_positive && (sign === " " || sign === "+")) {
-                    value = sign + value;
+                    value = ρσ_list_add(sign, value);
                 }
             }
             function repeat(char, num) {
@@ -3530,25 +5164,25 @@ define_str_func("format", (function() {
             }
             width = parseInt(width || "-1", 10);
             if (isNaN(width)) {
-                throw new ValueError("Invalid width specification: " + width);
+                throw new ValueError(ρσ_list_add("Invalid width specification: ", width));
             }
             if (fill && value.length < width) {
                 if (align === "<") {
-                    value = value + repeat(fill, width - value.length);
+                    value = ρσ_list_add(value, repeat(fill, width - value.length));
                 } else if (align === ">") {
-                    value = repeat(fill, width - value.length) + value;
+                    value = ρσ_list_add(repeat(fill, width - value.length), value);
                 } else if (align === "^") {
                     left = Math.floor((width - value.length) / 2);
                     right = width - left - value.length;
-                    value = repeat(fill, left) + value + repeat(fill, right);
+                    value = ρσ_list_add(ρσ_list_add(repeat(fill, left), value), repeat(fill, right));
                 } else if (align === "=") {
                     if (ρσ_in(value[0], "+- ")) {
-                        value = value[0] + repeat(fill, width - value.length) + value.slice(1);
+                        value = ρσ_list_add(ρσ_list_add(value[0], repeat(fill, width - value.length)), value.slice(1));
                     } else {
-                        value = repeat(fill, width - value.length) + value;
+                        value = ρσ_list_add(repeat(fill, width - value.length), value);
                     }
                 } else {
-                    throw new ValueError("Unrecognized alignment: " + align);
+                    throw new ValueError(ρσ_list_add("Unrecognized alignment: ", align));
                 }
             }
             return value;
@@ -3571,18 +5205,18 @@ define_str_func("format", (function() {
                     } else if (ch === ":") {
                         state = 2;
                     } else {
-                        key += ch;
+                        key = ρσ_list_iadd(key, ch);
                     }
                 } else if (state === 1) {
                     if (ch === ":") {
                         state = 2;
                     } else {
-                        transformer += ch;
+                        transformer = ρσ_list_iadd(transformer, ch);
                     }
                 } else {
-                    format_spec += ch;
+                    format_spec = ρσ_list_iadd(format_spec, ch);
                 }
-                pos += 1;
+                pos = ρσ_list_iadd(pos, 1);
             }
             return [key, transformer, format_spec];
         };
@@ -3599,7 +5233,7 @@ define_str_func("format", (function() {
             transformer = ρσ_unpack[1];
             format_spec = ρσ_unpack[2];
             if (transformer && ['a', 'r', 's'].indexOf(transformer) === -1) {
-                throw new ValueError("Unknown conversion specifier: " + transformer);
+                throw new ValueError(ρσ_list_add("Unknown conversion specifier: ", transformer));
             }
             ends_with_equal = key.endsWith("=");
             if (ends_with_equal) {
@@ -3626,20 +5260,20 @@ define_str_func("format", (function() {
                     throw new ValueError("cannot switch from manual field specification to automatic field numbering");
                 }
                 if (idx >= args.length) {
-                    throw new IndexError("Not enough arguments to match template: " + template);
+                    throw new IndexError(ρσ_list_add("Not enough arguments to match template: ", template));
                 }
                 object = args[(typeof idx === "number" && idx < 0) ? args.length + idx : idx];
-                idx += 1;
+                idx = ρσ_list_iadd(idx, 1);
             }
             if (typeof object === "function") {
                 object = object();
             }
-            ans = "" + object;
+            ans = ρσ_list_add("", object);
             if (format_spec) {
                 ans = apply_formatting(ans, format_spec);
             }
             if (ends_with_equal) {
-                ans = "" + ρσ_str.format("{}", key) + "=" + ρσ_str.format("{}", ans) + "";
+                ans = ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("", ρσ_str.format("{}", key)), "="), ρσ_str.format("{}", ans)), "");
             }
             return ans;
         };
@@ -3656,35 +5290,35 @@ define_str_func("format", (function() {
             ch = template[(typeof pos === "number" && pos < 0) ? template.length + pos : pos];
             if (in_brace) {
                 if (ch === "{") {
-                    in_brace += 1;
-                    markup += "{";
+                    in_brace = ρσ_list_iadd(in_brace, 1);
+                    markup = ρσ_list_iadd(markup, "{");
                 } else if (ch === "}") {
                     in_brace -= 1;
                     if (in_brace > 0) {
-                        markup += "}";
+                        markup = ρσ_list_iadd(markup, "}");
                     } else {
-                        ans += render_markup(markup);
+                        ans = ρσ_list_iadd(ans, render_markup(markup));
                     }
                 } else {
-                    markup += ch;
+                    markup = ρσ_list_iadd(markup, ch);
                 }
             } else {
                 if (ch === "{") {
-                    if (template[ρσ_bound_index(pos + 1, template)] === "{") {
-                        pos += 1;
-                        ans += "{";
+                    if (template[ρσ_bound_index(ρσ_list_add(pos, 1), template)] === "{") {
+                        pos = ρσ_list_iadd(pos, 1);
+                        ans = ρσ_list_iadd(ans, "{");
                     } else {
                         in_brace = 1;
                         markup = "";
                     }
                 } else {
-                    ans += ch;
-                    if (ch === "}" && template[ρσ_bound_index(pos + 1, template)] === "}") {
-                        pos += 1;
+                    ans = ρσ_list_iadd(ans, ch);
+                    if (ch === "}" && template[ρσ_bound_index(ρσ_list_add(pos, 1), template)] === "}") {
+                        pos = ρσ_list_iadd(pos, 1);
                     }
                 }
             }
-            pos += 1;
+            pos = ρσ_list_iadd(pos, 1);
         }
         if (in_brace) {
             throw new ValueError("expected '}' before end of string");
@@ -3701,7 +5335,7 @@ define_str_func("capitalize", (function() {
         var string;
         string = this;
         if (string) {
-            string = string[0].toUpperCase() + string.slice(1).toLowerCase();
+            string = ρσ_list_add(string[0].toUpperCase(), string.slice(1).toLowerCase());
         }
         return string;
     };
@@ -3716,7 +5350,7 @@ define_str_func("center", (function() {
         left = Math.floor((width - this.length) / 2);
         right = width - left - this.length;
         fill = fill || " ";
-        return new Array(left+1).join(fill) + this + new Array(right+1).join(fill);
+        return ρσ_list_add(ρσ_list_add(new Array(left+1).join(fill), this), new Array(right+1).join(fill));
     };
     if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
         __argnames__ : {value: ["width", "fill"]},
@@ -3745,8 +5379,8 @@ define_str_func("count", (function() {
         while (pos !== -1) {
             pos = string.indexOf(needle, pos);
             if (pos !== -1) {
-                ans += 1;
-                pos += step;
+                ans = ρσ_list_iadd(ans, 1);
+                pos = ρσ_list_iadd(pos, step);
             }
         }
         return ans;
@@ -3792,7 +5426,7 @@ define_str_func("startswith", (function() {
         for (var i = 0; i < prefixes.length; i++) {
             prefix = prefixes[(typeof i === "number" && i < 0) ? prefixes.length + i : i];
             end = (end === undefined) ? this.length : end;
-            if (end - start >= prefix.length && prefix === this.slice(start, start + prefix.length)) {
+            if (end - start >= prefix.length && prefix === this.slice(start, ρσ_list_add(start, prefix.length))) {
                 return true;
             }
         }
@@ -3808,12 +5442,12 @@ define_str_func("find", (function() {
     var ρσ_anonfunc = function (needle, start, end) {
         var ans;
         while (start < 0) {
-            start += this.length;
+            start = ρσ_list_iadd(start, this.length);
         }
         ans = this.indexOf(needle, start);
         if (end !== undefined && ans !== -1) {
             while (end < 0) {
-                end += this.length;
+                end = ρσ_list_iadd(end, this.length);
             }
             if (ans >= end - needle.length) {
                 return -1;
@@ -3831,12 +5465,12 @@ define_str_func("rfind", (function() {
     var ρσ_anonfunc = function (needle, start, end) {
         var ans;
         while (end < 0) {
-            end += this.length;
+            end = ρσ_list_iadd(end, this.length);
         }
         ans = this.lastIndexOf(needle, end - 1);
         if (start !== undefined && ans !== -1) {
             while (start < 0) {
-                start += this.length;
+                start = ρσ_list_iadd(start, this.length);
             }
             if (ans < start) {
                 return -1;
@@ -3907,6 +5541,81 @@ define_str_func("isspace", (function() {
     });
     return ρσ_anonfunc;
 })());
+define_str_func("isalpha", (function() {
+    var ρσ_anonfunc = function () {
+        return this.length > 0 && /^[a-zA-Z]+$/.test(this);
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
+define_str_func("isdigit", (function() {
+    var ρσ_anonfunc = function () {
+        return this.length > 0 && /^\d+$/.test(this);
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
+define_str_func("isalnum", (function() {
+    var ρσ_anonfunc = function () {
+        return this.length > 0 && /^[a-zA-Z0-9]+$/.test(this);
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
+define_str_func("isidentifier", (function() {
+    var ρσ_anonfunc = function () {
+        return this.length > 0 && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this);
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
+define_str_func("casefold", (function() {
+    var ρσ_anonfunc = function () {
+        return this.toLowerCase();
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
+define_str_func("removeprefix", (function() {
+    var ρσ_anonfunc = function (prefix) {
+        var s;
+        s = this.toString();
+        if (s.startsWith(prefix)) {
+            return s.slice(prefix.length);
+        }
+        return s;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["prefix"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
+define_str_func("removesuffix", (function() {
+    var ρσ_anonfunc = function (suffix) {
+        var s;
+        s = this.toString();
+        if (suffix.length && s.endsWith(suffix)) {
+            return s.slice(0, s.length - suffix.length);
+        }
+        return s;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["suffix"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
 define_str_func("join", (function() {
     var ρσ_anonfunc = function (iterable) {
         var ans, r;
@@ -3917,9 +5626,9 @@ define_str_func("join", (function() {
         r = iterable.next();
         while (!r.done) {
             if (ans) {
-                ans += this;
+                ans = ρσ_list_iadd(ans, this);
             }
-            ans += r.value;
+            ans = ρσ_list_iadd(ans, r.value);
             r = iterable.next();
         }
         return ans;
@@ -3936,7 +5645,7 @@ define_str_func("ljust", (function() {
         string = this;
         if (width > string.length) {
             fill = fill || " ";
-            string += new Array(width - string.length + 1).join(fill);
+            string = ρσ_list_iadd(string, new Array(width - string.length + 1).join(fill));
         }
         return string;
     };
@@ -3952,7 +5661,7 @@ define_str_func("rjust", (function() {
         string = this;
         if (width > string.length) {
             fill = fill || " ";
-            string = new Array(width - string.length + 1).join(fill) + string;
+            string = ρσ_list_add(new Array(width - string.length + 1).join(fill), string);
         }
         return string;
     };
@@ -3980,6 +5689,26 @@ define_str_func("upper", (function() {
     });
     return ρσ_anonfunc;
 })());
+define_str_func("title", (function() {
+    var ρσ_anonfunc = function () {
+        var words, title_cased_words, word;
+        words = this.split(" ");
+        title_cased_words = (function() {
+            var ρσ_Iter = ρσ_Iterable(words), ρσ_Result = [], word;
+            for (var ρσ_Index = 0; ρσ_Index < ρσ_Iter.length; ρσ_Index++) {
+                word = ρσ_Iter[ρσ_Index];
+                ρσ_Result.push((word) ? ρσ_list_add(word[0].upper(), word.slice(1).lower()) : "");
+            }
+            ρσ_Result = ρσ_list_constructor(ρσ_Result);
+            return ρσ_Result;
+        })();
+        return " ".join(title_cased_words);
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
 define_str_func("lstrip", (function() {
     var ρσ_anonfunc = function (chars) {
         var string, pos;
@@ -3987,7 +5716,7 @@ define_str_func("lstrip", (function() {
         pos = 0;
         chars = chars || ρσ_str.whitespace;
         while (chars.indexOf(string[(typeof pos === "number" && pos < 0) ? string.length + pos : pos]) !== -1) {
-            pos += 1;
+            pos = ρσ_list_iadd(pos, 1);
         }
         if (pos) {
             string = string.slice(pos);
@@ -4010,7 +5739,7 @@ define_str_func("rstrip", (function() {
             pos -= 1;
         }
         if (pos < string.length - 1) {
-            string = string.slice(0, pos + 1);
+            string = string.slice(0, ρσ_list_add(pos, 1));
         }
         return string;
     };
@@ -4037,7 +5766,7 @@ define_str_func("partition", (function() {
         if (idx === -1) {
             return [this, "", ""];
         }
-        return [this.slice(0, idx), sep, this.slice(idx + sep.length)];
+        return [this.slice(0, idx), sep, this.slice(ρσ_list_add(idx, sep.length))];
     };
     if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
         __argnames__ : {value: ["sep"]},
@@ -4052,7 +5781,7 @@ define_str_func("rpartition", (function() {
         if (idx === -1) {
             return ["", "", this];
         }
-        return [this.slice(0, idx), sep, this.slice(idx + sep.length)];
+        return [this.slice(0, idx), sep, this.slice(ρσ_list_add(idx, sep.length))];
     };
     if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
         __argnames__ : {value: ["sep"]},
@@ -4078,8 +5807,8 @@ define_str_func("replace", (function() {
             if (idx === -1) {
                 break;
             }
-            pos = idx + repl.length;
-            string = string.slice(0, idx) + repl + string.slice(idx + old.length);
+            pos = ρσ_list_add(idx, repl.length);
+            string = ρσ_list_add(ρσ_list_add(string.slice(0, idx), repl), string.slice(ρσ_list_add(idx, old.length)));
         }
         return string;
     };
@@ -4102,13 +5831,13 @@ define_str_func("split", (function() {
                 extra = "";
                 parts = [];
                 for (var i = 0; i < ans.length; i++) {
-                    if (parts.length >= maxsplit + 1) {
-                        extra += ans[(typeof i === "number" && i < 0) ? ans.length + i : i];
+                    if (parts.length >= ρσ_list_add(maxsplit, 1)) {
+                        extra = ρσ_list_iadd(extra, ans[(typeof i === "number" && i < 0) ? ans.length + i : i]);
                     } else if (i % 2 === 0) {
                         parts.push(ans[(typeof i === "number" && i < 0) ? ans.length + i : i]);
                     }
                 }
-                parts[parts.length-1] += extra;
+                parts[parts.length-1] = ρσ_list_iadd(parts[parts.length-1], extra);
                 ans = parts;
             } else {
                 ans = split(this, /\s+/);
@@ -4159,11 +5888,11 @@ define_str_func("rsplit", (function() {
                         }
                         current = ch;
                     } else {
-                        current += ch;
+                        current = ρσ_list_iadd(current, ch);
                     }
                     pos -= 1;
                 }
-                ans.push(this.slice(0, pos + 1) + current);
+                ans.push(ρσ_list_add(this.slice(0, ρσ_list_add(pos, 1)), current));
                 ans.reverse();
             } else {
                 ans = split(this, /\s+/);
@@ -4180,7 +5909,7 @@ define_str_func("rsplit", (function() {
                 if (idx === -1) {
                     break;
                 }
-                ans.push(this.slice(idx + sep.length, end));
+                ans.push(this.slice(ρσ_list_add(idx, sep.length), end));
                 pos = idx - 1;
                 end = idx;
             }
@@ -4206,7 +5935,7 @@ define_str_func("splitlines", (function() {
                 if (i % 2 === 0) {
                     ans.push(parts[(typeof i === "number" && i < 0) ? parts.length + i : i]);
                 } else {
-                    ans[ans.length-1] += parts[(typeof i === "number" && i < 0) ? parts.length + i : i];
+                    ans[ans.length-1] = ρσ_list_iadd(ans[ans.length-1], parts[(typeof i === "number" && i < 0) ? parts.length + i : i]);
                 }
             }
         } else {
@@ -4244,12 +5973,45 @@ define_str_func("zfill", (function() {
         var string;
         string = this;
         if (width > string.length) {
-            string = new Array(width - string.length + 1).join("0") + string;
+            string = ρσ_list_add(new Array(width - string.length + 1).join("0"), string);
         }
         return string;
     };
     if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
         __argnames__ : {value: ["width"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})());
+define_str_func("expandtabs", (function() {
+    var ρσ_anonfunc = function (tabsize) {
+        var string, ans, col, ch, spaces;
+        if (tabsize === undefined) {
+            tabsize = 8;
+        }
+        string = this;
+        ans = "";
+        col = 0;
+        for (var i = 0; i < string.length; i++) {
+            ch = string[(typeof i === "number" && i < 0) ? string.length + i : i];
+            if (ch === "\t") {
+                if (tabsize > 0) {
+                    spaces = tabsize - col % tabsize;
+                    ans = ρσ_list_iadd(ans, new Array(spaces + 1).join(" "));
+                    col = ρσ_list_iadd(col, spaces);
+                }
+            } else if (ch === "\n" || ch === "\r") {
+                ans = ρσ_list_iadd(ans, ch);
+                col = 0;
+            } else {
+                ans = ρσ_list_iadd(ans, ch);
+                col = ρσ_list_iadd(col, 1);
+            }
+        }
+        return ans;
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["tabsize"]},
         __module__ : {value: "__main__"}
     });
     return ρσ_anonfunc;
@@ -4349,7 +6111,7 @@ define_str_func("zfill", (function() {
         ans = 0;
         while (!r.done) {
             r = iterator.next();
-            ans += 1;
+            ans = ρσ_list_iadd(ans, 1);
         }
         return ans;
     };
@@ -4367,4 +6129,19 @@ define_str_func("zfill", (function() {
 ρσ_str.printable = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\u000b\f";
 ρσ_str.whitespace = " \t\n\r\u000b\f";
 define_str_func = undefined;
-var str = ρσ_str, repr = ρσ_repr;
+function ρσ_format(value, spec) {
+    if (value !== null && value !== undefined && typeof value.__format__ === "function") {
+        return value.__format__((spec !== undefined) ? spec : "");
+    }
+    if (spec === undefined || spec === "") {
+        return ρσ_str(value);
+    }
+    return str.format(ρσ_list_add(ρσ_list_add("{:", spec), "}"), value);
+};
+if (!ρσ_format.__argnames__) Object.defineProperties(ρσ_format, {
+    __argnames__ : {value: ["value", "spec"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_str.__name__ = "str";
+var str = ρσ_str, repr = ρσ_repr, format = ρσ_format;
