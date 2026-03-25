@@ -774,6 +774,29 @@ define_str_func('zfill', def(width):
     return string
 )
 
+define_str_func('expandtabs', def(tabsize):
+    if tabsize is undefined:
+        tabsize = 8
+    string = this
+    ans = ''
+    col = 0
+    for v'var i = 0; i < string.length; i++':
+        ch = string[i]  # noqa:undef
+        if ch is '\t':
+            if tabsize > 0:
+                spaces = tabsize - (col % tabsize)
+                ans += v'new Array(spaces + 1).join(" ")'
+                col += spaces
+            # tabsize <= 0: tab adds no spaces, col stays
+        elif ch is '\n' or ch is '\r':
+            ans += ch
+            col = 0
+        else:
+            ans += ch
+            col += 1
+    return ans
+)
+
 ρσ_str.uchrs = def(string, with_positions):
     # Return iterator over unicode chars in string. Will yield the unicode
     # replacement char U+FFFD for broken surrogate pairs
@@ -836,4 +859,5 @@ def ρσ_format(value, spec):
         return ρσ_str(value)
     return str.format('{:' + spec + '}', value)
 
+ρσ_str.__name__ = 'str'
 v'var str = ρσ_str, repr = ρσ_repr, format = ρσ_format'

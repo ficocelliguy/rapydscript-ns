@@ -718,6 +718,12 @@ def ρσ_dict_polyfill():
         return v"{'done':false, 'value':this._s[this._keys[this._i]]}"
     return ans
 
+ρσ_dict_polyfill.prototype.forEach = def(callback):
+    keys = Object.keys(this._store)
+    for v'var ρσ_fi = 0; ρσ_fi < keys.length; ρσ_fi++':
+        entry = this._store[keys[v'ρσ_fi']]
+        callback(entry[1], entry[0], this)
+
 if jstype(Map) is not 'function' or jstype(Map.prototype.delete) is not 'function':
     v'ρσ_dict_implementation = ρσ_dict_polyfill'
 else:
@@ -897,6 +903,60 @@ def ρσ_dict_wrap(x):
     return ans
 
 v'var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap'
+
+v'''
+function ρσ_kwargs_to_dict(kw) {
+    // Augment the plain kwargs object with non-enumerable Python dict methods so
+    // that kw.items(), kw.keys(), kw.values() work in user code, while plain
+    // property access (kw.propname) and Object.keys(kw) are unaffected.
+    //
+    // items/keys/values return dual-mode arrays: they support both Array indexing
+    // (for ρσ_dict.prototype.update which does pairs[i]) and iterator protocol
+    // (for `for k, v in kw.items():` which calls .next()).
+    function _make_seq(arr) {
+        arr._ρσ_i = 0;
+        arr.next = function() {
+            return this._ρσ_i < this.length
+                ? {done: false, value: this[this._ρσ_i++]}
+                : {done: true, value: undefined};
+        };
+        arr[ρσ_iterator_symbol] = function() { this._ρσ_i = 0; return this; };
+        return arr;
+    }
+    function _def(name, fn) {
+        if (!Object.prototype.hasOwnProperty.call(kw, name)) {
+            Object.defineProperty(kw, name, {value: fn, configurable: true, writable: true, enumerable: false});
+        }
+    }
+    _def("items", function() {
+        var ks = Object.keys(kw), arr = [], i;
+        for (i = 0; i < ks.length; i++) arr.push([ks[i], kw[ks[i]]]);
+        return _make_seq(arr);
+    });
+    _def("entries", kw.items);
+    _def("keys", function() {
+        return _make_seq(Object.keys(kw).slice());
+    });
+    _def("values", function() {
+        var ks = Object.keys(kw), arr = [], i;
+        for (i = 0; i < ks.length; i++) arr.push(kw[ks[i]]);
+        return _make_seq(arr);
+    });
+    _def("get", function(k, d) {
+        return Object.prototype.hasOwnProperty.call(kw, k) ? kw[k] : (d !== undefined ? d : null);
+    });
+    _def("__contains__", function(k) { return Object.prototype.hasOwnProperty.call(kw, k); });
+    _def("has", function(k) { return Object.prototype.hasOwnProperty.call(kw, k); });
+    _def("__len__", function() { return Object.keys(kw).length; });
+    kw[ρσ_iterator_symbol] = function() {
+        var ks = Object.keys(kw), i = 0;
+        return {next: function() {
+            return i < ks.length ? {done: false, value: ks[i++]} : {done: true, value: undefined};
+        }};
+    };
+    return kw;
+}
+'''
 
 v"""var ρσ_json_parse = function(text, reviver) {
     function dict_reviver(key, value) {

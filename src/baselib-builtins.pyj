@@ -20,6 +20,7 @@ def ρσ_bool(val):
     v'if ((typeof Set === "function" && val instanceof Set) || (typeof Map === "function" && val instanceof Map)) return val.size > 0'
     v'if (!val.constructor || val.constructor === Object) return Object.keys(val).length > 0'
     return True
+ρσ_bool.__name__ = 'bool'
 
 def ρσ_print(*args, **kwargs):
     if v'typeof console' is 'object':
@@ -35,6 +36,7 @@ def ρσ_int(val, base):
     if isNaN(ans):
         raise ValueError('Invalid literal for int with base ' + (base or 10) + ': ' + val)
     return ans
+ρσ_int.__name__ = 'int'
 
 def ρσ_float(val):
     if jstype(val) is "number":
@@ -44,6 +46,7 @@ def ρσ_float(val):
     if isNaN(ans):
         raise ValueError('Could not convert string to float: ' + arguments[0])
     return ans
+ρσ_float.__name__ = 'float'
 
 def ρσ_arraylike_creator():
     names = 'Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array'.split(' ')

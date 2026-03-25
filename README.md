@@ -1523,6 +1523,16 @@ Case-folding for locale-insensitive lowercase comparison:
 str.casefold('ÄÖÜ') == str.casefold('äöü')  # True (maps to lowercase)
 ```
 
+Tab expansion:
+
+```py
+str.expandtabs('a\tb', 4)   # 'a   b'  — expand to next 4-space tab stop
+str.expandtabs('\t\t', 8)   # '                '  — two full tab stops
+str.expandtabs('ab\tc', 4)  # 'ab  c'  — only 2 spaces needed to reach next stop
+```
+
+The optional `tabsize` argument defaults to `8`, matching Python's default. A `tabsize` of `0` removes all tab characters. Newline (`\n`) and carriage-return (`\r`) characters reset the column counter, so each line is expanded independently.
+
 However, if you want to make the python string methods available on string
 objects, there is a convenience method in the standard library to do so. Use
 the following code:

@@ -23,6 +23,7 @@
 | `str.casefold()` | Maps to `.toLowerCase()` |
 | `str.removeprefix(prefix)` | Returns unchanged string if prefix not found |
 | `str.removesuffix(suffix)` | Returns unchanged string if suffix not found |
+| `str.expandtabs(tabsize=8)` | Replaces `\t` with spaces to the next tab stop; `\n`/`\r` reset the column counter; `tabsize=0` removes all tabs; available as an instance method after `from pythonize import strings; strings()` |
 | `str * n` string repetition | Works when `from __python__ import overload_operators` is active |
 | `list * n` / `n * list` | Works with `overload_operators`; returns a proper RapydScript list |
 | `list + list` concatenation | `[1,2] + [3,4]` returns `[1, 2, 3, 4]`; `+=` extends in-place. No flag required. |
@@ -82,7 +83,6 @@
 | Feature                             | Priority                                                               |
 |-------------------------------------|------------------------------------------------------------------------|
 | `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access                      |
-| `str.expandtabs(tabsize)`           | 🟢 Low                                                                 |
 | `int.bit_length()`                  | 🟢 Low — useful for bit manipulation                                   |
 | `float.is_integer()`                | 🟢 Low                                                                 |
 | `exec(code)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
@@ -108,9 +108,7 @@
 | Complex number literals `3+4j`                | 🟢 Low — no `j` suffix; no complex type                              |
 | `b'...'` bytes literals                       | 🟢 Low — no `b` prefix; use the `encodings` module for encoding work |
 | `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
-| `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
 | `__format__` dunder                           | 🟢 Low — `format()` builtin not defined; `__format__` not dispatched |
-| `__init_subclass__` hook                      | 🟢 Low                                                               |
 
 ---
 
@@ -128,10 +126,10 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `functools`   | ✅           | `reduce`, `partial`, `wraps`, `lru_cache`                                                     |
 | `itertools`   | ✅           | Common iteration tools                                                                        |
 | `numpy`       | ✅           | Full numpy-like library in `src/lib/numpy.pyj`; `numpy.random` and `numpy.linalg` sub-modules |
+| `copy`        | ✅           | `copy()` shallow copy and `deepcopy()` (circular-ref-safe via memo Map); `__copy__` / `__deepcopy__(memo)` hooks honoured; handles list, set, frozenset, dict, class instances, and plain JS objects |
 | `typing`      | ❌           | `List`, `Dict`, `Optional`, `Union`, `Tuple`, `Generic`, `TypeVar` — none available           |
 | `dataclasses` | ❌           | `@dataclass`, `field()`, `asdict()`, `astuple()` not available                                |
 | `contextlib`  | ❌           | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available                |
-| `copy`        | ✅           | `copy()` shallow copy and `deepcopy()` (circular-ref-safe via memo Map); `__copy__` / `__deepcopy__(memo)` hooks honoured; handles list, set, frozenset, dict, class instances, and plain JS objects |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
 | `json`        | ❌           | No Python wrapper; JS `JSON.parse` / `JSON.stringify` work directly via verbatim JS           |
 | `datetime`    | ❌           | `date`, `time`, `datetime`, `timedelta` not available                                         |
@@ -177,7 +175,6 @@ Features that exist in RapydScript but behave differently from standard Python:
 | Keyword-only param enforcement | Passing positionally raises `TypeError` | Passing positionally raises no error — the extra positional arg is silently discarded and the default value is used |
 | `is` / `is not` with `NaN` | `math.nan is math.nan` → `True` (same object) | `x is NaN` compiles to `isNaN(x)` (not `x === NaN`), making NaN checks work correctly |
 | Arithmetic type coercion | `1 + '1'` raises `TypeError` | `1 + '1'` → `'11'`; JS coerces the number to a string |
-| `list + list` | Concatenation returns a new list | Now matches Python: `[1,2] + [3,4]` returns `[1, 2, 3, 4]`; `+=` extends the list in-place. No `overload_operators` flag required. (Pre-existing JS `+` coercion is replaced by a lightweight `ρσ_list_add` helper.) |
 | `<`, `>`, `<=`, `>=` on lists / containers | Element-wise lexicographic comparison | Falls through to JS coercion — operands are stringified first (e.g. `[10] < [9]` is `True` because `'[10]' < '[9]'`). Comparison dunders (`__lt__` etc.) can be defined and called directly but are not auto-dispatched by these operators. |
 | Default `{}` dict — missing key | `KeyError` raised | Returns `undefined`; use `from __python__ import dict_literals, overload_getitem` to get `KeyError` |
 | Default `{}` dict — numeric keys | Integer keys are stored as integers | Numeric keys are auto-coerced to strings by the JS engine: `d[1]` and `d['1']` refer to the same slot |

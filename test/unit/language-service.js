@@ -1351,6 +1351,38 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── str.expandtabs language-service tests ─────────────────────────
+
+        {
+            name: "expandtabs_no_errors",
+            description: "str.expandtabs() call produces no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "s = 'hello\\tworld'",
+                    "result = str.expandtabs(s)",
+                    "result2 = str.expandtabs(s, 4)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "expandtabs_result_used_no_errors",
+            description: "assigning expandtabs result and using it produces no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "lines = ['a\\tb', 'c\\td']",
+                    "expanded = [str.expandtabs(line, 4) for line in lines]",
+                    "print(expanded)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
     ];
 
     return TESTS;

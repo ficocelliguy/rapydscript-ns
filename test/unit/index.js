@@ -4411,6 +4411,22 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    {
+        name: "class_getitem_builtin_name",
+        description: "Built-in types int/str/float/bool have .__name__ so they work as __class_getitem__ arguments",
+        src: [
+            "# globals: assrt",
+            "class TypedList:",
+            "    prefix = 'TypedList'",
+            "    def __class_getitem__(cls, item):",
+            "        return cls.prefix + '[' + item.__name__ + ']'",
+            "assrt.equal(TypedList[int], 'TypedList[int]')",
+            "assrt.equal(TypedList[str], 'TypedList[str]')",
+            "assrt.equal(TypedList[float], 'TypedList[float]')",
+            "assrt.equal(TypedList[bool], 'TypedList[bool]')",
+        ].join("\n"),
+    },
+
     // ── __init_subclass__ hook ────────────────────────────────────────────
 
     {
@@ -5027,6 +5043,79 @@ assrt.equal(fib(15), 610)
             "c.items.append(4)",
             "assrt.equal(len(b.items), 3)",
         ].join("\n"),
+    },
+
+    // ── str.expandtabs ────────────────────────────────────────────────────
+
+    {
+        name: "expandtabs_default",
+        description: "str.expandtabs() with default tabsize=8 replaces tabs with spaces",
+        src: [
+            "# globals: assrt",
+            'assrt.equal(str.expandtabs("\\t"), "        ")',
+            'assrt.equal(str.expandtabs("a\\tb"), "a       b")',
+            'assrt.equal(str.expandtabs("ab\\tc"), "ab      c")',
+        ].join("\n"),
+        js_checks: ["expandtabs"],
+    },
+
+    {
+        name: "expandtabs_custom_tabsize",
+        description: "str.expandtabs(tabsize) respects a custom tabsize",
+        src: [
+            "# globals: assrt",
+            'assrt.equal(str.expandtabs("\\t", 4), "    ")',
+            'assrt.equal(str.expandtabs("a\\tb", 4), "a   b")',
+            'assrt.equal(str.expandtabs("abc\\td", 4), "abc d")',
+            'assrt.equal(str.expandtabs("ab\\tcd", 4), "ab  cd")',
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "expandtabs_tabsize_zero",
+        description: "str.expandtabs(0) removes all tab characters",
+        src: [
+            "# globals: assrt",
+            'assrt.equal(str.expandtabs("a\\tb\\tc", 0), "abc")',
+            'assrt.equal(str.expandtabs("\\t\\t", 0), "")',
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "expandtabs_newline_resets_column",
+        description: "str.expandtabs() resets column counter at newlines",
+        src: [
+            "# globals: assrt",
+            'assrt.equal(str.expandtabs("a\\n\\tb", 4), "a\\n    b")',
+            'assrt.equal(str.expandtabs("abc\\n\\td", 4), "abc\\n    d")',
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "expandtabs_instance_method",
+        description: "expandtabs works as an instance method via str.prototype",
+        src: [
+            "# globals: assrt",
+            "from pythonize import strings",
+            "strings()",
+            'assrt.equal("\\t".expandtabs(), "        ")',
+            'assrt.equal("a\\tb".expandtabs(4), "a   b")',
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "expandtabs_no_tabs",
+        description: "str.expandtabs() returns string unchanged when no tabs present",
+        src: [
+            "# globals: assrt",
+            'assrt.equal(str.expandtabs("hello world"), "hello world")',
+            'assrt.equal(str.expandtabs(""), "")',
+        ].join("\n"),
+        js_checks: [],
     },
 
 ];

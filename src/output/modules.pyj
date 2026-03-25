@@ -183,7 +183,7 @@ def print_top_level(self, output):
             write_imports(self, output)
             write_main_name(output)
 
-        declare_vars(self.localvars, output)
+        declare_vars(self.localvars, output, "var" if output.options.repl_mode else "let")
         display_body(self.body, True, output)
         if self.comments_after and self.comments_after.length:
             output_comments(self.comments_after, output)

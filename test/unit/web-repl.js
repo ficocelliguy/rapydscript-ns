@@ -620,6 +620,41 @@ var TESTS = [
     },
 
     {
+        name: "bundle_tuple_annotation_variable",
+        description: "variable type annotation with tuple does not become a function call",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "# globals: assrt",
+                "range_limits: tuple = (0, 100)",
+                "assrt.equal(range_limits[0], 0)",
+                "assrt.equal(range_limits[1], 100)",
+            ].join("\n"));
+            // Ensure it compiled to an assignment, not a call
+            if (/range_limits\s*\(/.test(js)) throw new Error("range_limits was compiled as a function call:\n" + js);
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_tuple_annotation_function_arg",
+        description: "function argument type annotation with tuple and int works at runtime",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "# globals: assrt",
+                "def clamp(val: int, bounds: tuple) -> int:",
+                "    lo, hi = bounds",
+                "    return max(lo, min(hi, val))",
+                "range_limits: tuple = (0, 100)",
+                "assrt.equal(clamp(150, range_limits), 100)",
+                "assrt.equal(clamp(-5,  range_limits), 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_list_concatenation",
         description: "list + list returns a concatenated list in the bundled baselib",
         run: function () {

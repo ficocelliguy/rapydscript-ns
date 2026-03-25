@@ -54,11 +54,11 @@ def first_in_statement(output):
             return False
 
 
-def declare_vars(vars, output):
+def declare_vars(vars, output, kind="var"):
     # declare all variables as local, unless explictly set otherwise
     if vars.length:
         output.indent()
-        output.print("var")
+        output.print(kind)
         output.space()
         for i, arg in enumerate(vars):
             if i:

@@ -150,6 +150,15 @@ def function_preamble(node, output, offset):
         output.print('.pop()')
         output.end_statement()
 
+    # Convert the plain JS kwargs object to a proper Python dict so that
+    # kw.items(), kw.keys(), etc. work in the function body.
+    # This must happen AFTER defaults/kwonly/starargs processing which rely on
+    # plain property access (kw.name) and ρσ_kwargs_symbol checks.
+    if a.kwargs:
+        output.indent()
+        output.spaced(kw, '=', 'ρσ_kwargs_to_dict(' + kw + ')')
+        output.end_statement()
+
 def has_annotations(self):
     if self.return_annotation:
         return True
