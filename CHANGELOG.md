@@ -1,3 +1,11 @@
+version 0.8.4
+=======================
+  * Added support for jsx
+  * Added support for basic React components
+  * support for __new__, __getattr__, __setattr__, __delattr__, __class_getitem__, __init_subclass__
+  * added `copy` standard library
+
+
 version 0.8.0 - 0.8.3
 =======================
 
