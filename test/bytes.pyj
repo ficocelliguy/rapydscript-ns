@@ -392,3 +392,76 @@ b = bytes(ua)
 ae(len(b), 3)
 ae(b[0], 10)
 ae(b[2], 30)
+
+# ---------------------------------------------------------------------------
+# b'...' bytes literal syntax
+# ---------------------------------------------------------------------------
+
+# Basic ASCII literal
+b = b'Hello'
+ok(isinstance(b, bytes))
+ae(len(b), 5)
+ae(b[0], 72)   # H
+ae(b[1], 101)  # e
+ae(b[4], 111)  # o
+ok(b == bytes([72, 101, 108, 108, 111]))
+
+# Uppercase B prefix
+b = B'ABC'
+ok(isinstance(b, bytes))
+ae(len(b), 3)
+ae(b[0], 65)   # A
+
+# Empty bytes literal
+b = b''
+ae(len(b), 0)
+ok(isinstance(b, bytes))
+
+# Hex escape sequences
+b = b'\x48\x65\x6c\x6c\x6f'  # Hello
+ae(len(b), 5)
+ae(b[0], 72)
+ok(b == bytes([72, 101, 108, 108, 111]))
+
+# Control character escapes
+b = b'\n\t\r'
+ae(len(b), 3)
+ae(b[0], 10)   # \n
+ae(b[1], 9)    # \t
+ae(b[2], 13)   # \r
+
+# Null byte and max Latin-1 byte
+b = b'\x00\xff'
+ae(len(b), 2)
+ae(b[0], 0)
+ae(b[1], 255)
+
+# Adjacent bytes literal concatenation
+b = b'foo' b'bar'
+ae(len(b), 6)
+ok(b == bytes([102, 111, 111, 98, 97, 114]))  # foobar
+
+# Raw bytes literal - backslash sequences not interpreted
+b = rb'\n\t'
+ae(len(b), 4)
+ae(b[0], 92)   # backslash
+ae(b[1], 110)  # n
+ae(b[2], 92)   # backslash
+ae(b[3], 116)  # t
+
+# Double-quoted bytes literal
+b = b"World"
+ae(len(b), 5)
+ae(b[0], 87)   # W
+
+# bytes literal behaves like bytes constructed from equivalent list
+b1 = b'Hello'
+b2 = bytes([72, 101, 108, 108, 111])
+ok(b1 == b2)
+ok(b1.decode('utf-8') is 'Hello')
+
+# Operations on bytes from literal
+b = b'hello'
+ok(b.upper() == bytes([72, 69, 76, 76, 79]))
+ae(len(b + b'!'), 6)
+ok(b'\x00\x01' + b'\x02' == bytes([0, 1, 2]))

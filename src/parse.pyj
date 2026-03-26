@@ -144,7 +144,7 @@ PRECEDENCE = (def(a, ret):
 
 STATEMENTS_WITH_LABELS = array_to_hash([ "for", "do", "while", "switch" ])
 
-ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "string", "regexp", "name", "js" ])
+ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "string", "bytes_literal", "regexp", "name", "js" ])
 
 compile_time_decorators = ['staticmethod', 'classmethod', 'external', 'property']
 
@@ -512,7 +512,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         p = prev()
         if p and not S.token.nlb and ATOMIC_START_TOKEN[p.type] and not is_('punc', ':'):
             unexpected()
-        if tmp_ is "string":
+        if tmp_ is "string" or tmp_ is "bytes_literal":
             return simple_statement()
         elif tmp_ is "shebang":
             tmp_ = S.token.value
@@ -542,7 +542,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 p = peek()
                 # 'match' is a soft keyword: treat as match statement when followed by
                 # a token that can start an expression subject (not an assignment/attr-access/call op)
-                if p.type is 'name' or p.type is 'string' or p.type is 'num' or p.type is 'atom' or p.type is 'js' or (p.type is 'punc' and (p.value is '[' or p.value is '(')):
+                if p.type is 'name' or p.type is 'string' or p.type is 'bytes_literal' or p.type is 'num' or p.type is 'atom' or p.type is 'js' or (p.type is 'punc' and (p.value is '[' or p.value is '(')):
                     next()  # consume the 'match' name token
                     return match_()
             if (is_token(peek(), 'punc', ':')):
@@ -2154,6 +2154,26 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             'value': strings.join('')
         })
 
+    def bytes_literal_():
+        parts = v'[]'
+        start = S.token
+        while True:
+            parts.push(S.token.value)
+            if peek().type is not 'bytes_literal':
+                break
+            next()
+        end_tok = S.token
+        value = parts.join('')
+        return new AST_Call({
+            'start': start,
+            'end': end_tok,
+            'expression': new AST_SymbolRef({'name': 'bytes', 'start': start, 'end': start}),
+            'args': [
+                new AST_String({'start': start, 'end': end_tok, 'value': value}),
+                new AST_String({'start': start, 'end': end_tok, 'value': 'latin-1'})
+            ]
+        })
+
     def token_as_atom_node():
         tok = S.token
         tmp_ = tok.type
@@ -2167,6 +2187,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             })
         elif tmp_ is "string":
             return string_()
+        elif tmp_ is "bytes_literal":
+            return bytes_literal_()
         elif tmp_ is "regexp":
             return new AST_RegExp({
                 'start': tok,

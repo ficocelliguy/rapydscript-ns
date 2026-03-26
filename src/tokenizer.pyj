@@ -104,7 +104,7 @@ IDENTIFIER_PAT = /^[a-z_$][_a-z0-9$]*$/i
 
 def is_string_modifier(val):
     for ch in val:
-        if 'vrufVRUF'.indexOf(ch) is -1:
+        if 'vrufbVRUFB'.indexOf(ch) is -1:
             return False
     return True
 
@@ -698,7 +698,7 @@ def tokenizer(raw_text, filename):
 
         if is_identifier_start(code):
             tok = read_word()
-            if '\'"'.indexOf(peek()) is not -1 and is_string_modifier(tok.value):
+            if (peek() is "'" or peek() is '"') and is_string_modifier(tok.value):
                 mods = tok.value.toLowerCase()
                 start_pos_for_string = S.tokpos
                 stok = read_string(mods.indexOf('r') is not -1, mods.indexOf('v') is not -1)
@@ -707,7 +707,7 @@ def tokenizer(raw_text, filename):
                     tok.col += start_pos_for_string - tok.pos
                     return handle_interpolated_string(stok.value, tok)
                 tok.value = stok.value
-                tok.type = stok.type
+                tok.type = 'bytes_literal' if mods.indexOf('b') is not -1 else stok.type
             return tok
 
         parse_error("Unexpected character «" + ch + "»")

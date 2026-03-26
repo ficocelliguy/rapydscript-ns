@@ -156,7 +156,6 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | `zip(strict=True)`                            | 🟢 Low                                                               |
 | `__slots__` enforcement                       | 🟢 Low — accepted but does not restrict attribute assignment         |
 | Complex number literals `3+4j`                | 🟢 Low — no `j` suffix; no complex type                              |
-| `b'...'` bytes literals                       | 🟢 Low — no `b` prefix; use the `encodings` module for encoding work |
 | `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
 | `__format__` dunder                           | 🟢 Low — `format()` builtin not defined; `__format__` not dispatched |
 

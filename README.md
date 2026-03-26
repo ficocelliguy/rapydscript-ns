@@ -1174,12 +1174,33 @@ RapydScript provides `bytes` (immutable) and `bytearray` (mutable) builtins
 that match Python's semantics and are backed by plain JS arrays of integers
 in the range 0–255.
 
+#### `b'...'` bytes literals
+
+RapydScript supports Python `b'...'` bytes literal syntax.  The prefix may be
+`b` or `B` (and `rb`/`br` for raw bytes where backslash sequences are not
+interpreted).  Adjacent bytes literals are automatically concatenated, just
+like adjacent string literals.
+
+```python
+b'Hello'              # bytes([72, 101, 108, 108, 111])
+b'\x00\xff'           # bytes([0, 255])  — hex escape sequences work
+b'\n\t\r'             # bytes([10, 9, 13]) — control-char escapes work
+b'foo' b'bar'         # bytes([102, 111, 111, 98, 97, 114])  — concatenation
+rb'\n\t'              # bytes([92, 110, 92, 116])  — raw: backslashes literal
+B'ABC'                # bytes([65, 66, 67])  — uppercase B also accepted
+```
+
+Each `b'...'` literal is compiled to a `bytes(str, 'latin-1')` call, so the
+full `bytes` API is available on the result.
+
 #### Construction
 
 ```python
 bytes()                      # empty bytes
 bytes(4)                     # b'\x00\x00\x00\x00'  (4 zero bytes)
+b'\x00\x00\x00\x00'          # same — bytes literal syntax
 bytes([72, 101, 108, 111])   # b'Hello'
+b'Hell\x6f'                  # same — mix of ASCII and hex escapes
 bytes('Hello', 'utf-8')      # encode a string
 bytes('ABC', 'ascii')        # ASCII / latin-1 encoding also accepted
 bytes.fromhex('48656c6c6f')  # from hex string → b'Hello'

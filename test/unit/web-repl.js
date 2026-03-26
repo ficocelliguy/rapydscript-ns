@@ -962,6 +962,39 @@ var TESTS = [
     },
 
     {
+        name: "bundle_bytes_literal_syntax",
+        description: "b'...' bytes literal compiles and runs correctly in bundled compiler",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "b = b'Hello'",
+                "assrt.ok(isinstance(b, bytes))",
+                "assrt.equal(len(b), 5)",
+                "assrt.equal(b[0], 72)",
+                "assrt.equal(b[4], 111)",
+                "assrt.ok(b == bytes([72, 101, 108, 108, 111]))",
+                "# hex escapes",
+                "b2 = b'\\x48\\x65\\x6c\\x6c\\x6f'",
+                "assrt.ok(b2 == b)",
+                "# empty literal",
+                "e = b''",
+                "assrt.equal(len(e), 0)",
+                "# adjacent literal concatenation",
+                "c = b'foo' b'bar'",
+                "assrt.equal(len(c), 6)",
+                "assrt.ok(c == bytes([102, 111, 111, 98, 97, 114]))",
+                "# uppercase B prefix",
+                "u = B'ABC'",
+                "assrt.ok(isinstance(u, bytes))",
+                "assrt.equal(u[0], 65)",
+                "# repr shows b'...' notation",
+                "assrt.equal(repr(b'Hi'), \"b'Hi'\")",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle___import__-error",
         description: "__import__ raises ModuleNotFoundError for unknown module in web-repl",
         run: function () {
