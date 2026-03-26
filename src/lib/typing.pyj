@@ -12,7 +12,7 @@
 #   TypeVar, Generic, Protocol,
 #   cast, overload, no_type_check, no_type_check_decorator,
 #   runtime_checkable, get_type_hints,
-#   TypedDict, NamedTuple, AnyStr, Text
+#   TypedDict, NamedTuple, AnyStr, ByteString, Text
 #
 # Type annotations are not enforced at runtime.  All typing constructs
 # transpile to lightweight JavaScript objects that carry the same
@@ -555,10 +555,23 @@ def NamedTuple(typename, fields):
     return _NT
 
 
+# ── ByteString ─────────────────────────────────────────────────────────────────
+
+class ByteString:
+    """Type covering bytes-like objects: bytes and bytearray.
+
+    Use as a type annotation when a function accepts any bytes-like object::
+
+        from typing import ByteString
+        def process(data: ByteString) -> None: ...
+    """
+    pass
+
+
 # ── Convenience aliases ────────────────────────────────────────────────────────
 
-# AnyStr: a TypeVar constrained to str (bytes is not a separate type in RapydScript/JS)
-AnyStr = TypeVar('AnyStr', str)
+# AnyStr: a TypeVar constrained to str or bytes
+AnyStr = TypeVar('AnyStr', str, bytes)
 
 # Python 2 → Python 3 compatibility alias
 Text = str

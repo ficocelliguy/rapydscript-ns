@@ -377,6 +377,8 @@ def ρσ_op_rshift(a, b):
 def ρσ_list_add(a, b):
     if Array.isArray(a) and Array.isArray(b):
         return ρσ_list_constructor(a.concat(b))
+    if a is not None and a is not undefined and jstype(a.__add__) is 'function':
+        return a.__add__(b)
     return v'a + b'
 
 # ρσ_list_iadd: used for +=; extends a in-place when both sides are arrays (Python semantics).
@@ -384,6 +386,10 @@ def ρσ_list_iadd(a, b):
     if Array.isArray(a) and Array.isArray(b):
         v'Array.prototype.push.apply(a, b)'
         return a
+    if a is not None and a is not undefined and jstype(a.__iadd__) is 'function':
+        return a.__iadd__(b)
+    if a is not None and a is not undefined and jstype(a.__add__) is 'function':
+        return a.__add__(b)
     return v'a + b'
 
 # Unary operator overloading helpers

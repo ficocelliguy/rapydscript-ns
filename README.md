@@ -1168,6 +1168,87 @@ Mutation methods (`add`, `remove`, `discard`, `clear`, `update`) are not
 present on `frozenset` instances, enforcing immutability at the API level.
 `frozenset` objects can be iterated and copied with `.copy()`.
 
+### `bytes` and `bytearray`
+
+RapydScript provides `bytes` (immutable) and `bytearray` (mutable) builtins
+that match Python's semantics and are backed by plain JS arrays of integers
+in the range 0–255.
+
+#### Construction
+
+```python
+bytes()                      # empty bytes
+bytes(4)                     # b'\x00\x00\x00\x00'  (4 zero bytes)
+bytes([72, 101, 108, 111])   # b'Hello'
+bytes('Hello', 'utf-8')      # encode a string
+bytes('ABC', 'ascii')        # ASCII / latin-1 encoding also accepted
+bytes.fromhex('48656c6c6f')  # from hex string → b'Hello'
+
+bytearray()                  # empty mutable byte sequence
+bytearray(3)                 # bytearray(b'\x00\x00\x00')
+bytearray([1, 2, 3])         # from list of ints
+bytearray('Hi', 'utf-8')     # from string
+bytearray(some_bytes)        # mutable copy of a bytes object
+```
+
+`Uint8Array` values may also be passed as the source argument.
+
+#### Common operations (both `bytes` and `bytearray`)
+
+```python
+b = bytes('Hello', 'utf-8')
+
+len(b)                        # 5
+b[0]                          # 72  (integer)
+b[-1]                         # 111
+b[1:4]                        # bytes([101, 108, 108])  (slice → new bytes)
+b[::2]                        # every other byte
+
+b + bytes([33])               # concatenate → b'Hello!'
+b * 2                         # repeat     → b'HelloHello'
+72 in b                       # True  (integer membership)
+bytes([101, 108]) in b        # True  (subsequence membership)
+b == bytes([72, 101, 108, 108, 111])  # True
+
+b.hex()                       # '48656c6c6f'
+b.hex(':', 2)                 # '48:65:6c:6c:6f'  (separator every 2 bytes)
+b.decode('utf-8')             # 'Hello'
+b.decode('ascii')             # works for ASCII-range bytes
+
+b.find(bytes([108, 108]))     # 2
+b.index(101)                  # 1
+b.rfind(108)                  # 3
+b.count(108)                  # 2
+b.startswith(bytes([72]))     # True
+b.endswith(bytes([111]))      # True
+b.split(bytes([108]))         # [b'He', b'', b'o']
+b.replace(bytes([108]), bytes([76]))  # b'HeLLo'
+b.strip()                     # strip leading/trailing whitespace bytes
+b.upper()                     # b'HELLO'
+b.lower()                     # b'hello'
+bytes(b' ').join([bytes('a', 'ascii'), bytes('b', 'ascii')])  # b'a b'
+
+repr(b)                       # "b'Hello'"
+isinstance(b, bytes)          # True
+isinstance(bytearray([1]), bytes)  # True  (bytearray is a subclass of bytes)
+```
+
+#### `bytearray`-only mutation methods
+
+```python
+ba = bytearray([1, 2, 3])
+ba[0] = 99                    # item assignment
+ba[1:3] = bytes([20, 30])     # slice assignment
+ba.append(4)                  # add one byte
+ba.extend([5, 6])             # add multiple bytes
+ba.insert(0, 0)               # insert at index
+ba.pop()                      # remove and return last byte (or ba.pop(i))
+ba.remove(20)                 # remove first occurrence of value
+ba.reverse()                  # reverse in place
+ba.clear()                    # remove all bytes
+ba += bytearray([7, 8])       # in-place concatenation
+```
+
 ### `issubclass`
 
 `issubclass(cls, classinfo)` checks whether a class is a subclass of another
@@ -2983,7 +3064,8 @@ One of Python's main strengths is the number of libraries available to the devel
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
 	copy                # copy (shallow), deepcopy; honours __copy__ / __deepcopy__ hooks
 	typing              # TYPE_CHECKING, Any, Union, Optional, List, Dict, Set, Tuple, TypeVar,
-	                    # Generic, Protocol, Callable, Literal, Final, TypedDict, NamedTuple, cast, …
+	                    # Generic, Protocol, Callable, Literal, Final, TypedDict, NamedTuple,
+	                    # ByteString, AnyStr (str | bytes), cast, …
 	itertools           # count, cycle, repeat, accumulate, chain, compress, dropwhile, filterfalse,
 	                    # groupby, islice, pairwise, starmap, takewhile, zip_longest,
 	                    # product, permutations, combinations, combinations_with_replacement

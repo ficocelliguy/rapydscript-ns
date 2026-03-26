@@ -1,0 +1,664 @@
+# vim:fileencoding=utf-8
+# License: BSD
+
+# globals: exports, console, ρσ_iterator_symbol, ρσ_arraylike, ρσ_str, ρσ_slice
+
+# ---------------------------------------------------------------------------
+# Encoding helpers
+# ---------------------------------------------------------------------------
+
+def ρσ_bytes_utf8_encode(s):
+    if v'typeof TextEncoder !== "undefined"':
+        return v'Array.from(new TextEncoder().encode(s))'
+    out = []
+    for v'var i = 0; i < s.length; i++':
+        c = s.charCodeAt(i)
+        if c < 0x80:
+            out.push(c)
+        elif c < 0x800:
+            out.push(0xC0 | (c >> 6))
+            out.push(0x80 | (c & 0x3F))
+        elif c >= 0xD800 and c <= 0xDBFF:
+            i += 1
+            c2 = s.charCodeAt(i)
+            cp = 0x10000 + ((c - 0xD800) << 10) + (c2 - 0xDC00)
+            out.push(0xF0 | (cp >> 18))
+            out.push(0x80 | ((cp >> 12) & 0x3F))
+            out.push(0x80 | ((cp >> 6) & 0x3F))
+            out.push(0x80 | (cp & 0x3F))
+        else:
+            out.push(0xE0 | (c >> 12))
+            out.push(0x80 | ((c >> 6) & 0x3F))
+            out.push(0x80 | (c & 0x3F))
+    return out
+
+def ρσ_bytes_utf8_decode(data):
+    if v'typeof TextDecoder !== "undefined"':
+        return v'new TextDecoder("utf-8").decode(new Uint8Array(data))'
+    out = []
+    i = 0
+    while i < data.length:
+        b = data[i]
+        if b < 0x80:
+            out.push(String.fromCharCode(b))
+            i += 1
+        elif b < 0xE0:
+            cp = ((b & 0x1F) << 6) | (data[i + 1] & 0x3F)
+            out.push(String.fromCharCode(cp))
+            i += 2
+        elif b < 0xF0:
+            cp = ((b & 0x0F) << 12) | ((data[i + 1] & 0x3F) << 6) | (data[i + 2] & 0x3F)
+            out.push(String.fromCharCode(cp))
+            i += 3
+        else:
+            cp = ((b & 0x07) << 18) | ((data[i + 1] & 0x3F) << 12) | ((data[i + 2] & 0x3F) << 6) | (data[i + 3] & 0x3F)
+            cp -= 0x10000
+            out.push(String.fromCharCode(0xD800 + (cp >> 10)))
+            out.push(String.fromCharCode(0xDC00 + (cp & 0x3FF)))
+            i += 4
+    return out.join('')
+
+def ρσ_bytes_latin1_encode(s):
+    out = []
+    for v'var i = 0; i < s.length; i++':
+        c = s.charCodeAt(i)
+        if c > 255:
+            raise UnicodeEncodeError('latin-1', s, i, i + 1, 'ordinal not in range(256)')
+        out.push(c)
+    return out
+
+def ρσ_bytes_latin1_decode(data):
+    chars = []
+    for v'var i = 0; i < data.length; i++':
+        chars.push(String.fromCharCode(data[i]))
+    return chars.join('')
+
+def ρσ_bytes_from_source(source, encoding, errors):
+    data = []
+    if arguments.length is 0 or source is None or source is undefined:
+        pass  # empty bytes
+    elif jstype(source) is 'number':
+        n = source | 0
+        if n < 0:
+            raise ValueError('negative count')
+        for v'var i = 0; i < n; i++':
+            data.push(0)
+    elif jstype(source) is 'string':
+        enc = (encoding or 'utf-8').toLowerCase().replace(/-|_/g, '')
+        if enc is 'utf8':
+            data = ρσ_bytes_utf8_encode(source)
+        elif enc is 'latin1' or enc is 'iso88591' or enc is 'ascii':
+            data = ρσ_bytes_latin1_encode(source)
+        else:
+            raise LookupError('unknown encoding: ' + (encoding or 'utf-8'))
+    elif v'source instanceof ρσ_bytes' or v'source instanceof ρσ_bytearray':
+        data = source._data.slice()
+    elif v'source instanceof Uint8Array' or v'source instanceof Int8Array':
+        for v'var i = 0; i < source.length; i++':
+            data.push(source[i] & 0xFF)
+    elif ρσ_arraylike(source) or Array.isArray(source):
+        for x in source:
+            b = x | 0
+            if b < 0 or b > 255:
+                raise ValueError('bytes must be in range(0, 256)')
+            data.push(b)
+    elif jstype(source[ρσ_iterator_symbol]) is 'function':
+        iterator = source[ρσ_iterator_symbol]()
+        result = iterator.next()
+        while not result.done:
+            b = result.value | 0
+            if b < 0 or b > 255:
+                raise ValueError('bytes must be in range(0, 256)')
+            data.push(b)
+            result = iterator.next()
+    else:
+        raise TypeError("cannot convert '" + jstype(source) + "' object to bytes-like object")
+    return data
+
+# ---------------------------------------------------------------------------
+# Index sync helper — sets numeric properties on the object so that
+# plain JS `obj[i]` access (used when the subscript is a literal number in
+# the compiler output) returns the correct byte value.  Also sets .length so
+# that the negative-index arithmetic in print_getitem works correctly.
+# ---------------------------------------------------------------------------
+
+def ρσ_bytes_sync(obj):
+    data = obj._data
+    old_len = obj.length | 0
+    new_len = data.length
+    # Remove stale numeric properties beyond the new length
+    for v'var i = new_len; i < old_len; i++':
+        v'delete obj[i]'
+    # Set all current indices
+    for v'var i = 0; i < new_len; i++':
+        obj[i] = data[i]
+    obj.length = new_len
+
+# ---------------------------------------------------------------------------
+# Shared helper — search for needle (plain array) in haystack (plain array)
+# starting at offset `start`. Returns index or -1.
+# ---------------------------------------------------------------------------
+
+def ρσ_bytes_find(haystack, needle, start):
+    hl = haystack.length
+    nl = needle.length
+    if nl is 0:
+        return start
+    for v'var i = start; i <= hl - nl; i++':
+        ok = True
+        for v'var j = 0; j < nl; j++':
+            if haystack[i + j] is not needle[j]:
+                ok = False
+                break
+        if ok:
+            return i
+    return -1
+
+# ---------------------------------------------------------------------------
+# bytes — immutable sequence of integers in 0..255
+# ---------------------------------------------------------------------------
+
+class ρσ_bytes:
+    def __init__(self, source, encoding, errors):
+        self._data = ρσ_bytes_from_source.apply(None, arguments)
+        ρσ_bytes_sync(self)
+
+
+    def __len__(self):
+        return self._data.length
+
+    def __getitem__(self, key):
+        if v'key instanceof ρσ_slice':
+            indices = key.indices(self._data.length)
+            start = indices[0]
+            stop  = indices[1]
+            step  = indices[2]
+            result = []
+            if step > 0:
+                for v'var i = start; i < stop; i += step':
+                    result.push(self._data[i])
+            else:
+                for v'var i = start; i > stop; i += step':
+                    result.push(self._data[i])
+            return ρσ_bytes(result)
+        n = key | 0
+        if n < 0:
+            n += self._data.length
+        if n < 0 or n >= self._data.length:
+            raise IndexError('index out of range')
+        return self._data[n]
+
+    def __contains__(self, item):
+        if v'item instanceof ρσ_bytes' or v'item instanceof ρσ_bytearray':
+            return ρσ_bytes_find(self._data, item._data, 0) >= 0
+        b = item | 0
+        for v'var i = 0; i < this._data.length; i++':
+            if self._data[i] is b:
+                return True
+        return False
+
+    def __add__(self, other):
+        if not (v'other instanceof ρσ_bytes' or v'other instanceof ρσ_bytearray'):
+            raise TypeError("can't concat bytes-like objects of different types")
+        return ρσ_bytes(self._data.concat(other._data))
+
+    def __mul__(self, n):
+        result = []
+        for v'var k = 0; k < n; k++':
+            for v'var j = 0; j < this._data.length; j++':
+                result.push(self._data[j])
+        return ρσ_bytes(result)
+
+    def __rmul__(self, n):
+        return self.__mul__(n)
+
+    def __eq__(self, other):
+        if not (v'other instanceof ρσ_bytes' or v'other instanceof ρσ_bytearray'):
+            return False
+        if self._data.length is not other._data.length:
+            return False
+        for v'var i = 0; i < this._data.length; i++':
+            if self._data[i] is not other._data[i]:
+                return False
+        return True
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __bool__(self):
+        return self._data.length > 0
+
+    def __repr__(self):
+        parts = ["b'"]
+        for v'var i = 0; i < this._data.length; i++':
+            b = self._data[i]
+            if b is 9:
+                parts.push('\\t')
+            elif b is 10:
+                parts.push('\\n')
+            elif b is 13:
+                parts.push('\\r')
+            elif b is 39:
+                parts.push("\\'")
+            elif b is 92:
+                parts.push('\\\\')
+            elif b >= 32 and b < 127:
+                parts.push(String.fromCharCode(b))
+            else:
+                h = b.toString(16)
+                parts.push('\\x' + ('0' if h.length < 2 else '') + h)
+        parts.push("'")
+        return parts.join('')
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __hash__(self):
+        h = 5381
+        for v'var i = 0; i < this._data.length; i++':
+            h = ((h << 5) + h) ^ self._data[i]
+            h = h | 0
+        return h
+
+    def hex(self, sep, bytes_per_sep):
+        parts = []
+        for v'var i = 0; i < this._data.length; i++':
+            h = self._data[i].toString(16)
+            parts.push(('0' if h.length < 2 else '') + h)
+        if sep is not undefined and sep is not None and parts.length > 0:
+            n = 1 if (bytes_per_sep is undefined or bytes_per_sep is None) else (bytes_per_sep | 0)
+            if n < 0:
+                n = -n
+                grouped = []
+                i = parts.length
+                while i > 0:
+                    grouped.unshift(parts.slice(max(0, i - n), i).join(''))
+                    i -= n
+                return grouped.join(sep)
+            else:
+                grouped = []
+                for v'var i = 0; i < parts.length; i += n':
+                    grouped.push(parts.slice(i, i + n).join(''))
+                return grouped.join(sep)
+        return parts.join('')
+
+    def decode(self, encoding, errors):
+        enc = (encoding or 'utf-8').toLowerCase().replace(/-|_/g, '')
+        if enc is 'utf8':
+            return ρσ_bytes_utf8_decode(self._data)
+        elif enc is 'latin1' or enc is 'iso88591' or enc is 'ascii':
+            return ρσ_bytes_latin1_decode(self._data)
+        else:
+            raise LookupError('unknown encoding: ' + (encoding or 'utf-8'))
+
+    @staticmethod
+    def fromhex(s):
+        s = s.replace(/ /g, '')
+        if s.length % 2 is not 0:
+            raise ValueError('non-hexadecimal number found in fromhex() arg')
+        data = []
+        for v'var i = 0; i < s.length; i += 2':
+            val = parseInt(s.slice(i, i + 2), 16)
+            if isNaN(val):
+                raise ValueError('non-hexadecimal number found in fromhex() arg at position ' + str(i))
+            data.push(val)
+        return ρσ_bytes(data)
+
+    def count(self, sub, start, end):
+        needle = [sub | 0] if jstype(sub) is 'number' else sub._data
+        s = 0 if start is undefined else (start | 0)
+        e = self._data.length if end is undefined else (end | 0)
+        n = 0
+        pos = s
+        while pos <= e - needle.length:
+            found = ρσ_bytes_find(self._data, needle, pos)
+            if found < 0 or found + needle.length > e:
+                break
+            n += 1
+            pos = found + max(1, needle.length)
+        return n
+
+    def find(self, sub, start, end):
+        needle = [sub | 0] if jstype(sub) is 'number' else sub._data
+        s = 0 if start is undefined else (start | 0)
+        e = self._data.length if end is undefined else (end | 0)
+        pos = ρσ_bytes_find(self._data, needle, s)
+        if pos >= 0 and pos + needle.length <= e:
+            return pos
+        return -1
+
+    def index(self, sub, start, end):
+        pos = self.find(sub, start, end)
+        if pos < 0:
+            raise ValueError('subsequence not found')
+        return pos
+
+    def rfind(self, sub, start, end):
+        needle = [sub | 0] if jstype(sub) is 'number' else sub._data
+        s = 0 if start is undefined else (start | 0)
+        e = self._data.length if end is undefined else (end | 0)
+        last = -1
+        pos = s
+        while pos <= e - needle.length:
+            found = ρσ_bytes_find(self._data, needle, pos)
+            if found < 0 or found + needle.length > e:
+                break
+            last = found
+            pos = found + max(1, needle.length)
+        return last
+
+    def rindex(self, sub, start, end):
+        pos = self.rfind(sub, start, end)
+        if pos < 0:
+            raise ValueError('subsequence not found')
+        return pos
+
+    def startswith(self, prefix, start, end):
+        s = 0 if start is undefined else (start | 0)
+        e = self._data.length if end is undefined else (end | 0)
+        pdata = [prefix | 0] if jstype(prefix) is 'number' else prefix._data
+        if pdata.length > e - s:
+            return False
+        for v'var i = 0; i < pdata.length; i++':
+            if self._data[s + i] is not pdata[i]:
+                return False
+        return True
+
+    def endswith(self, suffix, start, end):
+        s = 0 if start is undefined else (start | 0)
+        e = self._data.length if end is undefined else (end | 0)
+        sdata = [suffix | 0] if jstype(suffix) is 'number' else suffix._data
+        if sdata.length > e - s:
+            return False
+        offset = e - sdata.length
+        for v'var i = 0; i < sdata.length; i++':
+            if self._data[offset + i] is not sdata[i]:
+                return False
+        return True
+
+    def join(self, iterable):
+        parts = []
+        for item in iterable:
+            if not (v'item instanceof ρσ_bytes' or v'item instanceof ρσ_bytearray'):
+                raise TypeError('sequence item must be a bytes-like object')
+            parts.push(item._data)
+        result = []
+        for v'var i = 0; i < parts.length; i++':
+            if i > 0:
+                for v'var j = 0; j < this._data.length; j++':
+                    result.push(self._data[j])
+            for v'var j = 0; j < parts[i].length; j++':
+                result.push(parts[i][j])
+        return ρσ_bytes(result)
+
+    def split(self, sep, maxsplit):
+        if maxsplit is undefined:
+            maxsplit = -1
+        if sep is None or sep is undefined or jstype(sep) is 'string':
+            # Split on whitespace
+            result = []
+            i = 0
+            n = self._data.length
+            while i < n:
+                while i < n and self._data[i] <= 32:
+                    i += 1
+                if i >= n:
+                    break
+                j = i
+                while j < n and self._data[j] > 32:
+                    j += 1
+                result.push(ρσ_bytes(self._data.slice(i, j)))
+                i = j
+                if maxsplit >= 0 and result.length >= maxsplit:
+                    while i < n and self._data[i] <= 32:
+                        i += 1
+                    if i < n:
+                        result.push(ρσ_bytes(self._data.slice(i)))
+                    break
+            return result
+        needle = sep._data
+        result = []
+        pos = 0
+        splits = 0
+        while True:
+            found = ρσ_bytes_find(self._data, needle, pos)
+            if found < 0 or (maxsplit >= 0 and splits >= maxsplit):
+                result.push(ρσ_bytes(self._data.slice(pos)))
+                break
+            result.push(ρσ_bytes(self._data.slice(pos, found)))
+            pos = found + needle.length
+            splits += 1
+        return result
+
+    def replace(self, old, replacement, count):
+        odata = old._data
+        ndata = replacement._data
+        result = []
+        pos = 0
+        n = 0
+        limit = count if (count is not undefined and count is not None) else -1
+        while pos <= self._data.length:
+            found = ρσ_bytes_find(self._data, odata, pos)
+            if found < 0 or (limit >= 0 and n >= limit):
+                for v'var i = pos; i < this._data.length; i++':
+                    result.push(self._data[i])
+                break
+            for v'var i = pos; i < found; i++':
+                result.push(self._data[i])
+            for v'var i = 0; i < ndata.length; i++':
+                result.push(ndata[i])
+            pos = found + odata.length
+            n += 1
+            if odata.length is 0:
+                if pos < self._data.length:
+                    result.push(self._data[pos])
+                    pos += 1
+                else:
+                    break
+        return ρσ_bytes(result)
+
+    def strip(self, chars):
+        return self.lstrip(chars).rstrip(chars)
+
+    def lstrip(self, chars):
+        is_ws = chars is None or chars is undefined
+        cdata = [] if is_ws else chars._data
+        i = 0
+        while i < self._data.length:
+            b = self._data[i]
+            if is_ws:
+                if b > 32:
+                    break
+            else:
+                if cdata.indexOf(b) < 0:
+                    break
+            i += 1
+        return ρσ_bytes(self._data.slice(i))
+
+    def rstrip(self, chars):
+        is_ws = chars is None or chars is undefined
+        cdata = [] if is_ws else chars._data
+        i = self._data.length - 1
+        while i >= 0:
+            b = self._data[i]
+            if is_ws:
+                if b > 32:
+                    break
+            else:
+                if cdata.indexOf(b) < 0:
+                    break
+            i -= 1
+        return ρσ_bytes(self._data.slice(0, i + 1))
+
+    def upper(self):
+        data = self._data.slice()
+        for v'var i = 0; i < data.length; i++':
+            b = data[i]
+            if b >= 97 and b <= 122:
+                data[i] = b - 32
+        return ρσ_bytes(data)
+
+    def lower(self):
+        data = self._data.slice()
+        for v'var i = 0; i < data.length; i++':
+            b = data[i]
+            if b >= 65 and b <= 90:
+                data[i] = b + 32
+        return ρσ_bytes(data)
+
+    def copy(self):
+        return ρσ_bytes(self._data.slice())
+
+    # .slice() and .filter() are called by the RapydScript compiler output for
+    # b[start:end] and b[start:end:step] subscript expressions respectively.
+    # They must return a new bytes object (not a plain array) so that sliced
+    # bytes values continue to behave as bytes.
+
+    def slice(self, start, end):
+        return ρσ_bytes(self._data.slice(start, end))
+
+    def filter(self, fn):
+        return ρσ_bytes(self._data.filter(fn))
+
+ρσ_bytes.__name__ = 'bytes'
+
+# ---------------------------------------------------------------------------
+# bytearray — mutable version of bytes
+# ---------------------------------------------------------------------------
+
+class ρσ_bytearray(ρσ_bytes):
+    def __init__(self, source, encoding, errors):
+        self._data = ρσ_bytes_from_source.apply(None, arguments)
+        ρσ_bytes_sync(self)
+
+    def __setitem__(self, key, val):
+        if v'key instanceof ρσ_slice':
+            indices = key.indices(self._data.length)
+            start = indices[0]
+            stop  = indices[1]
+            step  = indices[2]
+            if v'val instanceof ρσ_bytes' or v'val instanceof ρσ_bytearray':
+                src = val._data
+            else:
+                src = ρσ_bytes_from_source(val)
+            if step is 1:
+                self._data.splice.apply(self._data, [start, stop - start].concat(src))
+            else:
+                positions = []
+                if step > 0:
+                    for v'var i = start; i < stop; i += step':
+                        positions.push(i)
+                else:
+                    for v'var i = start; i > stop; i += step':
+                        positions.push(i)
+                if src.length is not positions.length:
+                    raise ValueError('attempt to assign bytes of size ' + str(src.length) + ' to extended slice of size ' + str(positions.length))
+                for v'var i = 0; i < positions.length; i++':
+                    self._data[positions[i]] = src[i]
+            ρσ_bytes_sync(self)
+        else:
+            n = key | 0
+            if n < 0:
+                n += self._data.length
+            if n < 0 or n >= self._data.length:
+                raise IndexError('index out of range')
+            b = val | 0
+            if b < 0 or b > 255:
+                raise ValueError('byte must be in range(0, 256)')
+            self._data[n] = b
+            self[n] = b
+
+    def __add__(self, other):
+        if not (v'other instanceof ρσ_bytes' or v'other instanceof ρσ_bytearray'):
+            raise TypeError("can't concat bytes-like objects of different types")
+        return ρσ_bytearray(self._data.concat(other._data))
+
+    def __iadd__(self, other):
+        if not (v'other instanceof ρσ_bytes' or v'other instanceof ρσ_bytearray'):
+            raise TypeError("can't concat bytes-like objects of different types")
+        for v'var i = 0; i < other._data.length; i++':
+            self._data.push(other._data[i])
+        ρσ_bytes_sync(self)
+        return self
+
+    def __mul__(self, n):
+        result = []
+        for v'var k = 0; k < n; k++':
+            for v'var j = 0; j < this._data.length; j++':
+                result.push(self._data[j])
+        return ρσ_bytearray(result)
+
+    def __repr__(self):
+        b = ρσ_bytes.prototype.__repr__.call(self)
+        return 'bytearray(' + b + ')'
+
+    def append(self, item):
+        b = item | 0
+        if b < 0 or b > 255:
+            raise ValueError('byte must be in range(0, 256)')
+        idx = self._data.length
+        self._data.push(b)
+        self[idx] = b
+        self.length = self._data.length
+
+    def extend(self, iterable):
+        if v'iterable instanceof ρσ_bytes' or v'iterable instanceof ρσ_bytearray':
+            for v'var i = 0; i < iterable._data.length; i++':
+                self._data.push(iterable._data[i])
+        else:
+            for x in iterable:
+                b = x | 0
+                if b < 0 or b > 255:
+                    raise ValueError('byte must be in range(0, 256)')
+                self._data.push(b)
+        ρσ_bytes_sync(self)
+
+    def insert(self, idx, item):
+        n = idx | 0
+        if n < 0:
+            n = max(0, self._data.length + n)
+        b = item | 0
+        if b < 0 or b > 255:
+            raise ValueError('byte must be in range(0, 256)')
+        self._data.splice(n, 0, b)
+        ρσ_bytes_sync(self)
+
+    def pop(self, idx):
+        n = self._data.length - 1 if idx is undefined else (idx | 0)
+        if n < 0:
+            n += self._data.length
+        if n < 0 or n >= self._data.length:
+            raise IndexError('pop index out of range')
+        val = self._data.splice(n, 1)[0]
+        ρσ_bytes_sync(self)
+        return val
+
+    def remove(self, item):
+        b = item | 0
+        for v'var i = 0; i < this._data.length; i++':
+            if self._data[i] is b:
+                self._data.splice(i, 1)
+                ρσ_bytes_sync(self)
+                return
+        raise ValueError(str(item) + ' is not in bytearray')
+
+    def reverse(self):
+        self._data.reverse()
+        ρσ_bytes_sync(self)
+
+    def clear(self):
+        self._data.length = 0
+        ρσ_bytes_sync(self)
+
+    def copy(self):
+        return ρσ_bytearray(self._data.slice())
+
+    def slice(self, start, end):
+        return ρσ_bytearray(self._data.slice(start, end))
+
+    def filter(self, fn):
+        return ρσ_bytearray(self._data.filter(fn))
+
+ρσ_bytearray.__name__ = 'bytearray'
+
+v'var bytes = ρσ_bytes, bytearray = ρσ_bytearray'

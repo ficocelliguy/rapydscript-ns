@@ -48,7 +48,7 @@ export const BASE_BUILTINS = (
     ' NodeList alert console Node Symbol NamedNodeMap ρσ_eslice ρσ_delslice Number' +
     ' Boolean encodeURIComponent decodeURIComponent setTimeout setInterval' +
     ' setImmediate clearTimeout clearInterval clearImmediate requestAnimationFrame' +
-    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next __import__ ρσ_new ρσ_object_new hash ρσ_object_setattr ρσ_object_getattr ρσ_object_delattr ExceptionGroup BaseExceptionGroup tuple'
+    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next __import__ ρσ_new ρσ_object_new hash ρσ_object_setattr ρσ_object_getattr ρσ_object_delattr ExceptionGroup BaseExceptionGroup tuple bytes bytearray'
 ).split(' ');
 
 // ---------------------------------------------------------------------------

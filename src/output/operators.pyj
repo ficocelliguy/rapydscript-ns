@@ -43,7 +43,7 @@ def print_getitem(self, output):  # AST_Sub
         expr.print(output)
         output.print('['), prop.print(output), output.print(']')
         return
-    is_negative_number = is_node_type(prop, AST_Unary) and prop.operator is "-" and is_node_type(prop.expression, AST_Number)
+    is_negative_number = is_node_type(prop, AST_Unary) and prop.operator is "-" and is_node_type(prop.expression, AST_Number) and not prop.overloaded
     is_repeatable = is_node_type(expr, AST_SymbolRef)
     if is_repeatable:
         expr.print(output)

@@ -12,7 +12,7 @@ from typing import (
     TypeVar, Generic, Protocol,
     cast, overload, no_type_check, no_type_check_decorator,
     runtime_checkable, get_type_hints,
-    TypedDict, NamedTuple, AnyStr, Text
+    TypedDict, NamedTuple, AnyStr, ByteString, Text
 )
 
 
@@ -175,6 +175,10 @@ def _test_typevar():
     assrt.equal(S.__constraints__[1], int)
 
     assrt.equal(AnyStr.__name__, 'AnyStr')
+    # AnyStr is constrained to both str and bytes now that bytes is supported
+    assrt.equal(AnyStr.__constraints__.length, 2)
+    assrt.equal(AnyStr.__constraints__[0], str)
+    assrt.equal(AnyStr.__constraints__[1], bytes)
 _test_typevar()
 
 
@@ -324,6 +328,62 @@ def _test_namedtuple():
     # Negative indexing
     assrt.equal(p[-1], 4.0)
 _test_namedtuple()
+
+
+# ── ByteString ─────────────────────────────────────────────────────────────────
+
+def _test_bytestring():
+    from __python__ import overload_operators
+    # ByteString is importable and is a class
+    assrt.ok(ByteString is not None)
+
+    # Use ByteString as a type annotation — it is a no-op at runtime
+    def consume(data: ByteString) -> int:
+        return len(data)
+
+    assrt.equal(consume(bytes([1, 2, 3])), 3)
+    assrt.equal(consume(bytearray([10, 20])), 2)
+
+    # Optional[ByteString] works via _GenericAlias
+    from typing import Optional
+    alias = Optional[ByteString]
+    assrt.equal(alias._name, 'Optional')
+    assrt.equal(alias.__args__[0], ByteString)
+
+    # Union[bytes, bytearray] round-trip
+    from typing import Union
+    u = Union[bytes, bytearray]
+    assrt.equal(u._name, 'Union')
+    assrt.equal(u.__args__[0], bytes)
+    assrt.equal(u.__args__[1], bytearray)
+_test_bytestring()
+
+
+# ── bytes / bytearray in generic aliases ───────────────────────────────────────
+
+def _test_bytes_in_generic_aliases():
+    from __python__ import overload_operators
+    # List[bytes]
+    alias = List[bytes]
+    assrt.equal(alias.__origin__, list)
+    assrt.equal(alias.__args__[0], bytes)
+
+    # Dict[str, bytes]
+    alias = Dict[str, bytes]
+    assrt.equal(alias.__args__[0], str)
+    assrt.equal(alias.__args__[1], bytes)
+
+    # Optional[bytes]
+    from typing import Optional
+    alias = Optional[bytes]
+    assrt.equal(alias._name, 'Optional')
+    assrt.equal(alias.__args__[0], bytes)
+
+    # IO[bytes] — used to annotate binary-mode streams
+    alias = IO[bytes]
+    assrt.equal(alias._name, 'IO')
+    assrt.equal(alias.__args__[0], bytes)
+_test_bytes_in_generic_aliases()
 
 
 # ── Text alias ─────────────────────────────────────────────────────────────────

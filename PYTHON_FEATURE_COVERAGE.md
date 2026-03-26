@@ -75,6 +75,7 @@
 | `slice(start, stop[, step])` | Full Python `slice` class: 1-, 2-, and 3-argument forms; `.start`, `.stop`, `.step` attributes; `.indices(length)` → `(start, stop, step)`; `str()` / `repr()`; `isinstance(s, slice)`; equality `==`; use as subscript `lst[s]` (read, write, `del`) all work. |
 | `__import__(name[, globals, locals, fromlist, level])` | Runtime lookup in the compiled module registry (`ρσ_modules`). Without `fromlist` (or empty `fromlist`) returns the top-level package, matching Python's semantics. `ImportError` / `ModuleNotFoundError` raised for unknown modules. **Constraint**: the module must have been statically imported elsewhere in the source so it is present in `ρσ_modules`. |
 | `ImportError`, `ModuleNotFoundError` | Both defined as runtime exception classes; `ModuleNotFoundError` is a subclass of `ImportError` (same as Python 3.6+). |
+| `bytes(source[, encoding[, errors]])` and `bytearray(source[, encoding[, errors]])` | Full Python semantics: construction from integer (n zero bytes), list/iterable of ints (0–255), string + encoding (`utf-8`, `latin-1`, `ascii`), `Uint8Array`, or another `bytes`/`bytearray`. Key methods: `hex([sep[, bytes_per_sep]])`, `decode(encoding)`, `fromhex(s)` (static), `count`, `find`, `rfind`, `index`, `rindex`, `startswith`, `endswith`, `join`, `split`, `replace`, `strip`, `lstrip`, `rstrip`, `upper`, `lower`, `copy`. `bytearray` adds: `append`, `extend`, `insert`, `pop`, `remove`, `reverse`, `clear`, `__setitem__` (single and slice). Slicing returns a new `bytes`/`bytearray`. `+` concatenates; `*` repeats; `==` compares element-wise; `in` tests integer or subsequence membership; `isinstance(x, bytes)` / `isinstance(x, bytearray)` work; `bytearray` is a subclass of `bytes`. `repr()` returns `b'...'` notation. `Uint8Array` values may be passed anywhere a `bytes`-like object is accepted. |
 
 ---
 
@@ -138,7 +139,6 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | `exec(code)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
 | `eval(expr)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
 | `input(prompt)`                     | 🟢 Low — not built in; use `prompt()` via `v'prompt(...)'`            |
-| `bytes(x)` / `bytearray(x)`        | 🟢 Low — no built-in bytes type; use `Uint8Array` via verbatim JS     |
 | `object()`                          | 🟢 Low — base `object` type not exposed; use plain `{}` or a class    |
 | `abc` module — `ABC`, `@abstractmethod`, `Protocol` | 🟢 Low — no abc module; no enforcement of abstract methods |
 | `complex(real, imag)`               | 🟢 Low — no complex number type                                        |

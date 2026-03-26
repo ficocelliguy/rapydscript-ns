@@ -864,6 +864,103 @@ var TESTS = [
         },
     },
 
+    // ── bytes / bytearray ────────────────────────────────────────────────────
+
+    {
+        name: "bundle_bytes_basic",
+        description: "bytes() construction and basic operations work in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "b = bytes([72, 101, 108, 108, 111])",
+                "assrt.equal(len(b), 5)",
+                "assrt.equal(b[0], 72)",
+                "assrt.equal(b[-1], 111)",
+                "assrt.ok(isinstance(b, bytes))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bytes_from_string",
+        description: "bytes(str, encoding) encodes a string to UTF-8 bytes in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "b = bytes('Hello', 'utf-8')",
+                "assrt.equal(len(b), 5)",
+                "assrt.equal(b[0], 72)",
+                "assrt.equal(b.decode('utf-8'), 'Hello')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bytes_hex",
+        description: "bytes.hex() and bytes.fromhex() round-trip in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "b = bytes([0, 15, 255])",
+                "assrt.equal(b.hex(), '000fff')",
+                "b2 = bytes.fromhex('000fff')",
+                "assrt.ok(b == b2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bytes_slice",
+        description: "bytes slice returns bytes in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "b = bytes([10, 20, 30, 40, 50])",
+                "s = b[1:4]",
+                "assrt.ok(isinstance(s, bytes))",
+                "assrt.equal(len(s), 3)",
+                "assrt.equal(s[0], 20)",
+                "assrt.equal(s[2], 40)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bytearray_mutation",
+        description: "bytearray append/extend/pop work in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "ba = bytearray([1, 2, 3])",
+                "assrt.ok(isinstance(ba, bytearray))",
+                "ba.append(4)",
+                "assrt.equal(len(ba), 4)",
+                "assrt.equal(ba[3], 4)",
+                "p = ba.pop()",
+                "assrt.equal(p, 4)",
+                "assrt.equal(len(ba), 3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bytes_repr",
+        description: "repr(bytes(...)) returns b'...' notation in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "b = bytes([72, 101, 108, 108, 111])",
+                "assrt.equal(repr(b), \"b'Hello'\")",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     {
         name: "bundle___import__-error",
         description: "__import__ raises ModuleNotFoundError for unknown module in web-repl",
