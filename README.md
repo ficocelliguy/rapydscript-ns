@@ -446,7 +446,6 @@ Class decorators are also supported with the caveat that the class properties
 must be accessed via the prototype property. For example:
 
 ```py
-
 def add_x(cls):
 	cls.prototype.x = 1
 
@@ -856,11 +855,11 @@ differences between RapydScript dicts and Python dicts.
       RapydScript dict objects in ```for..in``` loops.
 
 Fortunately, there is a builtin ```dict``` type that behaves just like Python's
-```dict``` with all the same methods. The only caveat is that you have to add
-a special line to your RapydScript code to use these dicts, as shown below:
+```dict``` with all the same methods. The ``dict_literals`` and
+``overload_getitem`` flags are **on by default**, so dict literals and the
+``[]`` operator already behave like Python:
 
 ```py
-from __python__ import dict_literals, overload_getitem
 a = {1:1, 2:2}
 a[1]  # == 1
 a[3] = 3
@@ -868,17 +867,10 @@ list(a.keys()) == [1, 2, 3]
 a['3'] # raises a KeyError as this is a proper python dict, not a JavaScript object
 ```
 
-The special line, called a *scoped flag* tells the compiler that from
-that point on, you want it to treat dict literals and the getitem operator `[]`
-as they are treated in python, not JavaScript. 
-
-The scoped flags are local to each scope, that means that if you use it in a
-module, it will only affect code in that module, it you use it in a function,
-it will only affect code in that function. In fact, you can even use it to
-surround a few lines of code, like this:
+These are *scoped flags* — local to the scope where they appear. You can
+disable them for a region of code using the ``no_`` prefix:
 
 ```py
-from __python__ import dict_literals, overload_getitem
 a = {1:1, 2:2}
 isinstance(a, dict) == True
 from __python__ import no_dict_literals, no_overload_getitem
@@ -962,11 +954,10 @@ result = {**defaults, 'weight': 5}
 # result == {'color': 'blue', 'size': 10, 'weight': 5}
 ```
 
-This works for both plain JavaScript-object dicts (the default) and Python
-`dict` objects (enabled via `from __python__ import dict_literals`):
+This works for both plain JavaScript-object dicts and Python `dict` objects
+(``dict_literals`` is on by default):
 
 ```py
-from __python__ import dict_literals, overload_getitem
 pd1 = {'a': 1}
 pd2 = {'b': 2}
 merged = {**pd1, **pd2}   # isinstance(merged, dict) == True
@@ -977,12 +968,10 @@ and `dict.update()` for Python dicts.
 
 ### Dict merge operator `|` and `|=` (Python 3.9+)
 
-When `from __python__ import overload_operators, dict_literals` is active,
-Python dicts support the `|` (merge) and `|=` (update in-place) operators:
+Python dicts support the `|` (merge) and `|=` (update in-place) operators
+(requires ``overload_operators`` and ``dict_literals``, both on by default):
 
 ```py
-from __python__ import overload_operators, dict_literals
-
 d1 = {'x': 1, 'y': 2}
 d2 = {'y': 99, 'z': 3}
 
@@ -997,17 +986,15 @@ d1 |= d2           # d1 is now {'x': 1, 'y': 99, 'z': 3}
 `d1 |= d2` merges `d2` into `d1` and returns `d1`.
 
 Without `overload_operators` the `|` symbol is bitwise OR — use
-`{**d1, **d2}` spread syntax as a flag-free alternative.
+`{**d1, **d2}` spread syntax as an alternative if the flag is disabled.
 
 
 ### Arithmetic operator overloading
 
 RapydScript supports Python-style arithmetic operator overloading via the
-``overload_operators`` scoped flag:
+``overload_operators`` flag, which is **on by default**:
 
 ```py
-from __python__ import overload_operators
-
 class Vector:
     def __init__(self, x, y):
         self.x = x
@@ -1056,23 +1043,21 @@ is defined.
 When `overload_operators` is active, string and list repetition with `*` works just like Python:
 
 ```py
-from __python__ import overload_operators
 'ha' * 3      # 'hahaha'
 3 * 'ha'      # 'hahaha'
 [0] * 4       # [0, 0, 0, 0]
 [1, 2] * 2    # [1, 2, 1, 2]
 ```
 
-Because the dispatch adds one or two property lookups per operation, the flag
-is **opt-in** rather than always-on. Enable it only in the files or scopes
-where you need it.
+Because the dispatch adds one or two property lookups per operation, you can
+disable it in scopes where it is not needed with
+``from __python__ import no_overload_operators``.
 
 The ``collections.Counter`` class defines ``__add__``, ``__sub__``, ``__or__``,
 and ``__and__``. With ``overload_operators`` you can use the natural operator
 syntax:
 
 ```py
-from __python__ import overload_getitem, overload_operators
 from collections import Counter
 
 c1 = Counter('aab')
@@ -1105,13 +1090,8 @@ assert 1 < 2 > 3 == False  # 1<2 AND 2>3 = True AND False = False
 
 ### Python Truthiness and `__bool__`
 
-By default RapydScript uses JavaScript truthiness, where empty arrays `[]` and
-empty objects `{}` are **truthy**. Activate full Python truthiness semantics
-with:
-
-```py
-from __python__ import truthiness
-```
+RapydScript uses Python truthiness semantics by default (``truthiness`` is
+**on by default**):
 
 When this flag is active:
 
@@ -1122,8 +1102,6 @@ When this flag is active:
 - **All condition positions** (`if`, `while`, `assert`, `not`, ternary) use Python semantics.
 
 ```py
-from __python__ import truthiness
-
 class Empty:
     def __bool__(self): return False
 
@@ -1137,16 +1115,14 @@ z = [1] and 'ok'      # z == 'ok'
 
 The flag is **scoped** — it applies until the end of the enclosing
 function or class body. Use `from __python__ import no_truthiness` to
-disable it in a sub-scope.
+disable it in a sub-scope where JavaScript truthiness is needed.
 
 ### Callable Objects (`__call__`)
 
 Any class that defines `__call__` can be invoked directly with `obj(args)`,
-just like Python callable objects. This requires `from __python__ import truthiness`:
+just like Python callable objects:
 
 ```python
-from __python__ import truthiness
-
 class Multiplier:
     def __init__(self, factor):
         self.factor = factor
@@ -1818,11 +1794,8 @@ JSX Support
 
 RapydScript supports JSX syntax for building React UI components. JSX elements compile directly to `React.createElement()` calls, so the output is plain JavaScript — no Babel or JSX transform step is needed.
 
-Enable JSX support with:
-
-```py
-from __python__ import jsx
-```
+JSX support is **on by default**. The ``jsx`` flag can be disabled with
+``from __python__ import no_jsx`` if needed.
 
 ### Requirements
 
@@ -1838,8 +1811,6 @@ from __python__ import jsx
 RapydScript compiles JSX to `React.createElement()` calls. For example:
 
 ```py
-from __python__ import jsx
-
 def Greeting(props):
     return <h1>Hello, {props.name}!</h1>
 ```
@@ -1859,8 +1830,6 @@ Lowercase tags (`div`, `span`, `h1`, …) become string arguments. Capitalised n
 String, expression, boolean, and hyphenated attribute names all work:
 
 ```py
-from __python__ import jsx
-
 def Form(props):
     return (
         <form>
@@ -1880,8 +1849,6 @@ Hyphenated names (e.g. `aria-label`, `data-id`) are automatically quoted as obje
 ### Nested elements and expressions
 
 ```py
-from __python__ import jsx
-
 def UserList(users):
     return (
         <ul className="user-list">
@@ -1895,8 +1862,6 @@ def UserList(users):
 Use `<>...</>` to return multiple elements without a wrapper node. Fragments compile to `React.createElement(React.Fragment, null, ...)`:
 
 ```py
-from __python__ import jsx
-
 def TwoItems():
     return (
         <>
@@ -1909,8 +1874,6 @@ def TwoItems():
 ### Self-closing elements
 
 ```py
-from __python__ import jsx
-
 def Avatar(props):
     return <img src={props.url} alt={props.name} />
 ```
@@ -1918,8 +1881,6 @@ def Avatar(props):
 ### Spread attributes
 
 ```py
-from __python__ import jsx
-
 def Button(props):
     return <button {...props}>Click me</button>
 ```
@@ -1931,8 +1892,6 @@ Compiles to `React.createElement("button", {...props}, "Click me")`.
 Capitalised names and dot-notation are treated as component references (not quoted strings):
 
 ```py
-from __python__ import jsx
-
 def App():
     return (
         <Router.Provider>
@@ -1965,7 +1924,6 @@ RapydScript ships a `react` standard library module that re-exports every standa
 ### Importing hooks
 
 ```py
-from __python__ import jsx
 from react import useState, useEffect, useCallback, useMemo, useRef
 
 def Counter():
@@ -2096,7 +2054,6 @@ def ThemedButton():
 **useRef**
 
 ```py
-from __python__ import jsx
 from react import useRef
 
 def FocusInput():
@@ -2109,7 +2066,6 @@ def FocusInput():
 **memo**
 
 ```py
-from __python__ import jsx
 from react import memo
 
 def Row(props):
@@ -2121,7 +2077,6 @@ MemoRow = memo(Row)
 **forwardRef**
 
 ```py
-from __python__ import jsx
 from react import forwardRef
 
 def FancyInput(props, ref):
@@ -2135,7 +2090,6 @@ FancyInputWithRef = forwardRef(FancyInput)
 You can extend `React.Component` directly without importing it, or import `Component` from the `react` module:
 
 ```py
-from __python__ import jsx
 from react import Component
 
 class Greeter(Component):
@@ -2601,67 +2555,51 @@ You could also use `external` decorator to bypass improperly imported RapydScrip
 
 ### Method Binding
 
-By default, RapydScript does not bind methods to the classes they're declared under. This behavior is unlike Python, but very much like the rest of JavaScript. For example, consider this code:
+RapydScript automatically binds methods to their objects by default (the
+``bound_methods`` flag is **on by default**). This means method references
+like ``getattr(obj, 'method')`` work correctly when called later.
+
+If you need to disable auto-binding in a scope, use
+``from __python__ import no_bound_methods``.
+
+For example:
 
 ```py
-class Boy:
-	def __init__(self, name):
-		self.name = name
+class C:
+    def __init__(self):
+        self.a = 3
 
-	def greet(self):
-		if self:
-			print('My name is' + self.name)
+    def val(self):
+        return self.a
 
-tod = Boy('Tod')
-tod.greet()                 # Hello, my name is Tod
-getattr(tod, 'greet')()     # prints nothing
+getattr(C(), 'val')() == 3  # works because bound_methods is on by default
 ```
 
-In some cases, however, you may wish for the functions in the class to be
-automatically bound when the objects of that class are instantiated. In order
-to do that, use a *scoped flag*, which is a simple instruction to the compiler
-telling it to auto-bind methods, as shown below:
-
-```py
-
-class AutoBound:
-	from __python__ import bound_methods
-
-	def __init__(self):
-		self.a = 3
-
-	def val(self):
-		return self.a
-
-getattr(AutoBound(), 'val')() == 3
-```
-
-If you want all classes in a module to be auto-bound simply put the scoped flag
-at the top of the module. You can even choose to have only a few methods of the
-class auto-bound, like this:
+You can mix bound and unbound methods within a class using ``no_bound_methods``
+and ``bound_methods`` to toggle at any point:
 
 ```py
 class C:
 
-	def unbound1(self):
-		pass # this method will not be auto-bound
-
-	from __python__ import bound_methods
-	# Methods below this line will be auto-bound
-
-	def bound(self):
-	   pass # This method will be auto-bound
+	def bound1(self):
+		pass # auto-bound (default)
 
 	from __python__ import no_bound_methods
 	# Methods below this line will not be auto-bound
 
-	def unbound2(self):
-		pass  # this method will be unbound
+	def unbound(self):
+		pass  # not auto-bound
+
+	from __python__ import bound_methods
+	# Methods below this line will be auto-bound again
+
+	def bound2(self):
+	   pass # auto-bound
 ```
 
 Scoped flags apply only to the scope they are defined in, so if you define them
 inside a class declaration, they only apply to that class. If you define it at
-the module level, it will only apply to all classes in the module that occur
+the module level, it will apply to all classes in the module that occur
 below that line, and so on.
 
 Iterators
@@ -3253,18 +3191,18 @@ As a result, there are some things in RapydScript that might come as surprises
 to an experienced Python developer. The most important such gotchas are listed
 below:
 
-- Truthiness in JavaScript is very different from Python. Empty lists and dicts
-  are ``False`` in Python but ``True`` in JavaScript. You can opt in to full
-  Python truthiness semantics (where empty containers are falsy and ``__bool__``
-  is dispatched) with ``from __python__ import truthiness``. Without that flag,
-  test the length explicitly instead of the container directly.
+- RapydScript uses Python truthiness semantics by default: empty lists and dicts
+  are falsy and ``__bool__`` is dispatched. This is controlled by the
+  ``truthiness`` flag, which is on by default. Use
+  ``from __python__ import no_truthiness`` to fall back to JavaScript truthiness
+  in a scope.
 
-- Operators in JavaScript are very different from Python. ``1 + '1'`` would be
-  an error in Python, but results in ``'11'`` in JavaScript. Similarly, ``[1] +
-  [1]`` is a new list in Python, but a string in JavaScript. Keep that in mind
-  as you write code. By default, RapydScript does not implement operator
-  overloading for performance reasons. You can opt in via the
-  ``overload_operators`` scoped flag (see below).
+- Operator overloading is enabled by default via the ``overload_operators``
+  flag, so ``[1] + [1]`` produces a new list and ``'ha' * 3`` produces
+  ``'hahaha'`` as in Python. If you are working with plain numbers, strings,
+  and booleans there is no performance penalty — the dispatch only kicks in
+  when a dunder method is defined. Use ``from __python__ import no_overload_operators``
+  to disable it in a scope.
 
 - There are many more keywords than in Python. Because RapydScript compiles
   down to JavaScript, the set of keywords is all the keywords of Python + all
@@ -3285,16 +3223,18 @@ below:
   yourself. Similarly, the compiler will try to convert SomeClass.method() into
   SomeClass.prototype.method() for you, but again, this is not 100% reliable.
 
-- The {"a":b} syntax is used to create JavaScript hashes. These do not behave
-  like python dictionaries. To create python like dictionary objects, you
-  should use a scoped flag. See the section on dictionaries above for details.
+- The ``{"a":b}`` syntax creates Python ``dict`` objects by default (the
+  ``dict_literals`` flag is on by default). Use
+  ``from __python__ import no_dict_literals`` to get plain JavaScript objects
+  in a scope. See the section on dictionaries above for details.
 
 
 Python Flags
 ------------
 
-Python flags are scoped compiler directives that opt in to stricter Python
-semantics or language features.  In source code they are written as:
+Python flags are scoped compiler directives that control Python semantics.
+All flags are **on by default**.  They can be turned off in a scope with
+the ``no_`` prefix.  In source code they are written as:
 
 ```py
 from __python__ import flag_name
@@ -3302,17 +3242,20 @@ from __python__ import flag_name
 
 At the top level they take effect for the rest of the file; inside a function
 or class body they apply only to that scope.  Prefix a flag with `no_` to turn
-it off in a nested scope.
+it off in a scope (e.g. `from __python__ import no_truthiness`).
+
+All flags are **on by default**.  To revert to legacy RapydScript behavior
+with no flags enabled, pass ``--legacy-rapydscript`` on the command line.
 
 | Flag | Description |
 |---|---|
-| `dict_literals` | `{k: v}` literals create Python `dict` objects instead of plain JS objects. |
-| `overload_getitem` | `obj[key]` dispatches to `__getitem__` / `__setitem__` / `__delitem__` on objects that define them. |
-| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. |
-| `truthiness` | Boolean tests and `bool()` dispatch to `__bool__` and treat empty containers as falsy, matching Python semantics. |
-| `bound_methods` | Method references (`obj.method`) are automatically bound to their object, so they can be passed as callbacks without losing `self`. |
-| `hash_literals` | `{k: v}` creates a Python `dict` (alias for `dict_literals`; kept for backward compatibility). |
-| `jsx` | Enable JSX syntax (`<Tag attr={expr}>children</Tag>`). Required for files that contain JSX elements. |
+| `dict_literals` | `{k: v}` literals create Python `dict` objects instead of plain JS objects. On by default. |
+| `overload_getitem` | `obj[key]` dispatches to `__getitem__` / `__setitem__` / `__delitem__` on objects that define them. On by default. |
+| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. On by default. |
+| `truthiness` | Boolean tests and `bool()` dispatch to `__bool__` and treat empty containers as falsy, matching Python semantics. On by default. |
+| `bound_methods` | Method references (`obj.method`) are automatically bound to their object, so they can be passed as callbacks without losing `self`. On by default. |
+| `hash_literals` | `{k: v}` creates a Python `dict` (alias for `dict_literals`; kept for backward compatibility). On by default. |
+| `jsx` | JSX syntax (`<Tag attr={expr}>children</Tag>`) is enabled. On by default. |
 
 
 Monaco Language Service
