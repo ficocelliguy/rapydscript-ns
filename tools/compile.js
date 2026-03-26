@@ -75,6 +75,11 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
     var num_of_files = files.length || 1;
 
     var global_scoped_flags = build_scoped_flags(argv.python_flags);
+    if (!argv.legacy_rapydscript) {
+        var python_mode_flags = ['dict_literals', 'overload_getitem', 'bound_methods', 'hash_literals', 'overload_operators', 'truthiness', 'jsx'];
+        python_mode_flags.forEach(function(f) { if (!(f in global_scoped_flags)) global_scoped_flags[f] = true; });
+        if (!argv.pythonize_strings) OUTPUT_OPTIONS.pythonize_strings = true;
+    }
 
     function parse_file(code, file, toplevel) {
         return RapydScript.parse(code, {

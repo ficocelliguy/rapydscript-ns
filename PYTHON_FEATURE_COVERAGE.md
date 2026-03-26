@@ -23,9 +23,9 @@
 | `str.casefold()` | Maps to `.toLowerCase()` |
 | `str.removeprefix(prefix)` | Returns unchanged string if prefix not found |
 | `str.removesuffix(suffix)` | Returns unchanged string if suffix not found |
-| `str.expandtabs(tabsize=8)` | Replaces `\t` with spaces to the next tab stop; `\n`/`\r` reset the column counter; `tabsize=0` removes all tabs; available as an instance method after `from pythonize import strings; strings()` |
-| `str * n` string repetition | Works when `from __python__ import overload_operators` is active |
-| `list * n` / `n * list` | Works with `overload_operators`; returns a proper RapydScript list |
+| `str.expandtabs(tabsize=8)` | Replaces `\t` with spaces to the next tab stop; `\n`/`\r` reset the column counter; `tabsize=0` removes all tabs; available as an instance method on any string (via the default `pythonize_strings` patch) |
+| `str * n` string repetition | Works (via `overload_operators`, on by default) |
+| `list * n` / `n * list` | Works (via `overload_operators`); returns a proper RapydScript list |
 | `list + list` concatenation | `[1,2] + [3,4]` returns `[1, 2, 3, 4]`; `+=` extends in-place. No flag required. |
 | `match / case` | Structural pattern matching (Python 3.10) fully supported |
 | Variable type annotations `x: int = 1` | Parsed and ignored (no runtime enforcement); annotated assignments work normally |
@@ -41,7 +41,7 @@
 | `**expr` in function calls | Works with any expression (variable, attr access, call, dict literal), not just plain names |
 | `@classmethod`, `@staticmethod`, `@property` / `@prop.setter` | All work |
 | `{**dict1, **dict2}` dict spread | Works as merge replacement for the missing `\|` operator |
-| `dict.fromkeys()` | Works with `dict_literals` flag |
+| `dict.fromkeys()` | Works (via `dict_literals`, on by default) |
 | Chained comparisons `a < b < c` and `a < b > c` | Same-direction and mixed-direction chains both work; middle operand evaluated once |
 | `for`, `while`, `try/except/finally`, `with`, `match/case` | All control-flow constructs work |
 | Classes, inheritance, decorators, `__dunder__` methods | Fully supported |
@@ -55,13 +55,13 @@
 | `bin()`, `hex()`, `oct()`, `chr()`, `ord()` | All work |
 | `int(x, base)`, `float(x)` with ValueError on bad input | Works |
 | `lambda` keyword | Full support: args, defaults, `*args`, ternary body, closures, nesting |
-| Arithmetic operator overloading — `__add__`, `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`, `__neg__`, `__pos__`, `__abs__`, `__invert__`, `__lshift__`, `__rshift__`, `__and__`, `__or__`, `__xor__`, `__radd__`, `__iadd__` etc. | Dispatched when `from __python__ import overload_operators` is active; comparison operators (`<`, `>`, `<=`, `>=`) are **not** re-dispatched — call `obj.__lt__(other)` directly |
+| Arithmetic operator overloading — `__add__`, `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`, `__neg__`, `__pos__`, `__abs__`, `__invert__`, `__lshift__`, `__rshift__`, `__and__`, `__or__`, `__xor__`, `__radd__`, `__iadd__` etc. | Dispatched via `overload_operators` (on by default); comparison operators (`<`, `>`, `<=`, `>=`) are **not** re-dispatched — call `obj.__lt__(other)` directly |
 | Nested comprehensions (multi-`for` clause) | `[x for row in matrix for x in row if cond]`; works for list, set, and dict comprehensions |
 | Positional-only parameters `def f(a, b, /):` | Full support — parser enforces placement; runtime passes positional args correctly |
 | Keyword-only parameters `def f(a, *, b):` | Full support — bare `*` separator enforced; `b` must be passed as keyword |
 | Walrus operator `:=` | Fully supported: hoisted in `if`/`while` conditions at any scope; comprehension filter assigns to enclosing scope (Python-correct). |
-| `__call__` dunder dispatch | `obj()` dispatches to `obj.__call__(args)` for callable objects; `callable(obj)` also returns `True`; both forms work. Requires `from __python__ import truthiness`. |
-| **Truthiness / `__bool__`** | Full Python truthiness via `from __python__ import truthiness`: empty `[]`, `{}`, `set()`, `''` are falsy; `__bool__` is dispatched; `and`/`or` return operand values; `not`, `if`, `while`, `assert`, ternary all use `ρσ_bool()`. |
+| `__call__` dunder dispatch | `obj()` dispatches to `obj.__call__(args)` for callable objects; `callable(obj)` also returns `True`; both forms work. Active via `truthiness` (on by default). |
+| **Truthiness / `__bool__`** | Full Python truthiness via `truthiness` (on by default): empty `[]`, `{}`, `set()`, `''` are falsy; `__bool__` is dispatched; `and`/`or` return operand values; `not`, `if`, `while`, `assert`, ternary all use `ρσ_bool()`. |
 | `frozenset(iterable)` | Immutable set: construction from list/set/iterable; `in`, `len()`, iteration, `copy()`, `union()`, `intersection()`, `difference()`, `symmetric_difference()`, `issubset()`, `issuperset()`, `isdisjoint()` — all return `frozenset`. `isinstance(x, frozenset)` works. Compares equal to a `set` with the same elements via `__eq__`. No mutation methods (`add`, `remove`, etc.). |
 | `issubclass(cls, classinfo)` | Checks prototype chain; `classinfo` may be a class or tuple of classes; every class is a subclass of itself; raises `TypeError` for non-class arguments. |
 | `hash(obj)` and `__hash__` dunder | Numbers hash by value (int identity, float → int form if whole); strings use djb2; `None` → 0; booleans → 0/1; `def __hash__(self)` in a class is dispatched by `hash()`; class instances without `__hash__` get a stable identity hash; defining `__eq__` without `__hash__` makes the class unhashable (Python semantics — `hash()` raises `TypeError`); `list`, `set`, `dict` raise `TypeError`. |
@@ -71,10 +71,60 @@
 | `next(iterator[, default])` | Advances a JS-protocol iterator (`{done, value}`); returns `default` when exhausted if provided, otherwise raises `StopIteration`. Works with `iter()`, `range()`, `enumerate()`, generators, and any object with a `.next()` or `__next__()` method. |
 | `StopIteration` exception | Defined as a builtin exception class; raised by `next()` when an iterator is exhausted and no default is given. |
 | `iter(callable, sentinel)` | Two-argument form calls `callable` (no args) repeatedly until the return value equals `sentinel` (strict `===`). Returns a lazy iterator compatible with `for` loops, `next()`, `list()`, and all iterator consumers. Works with plain functions and callable objects (`__call__`). |
-| `dict \| dict` and `dict \|= dict` (Python 3.9+) | Dict merge via `\|` creates a new merged dict (right-side values win); `\|=` updates in-place. Requires `from __python__ import overload_operators, dict_literals`. |
+| `dict \| dict` and `dict \|= dict` (Python 3.9+) | Dict merge via `\|` creates a new merged dict (right-side values win); `\|=` updates in-place. Active via `overload_operators` + `dict_literals` (both on by default). |
 | `slice(start, stop[, step])` | Full Python `slice` class: 1-, 2-, and 3-argument forms; `.start`, `.stop`, `.step` attributes; `.indices(length)` → `(start, stop, step)`; `str()` / `repr()`; `isinstance(s, slice)`; equality `==`; use as subscript `lst[s]` (read, write, `del`) all work. |
 | `__import__(name[, globals, locals, fromlist, level])` | Runtime lookup in the compiled module registry (`ρσ_modules`). Without `fromlist` (or empty `fromlist`) returns the top-level package, matching Python's semantics. `ImportError` / `ModuleNotFoundError` raised for unknown modules. **Constraint**: the module must have been statically imported elsewhere in the source so it is present in `ρσ_modules`. |
 | `ImportError`, `ModuleNotFoundError` | Both defined as runtime exception classes; `ModuleNotFoundError` is a subclass of `ImportError` (same as Python 3.6+). |
+
+---
+
+## Python Compatibility Flags (Default-On)
+
+All flags below are enabled by default. They can be turned off per-file, per-scope, or globally via the CLI.
+
+### Opt-out: per-file or per-scope
+
+Place at the top of a file to affect the whole file, or inside a function to affect only that scope:
+
+```python
+from __python__ import no_truthiness           # single flag
+from __python__ import no_dict_literals, no_overload_operators  # multiple flags
+```
+
+To re-enable a flag in a nested scope after an outer scope turned it off:
+
+```python
+from __python__ import truthiness
+```
+
+### Opt-out: CLI (all files)
+
+```sh
+rapydscript compile --python-flags=no_dict_literals,no_truthiness input.pyj
+```
+
+Flags in `--python-flags` are comma-separated. Prefix a flag with `no_` to disable it; omit the prefix to force-enable it (useful when combining with `--legacy-rapydscript`).
+
+### Disable all flags (legacy mode)
+
+```sh
+rapydscript compile --legacy-rapydscript input.pyj
+```
+
+This restores the original RapydScript behavior: plain JS objects for `{}`, no operator overloading, JS truthiness, unbound methods, and no `String.prototype` patching.
+
+### Flag reference
+
+| Flag | What it enables | Effect when disabled |
+|---|---|---|
+| `dict_literals` | `{}` creates a Python `ρσ_dict` with `.keys()`, `.values()`, `.items()`, `.get()`, `.pop()`, `.update()`, `fromkeys()`, and `KeyError` on missing key access. | `{}` becomes a plain JS object; no Python dict methods; missing key access returns `undefined`. |
+| `overload_getitem` | `obj[key]` dispatches to `obj.__getitem__(key)` when defined; `obj[a:b:c]` passes a `slice` object; dict `[]` access raises `KeyError` on missing key. | `[]` compiles to plain JS property access; no `__getitem__` dispatch; no slice dispatch. |
+| `bound_methods` | Class methods are automatically bound to `self`, so they retain their `self` binding when stored in a variable or passed as a callback. | Detached method references lose `self` (JS default behavior). |
+| `hash_literals` | When `dict_literals` is off, `{}` creates `Object.create(null)` rather than `{}`, preventing prototype-chain pollution from keys like `toString`. Has no visible effect while `dict_literals` is on. | `{}` becomes a plain `{}` (inherits from `Object.prototype`). Only relevant when `dict_literals` is also disabled. |
+| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `~`, `<<`, `>>`) and their augmented-assignment forms dispatch to dunder methods (`__add__`, `__mul__`, etc.) when defined on the left operand. Also enables `str * n` string repetition, `list * n` / `n * list` list repetition, and `dict \| dict` / `dict \|= dict` merge. | All operators compile directly to JS; no dunder dispatch. `str * n` produces `NaN`; list repetition and dict merge are unavailable. |
+| `truthiness` | Python truthiness semantics: `[]`, `{}`, `set()`, `''`, `0`, `None` are falsy; objects with `__bool__` are dispatched; `and`/`or` return the deciding operand value (not `True`/`False`); `not`, `if`, `while`, `assert`, and ternary all route through `ρσ_bool()`. Also enables `__call__` dispatch: `obj(args)` invokes `obj.__call__(args)` for callable objects. | Truthiness is JS-native (all objects truthy); `__bool__` is never called; `and`/`or` return booleans; `__call__` is not dispatched. |
+| `jsx` | JSX syntax (`<Tag attr={expr}>children</Tag>` and `<>...</>` fragments) is recognised as expression syntax and compiled to `React.createElement` calls (or equivalent). | `<` is always a less-than operator; angle-bracket tokens are never parsed as JSX. |
+| `pythonize_strings` *(output-level option, not a `from __python__` flag)* | `String.prototype` is patched at startup with Python string methods (`strip`, `lstrip`, `rstrip`, `join`, `format`, `capitalize`, `lower`, `upper`, `find`, `rfind`, `index`, `rindex`, `count`, `startswith`, `endswith`, `center`, `ljust`, `rjust`, `zfill`, `partition`, `rpartition`, `splitlines`, `expandtabs`, `swapcase`, `title`, `isspace`, `islower`, `isupper`). Equivalent to calling `from pythonize import strings; strings()` manually. Note: `split()` and `replace()` are intentionally kept as their JS versions. | Python string methods are not available on string instances; call `str.strip(s)` etc., or import and call `strings()` from `pythonize` manually. Disable globally with `--legacy-rapydscript`. |
 
 ---
 
@@ -158,13 +208,13 @@ Features that exist in RapydScript but behave differently from standard Python:
 
 | Feature | Python Behavior | RapydScript Behavior |
 |---|---|---|
-| Truthiness of `[]` / `{}` | `False` | `True` (JS semantics) unless `from __python__ import truthiness` is active |
+| Truthiness of `[]` / `{}` | `False` | `True` (JS semantics) when `truthiness` is disabled via `from __python__ import no_truthiness` or `--legacy-rapydscript`; Python semantics (falsy) by default |
 | `is` / `is not` | Object identity | Strict equality `===` / `!==` |
 | `//` floor division on floats | `math.floor(a/b)` always | Correct for integers; uses `Math.floor` (same result for well-behaved floats) |
 | `%` on negative numbers | Python modulo (always non-negative) | JS remainder (can be negative) |
 | `int` / `float` distinction | Separate types | Both are JS `number`; `isinstance(x, int)` and `isinstance(x, float)` use heuristics |
-| `str * n` repetition | Always works | Requires `from __python__ import overload_operators` |
-| Unbound method references | Methods are unbound by default | Same — but storing a method in a variable without the `bound_methods` compiler flag loses `self` binding |
+| `str * n` repetition | Always works | Works by default (via `overload_operators`); disable with `from __python__ import no_overload_operators` |
+| Unbound method references | Methods are unbound by default | Methods are auto-bound to `self` by default (via `bound_methods`); storing a method in a variable retains `self`. Disable with `from __python__ import no_bound_methods` to get JS-style unbound methods. |
 | `dict` key ordering | Insertion order guaranteed (3.7+) | Depends on JS engine (V8 preserves insertion order in practice) |
 | `global` / `nonlocal` scoping | Full cross-scope declaration | `global` works for module-level; if a variable exists in both an intermediate outer scope **and** the module-level scope, the outer scope takes precedence (differs from Python where `global` always forces module-level) |
 | `Exception.message` | Not standard; use `.args[0]` | `.message` is the standard attribute (JS `Error` style) |
@@ -176,11 +226,11 @@ Features that exist in RapydScript but behave differently from standard Python:
 | `is` / `is not` with `NaN` | `math.nan is math.nan` → `True` (same object) | `x is NaN` compiles to `isNaN(x)` (not `x === NaN`), making NaN checks work correctly |
 | Arithmetic type coercion | `1 + '1'` raises `TypeError` | `1 + '1'` → `'11'`; JS coerces the number to a string |
 | `<`, `>`, `<=`, `>=` on lists / containers | Element-wise lexicographic comparison | Falls through to JS coercion — operands are stringified first (e.g. `[10] < [9]` is `True` because `'[10]' < '[9]'`). Comparison dunders (`__lt__` etc.) can be defined and called directly but are not auto-dispatched by these operators. |
-| Default `{}` dict — missing key | `KeyError` raised | Returns `undefined`; use `from __python__ import dict_literals, overload_getitem` to get `KeyError` |
+| Default `{}` dict — missing key | `KeyError` raised | `KeyError` raised by default (via `dict_literals` + `overload_getitem`); disable both flags to get `undefined` on missing keys |
 | Default `{}` dict — numeric keys | Integer keys are stored as integers | Numeric keys are auto-coerced to strings by the JS engine: `d[1]` and `d['1']` refer to the same slot |
 | Default `{}` dict — attribute access | `d.foo` raises `AttributeError` | `d.foo` and `d['foo']` access the same slot; keys are also properties |
-| Default `{}` dict — Python dict methods | `.keys()`, `.values()`, `.items()`, `.get()`, `.pop()`, `.update()` all available | None of these methods exist on a plain JS object dict; use `from __python__ import dict_literals` for full Python dict semantics |
-| String methods on instances | `'hello'.strip()` works directly | Python string methods live on the `str` module object (`str.strip(s)`), not on string instances. JS native methods (`.toUpperCase()`, `.trim()`, etc.) work on instances. Call `from pythonize import strings; strings()` to copy Python methods onto string instances. |
+| Default `{}` dict — Python dict methods | `.keys()`, `.values()`, `.items()`, `.get()`, `.pop()`, `.update()` all available | Available by default (via `dict_literals`); use `from __python__ import no_dict_literals` to revert to plain JS object semantics (no dict methods) |
+| String methods on instances | `'hello'.strip()` works directly | Python string methods are patched onto `String.prototype` at startup by default (via `pythonize_strings`), so `'hello'.strip()` works. Disable globally with `--legacy-rapydscript`; then call `from pythonize import strings; strings()` manually if needed. Note: `split()` and `replace()` are intentionally left as JS versions even after patching — use `str.split(s)` / `str.replace(s, old, new)` for Python semantics. |
 | `strings()` — `split()` / `replace()` | `'a b'.split()` splits on whitespace; `'aaa'.replace('a','b')` replaces all | After `strings()`, `split()` and `replace()` are **intentionally left** as JS versions: no-arg `.split()` returns a one-element array; `.replace(str, str)` replaces only the first occurrence. Use `str.split(s)` / `str.replace(s, old, new)` for Python semantics. |
 | String encoding | Unicode strings (full code-point aware) | UTF-16 — non-BMP characters (e.g. emoji) are stored as surrogate pairs. Use `str.uchrs()`, `str.uslice()`, `str.ulen()` for code-point-aware operations. |
 | Multiple inheritance MRO | C3 linearization (MRO) always deterministic | Built on JS prototype chain; may differ from Python's C3 MRO in complex or diamond-inheritance hierarchies |

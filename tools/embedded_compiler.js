@@ -7,6 +7,7 @@
 "use strict";  /*jshint node:true */
 
 var has_prop = Object.prototype.hasOwnProperty.call.bind(Object.prototype.hasOwnProperty);
+var PYTHON_MODE_FLAGS = ['dict_literals', 'overload_getitem', 'bound_methods', 'hash_literals', 'overload_operators', 'truthiness', 'jsx'];
 
 function build_scoped_flags(flags_str) {
     var result = Object.create(null);
@@ -134,8 +135,12 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
             opts = opts || {};
             var classes = (this.toplevel) ? this.toplevel.classes : undefined;
             var inherited_flags = (this.toplevel) ? this.toplevel.scoped_flags : undefined;
+            var base_flags = Object.create(null);
+            if (opts.legacy_rapydscript !== true) {
+                PYTHON_MODE_FLAGS.forEach(function(f) { base_flags[f] = true; });
+            }
             var scoped_flags = Object.assign(
-                Object.create(null),
+                base_flags,
                 opts.python_flags ? build_scoped_flags(opts.python_flags) : {},
                 inherited_flags || {}
             );
@@ -165,7 +170,8 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
                     libdir: undefined,
                 });
             }
-            var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, opts.omit_function_metadata, opts.pythonize_strings);
+            var pythonize_strings = (opts.legacy_rapydscript !== true) ? true : !!opts.pythonize_strings;
+            var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, opts.omit_function_metadata, pythonize_strings);
             if (opts.export_main) {
                 ans = ans.replace(/^(function\smain)/gm, 'export $1')
                     .replace(/^(async\sfunction\smain)/gm, 'export $1');
@@ -188,8 +194,12 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
             opts = opts || {};
             var classes = (this.toplevel) ? this.toplevel.classes : undefined;
             var inherited_flags = (this.toplevel) ? this.toplevel.scoped_flags : undefined;
+            var base_flags_sm = Object.create(null);
+            if (opts.legacy_rapydscript !== true) {
+                PYTHON_MODE_FLAGS.forEach(function(f) { base_flags_sm[f] = true; });
+            }
             var scoped_flags = Object.assign(
-                Object.create(null),
+                base_flags_sm,
                 opts.python_flags ? build_scoped_flags(opts.python_flags) : {},
                 inherited_flags || {}
             );
@@ -219,11 +229,12 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
                     libdir: undefined,
                 });
             }
+            var pythonize_strings_sm = (opts.legacy_rapydscript !== true) ? true : !!opts.pythonize_strings;
             var result = print_ast_with_sourcemap(
                 this.toplevel,
                 opts.keep_baselib, opts.keep_docstrings, opts.js_version,
                 opts.private_scope, opts.write_name, opts.omit_function_metadata,
-                opts.pythonize_strings,
+                pythonize_strings_sm,
                 opts.filename || '<input>',
                 code
             );

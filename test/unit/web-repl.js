@@ -798,7 +798,7 @@ var TESTS = [
             var repl = RS.web_repl();
             var js = bundle_compile(repl, [
                 "from react import forwardRef",
-                "def render(props, ref): return props.x",
+                "def render(props, ref): return props['x']",
                 "FancyInput = forwardRef(render)",
                 "assrt.equal(jstype(FancyInput), 'function')",
                 "assrt.equal(FancyInput({'x': 99}), 99)",

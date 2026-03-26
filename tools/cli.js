@@ -360,6 +360,17 @@ hash_literals, overload_operators. Prefix a flag with no_ to
 explicitly disable it (e.g. no_bound_methods).
 */});
 
+opt("legacy_rapydscript", "L", 'bool', false, function(){/*
+Use legacy RapydScript behavior (disabled by default). When set to
+true (--legacy-rapydscript), preserves legacy RapydScript behavior
+with no Python compatibility flags enabled by default. When false
+(the default), enables all Python compatibility flags globally
+(dict_literals, overload_getitem, bound_methods, hash_literals,
+overload_operators, truthiness, jsx) and patches String.prototype
+with Python string methods at startup, equivalent to:
+from pythonize import strings; strings()
+*/});
+
 create_group('repl', '', function(){/*
 Run a Read-Eval-Print-Loop (REPL). This allows
 you to type and run RapydScript at a live

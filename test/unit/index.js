@@ -98,6 +98,16 @@ function compile_with_flags(src, flags_obj) {
     return output.toString();
 }
 
+// compile_python_mode simulates the default (legacy_rapydscript=false) behavior:
+// all Python compatibility flags are enabled globally.
+var PYTHON_MODE_FLAGS = ['dict_literals', 'overload_getitem', 'bound_methods',
+                         'hash_literals', 'overload_operators', 'truthiness', 'jsx'];
+function compile_python_mode(src) {
+    var flags = {};
+    PYTHON_MODE_FLAGS.forEach(function(f) { flags[f] = true; });
+    return compile_with_flags(src, flags);
+}
+
 function compile_virtual(src, virtual_files) {
     compiler_module.set_virtual_files(virtual_files);
     try {
@@ -805,8 +815,8 @@ var TESTS = [
             'result = v"typeof undefined"',
             'assrt.equal(result, "undefined")',
             "arr = [1, 2, 3]",
-            'len = v"arr.length"',
-            "assrt.equal(len, 3)",
+            'leng = v"arr.length"',
+            "assrt.equal(leng, 3)",
             'assrt.equal(v"Math.max(4, 7)", 7)',
         ].join("\n"),
         js_checks: ["typeof undefined", "arr.length", "Math.max(4, 7)"],
@@ -3188,10 +3198,11 @@ assrt.equal(fib(15), 610)
             var js_with = ec_with.compile(src, { python_flags: "truthiness" });
             assert.ok(/if\s*\(ρσ_bool\(/.test(js_with),
                 "python_flags='truthiness': expected if(ρσ_bool( in: " + js_with);
-            var ec_without = make_ec(RapydScript, baselib, null);
-            var js_without = ec_without.compile(src, {});
-            assert.ok(!/if\s*\(ρσ_bool\(/.test(js_without),
-                "no python_flags: if(ρσ_bool( should NOT appear in: " + js_without);
+            // Use legacy_rapydscript: true to get legacy mode (no python flags by default)
+            var ec_legacy = make_ec(RapydScript, baselib, null);
+            var js_legacy = ec_legacy.compile(src, { legacy_rapydscript: true });
+            assert.ok(!/if\s*\(ρσ_bool\(/.test(js_legacy),
+                "legacy mode: if(ρσ_bool( should NOT appear in: " + js_legacy);
         },
     },
 
@@ -5116,6 +5127,104 @@ assrt.equal(fib(15), 610)
             'assrt.equal(str.expandtabs(""), "")',
         ].join("\n"),
         js_checks: [],
+    },
+
+    // ── legacy_rapydscript default ────────────────────────────────────────
+
+    {
+        name: "legacy_rapydscript_false_enables_overload_operators",
+        description: "default (legacy_rapydscript=false): overload_operators active; a+b uses ρσ_op_add",
+        run: function() {
+            // Use unique variable names so the pattern is only from user code, not baselib
+            var js = compile_python_mode("myval = myarg_a + myarg_b");
+            assert.ok(js.indexOf("ρσ_op_add(myarg_a, myarg_b)") !== -1,
+                "expected ρσ_op_add(myarg_a, myarg_b) in python mode; got:\n" + js);
+        },
+    },
+
+    {
+        name: "legacy_rapydscript_true_no_overload_operators",
+        description: "legacy mode (no flags): a+b uses ρσ_list_add, not ρσ_op_add",
+        run: function() {
+            // compile() uses no scoped_flags → no overload_operators
+            var js = compile("myval = myarg_a + myarg_b");
+            assert.ok(js.indexOf("ρσ_op_add(myarg_a") === -1,
+                "unexpected ρσ_op_add(myarg_a in legacy mode; got:\n" + js);
+            assert.ok(js.indexOf("ρσ_list_add(myarg_a") !== -1,
+                "expected ρσ_list_add(myarg_a in legacy mode; got:\n" + js);
+        },
+    },
+
+    {
+        name: "legacy_rapydscript_false_enables_dict_literals",
+        description: "default (legacy_rapydscript=false): dict_literals active; {} compiles to ρσ_dict()",
+        run: function() {
+            var js = compile_python_mode("mydict = {}");
+            assert.ok(js.indexOf("dict_literal") !== -1 || js.indexOf("ρσ_dict") !== -1,
+                "expected dict() wrapper with dict_literals enabled (python mode); got:\n" + js);
+        },
+    },
+
+    {
+        name: "legacy_rapydscript_true_no_dict_literals",
+        description: "legacy mode (no flags): {} compiles to a plain JS object literal",
+        run: function() {
+            var js = compile("mydict = {}");
+            // The assignment line should not contain dict_literal or ρσ_dict
+            var lines = js.split("\n").filter(function(l) { return l.indexOf("mydict") !== -1; });
+            var userline = lines.join("\n");
+            assert.ok(userline.indexOf("dict_literal") === -1 && userline.indexOf("ρσ_dict") === -1,
+                "unexpected dict() wrapper in legacy mode; got:\n" + userline);
+        },
+    },
+
+    {
+        name: "legacy_rapydscript_false_enables_truthiness",
+        description: "default (legacy_rapydscript=false): truthiness active; if-condition wrapped in ρσ_bool()",
+        run: function() {
+            var js = compile_python_mode("if mycond:\n    pass");
+            assert.ok(/if\s*\(ρσ_bool\(mycond/.test(js),
+                "expected if(ρσ_bool(mycond in python mode; got:\n" + js);
+        },
+    },
+
+    {
+        name: "legacy_rapydscript_true_no_truthiness",
+        description: "legacy mode (no flags): if-condition is not wrapped in ρσ_bool()",
+        run: function() {
+            var js = compile("if mycond:\n    pass");
+            assert.ok(!/if\s*\(ρσ_bool\(mycond/.test(js),
+                "unexpected ρσ_bool(mycond wrapping in legacy mode; got:\n" + js);
+        },
+    },
+
+    {
+        name: "legacy_rapydscript_false_enables_bound_methods",
+        description: "default (legacy_rapydscript=false): bound_methods active; methods are .bind()-ed",
+        run: function() {
+            var js = compile_python_mode([
+                "class MyFoo:",
+                "    def mybar(self):",
+                "        return 1",
+            ].join("\n"));
+            // Bound methods produce a .bind(this) call in the class prototype setup
+            assert.ok(/mybar.*bind/.test(js) || /bind.*mybar/.test(js),
+                "expected .bind() for mybar with bound_methods enabled (python mode); got:\n" + js);
+        },
+    },
+
+    {
+        name: "legacy_rapydscript_true_no_bound_methods",
+        description: "legacy mode (no flags): methods are not .bind()-ed",
+        run: function() {
+            var js = compile([
+                "class MyFoo:",
+                "    def mybar(self):",
+                "        return 1",
+            ].join("\n"));
+            assert.ok(!/mybar.*bind/.test(js) && !/bind.*mybar/.test(js),
+                "unexpected .bind() for mybar in legacy mode; got:\n" + js);
+        },
     },
 
 ];

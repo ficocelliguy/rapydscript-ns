@@ -109,7 +109,8 @@ define_str_func = def(name, func):
     if func.__argnames__:
         Object.defineProperty(f, '__argnames__', {'value':v"['string']".concat(func.__argnames__)})
 
-ρσ_orig_split, ρσ_orig_replace = String.prototype.split.call.bind(String.prototype.split), String.prototype.replace.call.bind(String.prototype.replace)
+ρσ_orig_split = String.prototype.split.call.bind(String.prototype.split)
+ρσ_orig_replace = String.prototype.replace.call.bind(String.prototype.replace)
 
 # format()  {{{
 define_str_func('format', def ():

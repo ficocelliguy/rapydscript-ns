@@ -4728,7 +4728,7 @@ if (!all.__argnames__) Object.defineProperties(all, {
     __argnames__ : {value: ["iterable"]},
     __module__ : {value: "__main__"}
 });
-let decimal_sep, define_str_func, ρσ_unpack, ρσ_orig_split, ρσ_orig_replace;
+let decimal_sep, define_str_func, ρσ_orig_split, ρσ_orig_replace;
 decimal_sep = 1.1.toLocaleString()[1];
 function ρσ_repr_js_builtin(x, as_array) {
     var ans, b, keys, key;
@@ -4901,9 +4901,8 @@ define_str_func = (function() {
     });
     return ρσ_anonfunc;
 })();
-ρσ_unpack = [String.prototype.split.call.bind(String.prototype.split), String.prototype.replace.call.bind(String.prototype.replace)];
-ρσ_orig_split = ρσ_unpack[0];
-ρσ_orig_replace = ρσ_unpack[1];
+ρσ_orig_split = String.prototype.split.call.bind(String.prototype.split);
+ρσ_orig_replace = String.prototype.replace.call.bind(String.prototype.replace);
 define_str_func("format", (function() {
     var ρσ_anonfunc = function () {
         var template, args, kwargs, explicit, implicit, idx, split, ans, pos, in_brace, markup, ch;
