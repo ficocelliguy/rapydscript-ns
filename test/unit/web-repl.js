@@ -1012,6 +1012,105 @@ var TESTS = [
         },
     },
 
+    // ── Enum ─────────────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_enum_basic",
+        description: "Enum subclass .name and .value attributes work in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from enum import Enum",
+                "class Color(Enum):",
+                "    RED   = 1",
+                "    GREEN = 2",
+                "    BLUE  = 3",
+                "assrt.equal(Color.RED.name,   'RED')",
+                "assrt.equal(Color.RED.value,  1)",
+                "assrt.equal(Color.GREEN.name,  'GREEN')",
+                "assrt.equal(Color.GREEN.value, 2)",
+                "assrt.equal(Color.BLUE.name,   'BLUE')",
+                "assrt.equal(Color.BLUE.value,  3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_enum_identity",
+        description: "Enum members are singletons — Color.RED is Color.RED",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from enum import Enum",
+                "class Color(Enum):",
+                "    RED   = 1",
+                "    GREEN = 2",
+                "assrt.ok(Color.RED is Color.RED)",
+                "assrt.ok(Color.RED is not Color.GREEN)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_enum_iteration",
+        description: "list(Color) and for-loop over an Enum class yield all members in order",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from enum import Enum",
+                "class Color(Enum):",
+                "    RED   = 1",
+                "    GREEN = 2",
+                "    BLUE  = 3",
+                "members = list(Color)",
+                "assrt.equal(len(members), 3)",
+                "assrt.equal(members[0].name, 'RED')",
+                "assrt.equal(members[1].name, 'GREEN')",
+                "assrt.equal(members[2].name, 'BLUE')",
+                "names = []",
+                "for m in Color:",
+                "    names.push(m.name)",
+                "assrt.deepEqual(names, ['RED', 'GREEN', 'BLUE'])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_enum_isinstance",
+        description: "isinstance(Color.RED, Color) and isinstance(Color.RED, Enum) both return True",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from enum import Enum",
+                "class Color(Enum):",
+                "    RED = 1",
+                "assrt.ok(isinstance(Color.RED, Color))",
+                "assrt.ok(isinstance(Color.RED, Enum))",
+                "assrt.ok(not isinstance(1, Color))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_enum_repr_str",
+        description: "repr() and str() of an enum member produce the expected strings",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from enum import Enum",
+                "class Color(Enum):",
+                "    RED = 1",
+                "assrt.equal(repr(Color.RED), '<Color.RED: 1>')",
+                "assrt.equal(str(Color.RED),  'Color.RED')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

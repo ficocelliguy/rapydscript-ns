@@ -319,7 +319,35 @@ def print_class(output):
     output.print('.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true})')
     output.end_statement()
 
-    # __init_subclass__ hook: call after identity properties so cls.__name__ is correct
+    # Other statements in the class context (including nested class definitions).
+    # Emitted BEFORE __init_subclass__ so that the hook can see class variables.
+    # This matches Python's behaviour: the class body executes first, then the
+    # hook is called with the fully-populated class namespace.
+    for stmt in self.statements:
+        if is_node_type(stmt, AST_Class):
+            # Print the nested class in full, then attach it to the outer class.
+            # Two assignments mirror Python semantics:
+            #   Outer.Inner        — class-level access (Outer.Inner())
+            #   Outer.prototype.Inner — instance-level access (self.Inner() inside methods)
+            output.indent()
+            stmt.print(output)
+            output.newline()
+            nested_name = stmt.name.name
+            output.indent()
+            self.name.print(output)
+            output.print('.' + nested_name + ' = ' + nested_name)
+            output.end_statement()
+            output.indent()
+            self.name.print(output)
+            output.print('.prototype.' + nested_name + ' = ' + nested_name)
+            output.end_statement()
+        elif not is_node_type(stmt, AST_Method):
+            output.indent()
+            stmt.print(output)
+            output.newline()
+
+    # __init_subclass__ hook: call after identity properties and class variables
+    # so cls.__name__ is correct and cls.prototype reflects the full class body.
     if self.parent:
         output.indent()
         output.print('if (typeof ')
@@ -370,30 +398,6 @@ def print_class(output):
         add_hidden_property('__doc__', def():
             output.print(JSON.stringify(create_doctring(self.docstrings)))
         )
-
-    # Other statements in the class context (including nested class definitions)
-    for stmt in self.statements:
-        if is_node_type(stmt, AST_Class):
-            # Print the nested class in full, then attach it to the outer class.
-            # Two assignments mirror Python semantics:
-            #   Outer.Inner        — class-level access (Outer.Inner())
-            #   Outer.prototype.Inner — instance-level access (self.Inner() inside methods)
-            output.indent()
-            stmt.print(output)
-            output.newline()
-            nested_name = stmt.name.name
-            output.indent()
-            self.name.print(output)
-            output.print('.' + nested_name + ' = ' + nested_name)
-            output.end_statement()
-            output.indent()
-            self.name.print(output)
-            output.print('.prototype.' + nested_name + ' = ' + nested_name)
-            output.end_statement()
-        elif not is_node_type(stmt, AST_Method):
-            output.indent()
-            stmt.print(output)
-            output.newline()
 
     if decorators.length:
         output.indent()

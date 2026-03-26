@@ -53,7 +53,8 @@ and notes which items are covered by tests.
 | 41 | `__getattr__`/`__setattr__`/`__delattr__` | Not supported | ✓ Yes | Noted in python_features.pyj #48 (skipped) |
 | 42 | `__getattribute__` | Not supported | ✓ Yes | Noted in python_features.pyj #49 |
 | 43 | `__class_getitem__` | Supported — `Class[item]` compiles to `Class.__class_getitem__(item)` at compile time; implicit classmethod, subclasses inherit with correct `cls` | ✓ Yes | Now supported; see unit tests `class_getitem_*` |
-| 44 | `__init_subclass__` | Not supported | ✓ Yes | Noted in python_features.pyj #52 (skipped) |
+| 44 | `__init_subclass__` | Supported — called after the class body (including class variables) is fully populated, matching Python semantics | ✓ Yes | unit tests `init_subclass_*` in index.js |
+| 45 | `Enum` | Supported via `from enum import Enum` — `class Color(Enum): RED=1` creates members with `.name`/`.value`, iteration, `isinstance` checks, and `repr`/`str` | ✓ Yes | test/enum.pyj; web-repl and language-service unit tests |
 
 ---
 
@@ -192,65 +193,6 @@ but widely compatible). Pass `--js-version 6` to emit native ES6 generators.
 
 The following improvements are prioritized by how frequently they surprise Python users and how disruptive the gap is in practice. Items marked 🔥 are silent footguns — they produce wrong behavior with no error, making them especially harmful.
 
----
-
-### 1. 🔥 Fix List Concatenation (`+`) Without `overload_operators`
-
-**Current:** `[1, 2] + [3, 4]` silently produces the string `'[1, 2][3, 4]'` — a completely wrong result with no warning.
-
-**Recommendation:** Make basic list `+` concatenation work correctly by default, without requiring `overload_operators`. This could be done at the compiler level by emitting a `.concat()` call whenever the `+` operator is applied between two list literals or list-typed variables. Alternatively, emit a runtime check: if both operands are arrays, use `.concat()`.
-
-**Why:** This is one of the worst silent footguns in the language. Any Python programmer who writes `result = list_a + list_b` will get corrupted output that looks like a string. The fact that `overload_operators` fixes it is obscure and adds overhead for an operation Python users expect to always work.
-
----
-
-### 2. ✅ Rename `pysort()` / `pypop()` Back to `sort()` / `pop()` — **IMPLEMENTED**
-
-**Implemented:** `list.sort()` now performs Python-style numeric sort (in-place, supports `key` and `reverse`). `list.pop()` now performs Python-style bounds-checked pop (raises `IndexError` for out-of-bounds). The native JS versions are available as `list.jssort()` and `list.jspop()`. The old `pysort()` / `pypop()` names are retained as backward-compat aliases.
-
----
-
-### 3. 🔥 Enable Python Truthiness by Default (or Warn on Empty Container Tests)
-
-**Current:** `if []:` evaluates to `True` (JS semantics). Python semantics require `from __python__ import truthiness`.
-
-**Recommendation:** Either (a) make `truthiness` the default behavior and provide a `from __js__ import truthiness` escape hatch for legacy code, or (b) emit a compiler warning when a list/dict/set literal is used directly as an `if` condition without the `truthiness` flag.
-
-**Why:** The truthiness of empty containers is one of the most fundamental Python idioms. `if items:`, `while queue:`, and `if not result:` are idiomatic Python in virtually every codebase. Getting them silently wrong without the `truthiness` flag is a trap that is very hard to debug.
-
----
-
-### 4. Make Python Dict the Default (or Promote `dict_literals` to a Global Default)
-
-**Current:** `{}` creates a plain JS object. Missing keys return `undefined`, numeric keys are coerced to strings, and `.keys()` / `.values()` / `.items()` don't exist. Full Python dict semantics require `from __python__ import dict_literals, overload_getitem`.
-
-**Recommendation:** Promote `dict_literals` to an opt-out default via a compiler flag (`--python-dicts` or similar). Alternatively, provide a project-level config option to enable it globally so users don't have to add the import to every file.
-
-**Why:** Python dicts are used everywhere. The behavior gap (missing key → `undefined` instead of `KeyError`, numeric keys aliasing to string keys, no `.items()`) causes subtle bugs that are extremely hard to trace. The current model forces users to remember a file-level import for behavior they'd expect to be the baseline.
-
----
-
-### 5. Auto-Apply `strings()` or Make Python String Methods Available on Instances
-
-**Current:** Python string methods like `.strip()`, `.split()`, `.upper()` live on the `str` module object (`str.strip(s)`) rather than on string instances. To use instance-style calls, users must call `from pythonize import strings; strings()`. Even then, `.split()` and `.replace()` remain JS versions.
-
-**Recommendation:** Two improvements:
-1. Make `strings()` apply automatically in Python-compatibility mode, or provide a cleaner `from __python__ import strings` import.
-2. Overwrite the JS `.split()` and `.replace()` with Python-correct implementations inside `strings()`. The current doc explicitly says these two are **intentionally** left as JS versions — this should be reconsidered, as it makes `strings()` provide incomplete Python compatibility.
-
-**Why:** Method calls on string instances (`s.split()`, `s.strip()`, `s.startswith('x')`) are the default mental model for every Python user. Having to write `str.split(s)` instead of `s.split()` is jarring and prevents Python code from running without modification.
-
----
-
-### 6. Add `__getattr__` / `__setattr__` Support via ES6 Proxy
-
-**Current:** `__getattr__` and `__setattr__` are not supported. Attribute access interception is impossible.
-
-**Recommendation:** In ES6 mode (`--js-version 6`), implement `__getattr__` and `__setattr__` by wrapping class instances in a `Proxy` when those dunders are defined. The `get` and `set` traps can delegate to the user's `__getattr__` / `__setattr__` methods with a fallback to the underlying object.
-
-**Why:** `__getattr__` is used extensively for lazy loading, dynamic APIs, mock objects, ORMs, and proxy patterns. It's the basis for many Python libraries (e.g. `dataclasses`-style field access, `unittest.mock`, `attrs`). Without it, an entire class of Python patterns is unavailable. ES6 Proxy support is well-established in all modern JS environments.
-
----
 
 ### 7. Add Stub Modules for `typing`, `dataclasses`, and `enum`
 

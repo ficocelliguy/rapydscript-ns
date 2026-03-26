@@ -1,0 +1,134 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# enum.pyj
+# Tests for the enum standard library (from enum import Enum).
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+from enum import Enum
+
+# ── 1. Basic member access: .name and .value ─────────────────────────────────
+# STATUS: ✓ WORKS
+
+class _Color(Enum):
+    RED   = 1
+    GREEN = 2
+    BLUE  = 3
+
+ae(_Color.RED.name,   'RED')
+ae(_Color.RED.value,  1)
+ae(_Color.GREEN.name,  'GREEN')
+ae(_Color.GREEN.value, 2)
+ae(_Color.BLUE.name,   'BLUE')
+ae(_Color.BLUE.value,  3)
+
+# ── 2. Member singletons (identity) ──────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ok(_Color.RED is _Color.RED)
+ok(_Color.RED is not _Color.GREEN)
+ok(_Color.GREEN is not _Color.BLUE)
+
+# ── 3. repr and str ──────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+# Note: repr() for integer values uses the numeric representation.
+# The class name in repr/str reflects the actual JS constructor name.
+
+ae(repr(_Color.RED),   '<_Color.RED: 1>')
+ae(repr(_Color.GREEN), '<_Color.GREEN: 2>')
+ae(str(_Color.RED),    '_Color.RED')
+ae(str(_Color.BLUE),   '_Color.BLUE')
+
+# ── 4. isinstance checks ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ok(isinstance(_Color.RED,   _Color))
+ok(isinstance(_Color.RED,   Enum))
+ok(isinstance(_Color.GREEN, _Color))
+ok(not isinstance(1, _Color))
+ok(not isinstance(1, Enum))
+
+# ── 5. Iteration via list() ───────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+members = list(_Color)
+ae(len(members), 3)
+ae(members[0].name, 'RED')
+ae(members[1].name, 'GREEN')
+ae(members[2].name, 'BLUE')
+ae(members[0].value, 1)
+ae(members[1].value, 2)
+ae(members[2].value, 3)
+
+# ── 6. for loop iteration ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_found_names = []
+for _m in _Color:
+    _found_names.push(_m.name)
+ade(_found_names, ['RED', 'GREEN', 'BLUE'])
+
+_found_values = []
+for _m in _Color:
+    _found_values.push(_m.value)
+ade(_found_values, [1, 2, 3])
+
+# ── 7. _member_names_ registry ───────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ade(_Color._member_names_, ['RED', 'GREEN', 'BLUE'])
+
+# ── 8. String-valued enum ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+class _Direction(Enum):
+    NORTH = 'north'
+    SOUTH = 'south'
+    EAST  = 'east'
+    WEST  = 'west'
+
+ae(_Direction.NORTH.name,  'NORTH')
+ae(_Direction.NORTH.value, 'north')
+ae(_Direction.SOUTH.value, 'south')
+# RapydScript repr() wraps strings in double quotes (JS convention)
+ae(repr(_Direction.NORTH), '<_Direction.NORTH: "north">')
+ae(str(_Direction.EAST),   '_Direction.EAST')
+ae(len(list(_Direction)), 4)
+
+# ── 9. Enum subclass with extra methods ───────────────────────────────────────
+# STATUS: ✓ WORKS
+
+class _Status(Enum):
+    ACTIVE   = 1
+    INACTIVE = 0
+
+    def is_active(self):
+        return this is _Status.ACTIVE
+
+ok(_Status.ACTIVE.is_active())
+ok(not _Status.INACTIVE.is_active())
+
+# ── 10. Multiple Enum subclasses are independent ──────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(len(list(_Color)),     3)
+ae(len(list(_Direction)), 4)
+ae(len(list(_Status)),    2)
+ok(_Color._member_names_ is not _Direction._member_names_)
+ok(_Color.RED is not _Status.ACTIVE)   # different classes, different members
+
+# ── 11. Members are not confused with plain class instances ───────────────────
+# STATUS: ✓ WORKS
+
+ok(isinstance(_Color.RED, _Color))
+ok(_Color.RED is _Color.RED)   # same object every time
+
+# ── 12. Values from _members_by_value_ lookup ────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(_Color._members_by_value_[1].name, 'RED')
+ae(_Color._members_by_value_[2].name, 'GREEN')
+ae(_Color._members_by_value_[3].name, 'BLUE')

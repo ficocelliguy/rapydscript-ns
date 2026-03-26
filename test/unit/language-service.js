@@ -1383,6 +1383,65 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── Enum ──────────────────────────────────────────────────────────────
+
+        {
+            name: "enum_import_no_errors",
+            description: "from enum import Enum and class Color(Enum) produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "from enum import Enum",
+                    "class Color(Enum):",
+                    "    RED   = 1",
+                    "    GREEN = 2",
+                    "    BLUE  = 3",
+                    "x = Color.RED",
+                    "print(x.name)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for Enum usage but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "enum_iteration_no_errors",
+            description: "for loop and list() over an Enum class produces no error markers",
+            run: function () {
+                var markers = d().check([
+                    "from enum import Enum",
+                    "class Status(Enum):",
+                    "    ACTIVE   = 1",
+                    "    INACTIVE = 0",
+                    "for m in Status:",
+                    "    print(m.name, m.value)",
+                    "members = list(Status)",
+                    "print(len(members))",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for Enum iteration but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "enum_isinstance_no_errors",
+            description: "isinstance(member, EnumClass) and isinstance(member, Enum) produce no errors",
+            run: function () {
+                var markers = d().check([
+                    "from enum import Enum",
+                    "class Color(Enum):",
+                    "    RED = 1",
+                    "ok = isinstance(Color.RED, Color)",
+                    "ok2 = isinstance(Color.RED, Enum)",
+                    "print(ok, ok2)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for isinstance/Enum but got: " + JSON.stringify(errors));
+            },
+        },
+
     ];
 
     return TESTS;

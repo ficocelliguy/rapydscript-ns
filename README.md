@@ -3082,6 +3082,7 @@ One of Python's main strengths is the number of libraries available to the devel
 	gettext             # Support for internationalization of your RapydScript app
 	operator            # a subset of Python's operator module
 	functools           # reduce, partial, wraps, lru_cache, cache, total_ordering, cmp_to_key
+	enum                # Enum base class — class Color(Enum): RED=1 with .name/.value, iteration
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
 	copy                # copy (shallow), deepcopy; honours __copy__ / __deepcopy__ hooks
 	typing              # TYPE_CHECKING, Any, Union, Optional, List, Dict, Set, Tuple, TypeVar,

@@ -1,0 +1,125 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's enum standard library.
+#
+# Supported: Enum base class with .name, .value attributes, iteration over
+# members, and Color.RED access — matching Python's Enum syntax.
+#
+# Usage:
+#   from enum import Enum
+#
+#   class Color(Enum):
+#       RED   = 1
+#       GREEN = 2
+#       BLUE  = 3
+#
+#   Color.RED.name    # 'RED'
+#   Color.RED.value   # 1
+#   list(Color)       # [<Color.RED: 1>, <Color.GREEN: 2>, <Color.BLUE: 3>]
+#   for m in Color: print(m)
+#
+# Implementation notes:
+#   - The RapydScript compiler now emits class variables (prototype assignments)
+#     BEFORE calling __init_subclass__, so the hook can inspect them.
+#   - Enum members are plain objects created with Object.create(cls.prototype);
+#     they are true instances of the subclass and of Enum.
+#   - Member singletons: Color.RED is always the same object.
+
+
+class Enum:
+    """Base class for creating enumerated constants."""
+
+    def __init__(self, value=None):
+        # Enum members are created lazily by __init_subclass__, not by calling
+        # the constructor directly.  This __init__ is intentionally a no-op so
+        # that the constructor can be called without side-effects.
+        pass
+
+    @property
+    def name(self):
+        return this._name_
+
+    @property
+    def value(self):
+        return this._value_
+
+    def __repr__(self):
+        return '<' + this.__class__.__name__ + '.' + this._name_ + ': ' + repr(this._value_) + '>'
+
+    def __str__(self):
+        return this.__class__.__name__ + '.' + this._name_
+
+    def __eq__(self, other):
+        # Enum members compare by identity (same as Python).
+        return this is other
+
+    def __hash__(self):
+        return this._value_
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        """
+        Called automatically when a class inherits from Enum.
+
+        Walks the own enumerable string-keyed properties of cls.prototype
+        (which at this point already hold the raw class-variable values because
+        the compiler emits class variables before this hook) and replaces each
+        non-function, non-dunder value with a proper enum member object that
+        carries .name and .value attributes.
+
+        Also installs Symbol.iterator on the prototype so that
+        ``for m in Color:`` and ``list(Color)`` work.
+        """
+        proto = cls.prototype
+        members = {}
+        members_by_value = {}
+        members_list = []
+
+        keys = v"Object.keys(proto)"
+        for k in keys:
+            # Skip dunder names (__init__, __repr__, …) and RapydScript internals
+            if k.startsWith('_') or k.startsWith('ρσ'):
+                continue
+            val = proto[k]
+            # Skip methods (functions) and already-processed members
+            if jstype(val) is 'function':
+                continue
+            if v"val instanceof cls":
+                continue
+
+            # Create an enum member as an object that inherits from cls.prototype,
+            # bypassing the constructor (same idea as Python's EnumMeta.__new__).
+            v"""
+            var ρσ_member = Object.create(proto);
+            ρσ_member._name_ = k;
+            ρσ_member._value_ = val;
+            """
+
+            # Replace the raw value on the prototype with the member singleton.
+            proto[k] = ρσ_member  # noqa: F821
+
+            members[k] = ρσ_member
+            if v"members_by_value[val] === undefined":
+                members_by_value[val] = ρσ_member
+            members_list.push(ρσ_member)
+
+        # Store the member registry on the class constructor itself.
+        cls._members_ = members
+        cls._members_by_value_ = members_by_value
+        cls._member_names_ = members_list.map(def(m): return m._name_;)
+
+        # Install Symbol.iterator on the class constructor itself (not the
+        # prototype) so that ``list(Color)`` and ``for m in Color:`` work.
+        # ρσ_list_constructor checks iterable[Symbol.iterator] on the object
+        # being iterated; for an enum class that object is the constructor.
+        v"""cls[Symbol.iterator] = function() {
+            var ρσ_i = 0;
+            return {
+                next: function() {
+                    if (ρσ_i < members_list.length) {
+                        return { value: members_list[ρσ_i++], done: false };
+                    }
+                    return { value: undefined, done: true };
+                }
+            };
+        };"""
