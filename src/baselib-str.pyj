@@ -694,6 +694,12 @@ define_str_func('split', def(sep, maxsplit):
             ans.push(extra)
     return ρσ_list_decorate(ans)
 )
+# Patch String.prototype.split so that no-argument calls (text.split()) use Python
+# semantics (split on whitespace) rather than JS semantics (return [text]).
+String.prototype.split = def(sep, limit):
+    if sep is undefined:
+        return ρσ_str.prototype.split.call(this)
+    return ρσ_orig_split(this, sep, limit)
 
 define_str_func('rsplit', def(sep, maxsplit):
     if not maxsplit:

@@ -3044,6 +3044,8 @@ One of Python's main strengths is the number of libraries available to the devel
 	functools           # reduce, partial, wraps, lru_cache, cache, total_ordering, cmp_to_key
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
 	copy                # copy (shallow), deepcopy; honours __copy__ / __deepcopy__ hooks
+	typing              # TYPE_CHECKING, Any, Union, Optional, List, Dict, Set, Tuple, TypeVar,
+	                    # Generic, Protocol, Callable, Literal, Final, TypedDict, NamedTuple, cast, …
 	itertools           # count, cycle, repeat, accumulate, chain, compress, dropwhile, filterfalse,
 	                    # groupby, islice, pairwise, starmap, takewhile, zip_longest,
 	                    # product, permutations, combinations, combinations_with_replacement

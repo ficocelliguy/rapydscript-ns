@@ -1,0 +1,409 @@
+# globals: assrt
+# Tests for the typing standard library module.
+# Verifies that typing constructs transpile correctly to JavaScript and
+# that the resulting runtime objects carry the expected attributes.
+
+from typing import (
+    TYPE_CHECKING, Any, Union, Optional, ClassVar, Final, Literal, NoReturn,
+    List, Dict, Set, FrozenSet, Tuple, Type, Callable,
+    Iterator, Iterable, Generator, Sequence, MutableSequence,
+    Mapping, MutableMapping, AsyncGenerator, AsyncIterator, AsyncIterable,
+    Awaitable, Coroutine, IO, TextIO, BinaryIO, Pattern, Match,
+    TypeVar, Generic, Protocol,
+    cast, overload, no_type_check, no_type_check_decorator,
+    runtime_checkable, get_type_hints,
+    TypedDict, NamedTuple, AnyStr, Text
+)
+
+
+# ── TYPE_CHECKING constant ─────────────────────────────────────────────────────
+
+assrt.equal(TYPE_CHECKING, False)
+
+
+# ── Generic aliases: __origin__ and __args__ ──────────────────────────────────
+
+def _test_list_alias():
+    alias = List[int]
+    assrt.ok(alias is not None)
+    assrt.equal(alias.__origin__, list)
+    assrt.equal(alias.__args__[0], int)
+    assrt.equal(alias._name, 'List')
+_test_list_alias()
+
+
+def _test_dict_alias():
+    alias = Dict[str, int]
+    assrt.equal(alias.__origin__, dict)
+    assrt.equal(alias.__args__[0], str)
+    assrt.equal(alias.__args__[1], int)
+    assrt.equal(alias._name, 'Dict')
+_test_dict_alias()
+
+
+def _test_set_alias():
+    alias = Set[str]
+    assrt.equal(alias.__origin__, set)
+    assrt.equal(alias.__args__[0], str)
+_test_set_alias()
+
+
+def _test_frozenset_alias():
+    alias = FrozenSet[int]
+    assrt.equal(alias.__origin__, frozenset)
+    assrt.equal(alias.__args__[0], int)
+_test_frozenset_alias()
+
+
+def _test_tuple_alias():
+    # Homogeneous variable-length tuple: Tuple[int, ...]
+    alias = Tuple[int, ...]
+    assrt.equal(alias.__origin__, tuple)
+    assrt.equal(alias.__args__[0], int)
+    assrt.equal(alias._name, 'Tuple')
+_test_tuple_alias()
+
+
+def _test_type_alias():
+    alias = Type[int]
+    assrt.equal(alias.__origin__, type)
+    assrt.equal(alias.__args__[0], int)
+_test_type_alias()
+
+
+def _test_callable_alias():
+    alias = Callable[[int, str], bool]
+    assrt.equal(alias._name, 'Callable')
+    assrt.ok(alias.__args__ is not None)
+_test_callable_alias()
+
+
+# ── Abstract aliases ───────────────────────────────────────────────────────────
+
+def _test_abstract_aliases():
+    assrt.equal(Iterator[int]._name, 'Iterator')
+    assrt.equal(Iterable[str]._name, 'Iterable')
+    assrt.equal(Generator[int, None, None]._name, 'Generator')
+    assrt.equal(Sequence[float]._name, 'Sequence')
+    assrt.equal(MutableSequence[float]._name, 'MutableSequence')
+    assrt.equal(Mapping[str, int]._name, 'Mapping')
+    assrt.equal(MutableMapping[str, int]._name, 'MutableMapping')
+    assrt.equal(Awaitable[int]._name, 'Awaitable')
+    assrt.equal(Coroutine[int, None, None]._name, 'Coroutine')
+    assrt.equal(AsyncGenerator[int, None]._name, 'AsyncGenerator')
+    assrt.equal(AsyncIterator[int]._name, 'AsyncIterator')
+    assrt.equal(AsyncIterable[int]._name, 'AsyncIterable')
+_test_abstract_aliases()
+
+
+# ── IO and pattern aliases ─────────────────────────────────────────────────────
+
+def _test_io_aliases():
+    assrt.equal(IO[str]._name, 'IO')
+    assrt.ok(TextIO is not None)
+    assrt.ok(BinaryIO is not None)
+    assrt.equal(Pattern[str]._name, 'Pattern')
+    assrt.equal(Match[str]._name, 'Match')
+_test_io_aliases()
+
+
+# ── Special forms ──────────────────────────────────────────────────────────────
+
+def _test_optional():
+    alias = Optional[str]
+    assrt.equal(alias._name, 'Optional')
+    assrt.equal(alias.__args__[0], str)
+    assrt.equal(alias.__args__[1], None)
+_test_optional()
+
+
+def _test_union():
+    alias = Union[str, int]
+    assrt.equal(alias._name, 'Union')
+    assrt.equal(alias.__args__.length, 2)
+    assrt.equal(alias.__args__[0], str)
+    assrt.equal(alias.__args__[1], int)
+_test_union()
+
+
+def _test_classvar():
+    alias = ClassVar[str]
+    assrt.equal(alias._name, 'ClassVar')
+    assrt.equal(alias.__args__[0], str)
+_test_classvar()
+
+
+def _test_final():
+    alias = Final[int]
+    assrt.equal(alias._name, 'Final')
+    assrt.equal(alias.__args__[0], int)
+_test_final()
+
+
+def _test_literal():
+    alias = Literal['r', 'w', 'a']
+    assrt.equal(alias._name, 'Literal')
+    assrt.equal(alias.__args__.length, 3)
+    assrt.equal(alias.__args__[0], 'r')
+    assrt.equal(alias.__args__[1], 'w')
+    assrt.equal(alias.__args__[2], 'a')
+_test_literal()
+
+
+def _test_any():
+    assrt.ok(Any is not None)
+    assrt.ok(repr(Any).indexOf('Any') >= 0)
+_test_any()
+
+
+def _test_noreturn():
+    assrt.ok(NoReturn is not None)
+_test_noreturn()
+
+
+# ── TypeVar ────────────────────────────────────────────────────────────────────
+
+def _test_typevar():
+    T = TypeVar('T')
+    assrt.equal(T.__name__, 'T')
+    assrt.ok(repr(T).indexOf('T') >= 0)
+
+    S = TypeVar('S', str, int)
+    assrt.equal(S.__name__, 'S')
+    assrt.equal(S.__constraints__.length, 2)
+    assrt.equal(S.__constraints__[0], str)
+    assrt.equal(S.__constraints__[1], int)
+
+    assrt.equal(AnyStr.__name__, 'AnyStr')
+_test_typevar()
+
+
+# ── Generic base class ─────────────────────────────────────────────────────────
+
+def _test_generic():
+    T = TypeVar('T')
+
+    class Stack(Generic[T]):
+        def __init__(self):
+            self._items = []
+        def push(self, item):
+            self._items.append(item)
+        def pop(self):
+            return self._items.pop()
+        def empty(self):
+            return len(self._items) == 0
+
+    s = Stack()
+    s.push(1)
+    s.push(2)
+    assrt.equal(s.pop(), 2)
+    assrt.equal(s.pop(), 1)
+    assrt.ok(s.empty())
+
+    # __class_getitem__ on Generic subclass
+    alias = Stack[int]
+    assrt.ok(alias is not None)
+_test_generic()
+
+
+# ── Protocol base class ────────────────────────────────────────────────────────
+
+def _test_protocol():
+    @runtime_checkable
+    class Drawable(Protocol):
+        def draw(self):
+            pass
+
+    class Circle:
+        def draw(self):
+            return 'circle'
+
+    c = Circle()
+    assrt.equal(c.draw(), 'circle')
+    assrt.ok(Drawable is not None)
+_test_protocol()
+
+
+# ── cast ───────────────────────────────────────────────────────────────────────
+
+def _test_cast():
+    result = cast(int, 'hello')
+    assrt.equal(result, 'hello')
+    assrt.deepEqual(cast(List[int], [1, 2, 3]), [1, 2, 3])
+    assrt.equal(cast(str, 42), 42)
+_test_cast()
+
+
+# ── overload decorator ─────────────────────────────────────────────────────────
+
+def _test_overload():
+    @overload
+    def process(x):
+        return x * 2
+
+    assrt.equal(process(5), 10)
+_test_overload()
+
+
+# ── no_type_check decorator ────────────────────────────────────────────────────
+
+def _test_no_type_check():
+    @no_type_check
+    def f(x):
+        return x + 1
+
+    assrt.equal(f(3), 4)
+_test_no_type_check()
+
+
+# ── get_type_hints ─────────────────────────────────────────────────────────────
+
+def _test_get_type_hints():
+    def annotated(x: int, y: str) -> bool:
+        pass
+
+    hints = get_type_hints(annotated)
+    assrt.equal(hints['x'], int)
+    assrt.equal(hints['y'], str)
+    assrt.equal(hints['return'], bool)
+
+    def no_hints():
+        pass
+
+    assrt.deepEqual(get_type_hints(no_hints), {})
+_test_get_type_hints()
+
+
+# ── Function annotations with typing types ─────────────────────────────────────
+
+def _test_annotations_with_typing():
+    def process(items: List[int], label: Optional[str]) -> Dict[str, int]:
+        pass
+
+    annot = process.__annotations__
+    assrt.ok(annot is not None)
+    assrt.equal(annot['items'].__origin__, list)
+    assrt.equal(annot['items'].__args__[0], int)
+    assrt.equal(annot['label']._name, 'Optional')
+    assrt.equal(annot['return'].__origin__, dict)
+_test_annotations_with_typing()
+
+
+# ── TypedDict ──────────────────────────────────────────────────────────────────
+
+def _test_typeddict():
+    class Movie(TypedDict):
+        pass
+
+    # TypedDict subclass is a valid class that can be instantiated
+    m = Movie()
+    assrt.ok(m is not None)
+    # TypedDict itself is importable
+    assrt.ok(TypedDict is not None)
+_test_typeddict()
+
+
+# ── NamedTuple (functional form) ───────────────────────────────────────────────
+
+def _test_namedtuple():
+    from __python__ import overload_getitem
+    Point = NamedTuple('Point', [('x', float), ('y', float)])
+
+    p = Point(3.0, 4.0)
+    assrt.equal(p.x, 3.0)
+    assrt.equal(p.y, 4.0)
+
+    # Annotations carry type information
+    assrt.equal(Point.__annotations__['x'], float)
+    assrt.equal(Point.__annotations__['y'], float)
+
+    # Integer indexing
+    assrt.equal(p[0], 3.0)
+    assrt.equal(p[1], 4.0)
+
+    # Negative indexing
+    assrt.equal(p[-1], 4.0)
+_test_namedtuple()
+
+
+# ── Text alias ─────────────────────────────────────────────────────────────────
+
+def _test_text_alias():
+    assrt.equal(Text, str)
+_test_text_alias()
+
+
+# ── repr smoke test ────────────────────────────────────────────────────────────
+
+def _test_repr():
+    assrt.ok(repr(List[int]).indexOf('List') >= 0)
+    assrt.ok(repr(Dict[str, int]).indexOf('Dict') >= 0)
+    assrt.ok(repr(Optional[str]).indexOf('Optional') >= 0)
+    assrt.ok(repr(Union[str, int]).indexOf('Union') >= 0)
+_test_repr()
+
+
+# ── Annotated assignment with attribute target (self.x: Type = value) ──────────
+# Regression: these were previously mis-parsed, causing "invalid left-hand side"
+# in the generated JS output.
+
+def _test_attr_annotated_assign():
+    T = TypeVar('T')
+
+    class Stack(Generic[T]):
+        def __init__(self):
+            self._items: List[T] = []
+
+        def push(self, item: T) -> None:
+            self._items.append(item)
+
+        def pop(self) -> Optional[T]:
+            return self._items.pop() if self._items else None
+
+    s = Stack()
+    s.push(10)
+    s.push(20)
+    assrt.equal(s.pop(), 20)
+    assrt.equal(s.pop(), 10)
+    # _items list was assigned correctly (not left as undefined)
+    assrt.equal(s._items.length, 0)
+_test_attr_annotated_assign()
+
+
+def _test_attr_annotated_assign_no_value():
+    # Annotation-only on an attribute (no rhs) should compile without error
+    # and emit nothing (attribute remains unset).
+    class Container:
+        def __init__(self):
+            self.x: int  # annotation only — no assignment
+            self.y: str = 'hello'
+
+    c = Container()
+    assrt.equal(c.x, undefined)
+    assrt.equal(c.y, 'hello')
+_test_attr_annotated_assign_no_value()
+
+
+def _test_local_annotated_assign_complex_type():
+    # Local variable with a parameterised type annotation — the type is erased,
+    # only the assignment runs.
+    def make_pair() -> List[int]:
+        pair: List[int] = [1, 2]
+        return pair
+
+    result = make_pair()
+    assrt.equal(result.length, 2)
+    assrt.equal(result[0], 1)
+    assrt.equal(result[1], 2)
+_test_local_annotated_assign_complex_type()
+
+
+def _test_module_level_attr_annotated_assign():
+    # Annotated assignment on a plain object attribute at module level.
+    class Box:
+        pass
+
+    b = Box()
+    b.value: int = 42
+    assrt.equal(b.value, 42)
+_test_module_level_attr_annotated_assign()

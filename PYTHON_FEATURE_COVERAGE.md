@@ -177,7 +177,7 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `itertools`   | ✅           | Common iteration tools                                                                        |
 | `numpy`       | ✅           | Full numpy-like library in `src/lib/numpy.pyj`; `numpy.random` and `numpy.linalg` sub-modules |
 | `copy`        | ✅           | `copy()` shallow copy and `deepcopy()` (circular-ref-safe via memo Map); `__copy__` / `__deepcopy__(memo)` hooks honoured; handles list, set, frozenset, dict, class instances, and plain JS objects |
-| `typing`      | ❌           | `List`, `Dict`, `Optional`, `Union`, `Tuple`, `Generic`, `TypeVar` — none available           |
+| `typing`      | ✅           | `TYPE_CHECKING`, `Any`, `Union`, `Optional`, `ClassVar`, `Final`, `Literal`, `NoReturn`, `List`, `Dict`, `Set`, `FrozenSet`, `Tuple`, `Type`, `Callable`, `Iterator`, `Iterable`, `Generator`, `Sequence`, `MutableSequence`, `Mapping`, `MutableMapping`, `Awaitable`, `Coroutine`, `AsyncGenerator`, `AsyncIterator`, `AsyncIterable`, `IO`, `TextIO`, `BinaryIO`, `Pattern`, `Match`, `TypeVar`, `Generic`, `Protocol`, `cast`, `overload`, `no_type_check`, `no_type_check_decorator`, `runtime_checkable`, `get_type_hints`, `TypedDict`, `NamedTuple`, `AnyStr`, `Text` — all available in `src/lib/typing.pyj` |
 | `dataclasses` | ❌           | `@dataclass`, `field()`, `asdict()`, `astuple()` not available                                |
 | `contextlib`  | ❌           | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available                |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |

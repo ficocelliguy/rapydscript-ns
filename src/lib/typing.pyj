@@ -1,0 +1,564 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's typing standard library.
+#
+# Supported:
+#   TYPE_CHECKING, Any, Union, Optional, ClassVar, Final, Literal, NoReturn,
+#   List, Dict, Set, FrozenSet, Tuple, Type, Callable,
+#   Iterator, Iterable, Generator, Sequence, MutableSequence,
+#   Mapping, MutableMapping, Awaitable, Coroutine,
+#   AsyncGenerator, AsyncIterator, AsyncIterable,
+#   IO, TextIO, BinaryIO, Pattern, Match,
+#   TypeVar, Generic, Protocol,
+#   cast, overload, no_type_check, no_type_check_decorator,
+#   runtime_checkable, get_type_hints,
+#   TypedDict, NamedTuple, AnyStr, Text
+#
+# Type annotations are not enforced at runtime.  All typing constructs
+# transpile to lightweight JavaScript objects that carry the same
+# introspection attributes (__origin__, __args__, _name) as their
+# CPython equivalents, so that annotation-aware code works identically.
+
+
+# ── Constants ──────────────────────────────────────────────────────────────────
+
+# Always False at runtime; True only when a static type-checker is running.
+TYPE_CHECKING = False
+
+
+# ── Internal representation ────────────────────────────────────────────────────
+
+class _GenericAlias:
+    """Represents a parameterized generic type such as List[int] or Dict[str, int].
+
+    Attributes:
+        __origin__  The origin type (list, dict, …) or None for abstract types.
+        __args__    Tuple of type arguments; empty tuple when not parameterised.
+        _name       Display name used in repr().
+    """
+
+    def __init__(self, origin, args, name=None):
+        self.__origin__ = origin
+        if args is None:
+            self.__args__ = []
+        elif Array.isArray(args):
+            self.__args__ = args
+        else:
+            self.__args__ = [args]
+        self._name = name
+        # Allow _GenericAlias to be used as a base class in `class Foo(Generic[T])`.
+        # ρσ_extends reads parent.prototype, so we proxy it to the origin's prototype.
+        if origin and jstype(origin.prototype) is not 'undefined':
+            self.prototype = origin.prototype
+
+    def __repr__(self):
+        if self._name:
+            base = 'typing.' + self._name
+        else:
+            base = 'typing._GenericAlias'
+        if self.__args__:
+            parts = []
+            for a in self.__args__:
+                if a is None:
+                    parts.append('None')
+                elif jstype(a.__name__) is 'string' and a.__name__:
+                    parts.append(a.__name__)
+                else:
+                    parts.append(repr(a))
+            return base + '[' + parts.join(', ') + ']'
+        return base
+
+
+# ── Special forms ──────────────────────────────────────────────────────────────
+
+class Any:
+    """Special form: matches any type.  Every type is compatible with Any."""
+
+    def __repr__(self):
+        return 'typing.Any'
+
+
+class Union:
+    """Union[X, Y] means either type X or type Y.
+
+    Example::
+
+        from typing import Union
+        def f(x: Union[str, int]) -> None: ...
+    """
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Union')
+
+
+class Optional:
+    """Optional[X] is shorthand for Union[X, None].
+
+    Example::
+
+        from typing import Optional
+        def f(x: Optional[str] = None) -> Optional[int]: ...
+    """
+
+    def __class_getitem__(cls, params):
+        return _GenericAlias(None, [params, None], 'Optional')
+
+
+class ClassVar:
+    """ClassVar[T] marks that a variable is intended as a class variable."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'ClassVar')
+
+
+class Final:
+    """Final[T] marks that a variable may not be reassigned after first assignment."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Final')
+
+
+class Literal:
+    """Literal[v, …] marks a type that may only take one of the given literal values.
+
+    Example::
+
+        from typing import Literal
+        Mode = Literal['r', 'w', 'a']
+    """
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Literal')
+
+
+class NoReturn:
+    """NoReturn marks a function that never returns normally."""
+    pass
+
+
+# ── Concrete generic aliases ───────────────────────────────────────────────────
+
+class List:
+    """Generic alias for the built-in list type.
+
+    Example::
+
+        from typing import List
+        def f(xs: List[int]) -> List[str]: ...
+    """
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(list, params, 'List')
+
+
+class Dict:
+    """Generic alias for the built-in dict type."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(dict, params, 'Dict')
+
+
+class Set:
+    """Generic alias for the built-in set type."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(set, params, 'Set')
+
+
+class FrozenSet:
+    """Generic alias for the built-in frozenset type."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(frozenset, params, 'FrozenSet')
+
+
+class Tuple:
+    """Generic alias for the built-in tuple type.
+
+    Use Tuple[X, Y] for a two-element tuple or Tuple[X, ...] for a
+    variable-length homogeneous tuple.
+    """
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(tuple, params, 'Tuple')
+
+
+class Type:
+    """Type[C] represents the class C itself rather than an instance of C."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(type, params, 'Type')
+
+
+class Callable:
+    """Callable[[ArgType, …], ReturnType] — any callable object.
+
+    Example::
+
+        from typing import Callable
+        f: Callable[[int, str], bool]
+    """
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Callable')
+
+
+# ── Abstract-base / protocol aliases ──────────────────────────────────────────
+
+class Iterator:
+    """Generic alias for an iterator (has __next__)."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Iterator')
+
+
+class Iterable:
+    """Generic alias for an iterable (has __iter__)."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Iterable')
+
+
+class Generator:
+    """Generic alias for a generator (yield / send / throw)."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Generator')
+
+
+class Sequence:
+    """Generic alias for a read-only sequence."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Sequence')
+
+
+class MutableSequence:
+    """Generic alias for a mutable sequence."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'MutableSequence')
+
+
+class Mapping:
+    """Generic alias for a read-only key-value mapping."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Mapping')
+
+
+class MutableMapping:
+    """Generic alias for a mutable key-value mapping."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'MutableMapping')
+
+
+class Awaitable:
+    """Generic alias for an awaitable object."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Awaitable')
+
+
+class Coroutine:
+    """Generic alias for a coroutine."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Coroutine')
+
+
+class AsyncGenerator:
+    """Generic alias for an async generator."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'AsyncGenerator')
+
+
+class AsyncIterator:
+    """Generic alias for an async iterator."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'AsyncIterator')
+
+
+class AsyncIterable:
+    """Generic alias for an async iterable."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'AsyncIterable')
+
+
+# ── IO type aliases ────────────────────────────────────────────────────────────
+
+class IO:
+    """Generic IO type; IO[str] for text or IO[bytes] for binary."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'IO')
+
+
+class TextIO:
+    """Text-mode IO stream (IO[str])."""
+    pass
+
+
+class BinaryIO:
+    """Binary-mode IO stream (IO[bytes])."""
+    pass
+
+
+# ── Pattern / Match aliases (for re module) ────────────────────────────────────
+
+class Pattern:
+    """Generic alias for compiled regular-expression pattern objects."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Pattern')
+
+
+class Match:
+    """Generic alias for regular-expression match objects."""
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(None, params, 'Match')
+
+
+# ── TypeVar ────────────────────────────────────────────────────────────────────
+
+class TypeVar:
+    """Type variable.  Used to parameterise generic classes and functions.
+
+    Example::
+
+        from typing import TypeVar
+        T = TypeVar('T')
+        S = TypeVar('S', str, bytes)       # constrained TypeVar
+    """
+
+    def __init__(self, name, *constraints):
+        self.__name__ = name
+        self.__constraints__ = constraints
+        self.__bound__ = None
+        self.__covariant__ = False
+        self.__contravariant__ = False
+
+    def __repr__(self):
+        return '~' + self.__name__
+
+
+# ── Generic and Protocol base classes ─────────────────────────────────────────
+
+class Generic:
+    """Base class for generic classes.
+
+    Example::
+
+        from typing import Generic, TypeVar
+        T = TypeVar('T')
+        class Stack(Generic[T]):
+            def push(self, item: T) -> None: ...
+            def pop(self) -> T: ...
+    """
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(cls, params)
+
+
+class Protocol:
+    """Base class for protocol classes (structural subtyping).
+
+    Example::
+
+        from typing import Protocol, runtime_checkable
+        @runtime_checkable
+        class Drawable(Protocol):
+            def draw(self) -> None: ...
+    """
+
+    def __class_getitem__(cls, params):
+        if not Array.isArray(params):
+            params = [params]
+        return _GenericAlias(cls, params)
+
+
+# ── Utility functions and decorators ──────────────────────────────────────────
+
+def cast(typ, val):
+    """Cast *val* to type *typ*.
+
+    At runtime this is a no-op: *val* is returned unchanged.  Type checkers
+    treat the result as having type *typ*.
+    """
+    return val
+
+
+def overload(func):
+    """Decorator for overloaded function definitions.
+
+    Returns *func* unchanged; the last non-``@overload``-decorated definition
+    is the one called at runtime.
+    """
+    return func
+
+
+def no_type_check(arg):
+    """Decorator to opt a function or class out of type checking."""
+    return arg
+
+
+def no_type_check_decorator(decorator):
+    """Decorator that disables type checking for the decorated decorator."""
+    return decorator
+
+
+def runtime_checkable(cls):
+    """Decorator to mark a Protocol as runtime-checkable via isinstance()."""
+    return cls
+
+
+def get_type_hints(obj, globalns=None, localns=None):
+    """Return the type hints for *obj* (a function, method, module, or class).
+
+    Returns a copy of ``obj.__annotations__``, or an empty dict when the
+    object carries no annotations.
+    """
+    a = obj.__annotations__
+    if jstype(a) is 'undefined' or a is None:
+        return {}
+    result = {}
+    keys = Object.keys(a)
+    for i in range(keys.length):
+        k = keys[i]
+        result[k] = a[k]
+    return result
+
+
+# ── TypedDict ──────────────────────────────────────────────────────────────────
+
+class TypedDict:
+    """Base class for typed dictionaries (class-based syntax).
+
+    Example::
+
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            name: str
+            year: int
+
+    At runtime, TypedDict subclasses are plain classes; no type enforcement
+    occurs.  Fields are declared via class-body annotations and accessible
+    via normal attribute access on instances.
+    """
+    pass
+
+
+# ── NamedTuple factory (functional form) ───────────────────────────────────────
+
+def NamedTuple(typename, fields):
+    """Create a typed named-tuple class (functional form).
+
+    *fields* is a list of (name, type) pairs::
+
+        from typing import NamedTuple
+        Point = NamedTuple('Point', [('x', float), ('y', float)])
+        p = Point(1.0, 2.0)
+        print(p.x)   # 1.0
+        print(p.y)   # 2.0
+
+    The returned class stores fields as plain attributes, carries a
+    ``__annotations__`` dict of name → type, and supports positional
+    construction.
+    """
+    field_names = [f[0] for f in fields]
+    annotations = {f[0]: f[1] for f in fields}
+    n = len(field_names)
+
+    class _NT:
+        def __init__(self, *args):
+            for i in range(n):
+                name = field_names[i]
+                val = args[i] if i < args.length else None
+                v'this[name] = val'
+
+        def __getitem__(self, idx):
+            if idx < 0:
+                idx = n + idx
+            if idx < 0 or idx >= n:
+                raise IndexError('tuple index out of range')
+            return v'this[field_names[idx]]'
+
+        def __repr__(self):
+            parts = []
+            for i in range(n):
+                val = v'this[field_names[i]]'
+                parts.append(repr(val))
+            return typename + '(' + ', '.join(parts) + ')'
+
+    _NT.__name__ = typename
+    _NT.__annotations__ = annotations
+    return _NT
+
+
+# ── Convenience aliases ────────────────────────────────────────────────────────
+
+# AnyStr: a TypeVar constrained to str (bytes is not a separate type in RapydScript/JS)
+AnyStr = TypeVar('AnyStr', str)
+
+# Python 2 → Python 3 compatibility alias
+Text = str

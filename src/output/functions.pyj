@@ -461,10 +461,15 @@ def print_function_call(self, output):
             # Method calls and other complex expressions — keep existing behaviour
             print_function_name()
             output.with_parens(def():
-                for i, a in enumerate(self.args):
-                    if i:
-                        output.comma()
-                    a.print(output)
+                # .split() with no args: default to ' ' so JS splits on space
+                # rather than returning [whole_string] (native JS no-arg behavior)
+                if is_node_type(self.expression, AST_Dot) and self.expression.property is 'split' and not self.args.length:
+                    output.print('" "')
+                else:
+                    for i, a in enumerate(self.args):
+                        if i:
+                            output.comma()
+                        a.print(output)
             )
         return
 

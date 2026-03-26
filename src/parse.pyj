@@ -1063,7 +1063,26 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         })
 
     def simple_statement(tmp):
+        start = S.token
         tmp = expression(True)
+        # Handle annotated assignment with a complex target (e.g., self.x: Type = value).
+        # Simple-name annotated assignments are caught earlier (annotated_var_statement),
+        # but attribute/subscript targets reach here as a completed expression followed by ':'.
+        if is_("punc", ":"):
+            next()  # consume ':'
+            annotation = maybe_conditional()
+            value = None
+            if is_("operator", "="):
+                next()  # consume '='
+                value = expression(True)
+            semicolon()
+            return new AST_AnnotatedAssign({
+                'start': start,
+                'target': tmp,
+                'annotation': annotation,
+                'value': value,
+                'end': prev()
+            })
         semicolon()
         return new AST_SimpleStatement({
             'body': tmp
@@ -1189,16 +1208,17 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         # to maintain a list of local variables for every AST_Scope and provide
         # an easy way to walk the ast tree upwards.
         if is_node_type(expr, AST_SymbolRef):
-            # check Native JS classes
+            # traverse in reverse to check local / imported classes first
+            # (user-defined classes take priority over native JS classes)
+            for s in range(S.classes.length-1, -1, -1):
+                if has_prop(S.classes[s], expr.name):
+                    return S.classes[s][expr.name]
+
+            # fallback to Native JS classes
             if has_prop(NATIVE_CLASSES, expr.name):
                 return NATIVE_CLASSES[expr.name]
             if has_prop(ERROR_CLASSES, expr.name):
                 return ERROR_CLASSES[expr.name]
-
-            # traverse in reverse to check local variables first
-            for s in range(S.classes.length-1, -1, -1):
-                if has_prop(S.classes[s], expr.name):
-                    return S.classes[s][expr.name]
 
         elif is_node_type(expr, AST_Dot):
             referenced_path = []

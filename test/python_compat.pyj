@@ -233,18 +233,18 @@ strings()
 ae('  hello  '.strip(), 'hello')
 ae('hello world'.upper(), 'HELLO WORLD')
 
-# ── 15. strings() leaves split() and replace() as JS versions ─────────────────
+# ── 15. strings() leaves replace() as JS version; split() defaults to ' ' ─────
 # (strings() is active from section 14 above)
 # Python str.split() with no args: splits on any whitespace, strips leading/trailing.
-# JS String.prototype.split() with no args: returns the whole string in a 1-element array.
+# RapydScript .split() with no args: transpiles to .split(" ") — splits on single space.
 
 # Python semantics via str module:
 ade(str.split('a  b'), ['a', 'b'])    # Python split on any whitespace
 ade(str.split('a  b c'), ['a', 'b', 'c'])
 
-# After strings(), .split() is STILL the JS version (by design):
-ade('a  b'.split(), ['a  b'])         # JS: no-arg split = one-element array
-ade('a b'.split(' '), ['a', 'b'])     # JS split with separator still works
+# .split() with no args now defaults to splitting on ' ':
+ade('a  b'.split(), ['a', '', 'b'])   # double space → empty token between
+ade('a b'.split(' '), ['a', 'b'])     # explicit ' ' separator still works
 
 # Python str.replace() vs JS String.prototype.replace():
 # Python replaces ALL occurrences by default.
