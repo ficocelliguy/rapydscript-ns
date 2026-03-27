@@ -112,7 +112,7 @@ const STUBS = [
     new BuiltinInfo({ name: 'float', kind: 'class',
         params: [p('x', { optional: true })],
         return_type: 'float',
-        doc: 'Return a floating-point number from x.' }),
+        doc: 'Return a floating-point number from x.\n\nInstance method:\n- `.is_integer()` — return `True` if the float has no fractional part (i.e. is a whole number), `False` otherwise. `Infinity` and `NaN` return `False`.\n\nExample:\n\n    (1.0).is_integer()   # True\n    (1.5).is_integer()   # False\n    (1e10).is_integer()  # True' }),
 
     new BuiltinInfo({ name: 'getattr',
         params: [p('obj'), p('name', { type: 'str' }), p('default', { optional: true })],
@@ -142,7 +142,7 @@ const STUBS = [
     new BuiltinInfo({ name: 'int', kind: 'class',
         params: [p('x', { optional: true }), p('base', { type: 'int', optional: true })],
         return_type: 'int',
-        doc: 'Return an integer from x, optionally in the given base.' }),
+        doc: 'Return an integer from x, optionally in the given base.\n\nInstance method:\n- `.bit_length()` — return the number of bits needed to represent the integer in binary, excluding the sign and leading zeros. Equivalent to `floor(log2(abs(n))) + 1` for nonzero `n`; returns `0` for `0`.\n\nExample:\n\n    (0).bit_length()    # 0\n    (1).bit_length()    # 1\n    (255).bit_length()  # 8\n    (256).bit_length()  # 9\n    (-5).bit_length()   # 3  (sign ignored)' }),
 
     new BuiltinInfo({ name: 'isinstance',
         params: [p('obj'), p('classinfo')],
@@ -173,6 +173,11 @@ const STUBS = [
         params: [p('iterator'), p('default', { optional: true })],
         return_type: 'any',
         doc: 'Retrieve the next item from an iterator. If the iterator is exhausted, return default; if default is not given, raise StopIteration.' }),
+
+    new BuiltinInfo({ name: 'object', kind: 'class',
+        params: [],
+        return_type: 'object',
+        doc: 'Create a new featureless base object instance.\n\nThe base class of all Python classes. Calling `object()` with no arguments returns a new, unique instance useful as a sentinel value:\n\n    MISSING = object()   # unique sentinel\n    if value is MISSING:\n        ...\n\nKey behaviours:\n- Each call returns a distinct instance (`object() is not object()`).\n- `isinstance(x, object)` returns `True` for any `object()` instance (and subclasses).\n- `class Foo(object):` works as an explicit base class.\n- `repr()` returns `\'<object object at 0x…>\'`.\n- `hash()` returns a stable identity hash.\n\nNote: unlike Python, you *can* add arbitrary attributes to an `object()` instance in RapydScript (JS objects are open by default).' }),
 
     new BuiltinInfo({ name: 'map',
         params: [p('function'), p('iterable'), p('*iterables', { rest: true })],

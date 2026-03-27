@@ -14,7 +14,7 @@
 - examples of using js libraries in rapydscript in readme?
 
 
-I would like you to add support for [ `__format__` dunder  ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [ `abc` module — `ABC`, `@abstractmethod`, `Protocol`  ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 # Example: Tuple Literals
 
@@ -95,4 +95,65 @@ print(format(m, 'usd'))           # $42
 print(str.format('{:eur}', m))    # €42
 print(f'{m:.2f}')                 # 42.00
 print(f'Total: {m:usd}')          # Total: $42
+```
+
+## `object()` example
+
+```py
+# Sentinel — a unique value that compares equal only to itself
+MISSING = object()
+
+def get(mapping, key):
+    result = mapping.get(key, MISSING)
+    if result is MISSING:
+        return 'not found'
+    return result
+
+d = {'a': 1, 'b': None}
+print(get(d, 'a'))   # 1
+print(get(d, 'b'))   # None  (distinguished from MISSING)
+print(get(d, 'c'))   # not found
+
+# Explicit base class
+class Node(object):
+    def __init__(self, val):
+        self.val = val
+
+n = Node(42)
+print(isinstance(n, object))  # True
+print(n.val)                  # 42
+```
+
+## `float.is_integer()` example
+
+```py
+print((1.0).is_integer())     # True
+print((1.5).is_integer())     # False
+print((0.0).is_integer())     # True
+print((-3.0).is_integer())    # True
+print((1e10).is_integer())    # True
+
+values = [1.0, 2.5, 3.0, 4.7, 5.0]
+whole = [x for x in values if x.is_integer()]
+print(whole)   # [1.0, 3.0, 5.0]
+```
+
+## `int.bit_length()` example
+
+```py
+print((0).bit_length())     # 0
+print((1).bit_length())     # 1
+print((255).bit_length())   # 8
+print((256).bit_length())   # 9
+print((-5).bit_length())    # 3  (sign ignored)
+
+# Pack a list of values into the minimum number of bits each requires
+values = [0, 7, 8, 255, 1024]
+for v in values:
+    print(v, '->', v.bit_length(), 'bits')
+# 0 -> 0 bits
+# 7 -> 3 bits
+# 8 -> 4 bits
+# 255 -> 8 bits
+# 1024 -> 11 bits
 ```

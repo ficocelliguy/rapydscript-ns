@@ -366,14 +366,41 @@ def _test_frozenset():
 _test_frozenset()
 
 # ── 17. int.bit_length() ─────────────────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — Number prototype does not have bit_length.
-#
-#  ae((255).bit_length(), 8)
+# STATUS: ✓ SUPPORTED — Number.prototype.bit_length added to baselib.
+
+def _test_int_bit_length():
+    ae((0).bit_length(), 0)
+    ae((1).bit_length(), 1)
+    ae((2).bit_length(), 2)
+    ae((3).bit_length(), 2)
+    ae((4).bit_length(), 3)
+    ae((255).bit_length(), 8)
+    ae((256).bit_length(), 9)
+    ae((1023).bit_length(), 10)
+    ae((1024).bit_length(), 11)
+    # Negative numbers: bit_length ignores sign (Python semantics)
+    ae((-1).bit_length(), 1)
+    ae((-5).bit_length(), 3)
+    ae((-255).bit_length(), 8)
+
+_test_int_bit_length()
 
 # ── 18. float.is_integer() ───────────────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — Number prototype does not have is_integer.
-#
-#  ae((1.0).is_integer(), True)
+# STATUS: ✓ SUPPORTED — Number.prototype.is_integer added to baselib.
+
+def _test_float_is_integer():
+    ae((1.0).is_integer(), True)
+    ae((1.5).is_integer(), False)
+    ae((0.0).is_integer(), True)
+    ae((-2.0).is_integer(), True)
+    ae((-2.5).is_integer(), False)
+    ae((1e10).is_integer(), True)
+    ae((1.0000000001).is_integer(), False)
+    # NaN and Infinity are not integers (JS literals)
+    ae(v'Infinity'.is_integer(), False)
+    ae(v'NaN'.is_integer(), False)
+
+_test_float_is_integer()
 
 # ── 19. dict | merge operator (Python 3.9+) ──────────────────────────────────
 # STATUS: ✓ WORKS — requires `from __python__ import overload_operators, dict_literals`

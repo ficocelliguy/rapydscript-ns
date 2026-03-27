@@ -1,0 +1,64 @@
+# globals: assrt
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── Basic instantiation ───────────────────────────────────────────────────────
+
+o = object()
+ok(o is not None)
+ok(o is not undefined)
+
+# ── Sentinel pattern: each call returns a distinct instance ───────────────────
+
+s1 = object()
+s2 = object()
+ok(s1 is not s2)
+
+# ── isinstance ────────────────────────────────────────────────────────────────
+
+ok(isinstance(o, object))
+ok(isinstance(s1, object))
+ok(isinstance(s2, object))
+
+# ── repr / str ────────────────────────────────────────────────────────────────
+
+r = repr(o)
+ok(r.startsWith('<object object'))
+
+# ── hash: stable and distinct between instances ───────────────────────────────
+
+h1 = hash(s1)
+h2 = hash(s2)
+ok(jstype(h1) is 'number')
+ok(h1 is not h2)
+ae(hash(s1), h1)  # hash is stable across calls
+
+# ── Subclassing: class Foo(object) ────────────────────────────────────────────
+
+class Widget(object):
+    def __init__(self, name):
+        self.name = name
+
+    def greet(self):
+        return 'Hello, ' + self.name
+
+w = Widget('world')
+ok(isinstance(w, Widget))
+ok(isinstance(w, object))
+ae(w.greet(), 'Hello, world')
+
+# ── Multiple inheritance with object as one parent ────────────────────────────
+
+class Mixin:
+    def tag(self):
+        return 'mixin'
+
+class Combined(Mixin, object):
+    pass
+
+c = Combined()
+ok(isinstance(c, Combined))
+ok(isinstance(c, object))
+ae(c.tag(), 'mixin')

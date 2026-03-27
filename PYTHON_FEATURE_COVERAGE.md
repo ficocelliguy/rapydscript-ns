@@ -77,6 +77,9 @@
 | `__import__(name[, globals, locals, fromlist, level])` | Runtime lookup in the compiled module registry (`ρσ_modules`). Without `fromlist` (or empty `fromlist`) returns the top-level package, matching Python's semantics. `ImportError` / `ModuleNotFoundError` raised for unknown modules. **Constraint**: the module must have been statically imported elsewhere in the source so it is present in `ρσ_modules`. |
 | `ImportError`, `ModuleNotFoundError` | Both defined as runtime exception classes; `ModuleNotFoundError` is a subclass of `ImportError` (same as Python 3.6+). |
 | `bytes(source[, encoding[, errors]])` and `bytearray(source[, encoding[, errors]])` | Full Python semantics: construction from integer (n zero bytes), list/iterable of ints (0–255), string + encoding (`utf-8`, `latin-1`, `ascii`), `Uint8Array`, or another `bytes`/`bytearray`. Key methods: `hex([sep[, bytes_per_sep]])`, `decode(encoding)`, `fromhex(s)` (static), `count`, `find`, `rfind`, `index`, `rindex`, `startswith`, `endswith`, `join`, `split`, `replace`, `strip`, `lstrip`, `rstrip`, `upper`, `lower`, `copy`. `bytearray` adds: `append`, `extend`, `insert`, `pop`, `remove`, `reverse`, `clear`, `__setitem__` (single and slice). Slicing returns a new `bytes`/`bytearray`. `+` concatenates; `*` repeats; `==` compares element-wise; `in` tests integer or subsequence membership; `isinstance(x, bytes)` / `isinstance(x, bytearray)` work; `bytearray` is a subclass of `bytes`. `repr()` returns `b'...'` notation. `Uint8Array` values may be passed anywhere a `bytes`-like object is accepted. |
+| `object()` | Featureless base-class instance: `object()` returns a unique instance; `isinstance(x, object)` works; `class Foo(object):` explicit base works; `repr()` → `'<object object at 0x…>'`; `hash()` returns a stable identity hash; each call returns a distinct object suitable as a sentinel value. Note: unlike CPython, JS objects are open, so arbitrary attributes can be set on `object()` instances. |
+| `float.is_integer()` | Returns `True` if the float has no fractional part (i.e. is a whole number), `False` otherwise. `float('inf').is_integer()` and `float('nan').is_integer()` both return `False`, matching Python semantics. Added to `Number.prototype` in the baselib so it works on any numeric literal or variable. |
+| `int.bit_length()` | Returns the number of bits needed to represent the integer in binary, excluding the sign and leading zeros. `(0).bit_length()` → `0`; `(255).bit_length()` → `8`; `(256).bit_length()` → `9`; sign is ignored (`(-5).bit_length()` → `3`). Added to `Number.prototype` in the baselib. |
 
 ---
 
@@ -135,12 +138,9 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | Feature                             | Priority                                                               |
 |-------------------------------------|------------------------------------------------------------------------|
 | `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access                      |
-| `int.bit_length()`                  | 🟢 Low — useful for bit manipulation                                   |
-| `float.is_integer()`                | 🟢 Low                                                                 |
 | `exec(code)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
 | `eval(expr)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
 | `input(prompt)`                     | 🟢 Low — not built in; use `prompt()` via `v'prompt(...)'`            |
-| `object()`                          | 🟢 Low — base `object` type not exposed; use plain `{}` or a class    |
 | `abc` module — `ABC`, `@abstractmethod`, `Protocol` | 🟢 Low — no abc module; no enforcement of abstract methods |
 | `complex(real, imag)`               | 🟢 Low — no complex number type                                        |
 | `compile()`                         | 🔴 N/A — Python compile/code objects have no JS equivalent            |

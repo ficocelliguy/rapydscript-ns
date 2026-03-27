@@ -1233,6 +1233,89 @@ var TESTS = [
         },
     },
 
+    // ── object() builtin ──────────────────────────────────────────────────────
+
+    {
+        name: "bundle_object_sentinel",
+        description: "object() returns distinct instances usable as sentinels",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "s1 = object()",
+                "s2 = object()",
+                "assrt.ok(s1 is not s2)",
+                "assrt.ok(isinstance(s1, object))",
+                "assrt.ok(isinstance(s2, object))",
+                "h1 = hash(s1)",
+                "h2 = hash(s2)",
+                "assrt.ok(h1 is not h2)",
+                "assrt.equal(hash(s1), h1)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_object_subclass",
+        description: "class Foo(object) works and isinstance checks succeed",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Node(object):",
+                "    def __init__(self, val):",
+                "        self.val = val",
+                "n = Node(42)",
+                "assrt.ok(isinstance(n, Node))",
+                "assrt.ok(isinstance(n, object))",
+                "assrt.equal(n.val, 42)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── float.is_integer() ───────────────────────────────────────────────────
+
+    {
+        name: "bundle_float_is_integer",
+        description: "float.is_integer() returns True for whole numbers and False for fractions/inf/nan",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.equal((1.0).is_integer(), True)",
+                "assrt.equal((1.5).is_integer(), False)",
+                "assrt.equal((0.0).is_integer(), True)",
+                "assrt.equal((-2.0).is_integer(), True)",
+                "assrt.equal((-2.5).is_integer(), False)",
+                "assrt.equal((1e10).is_integer(), True)",
+                "assrt.equal(v'Infinity'.is_integer(), False)",
+                "assrt.equal(v'NaN'.is_integer(), False)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── int.bit_length() ─────────────────────────────────────────────────────
+
+    {
+        name: "bundle_int_bit_length",
+        description: "int.bit_length() returns the number of bits needed to represent the integer",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.equal((0).bit_length(), 0)",
+                "assrt.equal((1).bit_length(), 1)",
+                "assrt.equal((255).bit_length(), 8)",
+                "assrt.equal((256).bit_length(), 9)",
+                "assrt.equal((1023).bit_length(), 10)",
+                "assrt.equal((1024).bit_length(), 11)",
+                "assrt.equal((-1).bit_length(), 1)",
+                "assrt.equal((-5).bit_length(), 3)",
+                "assrt.equal((-255).bit_length(), 8)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

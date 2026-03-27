@@ -459,6 +459,27 @@ class ρσ_slice:
         raise TypeError("unhashable type: 'slice'")
 
 
+class ρσ_object:
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        v'if (this.ρσ_object_id === undefined) this.ρσ_object_id = ++ρσ_hash_id_counter'
+        return '<object object at 0x' + v'this.ρσ_object_id.toString(16)'+ '>'
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self is other
+
+    def __hash__(self):
+        v'if (this.ρσ_object_id === undefined) this.ρσ_object_id = ++ρσ_hash_id_counter'
+        return self.ρσ_object_id
+
+ρσ_object.__name__ = 'object'
+
+
 v'var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
 v'var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
 v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__'
@@ -468,3 +489,6 @@ v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasatt
 v'var ρσ_Ellipsis = Object.freeze({toString: function(){return "Ellipsis";}, __repr__: function(){return "Ellipsis";}})'
 v'var Ellipsis = ρσ_Ellipsis'
 v'var slice = ρσ_slice'
+v'var object = ρσ_object'
+v'Number.prototype.is_integer = function() { return isFinite(+this) && (+this) % 1 === 0; }'
+v'Number.prototype.bit_length = function() { var n = Math.abs(Math.trunc(+this)); if (n === 0) return 0; return Math.floor(Math.log2(n)) + 1; }'
