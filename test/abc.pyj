@@ -1,0 +1,291 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# abc.pyj — tests for the abc standard library module.
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+from abc import ABC, ABCMeta, abstractmethod, Protocol, runtime_checkable, get_cache_token
+
+# ── 1. @abstractmethod marks the function ─────────────────────────────────────
+
+def _tagged(): pass
+abstractmethod(_tagged)
+ok(_tagged.__isabstractmethod__)
+
+# ── 2. Abstract class cannot be instantiated ──────────────────────────────────
+
+class _Shape(ABC):
+    @abstractmethod
+    def area(self): pass
+
+_raised = False
+try:
+    _Shape()
+except TypeError:
+    _raised = True
+ok(_raised)
+
+# The error message contains the abstract method name
+_msg = ''
+try:
+    _Shape()
+except TypeError as e:
+    _msg = str(e)
+ok('_Shape' in _msg)
+ok('area' in _msg)
+
+# ── 3. Concrete subclass CAN be instantiated ──────────────────────────────────
+
+class _Circle(_Shape):
+    def __init__(self, r):
+        self.r = r
+    def area(self):
+        return 3.14159 * self.r * self.r
+
+_c = _Circle(5)
+ok(_c is not None)
+ae(_c.r, 5)
+ok(abs(_c.area() - 78.53975) < 0.001)
+
+# ── 4. isinstance checks work for concrete subclasses ─────────────────────────
+
+ok(isinstance(_c, _Circle))
+ok(isinstance(_c, _Shape))
+ok(isinstance(_c, ABC))
+
+# ── 5. Multiple abstract methods listed in TypeError (alphabetical order) ──────
+
+class _Multi(ABC):
+    @abstractmethod
+    def bar(self): pass
+    @abstractmethod
+    def foo(self): pass
+
+_m_raised = False
+_m_msg = ''
+try:
+    _Multi()
+except TypeError as e:
+    _m_raised = True
+    _m_msg = str(e)
+ok(_m_raised)
+ok('bar' in _m_msg)
+ok('foo' in _m_msg)
+ok('methods' in _m_msg)   # plural
+
+# ── 6. Partial implementation still raises TypeError ──────────────────────────
+
+class _PartialMulti(_Multi):
+    def foo(self):
+        return 1
+
+_partial_raised = False
+try:
+    _PartialMulti()
+except TypeError:
+    _partial_raised = True
+ok(_partial_raised)
+
+# Full implementation works
+class _FullMulti(_Multi):
+    def foo(self): return 1
+    def bar(self): return 2
+
+_fm = _FullMulti()
+ae(_fm.foo(), 1)
+ae(_fm.bar(), 2)
+
+# ── 7. __abstractmethods__ set on the class ───────────────────────────────────
+
+ok('area' in _Shape.__abstractmethods__)
+ae(len(_Shape.__abstractmethods__), 1)
+ae(len(_Circle.__abstractmethods__), 0)
+
+# ── 8. Abstract class with own __init__ ───────────────────────────────────────
+
+class _Vehicle(ABC):
+    def __init__(self, name):
+        self.name = name
+
+    @abstractmethod
+    def drive(self): pass
+
+class _Car(_Vehicle):
+    def drive(self):
+        return 'driving ' + self.name
+
+_car = _Car('Tesla')
+ae(_car.name, 'Tesla')
+ae(_car.drive(), 'driving Tesla')
+
+_veh_raised = False
+try:
+    _Vehicle('Bus')
+except TypeError:
+    _veh_raised = True
+ok(_veh_raised)
+
+# ── 9. Multi-level abstract inheritance ───────────────────────────────────────
+
+class _A(ABC):
+    @abstractmethod
+    def m1(self): pass
+
+class _B(_A):
+    @abstractmethod
+    def m2(self): pass
+
+_b_raised = False
+try:
+    _B()
+except TypeError:
+    _b_raised = True
+ok(_b_raised)
+
+class _C(_B):
+    def m1(self): return 'one'
+    def m2(self): return 'two'
+
+_cobj = _C()
+ae(_cobj.m1(), 'one')
+ae(_cobj.m2(), 'two')
+
+# ── 10. ABC.register() — virtual subclass isinstance ─────────────────────────
+
+class _MyABC(ABC):
+    @abstractmethod
+    def do_it(self): pass
+
+class _External:
+    def do_it(self):
+        return 42
+
+_MyABC.register(_External)
+ok(isinstance(_External(), _MyABC))
+
+# Non-registered class without inheritance is NOT an instance
+class _Unrelated:
+    def do_it(self): return 99
+
+ok(not isinstance(_Unrelated(), _MyABC))
+
+# ── 11. ABC.register() used as a class decorator ──────────────────────────────
+
+class _Base(ABC):
+    @abstractmethod
+    def compute(self): pass
+
+@_Base.register
+class _Virtual:
+    def compute(self): return 7
+
+ok(isinstance(_Virtual(), _Base))
+
+# ── 12. get_cache_token() returns 0 ──────────────────────────────────────────
+
+ae(get_cache_token(), 0)
+
+# ── 13. Protocol + @runtime_checkable — structural isinstance ──────────────────
+
+@runtime_checkable
+class _Drawable(Protocol):
+    def draw(self): pass
+
+class _Canvas:
+    def draw(self):
+        return 'painting'
+
+class _NotDrawable:
+    def paint(self): pass
+
+ok(isinstance(_Canvas(), _Drawable))
+ok(not isinstance(_NotDrawable(), _Drawable))
+ok(not isinstance(42, _Drawable))
+ok(not isinstance(None, _Drawable))
+
+# ── 14. Protocol without @runtime_checkable — normal inheritance check ─────────
+
+class _Closeable(Protocol):
+    def close(self): pass
+
+class _ManagedFile(_Closeable):
+    def close(self):
+        return 'closed'
+
+ok(isinstance(_ManagedFile(), _ManagedFile))
+ok(isinstance(_ManagedFile(), _Closeable))   # direct subclass => True
+
+class _OtherFile:
+    def close(self): return 'also closed'
+
+# Without runtime_checkable, structural check does NOT happen
+ok(not isinstance(_OtherFile(), _Closeable))
+
+# ── 15. Protocol with @abstractmethod enforces instantiation guard ─────────────
+
+class _AbstractProto(Protocol):
+    @abstractmethod
+    def required(self): pass
+
+_ap_raised = False
+try:
+    _AbstractProto()
+except TypeError:
+    _ap_raised = True
+ok(_ap_raised)
+
+# Concrete implementation is instantiable
+class _ConcreteProto(_AbstractProto):
+    def required(self): return 'done'
+
+ok(_ConcreteProto() is not None)
+
+# ── 16. Protocol __protocol_attrs__ contains non-dunder method names ───────────
+
+@runtime_checkable
+class _Sizeable(Protocol):
+    def size(self): pass
+    def count(self): pass
+
+ok('size' in _Sizeable.__protocol_attrs__)
+ok('count' in _Sizeable.__protocol_attrs__)
+
+class _Box:
+    def size(self): return 10
+    def count(self): return 5
+
+class _Half:
+    def size(self): return 3
+
+ok(isinstance(_Box(), _Sizeable))
+ok(not isinstance(_Half(), _Sizeable))
+
+# ── 17. Protocol protocol_attrs inheritance (sub-protocols) ───────────────────
+
+@runtime_checkable
+class _Reader(Protocol):
+    def read(self): pass
+
+@runtime_checkable
+class _Writer(Protocol):
+    def write(self, data): pass
+
+@runtime_checkable
+class _ReadWriter(_Reader, _Writer, Protocol):
+    pass
+
+ok('read' in _ReadWriter.__protocol_attrs__)
+ok('write' in _ReadWriter.__protocol_attrs__)
+
+class _FullRW:
+    def read(self): return 'data'
+    def write(self, data): pass
+
+class _ReadOnly:
+    def read(self): return 'data'
+
+ok(isinstance(_FullRW(), _ReadWriter))
+ok(not isinstance(_ReadOnly(), _ReadWriter))

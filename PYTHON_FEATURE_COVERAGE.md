@@ -141,7 +141,7 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | `exec(code)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
 | `eval(expr)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
 | `input(prompt)`                     | 🟢 Low — not built in; use `prompt()` via `v'prompt(...)'`            |
-| `abc` module — `ABC`, `@abstractmethod`, `Protocol` | 🟢 Low — no abc module; no enforcement of abstract methods |
+| `abc` module — `ABC`, `@abstractmethod`, `Protocol` | ✅ — supported via `src/lib/abc.pyj`; see Standard Library Modules below |
 | `complex(real, imag)`               | 🟢 Low — no complex number type                                        |
 | `compile()`                         | 🔴 N/A — Python compile/code objects have no JS equivalent            |
 | `memoryview(obj)`                   | 🔴 N/A — no buffer protocol in browser context                        |
@@ -185,7 +185,7 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `datetime`    | ❌           | `date`, `time`, `datetime`, `timedelta` not available                                         |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `asyncio`     | ❌           | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await`    |
-| `abc`         | ❌           | `ABC`, `abstractmethod` not available                                                         |
+| `abc`         | ✅           | `ABC`, `@abstractmethod`, `Protocol`, `@runtime_checkable`, `ABCMeta` (informational), `get_cache_token()` in `src/lib/abc.pyj`; abstract method enforcement via `__init__` guard; `ABC.register()` for virtual subclasses with isinstance support; `Symbol.hasInstance` enables structural isinstance for `@runtime_checkable` protocols; `ABCMeta` metaclass not usable (no metaclass support), use `ABC` base class instead |
 | `io`          | ❌           | `StringIO`, `BytesIO` not available                                                           |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |

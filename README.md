@@ -3133,6 +3133,8 @@ One of Python's main strengths is the number of libraries available to the devel
 	enum                # Enum base class — class Color(Enum): RED=1 with .name/.value, iteration
 	dataclasses         # @dataclass decorator — auto-generates __init__, __repr__, __eq__; field(),
 	                    # fields(), asdict(), astuple(), replace(), is_dataclass(), frozen=True, order=True
+	abc                 # ABC base class, @abstractmethod, Protocol, @runtime_checkable;
+	                    # abstract enforcement at instantiation; ABC.register() virtual subclasses
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
 	copy                # copy (shallow), deepcopy; honours __copy__ / __deepcopy__ hooks
 	typing              # TYPE_CHECKING, Any, Union, Optional, List, Dict, Set, Tuple, TypeVar,

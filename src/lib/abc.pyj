@@ -1,0 +1,317 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's abc standard library.
+#
+# Supported:
+#   ABC                 — base class for abstract base classes
+#   @abstractmethod     — decorator marking a method as abstract
+#   Protocol            — base class for structural subtyping (PEP 544)
+#   @runtime_checkable  — allow isinstance() structural checks on Protocol
+#   ABCMeta             — informational placeholder (not a real metaclass)
+#   get_cache_token()   — returns 0
+#
+# Usage:
+#   from abc import ABC, abstractmethod
+#
+#   class Shape(ABC):
+#       @abstractmethod
+#       def area(self): pass
+#
+#   class Circle(Shape):
+#       def __init__(self, r):
+#           self.r = r
+#       def area(self):
+#           return 3.14159 * self.r * self.r
+#
+#   c = Circle(5)       # OK
+#   Shape()             # TypeError: Can't instantiate abstract class Shape
+#                       #            with abstract method area
+#
+# Protocol usage:
+#   from abc import Protocol, runtime_checkable
+#
+#   @runtime_checkable
+#   class Drawable(Protocol):
+#       def draw(self): ...
+#
+#   class Canvas:
+#       def draw(self): pass
+#
+#   isinstance(Canvas(), Drawable)  # True  (structural check)
+#   isinstance(42, Drawable)        # False
+#
+# Implementation notes:
+#   - @abstractmethod sets func.__isabstractmethod__ = True.
+#   - ABC.__init_subclass__ is called for every subclass (directly or transitively)
+#     because ρσ_extends calls Object.setPrototypeOf(child, parent), making
+#     constructor-chain lookup find the parent's __init_subclass__.
+#   - A __init__ guard is installed on cls.prototype when abstract methods remain;
+#     the guard checks this.__class__.__abstractmethods__ at runtime so concrete
+#     subclasses that inherit the guard pass cleanly.
+#   - ABC.register() stores class constructors in a native JS Set; Symbol.hasInstance
+#     is installed to make isinstance(obj, SomeABC) respect the registry.
+#   - Protocol collects __protocol_attrs__ (non-dunder callable own-properties).
+#     @runtime_checkable installs Symbol.hasInstance for structural isinstance().
+
+
+def abstractmethod(func):
+    """Decorator to declare a method as abstract."""
+    func.__isabstractmethod__ = True
+    return func
+
+
+def _collect_abstract_methods(cls):
+    """
+    Return a Python set of still-abstract method names in cls.
+
+    Merges base classes' __abstractmethods__ sets, then walks cls.prototype's
+    own properties: methods with __isabstractmethod__ are added; concrete
+    implementations remove the name from the set.
+    """
+    abstract = set()
+
+    v"""
+    var ρσ_bases = (cls.prototype && cls.prototype.__bases__) || [];
+    for (var ρσ_bi = 0; ρσ_bi < ρσ_bases.length; ρσ_bi++) {
+        var ρσ_base = ρσ_bases[ρσ_bi];
+        if (ρσ_base && ρσ_base.__abstractmethods__) {
+            for (var ρσ_n of ρσ_base.__abstractmethods__) {
+                abstract.add(ρσ_n);
+            }
+        }
+    }
+    var ρσ_proto = cls.prototype;
+    var ρσ_keys = Object.getOwnPropertyNames(ρσ_proto);
+    for (var ρσ_ki = 0; ρσ_ki < ρσ_keys.length; ρσ_ki++) {
+        var ρσ_k = ρσ_keys[ρσ_ki];
+        if (ρσ_k.startsWith('ρσ') || ρσ_k === '__class__') continue;
+        var ρσ_desc = Object.getOwnPropertyDescriptor(ρσ_proto, ρσ_k);
+        if (!ρσ_desc) continue;
+        if (typeof ρσ_desc.value === 'function') {
+            if (ρσ_desc.value.__isabstractmethod__) {
+                abstract.add(ρσ_k);
+            } else {
+                abstract.discard(ρσ_k);
+            }
+        } else if (ρσ_desc.get && ρσ_desc.get.__isabstractmethod__) {
+            abstract.add(ρσ_k);
+        }
+    }
+    """
+
+    return abstract
+
+
+def _install_abstract_guard(cls):
+    """
+    Replace cls.prototype.__init__ with a wrapper that raises TypeError if the
+    concrete class being instantiated still has un-overridden abstract methods.
+    The check uses this.__class__.__abstractmethods__ at call-time, so a
+    concrete subclass that inherits this guard from an abstract parent passes.
+    """
+    v"""
+    var ρσ_orig_init = Object.prototype.hasOwnProperty.call(cls.prototype, '__init__')
+        ? cls.prototype.__init__
+        : null;
+    cls.prototype.__init__ = function() {
+        var ρσ_actual_cls = (this && (this.__class__ || this.constructor)) || cls;
+        var ρσ_am = ρσ_actual_cls && ρσ_actual_cls.__abstractmethods__;
+        if (ρσ_am && ρσ_am.size > 0) {
+            var ρσ_names = Array.from(ρσ_am).sort().join(', ');
+            var ρσ_s = ρσ_am.size > 1 ? 's' : '';
+            throw new TypeError(
+                "Can't instantiate abstract class " + ρσ_actual_cls.__name__ +
+                " with abstract method" + ρσ_s + " " + ρσ_names
+            );
+        }
+        if (typeof ρσ_orig_init === 'function') {
+            ρσ_orig_init.apply(this, arguments);
+        }
+    };
+    """
+
+
+class ABCMeta:
+    """
+    Metaclass for defining Abstract Base Classes (informational in RapydScript).
+
+    In Python, ABCMeta is the true metaclass that powers abstract classes.
+    RapydScript does not support metaclasses; use ABC as a regular base class
+    instead.  ABCMeta is provided for compatibility with code that references it.
+    """
+    pass
+
+
+class ABC:
+    """
+    Helper class for defining Abstract Base Classes via inheritance.
+
+    Any class that inherits from ABC (directly or transitively) and still has
+    un-overridden @abstractmethod declarations cannot be instantiated — a
+    TypeError is raised at construction time.
+
+    Use ABC.register(subclass) to declare a virtual subclass that passes
+    isinstance() checks without actual inheritance.
+
+    Example::
+
+        class Vehicle(ABC):
+            @abstractmethod
+            def drive(self): ...
+
+        class Car(Vehicle):
+            def drive(self):
+                print('vroom')
+
+        Car()       # OK
+        Vehicle()   # TypeError: Can't instantiate abstract class Vehicle
+                    #            with abstract method drive
+    """
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        am = _collect_abstract_methods(cls)
+        cls.__abstractmethods__ = am
+
+        v"""
+        cls.__abc_registry__ = new Set();
+        var ρσ_registry = cls.__abc_registry__;
+        // Two install sites for register():
+        //
+        // 1. cls.register (constructor property): used when @MyABC.register is
+        //    written as a class decorator — RapydScript stores the expression value
+        //    [_MyABC.register] in ρσ_decorators, then calls ρσ_decorators[0](Cls).
+        //    Here 'subclass' receives the class being decorated.
+        cls.register = function(subclass) {
+            ρσ_registry.add(subclass);
+            return subclass;
+        };
+        // 2. cls.prototype.register (prototype method): used when the user writes
+        //    MyABC.register(Cls) as a plain call — RapydScript compiles this to
+        //    MyABC.prototype.register.call(Cls), so 'this' is the class to register.
+        cls.prototype.register = function() {
+            ρσ_registry.add(this);
+            return this;
+        };
+        Object.defineProperty(cls, Symbol.hasInstance, {
+            configurable: true,
+            value: function(instance) {
+                if (instance === null || instance === undefined) return false;
+                if (Object.prototype.isPrototypeOf.call(cls.prototype, instance)) return true;
+                var reg = cls.__abc_registry__;
+                if (reg && reg.size > 0) {
+                    var ctor = instance.__class__ || instance.constructor;
+                    while (ctor && ctor !== Function.prototype) {
+                        if (reg.has(ctor)) return true;
+                        ctor = Object.getPrototypeOf(ctor);
+                    }
+                }
+                return false;
+            }
+        });
+        """
+
+        if am.size > 0:
+            _install_abstract_guard(cls)
+
+
+class Protocol:
+    """
+    Base class for protocol classes (structural subtyping — PEP 544).
+
+    Define a Protocol to specify a structural interface: any class that has
+    the required methods satisfies the protocol at runtime.  Use
+    @runtime_checkable to enable isinstance() checks based on method presence
+    rather than inheritance.
+
+    Example::
+
+        from abc import Protocol, runtime_checkable
+
+        @runtime_checkable
+        class Drawable(Protocol):
+            def draw(self): ...
+
+        class Canvas:
+            def draw(self):
+                print('drawing...')
+
+        isinstance(Canvas(), Drawable)   # True
+        isinstance(42, Drawable)         # False
+    """
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        am = _collect_abstract_methods(cls)
+        cls.__abstractmethods__ = am
+
+        v"""
+        var ρσ_proto_attrs = new Set();
+        var ρσ_pbases = (cls.prototype && cls.prototype.__bases__) || [];
+        for (var ρσ_pbi = 0; ρσ_pbi < ρσ_pbases.length; ρσ_pbi++) {
+            var ρσ_pbase = ρσ_pbases[ρσ_pbi];
+            if (ρσ_pbase && ρσ_pbase.__protocol_attrs__) {
+                for (var ρσ_pa of ρσ_pbase.__protocol_attrs__) {
+                    ρσ_proto_attrs.add(ρσ_pa);
+                }
+            }
+        }
+        var ρσ_pproto = cls.prototype;
+        var ρσ_pkeys = Object.getOwnPropertyNames(ρσ_pproto);
+        for (var ρσ_pki = 0; ρσ_pki < ρσ_pkeys.length; ρσ_pki++) {
+            var ρσ_pk = ρσ_pkeys[ρσ_pki];
+            if (ρσ_pk.startsWith('_') || ρσ_pk.startsWith('ρσ')) continue;
+            var ρσ_pd = Object.getOwnPropertyDescriptor(ρσ_pproto, ρσ_pk);
+            if (ρσ_pd && typeof ρσ_pd.value === 'function') {
+                ρσ_proto_attrs.add(ρσ_pk);
+            }
+        }
+        cls.__protocol_attrs__ = ρσ_proto_attrs;
+        """
+
+        if am.size > 0:
+            _install_abstract_guard(cls)
+
+
+def runtime_checkable(cls):
+    """
+    Decorator for Protocol subclasses to allow isinstance() structural checks.
+
+    After applying @runtime_checkable, isinstance(obj, MyProtocol) returns True
+    if *obj* has all the non-dunder methods declared in the Protocol, regardless
+    of inheritance.
+
+    Example::
+
+        @runtime_checkable
+        class Closeable(Protocol):
+            def close(self): ...
+
+        class File:
+            def close(self): ...
+
+        isinstance(File(), Closeable)   # True
+        isinstance(42, Closeable)       # False
+    """
+    cls.__runtime_checkable__ = True
+
+    v"""
+    var ρσ_attrs = cls.__protocol_attrs__ || new Set();
+    Object.defineProperty(cls, Symbol.hasInstance, {
+        configurable: true,
+        value: function(instance) {
+            if (instance === null || instance === undefined) return false;
+            for (var ρσ_attr of ρσ_attrs) {
+                if (typeof instance[ρσ_attr] !== 'function') return false;
+            }
+            return true;
+        }
+    });
+    """
+
+    return cls
+
+
+def get_cache_token():
+    """Return the current ABC cache invalidation token (always 0 in RapydScript)."""
+    return 0

@@ -157,3 +157,57 @@ for v in values:
 # 255 -> 8 bits
 # 1024 -> 11 bits
 ```
+
+## `abc` module example
+
+```py
+from abc import ABC, abstractmethod, Protocol, runtime_checkable
+
+# Abstract base class — subclasses must implement area()
+class Shape(ABC):
+    @abstractmethod
+    def area(self): pass
+
+    @abstractmethod
+    def perimeter(self): pass
+
+class Circle(Shape):
+    def __init__(self, r):
+        self.r = r
+    def area(self):
+        return 3.14159 * self.r * self.r
+    def perimeter(self):
+        return 2 * 3.14159 * self.r
+
+c = Circle(5)
+print(c.area())       # 78.53975
+print(c.perimeter())  # 31.4159
+
+# Attempting to instantiate the abstract class raises TypeError:
+# Shape()  ->  TypeError: Can't instantiate abstract class Shape
+#              with abstract methods area, perimeter
+
+# Virtual subclass registration
+class Square:
+    def __init__(self, side):
+        self.side = side
+    def area(self):
+        return self.side * self.side
+    def perimeter(self):
+        return 4 * self.side
+
+Shape.register(Square)
+print(isinstance(Square(4), Shape))  # True
+
+# Protocol — structural subtyping
+@runtime_checkable
+class Drawable(Protocol):
+    def draw(self): pass
+
+class Canvas:
+    def draw(self):
+        print('drawing...')
+
+print(isinstance(Canvas(), Drawable))  # True
+print(isinstance(42, Drawable))        # False
+```

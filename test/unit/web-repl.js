@@ -1316,6 +1316,104 @@ var TESTS = [
         },
     },
 
+    // ── abc module ───────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_abc_basic",
+        description: "ABC + @abstractmethod raises TypeError when abstract class is instantiated",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from abc import ABC, abstractmethod",
+                "class Shape(ABC):",
+                "    @abstractmethod",
+                "    def area(self): pass",
+                "raised = False",
+                "try:",
+                "    Shape()",
+                "except TypeError:",
+                "    raised = True",
+                "assrt.ok(raised)",
+                "assrt.ok('area' in Shape.__abstractmethods__)",
+                "assrt.equal(len(Shape.__abstractmethods__), 1)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_abc_concrete",
+        description: "Concrete ABC subclass can be instantiated; isinstance sees the full chain",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from abc import ABC, abstractmethod",
+                "class Shape(ABC):",
+                "    @abstractmethod",
+                "    def area(self): pass",
+                "class Circle(Shape):",
+                "    def __init__(self, r):",
+                "        self.r = r",
+                "    def area(self):",
+                "        return 3.14159 * self.r * self.r",
+                "c = Circle(5)",
+                "assrt.ok(isinstance(c, Circle))",
+                "assrt.ok(isinstance(c, Shape))",
+                "assrt.ok(isinstance(c, ABC))",
+                "assrt.equal(c.r, 5)",
+                "assrt.ok(abs(c.area() - 78.53975) < 0.001)",
+                "assrt.equal(len(Circle.__abstractmethods__), 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_abc_register",
+        description: "ABC.register() makes isinstance return True for virtual subclasses",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from abc import ABC, abstractmethod",
+                "class MyABC(ABC):",
+                "    @abstractmethod",
+                "    def do_it(self): pass",
+                "class External:",
+                "    def do_it(self): return 42",
+                "MyABC.register(External)",
+                "assrt.ok(isinstance(External(), MyABC))",
+                "class Unrelated:",
+                "    def do_it(self): return 99",
+                "assrt.ok(not isinstance(Unrelated(), MyABC))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_abc_protocol",
+        description: "@runtime_checkable Protocol enables structural isinstance() checks",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from abc import Protocol, runtime_checkable",
+                "@runtime_checkable",
+                "class Drawable(Protocol):",
+                "    def draw(self): pass",
+                "class Canvas:",
+                "    def draw(self):",
+                "        return 'painting'",
+                "class NotDrawable:",
+                "    def paint(self): pass",
+                "assrt.ok(isinstance(Canvas(), Drawable))",
+                "assrt.ok(not isinstance(NotDrawable(), Drawable))",
+                "assrt.ok(not isinstance(42, Drawable))",
+                "assrt.ok('draw' in Drawable.__protocol_attrs__)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------
