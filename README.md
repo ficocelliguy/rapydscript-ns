@@ -1058,10 +1058,24 @@ The supported dunder methods are:
 Augmented assignment (``+=``, ``-=``, etc.) first tries the in-place method
 (``__iadd__``, ``__isub__``, …) and then falls back to the binary method.
 
-If neither operand defines the relevant dunder method the operation falls back
-to the native JavaScript operator, so plain numbers, strings, and booleans
-continue to work as expected with no performance penalty when no dunder method
-is defined.
+If neither operand defines the relevant dunder method, the operation enforces
+Python-style type compatibility before falling back to the native JavaScript
+operator:
+
+- ``number`` ± ``number`` → allowed (including ``bool``, which is treated as an integer subclass)
+- ``str`` + ``str`` → allowed
+- ``str`` * ``int`` and ``list`` * ``int`` → allowed (and also with ``bool`` in place of ``int``)
+- Anything else raises ``TypeError`` with a Python-style message, e.g.:
+
+```py
+1 + 'x'       # TypeError: unsupported operand type(s) for +: 'int' and 'str'
+'a' - 1       # TypeError: unsupported operand type(s) for -: 'str' and 'int'
+[1] + 'b'     # TypeError: unsupported operand type(s) for +: 'list' and 'str'
+```
+
+This matches Python's behaviour exactly. When ``overload_operators`` is
+disabled (``from __python__ import no_overload_operators``) the operators
+compile directly to JavaScript and no type checking is performed.
 
 When `overload_operators` is active, string and list repetition with `*` works just like Python:
 
@@ -1360,6 +1374,64 @@ class Bar:
         return True
 hash(Bar())  # TypeError: unhashable type: 'Bar'
 ```
+
+### `eval` and `exec`
+
+Both `eval` and `exec` are supported with Python-compatible signatures.
+String literals passed to them are treated as **RapydScript source code**: the
+compiler parses and transpiles the string at compile time, so you write
+RapydScript (not raw JavaScript) inside the quotes — just like Python's
+`eval`/`exec` take Python source strings.
+
+#### `eval(expr[, globals[, locals]])`
+
+* **One argument** — the compiled expression is passed to the native JS `eval`,
+  giving direct scope access to module-level variables:
+
+  ```python
+  result = eval("1 + 2")               # 3
+  x = 7
+  sq = eval("x * x")                   # 49  (x is in scope)
+  ```
+
+* **Two or three arguments** — uses the `Function` constructor with explicit
+  variable bindings.  `locals` override `globals` when both are given:
+
+  ```python
+  eval("x + y", {"x": 10, "y": 5})          # 15
+  eval("x", {"x": 1}, {"x": 99})             # 99  (local overrides global)
+  ```
+
+#### `exec(code[, globals[, locals]])`
+
+Executes a RapydScript code string and always returns `None`, like Python's
+`exec`.
+
+* **One argument** — the compiled code runs via native `eval`:
+
+  ```python
+  exec("print('hi')")           # prints hi
+  exec("_x = 42")               # _x is discarded after exec returns
+  ```
+
+* **Two or three arguments** — uses the `Function` constructor.  Mutable
+  objects (arrays, dicts) passed in `globals` are accessible by reference, so
+  mutations are visible in the caller:
+
+  ```python
+  log = []
+  exec("log.append(1 + 2)", {"log": log})
+  print(log[0])    # 3
+
+  def add(a, b): log.append(a + b);
+  exec("fn(10, 7)", {"fn": add, "log": log})
+  print(log[1])    # 17
+  ```
+
+> **Note:** Because strings are compiled at compile time, only **string
+> literals** are transformed — dynamic strings assembled at runtime are passed
+> through unchanged.  `exec(code)` cannot modify the caller's local variables,
+> matching Python 3 semantics.
 
 ### Attribute-Access Dunders
 
@@ -3354,11 +3426,13 @@ below:
   in a scope.
 
 - Operator overloading is enabled by default via the ``overload_operators``
-  flag, so ``[1] + [1]`` produces a new list and ``'ha' * 3`` produces
-  ``'hahaha'`` as in Python. If you are working with plain numbers, strings,
-  and booleans there is no performance penalty — the dispatch only kicks in
-  when a dunder method is defined. Use ``from __python__ import no_overload_operators``
-  to disable it in a scope.
+  flag, so ``[1] + [1]`` produces a new list, ``'ha' * 3`` produces
+  ``'hahaha'``, and mixing incompatible types raises ``TypeError`` (e.g.
+  ``1 + 'x'`` raises ``TypeError: unsupported operand type(s) for +: 'int'
+  and 'str'``), all matching Python semantics. For plain numbers, strings, and
+  booleans there is no performance penalty when no dunder method is defined.
+  Use ``from __python__ import no_overload_operators`` to disable it in a
+  scope and revert to JavaScript's silent coercion behaviour.
 
 - There are many more keywords than in Python. Because RapydScript compiles
   down to JavaScript, the set of keywords is all the keywords of Python + all
@@ -3407,7 +3481,7 @@ with no flags enabled, pass ``--legacy-rapydscript`` on the command line.
 |---|---|
 | `dict_literals` | `{k: v}` literals create Python `dict` objects instead of plain JS objects. On by default. |
 | `overload_getitem` | `obj[key]` dispatches to `__getitem__` / `__setitem__` / `__delitem__` on objects that define them. On by default. |
-| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. On by default. |
+| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. Also enforces Python-style type coercion: incompatible operand types (e.g. `int + str`) raise `TypeError` instead of silently coercing as JavaScript would. On by default. |
 | `truthiness` | Boolean tests and `bool()` dispatch to `__bool__` and treat empty containers as falsy, matching Python semantics. On by default. |
 | `bound_methods` | Method references (`obj.method`) are automatically bound to their object, so they can be passed as callbacks without losing `self`. On by default. |
 | `hash_literals` | `{k: v}` creates a Python `dict` (alias for `dict_literals`; kept for backward compatibility). On by default. |

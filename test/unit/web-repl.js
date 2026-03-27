@@ -1414,6 +1414,41 @@ var TESTS = [
         },
     },
 
+    // ── eval / exec ───────────────────────────────────────────────────────
+
+    {
+        name: "bundle_eval_exec",
+        description: "eval and exec builtins work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                // eval — basic expression
+                "assrt.equal(eval('1 + 2'), 3)",
+                "assrt.equal(eval('10 * 5'), 50)",
+                "assrt.equal(eval('True'), True)",
+                // eval with globals dict
+                "assrt.equal(eval('x + y', {'x': 10, 'y': 5}), 15)",
+                "assrt.equal(eval('a * b', {'a': 3, 'b': 4}), 12)",
+                // eval with locals overriding globals
+                "assrt.equal(eval('x', {'x': 1}, {'x': 99}), 99)",
+                // exec returns None (null in JS)
+                "assrt.equal(exec('1 + 2'), None)",
+                // exec side-effects via mutable object in globals
+                "log = []",
+                "exec(\"log.push('hello')\", {'log': log})",
+                "assrt.equal(log[0], 'hello')",
+                "exec('log.push(1 + 2)', {'log': log})",
+                "assrt.equal(log[1], 3)",
+                // exec with function in globals
+                "out = []",
+                "def _add(a, b): out.push(a + b);",
+                "exec('fn(10, 7)', {'fn': _add, 'out': out})",
+                "assrt.equal(out[0], 17)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

@@ -39,7 +39,7 @@ STDLIB_MODULES.forEach(m => { _STDLIB_MODULE_SET[m] = true; });
 // Symbols always available in RapydScript (from tools/lint.js BUILTINS list).
 export const BASE_BUILTINS = (
     'this self window document chr ord iterator_symbol print len range dir' +
-    ' eval undefined arguments abs max min enumerate pow callable reversed sum' +
+    ' eval exec undefined arguments abs max min enumerate pow callable reversed sum' +
     ' getattr isFinite setattr hasattr parseInt parseFloat options_object' +
     ' isNaN JSON Math list set list_wrap ρσ_modules require bool int bin' +
     ' float iter Error EvalError set_wrap frozenset RangeError ReferenceError SyntaxError' +

@@ -80,6 +80,9 @@
 | `object()` | Featureless base-class instance: `object()` returns a unique instance; `isinstance(x, object)` works; `class Foo(object):` explicit base works; `repr()` → `'<object object at 0x…>'`; `hash()` returns a stable identity hash; each call returns a distinct object suitable as a sentinel value. Note: unlike CPython, JS objects are open, so arbitrary attributes can be set on `object()` instances. |
 | `float.is_integer()` | Returns `True` if the float has no fractional part (i.e. is a whole number), `False` otherwise. `float('inf').is_integer()` and `float('nan').is_integer()` both return `False`, matching Python semantics. Added to `Number.prototype` in the baselib so it works on any numeric literal or variable. |
 | `int.bit_length()` | Returns the number of bits needed to represent the integer in binary, excluding the sign and leading zeros. `(0).bit_length()` → `0`; `(255).bit_length()` → `8`; `(256).bit_length()` → `9`; sign is ignored (`(-5).bit_length()` → `3`). Added to `Number.prototype` in the baselib. |
+| Arithmetic type coercion — `TypeError` on incompatible operands | `1 + '1'` raises `TypeError: unsupported operand type(s) for +: 'int' and 'str'`; all arithmetic operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`) enforce compatible types in their `ρσ_op_*` helpers. `bool` is treated as numeric (like Python's `int` subclass). Activated by `overload_operators` (on by default). String `+` string and numeric `+` numeric are allowed; mixed types raise `TypeError` with a Python-style message. |
+| `eval(expr[, globals[, locals]])` | String literals are compiled as **RapydScript source** at compile time (the compiler parses and transpiles the string, just like Python's `eval` takes Python source). `eval(expr)` maps to native JS direct `eval` for scope access. `eval(expr, globals)` / `eval(expr, globals, locals)` use `Function` constructor with explicit bindings; `locals` override `globals`. Runtime `ρσ_` helpers referenced in the compiled string are automatically injected into the Function scope. Only string *literals* are transformed at compile time; dynamic strings are passed through unchanged. |
+| `exec(code[, globals[, locals]])` | String literals are compiled as **RapydScript source** at compile time. Executes the compiled code string; always returns `None`. Without `globals`/`locals` uses native `eval` (scope access). With `globals`/`locals` uses `Function` constructor — mutable objects (lists, dicts) passed in `globals` are accessible by reference, so side-effects are visible after the call. `ρσ_dict` instances (created when `dict_literals` flag is active) are correctly unwrapped via their `jsmap` backing store. |
 
 ---
 
@@ -135,17 +138,14 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 
 ## ❌ Not Supported — Missing from Baselib (runtime)
 
-| Feature                             | Priority                                                               |
-|-------------------------------------|------------------------------------------------------------------------|
-| `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access                      |
-| `exec(code)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
-| `eval(expr)`                        | 🟢 Low — use `v'eval(...)'` for inline JS evaluation                  |
-| `input(prompt)`                     | 🟢 Low — not built in; use `prompt()` via `v'prompt(...)'`            |
-| `abc` module — `ABC`, `@abstractmethod`, `Protocol` | ✅ — supported via `src/lib/abc.pyj`; see Standard Library Modules below |
-| `complex(real, imag)`               | 🟢 Low — no complex number type                                        |
-| `compile()`                         | 🔴 N/A — Python compile/code objects have no JS equivalent            |
-| `memoryview(obj)`                   | 🔴 N/A — no buffer protocol in browser context                        |
-| `open(path)`                        | 🔴 N/A — no filesystem access in browser context                      |
+| Feature                             | Priority                                                   |
+|-------------------------------------|------------------------------------------------------------|
+| `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access          |
+| `complex(real, imag)`               | 🟢 Low — no complex number type                            |
+| `input(prompt)`                     | 🔴 N/A — no simple cli input in browser; use `prompt()`    |
+| `compile()`                         | 🔴 N/A — Python compile/code objects have no JS equivalent |
+| `memoryview(obj)`                   | 🔴 N/A — no buffer protocol in browser context             |
+| `open(path)`                        | 🔴 N/A — no filesystem access in browser context           |
 
 ---
 
@@ -179,13 +179,13 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `typing`      | ✅           | `TYPE_CHECKING`, `Any`, `Union`, `Optional`, `ClassVar`, `Final`, `Literal`, `NoReturn`, `List`, `Dict`, `Set`, `FrozenSet`, `Tuple`, `Type`, `Callable`, `Iterator`, `Iterable`, `Generator`, `Sequence`, `MutableSequence`, `Mapping`, `MutableMapping`, `Awaitable`, `Coroutine`, `AsyncGenerator`, `AsyncIterator`, `AsyncIterable`, `IO`, `TextIO`, `BinaryIO`, `Pattern`, `Match`, `TypeVar`, `Generic`, `Protocol`, `cast`, `overload`, `no_type_check`, `no_type_check_decorator`, `runtime_checkable`, `get_type_hints`, `TypedDict`, `NamedTuple`, `AnyStr`, `Text` — all available in `src/lib/typing.pyj` |
 | `dataclasses` | ✅           | `@dataclass`, `field()`, `asdict()`, `astuple()`, `replace()`, `fields()`, `is_dataclass()`, `MISSING` in `src/lib/dataclasses.pyj`; `frozen=True`, `order=True`, inheritance supported; note: `field()` first positional arg is the default value (JS reserved word `default` cannot be used as a kwarg) |
 | `enum`        | ✅           | `Enum` base class in `src/lib/enum.pyj`; `.name`, `.value`, iteration, `isinstance` checks; `IntEnum`/`Flag` not available |
+| `abc`         | ✅           | `ABC`, `@abstractmethod`, `Protocol`, `@runtime_checkable`, `ABCMeta` (informational), `get_cache_token()` in `src/lib/abc.pyj`; abstract method enforcement via `__init__` guard; `ABC.register()` for virtual subclasses with isinstance support; `Symbol.hasInstance` enables structural isinstance for `@runtime_checkable` protocols; `ABCMeta` metaclass not usable (no metaclass support), use `ABC` base class instead |
 | `contextlib`  | ❌           | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available                |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
 | `json`        | ❌           | No Python wrapper; JS `JSON.parse` / `JSON.stringify` work directly via verbatim JS           |
 | `datetime`    | ❌           | `date`, `time`, `datetime`, `timedelta` not available                                         |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `asyncio`     | ❌           | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await`    |
-| `abc`         | ✅           | `ABC`, `@abstractmethod`, `Protocol`, `@runtime_checkable`, `ABCMeta` (informational), `get_cache_token()` in `src/lib/abc.pyj`; abstract method enforcement via `__init__` guard; `ABC.register()` for virtual subclasses with isinstance support; `Symbol.hasInstance` enables structural isinstance for `@runtime_checkable` protocols; `ABCMeta` metaclass not usable (no metaclass support), use `ABC` base class instead |
 | `io`          | ❌           | `StringIO`, `BytesIO` not available                                                           |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |
@@ -215,12 +215,10 @@ Features that exist in RapydScript but behave differently from standard Python:
 | `global` / `nonlocal` scoping | Full cross-scope declaration | `global` works for module-level; if a variable exists in both an intermediate outer scope **and** the module-level scope, the outer scope takes precedence (differs from Python where `global` always forces module-level) |
 | `Exception.message` | Not standard; use `.args[0]` | `.message` is the standard attribute (JS `Error` style) |
 | `re` module | Full PCRE (lookbehind, full unicode, conditional groups) | No lookbehind; limited unicode property escapes; no `(?(1)...)` conditional groups |
-| `parenthesized with (A() as a, B() as b):` | Multiple context managers in parenthesized form (3.10+) | Not meaningful in a browser/event-driven context; multi-context `with` without parens works |
 | Function call argument count | Too few args → `TypeError`; too many → `TypeError` | Too few args → extra params are `undefined`; too many → extras silently discarded. No `TypeError` is raised in either case. |
 | Positional-only param enforcement | Passing by keyword raises `TypeError` | Passing by keyword is silently ignored — the named arg is discarded and the parameter gets `undefined` (no error raised) |
 | Keyword-only param enforcement | Passing positionally raises `TypeError` | Passing positionally raises no error — the extra positional arg is silently discarded and the default value is used |
 | `is` / `is not` with `NaN` | `math.nan is math.nan` → `True` (same object) | `x is NaN` compiles to `isNaN(x)` (not `x === NaN`), making NaN checks work correctly |
-| Arithmetic type coercion | `1 + '1'` raises `TypeError` | `1 + '1'` → `'11'`; JS coerces the number to a string |
 | `<`, `>`, `<=`, `>=` on lists / containers | Element-wise lexicographic comparison | Falls through to JS coercion — operands are stringified first (e.g. `[10] < [9]` is `True` because `'[10]' < '[9]'`). Comparison dunders (`__lt__` etc.) can be defined and called directly but are not auto-dispatched by these operators. |
 | Default `{}` dict — numeric keys | Integer keys are stored as integers | Numeric keys are auto-coerced to strings by the JS engine: `d[1]` and `d['1']` refer to the same slot |
 | Default `{}` dict — attribute access | `d.foo` raises `AttributeError` | `d.foo` and `d['foo']` access the same slot; keys are also properties |
@@ -228,6 +226,7 @@ Features that exist in RapydScript but behave differently from standard Python:
 | Multiple inheritance MRO | C3 linearization (MRO) always deterministic | Built on JS prototype chain; may differ from Python's C3 MRO in complex or diamond-inheritance hierarchies |
 | Generators — output format | Native Python generator objects | Down-compiled to ES5 state-machine switch statements by default; pass `--js-version 6` for native ES6 generators (smaller and faster) |
 | Reserved keywords | Python keywords only | All JavaScript reserved words (`default`, `switch`, `delete`, `void`, `typeof`, etc.) are also reserved in RapydScript, since it compiles to JS |
+| `parenthesized with (A() as a, B() as b):` | Multiple context managers in parenthesized form (3.10+) | Not meaningful in a browser/event-driven context; multi-context `with` without parens works |
 
 ---
 

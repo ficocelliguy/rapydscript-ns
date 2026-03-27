@@ -480,12 +480,75 @@ class ρσ_object:
 ρσ_object.__name__ = 'object'
 
 
+def ρσ_exec(code, globals, locals):
+    # Execute a string of JavaScript/RapydScript-compiled code, like Python's exec.
+    # Always returns None.  Without globals/locals uses indirect eval (global scope).
+    # With globals/locals uses the Function constructor so the code can reference the
+    # supplied variables; mutable object arguments (lists, dicts) are passed by
+    # reference so side-effects (e.g. array.push) are visible in the caller.
+    # Handles both plain JS objects and Python ρσ_dict instances (jsmap-backed Map).
+    # ρσ_ helpers referenced in compiled strings are injected from the current scope.
+    if globals is undefined:
+        v'eval(code)'
+        return None
+    v'''
+    function _ρσ_to_obj(d) {
+        if (d == null) return {};
+        if (typeof ρσ_dict === "function" && d instanceof ρσ_dict) {
+            var _r = {}; d.jsmap.forEach(function(v, k) { _r[k] = v; }); return _r;
+        }
+        return Object.assign({}, d);
+    }
+    var _ctx = _ρσ_to_obj(globals);
+    if (locals !== undefined) Object.assign(_ctx, _ρσ_to_obj(locals));
+    var _rσ_refs = code.match(/ρσ_\w+/g) || [];
+    _rσ_refs.forEach(function(name) {
+        if (!Object.prototype.hasOwnProperty.call(_ctx, name)) {
+            try { var _v = eval(name); if (_v !== undefined) _ctx[name] = _v; } catch(e) {}
+        }
+    });
+    var _keys = Object.keys(_ctx);
+    var _vals = _keys.map(function(k) { return _ctx[k]; });
+    Function.apply(null, _keys.concat([code])).apply(null, _vals);
+    '''
+    return None
+ρσ_exec.__name__ = 'exec'
+
+def ρσ_eval(expr, globals, locals):
+    # Called only when 2 or 3 args are provided (scoped eval via Function constructor).
+    # The compiler emits ρσ_eval() only when globals/locals are supplied; the
+    # plain 1-arg eval(expr) stays as a native direct JS eval call.
+    # Handles both plain JS objects and Python ρσ_dict instances (jsmap-backed Map).
+    # ρσ_ helpers referenced in compiled strings are injected from the current scope.
+    v'''
+    function _ρσ_to_obj(d) {
+        if (d == null) return {};
+        if (typeof ρσ_dict === "function" && d instanceof ρσ_dict) {
+            var _r = {}; d.jsmap.forEach(function(v, k) { _r[k] = v; }); return _r;
+        }
+        return Object.assign({}, d);
+    }
+    var _ctx = (globals !== undefined) ? _ρσ_to_obj(globals) : {};
+    if (locals !== undefined) Object.assign(_ctx, _ρσ_to_obj(locals));
+    var _rσ_refs = expr.match(/ρσ_\w+/g) || [];
+    _rσ_refs.forEach(function(name) {
+        if (!Object.prototype.hasOwnProperty.call(_ctx, name)) {
+            try { var _v = eval(name); if (_v !== undefined) _ctx[name] = _v; } catch(e) {}
+        }
+    });
+    var _keys = Object.keys(_ctx);
+    var _vals = _keys.map(function(k) { return _ctx[k]; });
+    return Function.apply(null, _keys.concat(['return (' + expr + ')'])).apply(null, _vals);
+    '''
+ρσ_eval.__name__ = 'eval'
+
 v'var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
 v'var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
 v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__'
 v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round'
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'
 v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next'
+v'var exec = ρσ_exec'
 v'var ρσ_Ellipsis = Object.freeze({toString: function(){return "Ellipsis";}, __repr__: function(){return "Ellipsis";}})'
 v'var Ellipsis = ρσ_Ellipsis'
 v'var slice = ρσ_slice'

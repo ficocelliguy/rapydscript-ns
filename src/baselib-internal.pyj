@@ -296,55 +296,96 @@ def ρσ_mixin():
             p = Object.getPrototypeOf(p)
     Object.defineProperties(target, resolved_props)
 
+# Returns a Python-style type name used in arithmetic TypeError messages.
+def ρσ_arith_type_name(v):
+    if v is None or v is undefined:
+        return 'NoneType'
+    t = jstype(v)
+    if t is 'boolean':
+        return 'bool'
+    if t is 'number':
+        return 'int' if Number.isInteger(v) else 'float'
+    if t is 'string' or v'v instanceof String':
+        return 'str'
+    if Array.isArray(v):
+        return 'list'
+    if v.constructor and v.constructor.__name__:
+        return v.constructor.__name__
+    return t
+
 # Arithmetic/bitwise operator overloading helpers.
 # Each checks for the forward dunder method, then the reflected one, then
-# falls back to the native JS operation (with special handling for // and **).
+# enforces Python-style type compatibility before the native JS operation.
+# Incompatible operand types raise TypeError, mirroring Python semantics.
 def ρσ_op_add(a, b):
     if a is not None and jstype(a.__add__) is 'function': return a.__add__(b)
     if b is not None and jstype(b.__radd__) is 'function': return b.__radd__(a)
-    return a + b
+    if Array.isArray(a) and Array.isArray(b): return ρσ_list_constructor(a.concat(b))
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a + b'
+    if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a + b'
+    raise TypeError("unsupported operand type(s) for +: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_sub(a, b):
     if a is not None and jstype(a.__sub__) is 'function': return a.__sub__(b)
     if b is not None and jstype(b.__rsub__) is 'function': return b.__rsub__(a)
-    return a - b
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a - b
+    raise TypeError("unsupported operand type(s) for -: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_mul(a, b):
     if a is not None and jstype(a.__mul__) is 'function': return a.__mul__(b)
     if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
-    if (jstype(a) is 'string' or v'a instanceof String') and jstype(b) is 'number': return a.repeat(b)
-    if (jstype(b) is 'string' or v'b instanceof String') and jstype(a) is 'number': return b.repeat(a)
-    if Array.isArray(a) and jstype(b) is 'number':
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(b)
+    if (tb is 'string' or v'b instanceof String') and (ta is 'number' or ta is 'boolean'): return b.repeat(a)
+    if Array.isArray(a) and (tb is 'number' or tb is 'boolean'):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++':
             result = result.concat(a)  # noqa:undef
         return ρσ_list_constructor(result)
-    if Array.isArray(b) and jstype(a) is 'number':
+    if Array.isArray(b) and (ta is 'number' or ta is 'boolean'):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < a; ρσ_mi++':
             result = result.concat(b)  # noqa:undef
         return ρσ_list_constructor(result)
-    return a * b
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a * b
+    raise TypeError("unsupported operand type(s) for *: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_truediv(a, b):
     if a is not None and jstype(a.__truediv__) is 'function': return a.__truediv__(b)
     if b is not None and jstype(b.__rtruediv__) is 'function': return b.__rtruediv__(a)
-    return a / b
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a / b
+    raise TypeError("unsupported operand type(s) for /: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_floordiv(a, b):
     if a is not None and jstype(a.__floordiv__) is 'function': return a.__floordiv__(b)
     if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
-    return Math.floor(a / b)
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return Math.floor(a / b)
+    raise TypeError("unsupported operand type(s) for //: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_mod(a, b):
     if a is not None and jstype(a.__mod__) is 'function': return a.__mod__(b)
     if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
-    return a % b
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a % b
+    raise TypeError("unsupported operand type(s) for %: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_pow(a, b):
     if a is not None and jstype(a.__pow__) is 'function': return a.__pow__(b)
     if b is not None and jstype(b.__rpow__) is 'function': return b.__rpow__(a)
-    return Math.pow(a, b)
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return Math.pow(a, b)
+    raise TypeError("unsupported operand type(s) for **: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_and(a, b):
     if a is not None and jstype(a.__and__) is 'function': return a.__and__(b)

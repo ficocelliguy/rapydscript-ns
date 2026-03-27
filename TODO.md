@@ -4,6 +4,7 @@
 
 - remove repl_mode and make repl make a new context for each "run" press
 - `.replace(str, str)` replaces only the first occurrence.
+- eval is js
 
 - rework tests to use jest
 
@@ -14,7 +15,7 @@
 - examples of using js libraries in rapydscript in readme?
 
 
-I would like you to add support for [ `abc` module — `ABC`, `@abstractmethod`, `Protocol`  ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [  python eval and exec ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 # Example: Tuple Literals
 
@@ -158,6 +159,26 @@ for v in values:
 # 1024 -> 11 bits
 ```
 
+## `eval` and `exec` example
+
+```py
+# eval — evaluate a RapydScript expression, optional explicit scope
+print(eval("1 + 2"))                          # 3
+print(eval("x * x", {"x": 7}))               # 49
+print(eval("a + b", {"a": 10}, {"b": 5}))    # 15  (locals merged over globals)
+
+# exec — execute a RapydScript code string, always returns None
+log = []
+exec("log.append('hello')", {"log": log})
+print(log[0])   # hello
+
+exec("for i in range(3):\n    log.append(i * i)", {"log": log})
+print(log)      # ['hello', 0, 1, 4]
+
+result = exec("1 + 1")
+print(result)   # None
+```
+
 ## `abc` module example
 
 ```py
@@ -210,4 +231,27 @@ class Canvas:
 
 print(isinstance(Canvas(), Drawable))  # True
 print(isinstance(42, Drawable))        # False
+```
+
+# Example: Arithmetic Type Coercion
+
+```py
+from __python__ import overload_operators  # on by default; shown here for clarity
+
+# Valid arithmetic — same types or compatible (bool is an int subclass)
+print(1 + 2)        # 3
+print('a' + 'b')    # 'ab'
+print('ha' * 3)     # 'hahaha'
+print(True + 1)     # 2  (bool treated as int)
+
+# Incompatible types raise TypeError, just like Python
+try:
+    result = 1 + 'x'
+except TypeError as e:
+    print(e)   # unsupported operand type(s) for +: 'int' and 'str'
+
+try:
+    result = 'hello' - 1
+except TypeError as e:
+    print(e)   # unsupported operand type(s) for -: 'str' and 'int'
 ```

@@ -1,0 +1,56 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── eval — basic expression evaluation ────────────────────────────────────────
+
+ae(eval("1 + 2"), 3)
+ae(eval("10 * 5"), 50)
+ae(eval("100 - 37"), 63)
+ae(eval('"hello" + " world"'), "hello world")
+ae(eval("Math.pow(2, 8)"), 256)
+ae(eval("True"), True)
+ae(eval("None"), None)
+
+# ── eval — with explicit globals dict ─────────────────────────────────────────
+
+ae(eval("x + y", {"x": 10, "y": 5}), 15)
+ae(eval("a * b", {"a": 3, "b": 4}), 12)
+ae(eval("n * n", {"n": 7}), 49)
+
+# ── eval — locals override globals ────────────────────────────────────────────
+
+ae(eval("x", {"x": 1}, {"x": 99}), 99)
+ae(eval("x + y", {"x": 10, "y": 20}, {"y": 1}), 11)
+
+# ── exec — always returns None ────────────────────────────────────────────────
+
+ae(exec("1 + 2"), None)
+ae(exec("_ignored = 42"), None)
+
+# ── exec — side effects via mutable objects in globals ────────────────────────
+
+log = []
+exec("log.push('hello')", {"log": log})
+ae(log[0], "hello")
+
+exec("log.push(1 + 2)", {"log": log})
+ae(log[1], 3)
+
+# exec with a function in globals
+out = []
+def _adder(a, b): out.push(a + b);
+exec("fn(10, 7)", {"fn": _adder, "out": out})
+ae(out[0], 17)
+
+# exec returns None even when globals/locals provided
+ae(exec("1 + 1", {"x": 5}), None)
+
+# ── exec — JS loop, mutation visible in caller ────────────────────────────────
+
+nums = []
+exec("for _i in range(4):\n    nums.append(_i * _i)", {"nums": nums})
+ade(nums, [0, 1, 4, 9])

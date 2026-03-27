@@ -1,0 +1,169 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# arithmetic_types.pyj
+# Tests for Python-style arithmetic type coercion: incompatible operand types
+# raise TypeError instead of silently coercing (as JavaScript would).
+# overload_operators must be active for the ρσ_op_* helpers to be dispatched.
+
+from __python__ import overload_operators
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+def _raises_type_error(fn):
+    try:
+        fn()
+        return False
+    except TypeError:
+        return True
+
+# ── 1. Valid numeric arithmetic ──────────────────────────────────────────────
+
+ae(1 + 2, 3)
+ae(1.5 + 2.5, 4.0)
+ae(10 - 3, 7)
+ae(3 * 4, 12)
+ae(7 / 2, 3.5)
+ae(7 // 2, 3)
+ae(7 % 3, 1)
+ae(2 ** 8, 256)
+
+# ── 2. Valid string concatenation ────────────────────────────────────────────
+
+ae('hello' + ' world', 'hello world')
+ae('a' + 'b' + 'c', 'abc')
+
+# ── 3. Valid list concatenation ──────────────────────────────────────────────
+
+ade([1, 2] + [3, 4], [1, 2, 3, 4])
+ade([] + [1], [1])
+
+# ── 4. Valid string/list repetition ──────────────────────────────────────────
+
+ae('ha' * 3, 'hahaha')
+ae(3 * 'ha', 'hahaha')
+ade([0] * 3, [0, 0, 0])
+ade(3 * [1, 2], [1, 2, 1, 2, 1, 2])
+
+# ── 5. bool treated as int for arithmetic (Python semantics) ─────────────────
+
+ae(True + 1, 2)
+ae(False + 0, 0)
+ae(True + True, 2)
+ae(True * 5, 5)
+ae(False * 100, 0)
+ae(True + 1.5, 2.5)
+
+# bool * str and bool * list repetition
+ae(True * 'x', 'x')
+ae(False * 'x', '')
+ade(True * [1, 2], [1, 2])
+ade(False * [1, 2], [])
+
+# ── 6. int + str raises TypeError ────────────────────────────────────────────
+
+ok(_raises_type_error(def(): return 1 + 'x';))
+ok(_raises_type_error(def(): return 'x' + 1;))
+ok(_raises_type_error(def(): return 1 + '1';))
+
+# ── 7. numeric - non-numeric raises TypeError ────────────────────────────────
+
+ok(_raises_type_error(def(): return 1 - 'x';))
+ok(_raises_type_error(def(): return 'a' - 'b';))
+ok(_raises_type_error(def(): return [1] - [2];))
+
+# ── 8. numeric / non-numeric raises TypeError ────────────────────────────────
+
+ok(_raises_type_error(def(): return 1 / 'x';))
+ok(_raises_type_error(def(): return 'a' / 2;))
+
+# ── 9. numeric // non-numeric raises TypeError ───────────────────────────────
+
+ok(_raises_type_error(def(): return 5 // 'x';))
+ok(_raises_type_error(def(): return 'a' // 2;))
+
+# ── 10. numeric % non-numeric raises TypeError ───────────────────────────────
+
+ok(_raises_type_error(def(): return 5 % 'x';))
+ok(_raises_type_error(def(): return 'a' % 2;))
+
+# ── 11. numeric ** non-numeric raises TypeError ──────────────────────────────
+
+ok(_raises_type_error(def(): return 2 ** 'x';))
+ok(_raises_type_error(def(): return 'a' ** 2;))
+
+# ── 12. mixed str * non-numeric raises TypeError ─────────────────────────────
+
+ok(_raises_type_error(def(): return 'ha' * 'ha';))
+ok(_raises_type_error(def(): return 'ha' * [1];))
+
+# ── 13. list + non-list raises TypeError ─────────────────────────────────────
+
+ok(_raises_type_error(def(): return [1, 2] + 1;))
+ok(_raises_type_error(def(): return [1, 2] + 'x';))
+ok(_raises_type_error(def(): return 1 + [1, 2];))
+
+# ── 14. None as operand raises TypeError ─────────────────────────────────────
+
+ok(_raises_type_error(def(): return None + 1;))
+ok(_raises_type_error(def(): return 1 + None;))
+ok(_raises_type_error(def(): return None + 'x';))
+
+# ── 15. TypeError message contains operand type names ────────────────────────
+
+msg = ''
+try:
+    v = 1 + 'x'
+except TypeError as e:
+    msg = str(e)
+ok(msg.indexOf('int') >= 0)
+ok(msg.indexOf('str') >= 0)
+ok(msg.indexOf('+') >= 0)
+
+msg2 = ''
+try:
+    v = 2.5 - 'y'
+except TypeError as e:
+    msg2 = str(e)
+ok(msg2.indexOf('float') >= 0)
+ok(msg2.indexOf('str') >= 0)
+ok(msg2.indexOf('-') >= 0)
+
+# ── 16. augmented assignment also raises TypeError ───────────────────────────
+
+ok(_raises_type_error(def():
+    x = 1
+    x += 'oops'
+))
+ok(_raises_type_error(def():
+    x = 'hello'
+    x -= 1
+))
+
+# ── 17. dunder methods still take priority over type checks ──────────────────
+
+class _Meter:
+    def __init__(self, n):
+        self.n = n
+    def __add__(self, other):
+        return _Meter(self.n + other.n)
+    def __mul__(self, scalar):
+        return _Meter(self.n * scalar)
+
+m = _Meter(3) + _Meter(4)
+ae(m.n, 7)
+m2 = _Meter(5) * 2
+ae(m2.n, 10)
+
+# ── 18. radd/rsub reflected methods still work ───────────────────────────────
+
+class _Vec:
+    def __init__(self, x):
+        self.x = x
+    def __radd__(self, other):
+        return _Vec(other + self.x)
+
+v = 10 + _Vec(5)
+ae(v.x, 15)
