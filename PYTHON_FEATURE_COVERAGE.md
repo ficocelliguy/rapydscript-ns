@@ -72,6 +72,7 @@
 | `StopIteration` exception | Defined as a builtin exception class; raised by `next()` when an iterator is exhausted and no default is given. |
 | `iter(callable, sentinel)` | Two-argument form calls `callable` (no args) repeatedly until the return value equals `sentinel` (strict `===`). Returns a lazy iterator compatible with `for` loops, `next()`, `list()`, and all iterator consumers. Works with plain functions and callable objects (`__call__`). |
 | `dict \| dict` and `dict \|= dict` (Python 3.9+) | Dict merge via `\|` creates a new merged dict (right-side values win); `\|=` updates in-place. Active via `overload_operators` + `dict_literals` (both on by default). |
+| `__format__` dunder                           | `format()`, `str.format()`, and f-strings all dispatch to `__format__`; default `__format__` auto-generated for classes (returns `__str__()` for empty spec, raises `TypeError` for non-empty spec); `!r`/`!s`/`!a` transformers bypass `__format__` correctly |
 | `slice(start, stop[, step])` | Full Python `slice` class: 1-, 2-, and 3-argument forms; `.start`, `.stop`, `.step` attributes; `.indices(length)` → `(start, stop, step)`; `str()` / `repr()`; `isinstance(s, slice)`; equality `==`; use as subscript `lst[s]` (read, write, `del`) all work. |
 | `__import__(name[, globals, locals, fromlist, level])` | Runtime lookup in the compiled module registry (`ρσ_modules`). Without `fromlist` (or empty `fromlist`) returns the top-level package, matching Python's semantics. `ImportError` / `ModuleNotFoundError` raised for unknown modules. **Constraint**: the module must have been statically imported elsewhere in the source so it is present in `ρσ_modules`. |
 | `ImportError`, `ModuleNotFoundError` | Both defined as runtime exception classes; `ModuleNotFoundError` is a subclass of `ImportError` (same as Python 3.6+). |
@@ -157,7 +158,6 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | `__slots__` enforcement                       | 🟢 Low — accepted but does not restrict attribute assignment         |
 | Complex number literals `3+4j`                | 🟢 Low — no `j` suffix; no complex type                              |
 | `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
-| `__format__` dunder                           | 🟢 Low — `format()` builtin not defined; `__format__` not dispatched |
 
 ---
 
@@ -178,13 +178,13 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `copy`        | ✅           | `copy()` shallow copy and `deepcopy()` (circular-ref-safe via memo Map); `__copy__` / `__deepcopy__(memo)` hooks honoured; handles list, set, frozenset, dict, class instances, and plain JS objects |
 | `typing`      | ✅           | `TYPE_CHECKING`, `Any`, `Union`, `Optional`, `ClassVar`, `Final`, `Literal`, `NoReturn`, `List`, `Dict`, `Set`, `FrozenSet`, `Tuple`, `Type`, `Callable`, `Iterator`, `Iterable`, `Generator`, `Sequence`, `MutableSequence`, `Mapping`, `MutableMapping`, `Awaitable`, `Coroutine`, `AsyncGenerator`, `AsyncIterator`, `AsyncIterable`, `IO`, `TextIO`, `BinaryIO`, `Pattern`, `Match`, `TypeVar`, `Generic`, `Protocol`, `cast`, `overload`, `no_type_check`, `no_type_check_decorator`, `runtime_checkable`, `get_type_hints`, `TypedDict`, `NamedTuple`, `AnyStr`, `Text` — all available in `src/lib/typing.pyj` |
 | `dataclasses` | ✅           | `@dataclass`, `field()`, `asdict()`, `astuple()`, `replace()`, `fields()`, `is_dataclass()`, `MISSING` in `src/lib/dataclasses.pyj`; `frozen=True`, `order=True`, inheritance supported; note: `field()` first positional arg is the default value (JS reserved word `default` cannot be used as a kwarg) |
+| `enum`        | ✅           | `Enum` base class in `src/lib/enum.pyj`; `.name`, `.value`, iteration, `isinstance` checks; `IntEnum`/`Flag` not available |
 | `contextlib`  | ❌           | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available                |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
 | `json`        | ❌           | No Python wrapper; JS `JSON.parse` / `JSON.stringify` work directly via verbatim JS           |
 | `datetime`    | ❌           | `date`, `time`, `datetime`, `timedelta` not available                                         |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `asyncio`     | ❌           | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await`    |
-| `enum`        | ✅           | `Enum` base class in `src/lib/enum.pyj`; `.name`, `.value`, iteration, `isinstance` checks; `IntEnum`/`Flag` not available |
 | `abc`         | ❌           | `ABC`, `abstractmethod` not available                                                         |
 | `io`          | ❌           | `StringIO`, `BytesIO` not available                                                           |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |
@@ -207,13 +207,10 @@ Features that exist in RapydScript but behave differently from standard Python:
 
 | Feature | Python Behavior | RapydScript Behavior |
 |---|---|---|
-| Truthiness of `[]` / `{}` | `False` | `True` (JS semantics) when `truthiness` is disabled via `from __python__ import no_truthiness` or `--legacy-rapydscript`; Python semantics (falsy) by default |
 | `is` / `is not` | Object identity | Strict equality `===` / `!==` |
 | `//` floor division on floats | `math.floor(a/b)` always | Correct for integers; uses `Math.floor` (same result for well-behaved floats) |
 | `%` on negative numbers | Python modulo (always non-negative) | JS remainder (can be negative) |
 | `int` / `float` distinction | Separate types | Both are JS `number`; `isinstance(x, int)` and `isinstance(x, float)` use heuristics |
-| `str * n` repetition | Always works | Works by default (via `overload_operators`); disable with `from __python__ import no_overload_operators` |
-| Unbound method references | Methods are unbound by default | Methods are auto-bound to `self` by default (via `bound_methods`); storing a method in a variable retains `self`. Disable with `from __python__ import no_bound_methods` to get JS-style unbound methods. |
 | `dict` key ordering | Insertion order guaranteed (3.7+) | Depends on JS engine (V8 preserves insertion order in practice) |
 | `global` / `nonlocal` scoping | Full cross-scope declaration | `global` works for module-level; if a variable exists in both an intermediate outer scope **and** the module-level scope, the outer scope takes precedence (differs from Python where `global` always forces module-level) |
 | `Exception.message` | Not standard; use `.args[0]` | `.message` is the standard attribute (JS `Error` style) |
@@ -225,12 +222,8 @@ Features that exist in RapydScript but behave differently from standard Python:
 | `is` / `is not` with `NaN` | `math.nan is math.nan` → `True` (same object) | `x is NaN` compiles to `isNaN(x)` (not `x === NaN`), making NaN checks work correctly |
 | Arithmetic type coercion | `1 + '1'` raises `TypeError` | `1 + '1'` → `'11'`; JS coerces the number to a string |
 | `<`, `>`, `<=`, `>=` on lists / containers | Element-wise lexicographic comparison | Falls through to JS coercion — operands are stringified first (e.g. `[10] < [9]` is `True` because `'[10]' < '[9]'`). Comparison dunders (`__lt__` etc.) can be defined and called directly but are not auto-dispatched by these operators. |
-| Default `{}` dict — missing key | `KeyError` raised | `KeyError` raised by default (via `dict_literals` + `overload_getitem`); disable both flags to get `undefined` on missing keys |
 | Default `{}` dict — numeric keys | Integer keys are stored as integers | Numeric keys are auto-coerced to strings by the JS engine: `d[1]` and `d['1']` refer to the same slot |
 | Default `{}` dict — attribute access | `d.foo` raises `AttributeError` | `d.foo` and `d['foo']` access the same slot; keys are also properties |
-| Default `{}` dict — Python dict methods | `.keys()`, `.values()`, `.items()`, `.get()`, `.pop()`, `.update()` all available | Available by default (via `dict_literals`); use `from __python__ import no_dict_literals` to revert to plain JS object semantics (no dict methods) |
-| String methods on instances | `'hello'.strip()` works directly | Python string methods are patched onto `String.prototype` at startup by default (via `pythonize_strings`), so `'hello'.strip()` works. Disable globally with `--legacy-rapydscript`; then call `from pythonize import strings; strings()` manually if needed. Note: `split()` and `replace()` are intentionally left as JS versions even after patching — use `str.split(s)` / `str.replace(s, old, new)` for Python semantics. |
-| `strings()` — `split()` / `replace()` | `'a b'.split()` splits on whitespace; `'aaa'.replace('a','b')` replaces all | After `strings()`, `split()` and `replace()` are **intentionally left** as JS versions: no-arg `.split()` returns a one-element array; `.replace(str, str)` replaces only the first occurrence. Use `str.split(s)` / `str.replace(s, old, new)` for Python semantics. |
 | String encoding | Unicode strings (full code-point aware) | UTF-16 — non-BMP characters (e.g. emoji) are stored as surrogate pairs. Use `str.uchrs()`, `str.uslice()`, `str.ulen()` for code-point-aware operations. |
 | Multiple inheritance MRO | C3 linearization (MRO) always deterministic | Built on JS prototype chain; may differ from Python's C3 MRO in complex or diamond-inheritance hierarchies |
 | Generators — output format | Native Python generator objects | Down-compiled to ES5 state-machine switch statements by default; pass `--js-version 6` for native ES6 generators (smaller and faster) |

@@ -940,8 +940,10 @@ ae(_c(), 3)
 # STATUS: ✗ NOT SUPPORTED — no attribute-lookup override.
 
 # ── 50. __format__ dunder ────────────────────────────────────────────────────
-# STATUS: ✓ WORKS — format(obj, spec) dispatches to obj.__format__(spec).
-#         Tested fully in test/str.pyj.
+# STATUS: ✓ WORKS — format(), str.format(), and f-strings all dispatch to
+#         obj.__format__(spec). Default __format__ auto-generated for classes.
+#         !r/!s/!a transformers bypass __format__ correctly.
+#         Tested fully in test/format.pyj.
 
 # ── 51. __class_getitem__ ────────────────────────────────────────────────────
 # STATUS: ✓ WORKS — Class[item] dispatches to __class_getitem__(cls, item).
@@ -1099,7 +1101,8 @@ _check_unhashable({'a': 1})
 
 # ── 55. format(value, spec) builtin ──────────────────────────────────────────
 # STATUS: ✓ WORKS — format(value, spec) is defined and dispatches to __format__.
-#         Tested fully in test/str.pyj.
+#         str.format() and f-strings also dispatch to __format__.
+#         Tested fully in test/format.pyj and test/str.pyj.
 #
 #   ae(format(3.14159, '.2f'), '3.14')
 

@@ -1199,6 +1199,40 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_format_dunder",
+        description: "__format__ dunder dispatches from format(), str.format(), and f-strings in web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Money:",
+                "    def __init__(self, amount):",
+                "        self.amount = amount",
+                "    def __str__(self):",
+                "        return str(self.amount)",
+                "    def __format__(self, spec):",
+                "        if spec == 'usd':",
+                "            return '$' + str(self.amount)",
+                "        return format(self.amount, spec)",
+                "m = Money(42)",
+                "assrt.equal(format(m, 'usd'), '$42')",
+                "assrt.equal(str.format('{:usd}', m), '$42')",
+                "assrt.equal(f'{m:usd}', '$42')",
+                "assrt.equal(format(m, '.2f'), '42.00')",
+                "assrt.equal(f'{m:.2f}', '42.00')",
+                // Default __format__ (no custom __format__ defined)
+                "class Plain:",
+                "    def __str__(self):",
+                "        return 'plain'",
+                "p = Plain()",
+                "assrt.equal(format(p), 'plain')",
+                "assrt.equal(str.format('{}', p), 'plain')",
+                "assrt.equal(f'{p}', 'plain')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

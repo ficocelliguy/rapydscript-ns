@@ -291,6 +291,17 @@ def print_class(output):
             output.end_statement()
         )
 
+    if not defined_methods['__format__']:
+        define_default_method('__format__', def():
+            if self.parent:
+                output.print('if('), self.parent.print(output), output.spaced('.prototype.__format__)', 'return', self.parent)
+                output.print('.prototype.__format__.call(this, arguments[0])'), output.end_statement()
+            output.indent(), output.spaced('if', '(!arguments[0])', 'return', 'this.__str__()')
+            output.end_statement()
+            output.indent(), output.spaced('throw', 'new TypeError("unsupported format specification")')
+            output.end_statement()
+        )
+
     # Python semantics: defining __eq__ without __hash__ makes the class unhashable
     if defined_methods['__eq__'] and not defined_methods['__hash__']:
         output.indent()

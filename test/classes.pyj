@@ -69,6 +69,7 @@ assrt.equal(bound(), angela.how_long())
 # function methods
 assrt.deepEqual(sorted(dir(angela)), [
     'HAIRS',
+    '__format__',
     "__init__",
     '__repr__',
     '__str__',

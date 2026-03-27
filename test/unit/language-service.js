@@ -1442,6 +1442,31 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        {
+            name: "format_dunder_no_errors",
+            description: "__format__ dunder in class body and format() / f-string usage produce no errors",
+            run: function () {
+                var markers = d().check([
+                    "class Money:",
+                    "    def __init__(self, amount):",
+                    "        self.amount = amount",
+                    "    def __str__(self):",
+                    "        return str(self.amount)",
+                    "    def __format__(self, spec):",
+                    "        if spec == 'usd':",
+                    "            return '$' + str(self.amount)",
+                    "        return format(self.amount, spec)",
+                    "m = Money(10)",
+                    "s1 = format(m, 'usd')",
+                    "s2 = str.format('{:usd}', m)",
+                    "s3 = f'{m:usd}'",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for __format__ class but got: " + JSON.stringify(errors));
+            },
+        },
+
     ];
 
     return TESTS;

@@ -3,6 +3,7 @@
 
 
 - remove repl_mode and make repl make a new context for each "run" press
+- `.replace(str, str)` replaces only the first occurrence.
 
 - rework tests to use jest
 
@@ -13,7 +14,7 @@
 - examples of using js libraries in rapydscript in readme?
 
 
-I would like you to add support for [ python dataclasses class ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [ `__format__` dunder  ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 # Example: Tuple Literals
 
@@ -72,4 +73,26 @@ print(asdict(tri))      # {'name': 'triangle', 'vertices': [...]}
 p2 = replace(p, y=99)
 print(p2)               # Point(x=3, y=99)
 print(p.y)              # 4  (original unchanged)
+```
+
+## `__format__` dunder example
+
+```py
+class Money:
+    def __init__(self, amount):
+        self.amount = amount
+    def __str__(self):
+        return str(self.amount)
+    def __format__(self, spec):
+        if spec == 'usd':
+            return '$' + str(self.amount)
+        if spec == 'eur':
+            return '€' + str(self.amount)
+        return format(self.amount, spec)
+
+m = Money(42)
+print(format(m, 'usd'))           # $42
+print(str.format('{:eur}', m))    # €42
+print(f'{m:.2f}')                 # 42.00
+print(f'Total: {m:usd}')          # Total: $42
 ```

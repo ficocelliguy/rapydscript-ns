@@ -368,9 +368,20 @@ define_str_func('format', def ():
             idx += 1
         if jstype(object) is 'function':
             object = object()
-        ans = '' + object
-        if format_spec:
-            ans = apply_formatting(ans, format_spec)
+        # Apply !-conversion (transformer) before format spec, per Python semantics
+        if transformer is 'r':
+            object = ρσ_repr(object)
+        elif transformer is 's':
+            object = ρσ_str(object)
+        elif transformer is 'a':
+            object = ρσ_repr(object)
+        # Dispatch to __format__ when defined and no transformer was applied
+        if not transformer and object is not None and object is not undefined and v'typeof object.__format__ === "function"':
+            ans = object.__format__(format_spec or '')
+        else:
+            ans = '' + object
+            if format_spec:
+                ans = apply_formatting(ans, format_spec)
         if ends_with_equal:
             ans = f'{key}={ans}'
         return ans

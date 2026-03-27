@@ -1596,8 +1596,33 @@ format('hi', '>10')   # '        hi' — right-aligned in 10-char field
 format(42)            # '42'        — no spec: same as str(42)
 ```
 
-Objects with a `__format__` method are dispatched to it, matching Python's
-protocol exactly.
+Objects with a `__format__` method are dispatched to it in all three contexts
+— `format(obj, spec)`, `str.format('{:spec}', obj)`, and `f'{obj:spec}'` —
+matching Python's protocol exactly. Every user-defined class automatically
+gets a default `__format__` that returns `str(self)` for an empty spec and
+raises `TypeError` for any other spec, just like `object.__format__` in
+Python:
+
+```py
+class Money:
+    def __init__(self, amount):
+        self.amount = amount
+    def __str__(self):
+        return str(self.amount)
+    def __format__(self, spec):
+        if spec == 'usd':
+            return '$' + str(self.amount)
+        return format(self.amount, spec)  # delegate numeric specs
+
+m = Money(42)
+format(m, 'usd')          # '$42'
+str.format('{:usd}', m)   # '$42'
+f'{m:usd}'                # '$42'
+f'{m:.2f}'                # '42.00'
+```
+
+The `!r`, `!s`, and `!a` conversion flags apply `repr()`/`str()`/`repr()` to the
+value before formatting, bypassing `__format__` (same as Python).
 
 String predicate methods are also available:
 

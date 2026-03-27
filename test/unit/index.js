@@ -4818,7 +4818,7 @@ assrt.equal(fib(15), 610)
             "assrt.equal(coords[0], 10)",
             "assrt.equal(coords[1], 20)",
         ].join("\n"),
-        js_checks: ["coords = [10, 20]"],
+        js_checks: [/coords\s*=\s*ρσ_list_decorate\(\s*\[\s*10,\s*20\s*\]/],
     },
 
     {

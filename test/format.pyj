@@ -1,0 +1,148 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# Tests for __format__ dunder dispatch in format(), str.format(), and f-strings
+# globals: assrt
+
+ae = assrt.equal
+
+# ── Basic custom __format__ ───────────────────────────────────────────────────
+
+class Currency:
+    def __init__(self, amount):
+        self.amount = amount
+    def __str__(self):
+        return str(self.amount)
+    def __format__(self, spec):
+        if spec == 'usd':
+            return '$' + str(self.amount)
+        if spec == 'eur':
+            return '€' + str(self.amount)
+        return format(self.amount, spec)
+
+c = Currency(42)
+
+# format() builtin dispatches to __format__
+ae(format(c, 'usd'), '$42')
+ae(format(c, 'eur'), '€42')
+ae(format(c, '.2f'), '42.00')
+
+# str.format() dispatches to __format__
+ae(str.format('{:usd}', c), '$42')
+ae(str.format('{:eur}', c), '€42')
+ae(str.format('{:.2f}', c), '42.00')
+
+# f-strings dispatch to __format__
+ae(f'{c:usd}', '$42')
+ae(f'{c:eur}', '€42')
+ae(f'{c:.2f}', '42.00')
+
+# ── format() with empty spec calls __format__('') ────────────────────────────
+
+class Tagged:
+    def __init__(self, v):
+        self.v = v
+    def __str__(self):
+        return 'str:' + str(self.v)
+    def __format__(self, spec):
+        if not spec:
+            return 'fmt:' + str(self.v)
+        return 'fmt:' + format(self.v, spec)
+
+t = Tagged(7)
+ae(format(t), 'fmt:7')
+ae(format(t, ''), 'fmt:7')
+ae(str.format('{}', t), 'fmt:7')
+ae(f'{t}', 'fmt:7')
+
+# ── Default __format__ delegates to __str__ when spec is empty ────────────────
+
+class Simple:
+    def __str__(self):
+        return 'simple!'
+
+s = Simple()
+ae(format(s), 'simple!')
+ae(format(s, ''), 'simple!')
+ae(str.format('{}', s), 'simple!')
+ae(f'{s}', 'simple!')
+
+# ── Default __format__ raises TypeError for non-empty spec ───────────────────
+
+class Plain:
+    def __str__(self):
+        return 'plain'
+
+p = Plain()
+raised = False
+try:
+    format(p, 'd')
+except TypeError:
+    raised = True
+ae(raised, True)
+
+raised = False
+try:
+    str.format('{:d}', p)
+except TypeError:
+    raised = True
+ae(raised, True)
+
+# ── Inheritance: subclass inherits parent __format__ ─────────────────────────
+
+class Base:
+    def __format__(self, spec):
+        return 'base:' + spec
+
+class Child(Base):
+    pass
+
+child = Child()
+ae(format(child, 'x'), 'base:x')
+ae(str.format('{:x}', child), 'base:x')
+ae(f'{child:x}', 'base:x')
+
+# ── Subclass can override __format__ ─────────────────────────────────────────
+
+class Override(Base):
+    def __format__(self, spec):
+        return 'override:' + spec
+
+o = Override()
+ae(format(o, 'y'), 'override:y')
+ae(str.format('{:y}', o), 'override:y')
+
+# ── !r and !s transformers bypass __format__ ─────────────────────────────────
+
+class WithRepr:
+    def __repr__(self):
+        return 'MyRepr'
+    def __str__(self):
+        return 'MyStr'
+    def __format__(self, spec):
+        return 'MyFmt'
+
+wr = WithRepr()
+# With no transformer, __format__ is called
+ae(str.format('{}', wr), 'MyFmt')
+# !s applies str(), result is a string (no __format__)
+ae(str.format('{!s}', wr), 'MyStr')
+# !r applies repr()
+ae(str.format('{!r}', wr), 'MyRepr')
+
+# ── Multiple fields with __format__ ──────────────────────────────────────────
+
+class Qty:
+    def __init__(self, n):
+        self.n = n
+    def __str__(self):
+        return str(self.n)
+    def __format__(self, spec):
+        if spec == 'w':
+            words = ['zero', 'one', 'two', 'three', 'four', 'five']
+            return words[self.n] if self.n < len(words) else str(self.n)
+        return format(self.n, spec)
+
+a, b = Qty(1), Qty(2)
+ae(str.format('{:w} and {:w}', a, b), 'one and two')
+ae(f'{a:w} + {b:w}', 'one + two')
+ae(str.format('{0:d} + {1:d}', a, b), '1 + 2')
