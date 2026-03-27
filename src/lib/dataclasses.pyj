@@ -1,0 +1,532 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's dataclasses standard library.
+#
+# Supported:
+#   @dataclass                   — auto-generates __init__, __repr__, __eq__
+#   @dataclass(init, repr, eq, order, unsafe_hash, frozen)
+#   field(...)                   — field descriptor; see note on 'default' below
+#   fields(instance_or_class)    — tuple of Field objects
+#   asdict(instance)             — deep-converts to plain dict
+#   astuple(instance)            — deep-converts to tuple
+#   replace(instance, **changes) — copy with field changes
+#   is_dataclass(obj)            — True if class or instance is a dataclass
+#   MISSING                      — sentinel for "no value given"
+#   KW_ONLY                      — sentinel for keyword-only field separator
+#
+# Note on field() and the 'default' reserved word:
+#   In JavaScript (and therefore RapydScript), 'default' is a reserved word
+#   and cannot be used as a parameter name.  Use the FIRST POSITIONAL ARGUMENT
+#   to pass a plain default value instead of the keyword form:
+#
+#       name: str = field("unnamed")        # default="unnamed"
+#       items: list = field(default_factory=list)   # default_factory=list
+#
+# Usage:
+#   from dataclasses import dataclass, field
+#
+#   @dataclass
+#   class Point:
+#       x: float
+#       y: float = 0.0
+#
+#   p = Point(1.0)
+#   repr(p)           # 'Point(x=1.0, y=0.0)'
+#   p == Point(1.0)   # True
+#
+# Implementation notes:
+#   - The RapydScript compiler now emits ClassName.__annotations__ = {...}
+#     for any class that contains annotated variable declarations (x: T or
+#     x: T = v).  @dataclass reads this to discover field names in order.
+#   - Fields that have no default value have no corresponding prototype key.
+#   - Field sentinels (Field objects) on the prototype are cleaned up by the
+#     decorator so instances don't inherit them.
+#   - Frozen dataclasses use Object.defineProperty with writable: false.
+
+
+# Internal sentinel — distinct from None and undefined.
+class _MISSING_TYPE:
+    def __repr__(self):
+        return 'MISSING'
+
+MISSING = _MISSING_TYPE()
+
+# KW_ONLY sentinel
+class _KW_ONLY_TYPE:
+    def __repr__(self):
+        return 'KW_ONLY'
+
+KW_ONLY = _KW_ONLY_TYPE()
+
+
+class Field:
+    """Represents the metadata for a single dataclass field."""
+
+    # Parameters use _default / _default_factory because 'default' is a JS
+    # reserved word and cannot be used as an identifier in RapydScript.
+    def __init__(self, _default, _default_factory, _init, _repr, _hash,
+                 _compare, _metadata, _kw_only):
+        self.name = None            # set by @dataclass
+        self.type = None            # always None (type info erased in JS)
+        self.default = _default
+        self.default_factory = _default_factory
+        self.init = _init
+        self.repr = _repr
+        self.hash = _hash
+        self.compare = _compare
+        self.metadata = _metadata if _metadata is not None else {}
+        self.kw_only = _kw_only
+        self._field_type = 'FIELD'
+
+    def __repr__(self):
+        return ('Field(name=' + repr(self.name) +
+                ',default=' + repr(self.default) +
+                ',default_factory=' + repr(self.default_factory) + ')')
+
+
+def field(*args, **kwargs):
+    """
+    Return a Field descriptor for use as a class-level default in a dataclass.
+
+    Because 'default' is a JS reserved word, pass a plain default value as
+    the FIRST POSITIONAL ARGUMENT instead of default=...:
+
+        name: str = field("unnamed")              # plain default
+        items: list = field(default_factory=list) # factory default
+        secret: str = field(repr=False)           # repr suppressed, no default
+        dist: float = field(init=False)           # computed in __post_init__
+    """
+    # First positional arg (if any) is the plain default value.
+    _default = args[0] if args.length > 0 else MISSING
+    _default_factory = kwargs['default_factory'] if 'default_factory' in kwargs else MISSING
+
+    if _default is not MISSING and _default_factory is not MISSING:
+        raise ValueError('cannot specify both default and default_factory')
+
+    _init    = kwargs['init']    if 'init'    in kwargs else True
+    _repr    = kwargs['repr']    if 'repr'    in kwargs else True
+    _hash    = kwargs['hash']    if 'hash'    in kwargs else None
+    _compare = kwargs['compare'] if 'compare' in kwargs else True
+    _meta    = kwargs['metadata'] if 'metadata' in kwargs else None
+    _kw_only = kwargs['kw_only'] if 'kw_only' in kwargs else False
+
+    return Field(_default, _default_factory, _init, _repr, _hash, _compare, _meta, _kw_only)
+
+
+def _is_field(obj):
+    return isinstance(obj, Field)
+
+
+def _get_own_annotations(cls):
+    """Return cls.__annotations__ (own only, not inherited), or {}."""
+    v"""if (!Object.prototype.hasOwnProperty.call(cls, '__annotations__')) return {};"""
+    anns = cls.__annotations__
+    return anns if anns else {}
+
+
+def _collect_fields(cls):
+    """
+    Return a list of Field objects for *cls* in declaration order.
+
+    Base-class fields (from parent dataclasses) come first, then the
+    subclass's own fields — matching Python's dataclasses behaviour.
+    """
+    # Collect inherited fields from the direct parent dataclass (if any).
+    # __bases__ is defined on cls.prototype (via Object.defineProperty).
+    inherited = []
+    bases = v"(cls.prototype && cls.prototype.__bases__) || []"
+    for base in bases:
+        if base and base.__dataclass_fields__:
+            base_dfc = base.__dataclass_fields__
+            for nm in v"Object.keys(base_dfc)":
+                inherited.push(base_dfc[nm])
+
+    own_anns = _get_own_annotations(cls)
+    own_names = v"Object.keys(own_anns)"
+    own_fields = []
+    for name in own_names:
+        if name.startsWith('_'):
+            continue
+        proto_val = cls.prototype[name]
+        if _is_field(proto_val):
+            f = proto_val
+        elif jstype(proto_val) is not 'undefined':
+            f = Field(proto_val, MISSING, True, True, None, True, None, False)
+        else:
+            f = Field(MISSING, MISSING, True, True, None, True, None, False)
+        f.name = name
+        f.type = None
+        f._field_type = 'FIELD'
+        own_fields.push(f)
+
+    # Build result: inherited first, then own fields, own overrides inherited.
+    seen = {}
+    result = []
+    for f in inherited:
+        seen[f.name] = result.length
+        result.push(f)
+    for f in own_fields:
+        if f.name in seen:
+            result[seen[f.name]] = f
+        else:
+            result.push(f)
+    return result
+
+
+def _process_class(cls, do_init, do_repr, do_eq, do_order, unsafe_hash, frozen):
+    """Introspect cls and install the generated dunder methods."""
+    dc_fields = _collect_fields(cls)
+
+    # Store the field registry on the class constructor.
+    cls.__dataclass_fields__ = {}
+    for f in dc_fields:
+        cls.__dataclass_fields__[f.name] = f
+        # Clean up Field sentinels from the prototype.
+        if _is_field(cls.prototype[f.name]):
+            v"delete cls.prototype[f.name]"
+
+    # Validate ordering: non-default fields must precede default fields
+    # (among init=True, non-kw_only fields).
+    seen_default = False
+    for f in dc_fields:
+        if not f.init or f.kw_only:
+            continue
+        has_def = f.default is not MISSING or f.default_factory is not MISSING
+        if has_def:
+            seen_default = True
+        elif seen_default:
+            raise TypeError(
+                'non-default argument ' + repr(f.name) +
+                ' follows default argument in dataclass ' + cls.__name__)
+
+    if do_init:
+        _make_init(cls, dc_fields, frozen)
+    if do_repr:
+        _make_repr(cls, dc_fields)
+    if do_eq:
+        _make_eq(cls, dc_fields)
+    if do_order:
+        _make_order(cls, dc_fields)
+    if frozen:
+        _make_frozen(cls, dc_fields)
+    if unsafe_hash or (do_eq and frozen):
+        _make_hash(cls, dc_fields)
+
+    cls.__dataclass_params__ = {
+        'init': do_init, 'repr': do_repr, 'eq': do_eq,
+        'order': do_order, 'unsafe_hash': unsafe_hash, 'frozen': frozen,
+    }
+
+
+def _make_init(cls, dc_fields, frozen):
+    """Install a generated __init__ on cls.prototype."""
+    init_fields = [f for f in dc_fields if f.init]
+
+    # The generated function handles both positional and RapydScript-style
+    # keyword arguments (kwargs sentinel is the last argument object when
+    # keywords are used in a call).
+    v"""
+    cls.prototype.__init__ = function() {
+        var self = this;
+        var args = Array.prototype.slice.call(arguments);
+        var kwargs = null;
+        if (args.length > 0 &&
+                args[args.length - 1] !== null &&
+                typeof args[args.length - 1] === 'object' &&
+                args[args.length - 1][ρσ_kwargs_symbol] === true) {
+            kwargs = args.pop();
+        }
+        for (var ρσ_i = 0; ρσ_i < init_fields.length; ρσ_i++) {
+            var f = init_fields[ρσ_i];
+            var val;
+            if (ρσ_i < args.length) {
+                val = args[ρσ_i];
+            } else if (kwargs !== null &&
+                       Object.prototype.hasOwnProperty.call(kwargs, f.name)) {
+                val = kwargs[f.name];
+            } else if (f.default_factory !== MISSING) {
+                val = f.default_factory();
+            } else if (f.default !== MISSING) {
+                val = f.default;
+            } else {
+                throw new TypeError(
+                    cls.__name__ + '() missing required argument: "' + f.name + '"');
+            }
+            if (frozen) {
+                Object.defineProperty(self, f.name, {
+                    value: val, writable: false, enumerable: true, configurable: true
+                });
+            } else {
+                self[f.name] = val;
+            }
+        }
+        if (typeof self.__post_init__ === 'function') {
+            self.__post_init__();
+        }
+    };
+    """
+
+
+def _make_repr(cls, dc_fields):
+    """Install a __repr__ that renders ClassName(field=value, ...)."""
+    repr_fields = [f for f in dc_fields if f.repr]
+
+    def _repr_fn():
+        _self = this
+        parts = []
+        for f in repr_fields:
+            parts.push(f.name + '=' + repr(_self[f.name]))
+        return _self.__class__.__name__ + '(' + parts.join(', ') + ')'
+
+    cls.prototype.__repr__ = _repr_fn
+
+
+def _make_eq(cls, dc_fields):
+    """Install __eq__ comparing all compare-flagged fields."""
+    cmp_fields = [f for f in dc_fields if f.compare]
+
+    v"""
+    cls.prototype.__eq__ = function(other) {
+        if (!(other instanceof cls)) return false;
+        for (var ρσ_i = 0; ρσ_i < cmp_fields.length; ρσ_i++) {
+            var nm = cmp_fields[ρσ_i].name;
+            if (this[nm] !== other[nm]) return false;
+        }
+        return true;
+    };
+    """
+
+
+def _make_order(cls, dc_fields):
+    """Install __lt__, __le__, __gt__, __ge__ based on compare fields."""
+    cmp_fields = [f for f in dc_fields if f.compare]
+
+    def _key(obj):
+        return [obj[f.name] for f in cmp_fields]
+
+    def _lt(other):
+        a = _key(this)
+        b = _key(other)
+        for i in range(a.length):
+            if a[i] < b[i]:
+                return True
+            if a[i] > b[i]:
+                return False
+        return False
+
+    def _le(other):
+        return this.__lt__(other) or this.__eq__(other)
+
+    def _gt(other):
+        return not this.__le__(other)
+
+    def _ge(other):
+        return not this.__lt__(other)
+
+    cls.prototype.__lt__ = _lt
+    cls.prototype.__le__ = _le
+    cls.prototype.__gt__ = _gt
+    cls.prototype.__ge__ = _ge
+
+
+def _make_frozen(cls, dc_fields):
+    """Install __setattr__ and __delattr__ that raise AttributeError."""
+    def _setattr(name, value):
+        raise AttributeError(
+            'cannot assign to field ' + repr(name) +
+            ' of frozen dataclass ' + repr(this.__class__.__name__))
+
+    def _delattr(name):
+        raise AttributeError(
+            'cannot delete field ' + repr(name) +
+            ' of frozen dataclass ' + repr(this.__class__.__name__))
+
+    cls.prototype.__setattr__ = _setattr
+    cls.prototype.__delattr__ = _delattr
+
+
+def _make_hash(cls, dc_fields):
+    """Install __hash__ based on compare-flagged (or explicitly hashed) fields."""
+    hash_fields = [f for f in dc_fields
+                   if (f.hash is None and f.compare) or f.hash is True]
+
+    def _hash_fn():
+        _self = this
+        h = 0
+        for f in hash_fields:
+            v_val = _self[f.name]
+            hv = 0
+            if jstype(v_val) is 'number':
+                hv = v_val
+            elif jstype(v_val) is 'string':
+                for i in range(v_val.length):
+                    hv = v'(hv * 31 + v_val.charCodeAt(i)) | 0'
+            else:
+                hv = v_val if v_val is not None else 0
+            h = v'(h * 1000003 ^ hv) | 0'
+        return h
+
+    cls.prototype.__hash__ = _hash_fn
+
+
+# ─── Public API ──────────────────────────────────────────────────────────────
+
+def dataclass(cls=None, *, init=True, repr=True, eq=True, order=False,
+              unsafe_hash=False, frozen=False):
+    """
+    Class decorator that generates __init__, __repr__, __eq__ (and optionally
+    ordering and hashing methods) from annotated class variables.
+
+    Can be used as @dataclass or @dataclass(frozen=True, order=True).
+    """
+    def wrap(c):
+        _process_class(c, init, repr, eq, order, unsafe_hash, frozen)
+        return c
+
+    if cls is None:
+        return wrap       # @dataclass(...)
+    return wrap(cls)      # @dataclass
+
+
+def fields(class_or_instance):
+    """Return a tuple of Field objects for the dataclass or its instance."""
+    cls = None
+    if jstype(class_or_instance) is 'function':
+        cls = class_or_instance
+    elif class_or_instance is not None:
+        cls = class_or_instance.__class__
+    if cls and cls.__dataclass_fields__:
+        return tuple(v"Object.values(cls.__dataclass_fields__)")
+    raise TypeError(repr(class_or_instance) + ' is not a dataclass or dataclass instance')
+
+
+def is_dataclass(obj):
+    """Return True if obj is a dataclass class or instance."""
+    if obj is None:
+        return False
+    if jstype(obj) is 'function':
+        return bool(obj.__dataclass_fields__)
+    cls = obj.__class__
+    return bool(cls and cls.__dataclass_fields__)
+
+
+def asdict(obj, *, dict_factory=None):
+    """Recursively convert a dataclass instance to a dict."""
+    if not is_dataclass(obj) or jstype(obj) is 'function':
+        raise TypeError('asdict() should be called on dataclass instances')
+    return _asdict_inner(obj, dict_factory)
+
+
+def _asdict_inner(obj, dict_factory):
+    if is_dataclass(obj) and jstype(obj) is not 'function':
+        result = {}
+        dfc = obj.__class__.__dataclass_fields__
+        for name in v"Object.keys(dfc)":
+            result[name] = _asdict_inner(obj[name], dict_factory)
+        if dict_factory is not None:
+            pairs = [[k, v] for k, v in result.items()]
+            return dict_factory(pairs)
+        return result
+    elif isinstance(obj, list):
+        return [_asdict_inner(v, dict_factory) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple([_asdict_inner(v, dict_factory) for v in list(obj)])
+    elif isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            result[_asdict_inner(k, dict_factory)] = _asdict_inner(v, dict_factory)
+        if dict_factory is not None:
+            pairs = [[ki, vi] for ki, vi in result.items()]
+            return dict_factory(pairs)
+        return result
+    else:
+        return obj
+
+
+def astuple(obj, *, tuple_factory=tuple):
+    """Recursively convert a dataclass instance to a tuple of its field values."""
+    if not is_dataclass(obj) or jstype(obj) is 'function':
+        raise TypeError('astuple() should be called on dataclass instances')
+    return _astuple_inner(obj, tuple_factory)
+
+
+def _astuple_inner(obj, tuple_factory):
+    if is_dataclass(obj) and jstype(obj) is not 'function':
+        result = []
+        dfc = obj.__class__.__dataclass_fields__
+        for name in v"Object.keys(dfc)":
+            result.push(_astuple_inner(obj[name], tuple_factory))
+        return tuple_factory(result)
+    elif isinstance(obj, list):
+        return [_astuple_inner(v, tuple_factory) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple_factory([_astuple_inner(v, tuple_factory) for v in list(obj)])
+    elif isinstance(obj, dict):
+        return {k: _astuple_inner(v, tuple_factory) for k, v in obj.items()}
+    else:
+        return obj
+
+
+
+
+
+def replace(obj, **changes):
+    """Return a new dataclass instance with the specified fields replaced."""
+    if not is_dataclass(obj) or jstype(obj) is 'function':
+        raise TypeError('replace() should be called on dataclass instances')
+    cls = obj.__class__
+    dfc = cls.__dataclass_fields__
+    init_kwargs = {}
+    for name in v"Object.keys(dfc)":
+        f = dfc[name]
+        if not f.init:
+            continue
+        init_kwargs[name] = changes[name] if name in changes else obj[name]
+    v"""
+    var ρσ_kw = init_kwargs;
+    ρσ_kw[ρσ_kwargs_symbol] = true;
+    return new cls(ρσ_kw);
+    """
+
+
+def make_dataclass(cls_name, fields_spec, *, bases=None,
+                   init=True, repr=True, eq=True, order=False,
+                   unsafe_hash=False, frozen=False):
+    """
+    Dynamically create a new dataclass from a list of field specifications.
+
+    Each item in fields_spec can be:
+      'name'                  → required field (no default)
+      ('name', type)          → required field with type hint (type ignored at runtime)
+      ('name', type, field()) → field with a field() descriptor
+    """
+    anns = {}
+    proto_vals = {}
+    for item in fields_spec:
+        if jstype(item) is 'string':
+            anns[item] = None
+        elif item.length >= 3:
+            anns[item[0]] = item[1]
+            proto_vals[item[0]] = item[2]
+        else:
+            anns[item[0]] = item[1] if item.length > 1 else None
+
+    v"""
+    var new_cls;
+    var base_list = bases || [];
+    new_cls = function() {
+        if (!(this instanceof new_cls)) return new new_cls(...arguments);
+        Object.defineProperty(this, 'ρσ_object_id', {value: ++ρσ_object_counter});
+        if (new_cls.prototype.__init__) new_cls.prototype.__init__.apply(this, arguments);
+    };
+    new_cls.__name__ = cls_name;
+    new_cls.__qualname__ = cls_name;
+    new_cls.__annotations__ = anns;
+    if (base_list.length > 0) ρσ_extends(new_cls, base_list[0]);
+    """
+
+    for k in v"Object.keys(proto_vals)":
+        new_cls.prototype[k] = proto_vals[k]  # noqa: F821
+
+    _process_class(new_cls, init, repr, eq, order, unsafe_hash, frozen)  # noqa: F821
+    return new_cls  # noqa: F821

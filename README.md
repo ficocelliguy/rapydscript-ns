@@ -698,6 +698,29 @@ head, *mid, tail = [1, 2, 3, 4, 5] # head=1, mid=[2, 3, 4], tail=5
 
 Starred assignment works with any iterable, including generators and strings (which are unpacked character by character). The starred variable always receives a list, even if it captures zero elements.
 
+**Explicit tuple literals** using parentheses work the same as in Python and compile to JavaScript arrays:
+
+```py
+empty   = ()            # []
+single  = (42,)         # [42]  — trailing comma required for single-element tuple
+pair    = (1, 2)        # [1, 2]
+triple  = ('a', 'b', 'c')  # ['a', 'b', 'c']
+nested  = ((1, 2), (3, 4))  # [[1, 2], [3, 4]]
+```
+
+A parenthesised expression without a trailing comma is **not** a tuple — `(x)` is just `x`.  Add a comma to make it one: `(x,)`.
+
+Tuple literals work naturally everywhere arrays do: as return values, function arguments, in `isinstance` checks, and in destructuring assignments:
+
+```py
+def bounding_box(points):
+    return (min(p[0] for p in points), max(p[0] for p in points))
+
+ok  = isinstance(value, (int, str))   # tuple of types
+
+(a, b), c = (1, 2), 3
+```
+
 Operators and keywords
 ------------------------
 
@@ -3083,6 +3106,8 @@ One of Python's main strengths is the number of libraries available to the devel
 	operator            # a subset of Python's operator module
 	functools           # reduce, partial, wraps, lru_cache, cache, total_ordering, cmp_to_key
 	enum                # Enum base class — class Color(Enum): RED=1 with .name/.value, iteration
+	dataclasses         # @dataclass decorator — auto-generates __init__, __repr__, __eq__; field(),
+	                    # fields(), asdict(), astuple(), replace(), is_dataclass(), frozen=True, order=True
 	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
 	copy                # copy (shallow), deepcopy; honours __copy__ / __deepcopy__ hooks
 	typing              # TYPE_CHECKING, Any, Union, Optional, List, Dict, Set, Tuple, TypeVar,
@@ -3624,3 +3649,50 @@ new code is under the same license, to make that possible.
 
 See the [Changelog](https://github.com/ficocelliguy/rapydscript-ns/blob/master/CHANGELOG.md)
 for a list of changes to rapydscript-ns, including this fork at version 8.0
+
+---
+
+Example: Tuple Literals
+-----------------------
+
+This example demonstrates explicit tuple literals — `()`, `(x,)`, `(a, b)` — and how they interplay with unpacking, isinstance checks, and nested destructuring.
+
+```py
+# Empty tuple, single-element tuple, multi-element tuple
+empty  = ()
+single = (42,)          # trailing comma required; (42) is just the number 42
+pair   = (1, 2)
+coords = (10.5, -3.7)
+
+print(empty)            # []
+print(single[0])        # 42
+print(pair)             # [1, 2]
+
+# Tuple as function return value
+def minmax(values):
+    return (min(values), max(values))
+
+lo, hi = minmax([3, 1, 4, 1, 5, 9])
+print(lo, hi)           # 1 9
+
+# isinstance with a tuple of types
+def describe(x):
+    if isinstance(x, (int, float)):
+        return 'number'
+    elif isinstance(x, str):
+        return 'string'
+    return 'other'
+
+print(describe(42))       # number
+print(describe('hello'))  # string
+print(describe([]))       # other
+
+# Nested tuple unpacking in for loop
+points = [(0, 0), (1, 2), (3, 4)]
+for x, y in points:
+    print(x, y)
+
+# Nested tuple assignment
+(a, b), c = (10, 20), 30
+print(a, b, c)          # 10 20 30
+```

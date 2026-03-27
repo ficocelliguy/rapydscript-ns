@@ -2,7 +2,7 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-from ast import AST_Class, AST_Method, is_node_type
+from ast import AST_Class, AST_Method, AST_AnnotatedAssign, AST_SymbolRef, is_node_type
 from output.functions import decorate, function_definition, function_annotation
 from output.utils import create_doctring
 from utils import has_prop
@@ -345,6 +345,27 @@ def print_class(output):
             output.indent()
             stmt.print(output)
             output.newline()
+
+    # Emit __annotations__ for annotated class variables so that @dataclass and
+    # similar decorators can introspect field names and their declaration order.
+    # Only annotation-with-value statements (x: T = v) AND annotation-only
+    # statements (x: T) are collected; the value (if any) is already emitted
+    # above as a prototype assignment.  We store null as the type since type
+    # information is erased in the JS output.
+    annotated_field_names = []
+    for stmt in self.statements:
+        if is_node_type(stmt, AST_AnnotatedAssign) and is_node_type(stmt.target, AST_SymbolRef):
+            annotated_field_names.push(stmt.target.name)
+    if annotated_field_names.length:
+        output.indent()
+        self.name.print(output)
+        output.print('.__annotations__ = {')
+        for i in range(annotated_field_names.length):
+            if i > 0:
+                output.comma()
+            output.print(JSON.stringify(annotated_field_names[i]) + ': null')
+        output.print('}')
+        output.end_statement()
 
     # __init_subclass__ hook: call after identity properties and class variables
     # so cls.__name__ is correct and cls.prototype reflects the full class body.

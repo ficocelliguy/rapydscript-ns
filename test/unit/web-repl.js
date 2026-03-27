@@ -1111,6 +1111,94 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_dataclasses_basic",
+        description: "@dataclass generates __init__, __repr__, __eq__ in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from dataclasses import dataclass, field, is_dataclass",
+                "@dataclass",
+                "class Point:",
+                "    x: int",
+                "    y: int = 0",
+                "p = Point(3, 4)",
+                "assrt.equal(p.x, 3)",
+                "assrt.equal(p.y, 4)",
+                "assrt.ok(p == Point(3, 4))",
+                "assrt.ok(p is not Point(3, 4))",
+                "assrt.equal(repr(p), 'Point(x=3, y=4)')",
+                "assrt.ok(is_dataclass(p))",
+                "assrt.ok(is_dataclass(Point))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_dataclasses_field_factory",
+        description: "field(default_factory=...) gives each instance its own mutable default",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from dataclasses import dataclass, field",
+                "@dataclass",
+                "class Container:",
+                "    items: list = field(default_factory=list)",
+                "a = Container()",
+                "b = Container()",
+                "a.items.push(1)",
+                "assrt.equal(a.items.length, 1)",
+                "assrt.equal(b.items.length, 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_dataclasses_asdict",
+        description: "asdict() recursively converts a dataclass instance to a plain dict",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from dataclasses import dataclass, asdict",
+                "@dataclass",
+                "class Inner:",
+                "    value: int",
+                "@dataclass",
+                "class Outer:",
+                "    inner: object",
+                "    tag: str",
+                "d = asdict(Outer(Inner(42), 'hello'))",
+                "assrt.equal(d['tag'], 'hello')",
+                "assrt.equal(d['inner']['value'], 42)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_dataclasses_frozen",
+        description: "frozen=True makes fields read-only (writable:false, assignment silently ignored outside strict mode)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from dataclasses import dataclass",
+                "@dataclass(frozen=True)",
+                "class FP:",
+                "    x: int",
+                "    y: int",
+                "fp = FP(1, 2)",
+                "assrt.equal(fp.x, 1)",
+                "assrt.equal(fp.y, 2)",
+                "fp.x = 99",
+                // In non-strict mode, writable:false assignment is silently ignored
+                "assrt.equal(fp.x, 1)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

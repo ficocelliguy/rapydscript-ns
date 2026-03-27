@@ -1,0 +1,96 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# tuples.pyj
+# Tests for tuple literal syntax: (a, b), (a,), and ().
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Empty tuple ────────────────────────────────────────────────────────────
+t = ()
+ok(Array.isArray(t))
+ae(t.length, 0)
+
+# ── 2. Single-element tuple with trailing comma ───────────────────────────────
+t1 = (42,)
+ok(Array.isArray(t1))
+ae(t1.length, 1)
+ae(t1[0], 42)
+
+t_str = ('hello',)
+ae(t_str[0], 'hello')
+
+# ── 3. Two-element tuple ──────────────────────────────────────────────────────
+t2 = (1, 2)
+ok(Array.isArray(t2))
+ae(t2.length, 2)
+ae(t2[0], 1)
+ae(t2[1], 2)
+
+# ── 4. Three-element tuple ────────────────────────────────────────────────────
+t3 = ('a', 'b', 'c')
+ae(t3.length, 3)
+ae(t3[0], 'a')
+ae(t3[1], 'b')
+ae(t3[2], 'c')
+
+# ── 5. Trailing comma on multi-element tuple ──────────────────────────────────
+t_trail = (10, 20, 30,)
+ae(t_trail.length, 3)
+ae(t_trail[0], 10)
+ae(t_trail[2], 30)
+
+# ── 6. Tuple in an expression context (return, assignment) ────────────────────
+def make_pair():
+    return (99, 100)
+
+p = make_pair()
+ae(p[0], 99)
+ae(p[1], 100)
+
+# ── 7. Tuple unpacking works the same as array unpacking ─────────────────────
+a, b = (10, 20)
+ae(a, 10)
+ae(b, 20)
+
+# ── 8. Nested tuples ─────────────────────────────────────────────────────────
+nested = ((1, 2), (3, 4))
+ae(nested.length, 2)
+ae(nested[0][0], 1)
+ae(nested[0][1], 2)
+ae(nested[1][0], 3)
+ae(nested[1][1], 4)
+
+# ── 9. Tuple as function argument ─────────────────────────────────────────────
+def first(t):
+    return t[0]
+
+ae(first((7, 8, 9)), 7)
+
+# ── 10. isinstance with tuple of types ────────────────────────────────────────
+ok(isinstance(42,    (int, str)))
+ok(isinstance('hi',  (int, str)))
+ok(not isinstance(3.14, (int, str)))
+
+# ── 11. Tuple expressions with complex elements ───────────────────────────────
+x = 5
+tup = (x + 1, x * 2, x if x > 0 else 0)
+ae(tup[0], 6)
+ae(tup[1], 10)
+ae(tup[2], 5)
+
+# ── 12. Parenthesised single expression is NOT a tuple ───────────────────────
+plain = (42)
+ae(plain, 42)
+ok(not Array.isArray(plain))
+
+# ── 13. Tuple used in for-loop unpacking ─────────────────────────────────────
+pairs = [(1, 'one'), (2, 'two'), (3, 'three')]
+result = []
+for num, name in pairs:
+    result.push(str(num) + ':' + name)
+ae(result[0], '1:one')
+ae(result[1], '2:two')
+ae(result[2], '3:three')

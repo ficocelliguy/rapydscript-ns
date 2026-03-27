@@ -26,7 +26,7 @@ const MESSAGES = {
 // with the compiler from src/lib/).  These should never produce 'Unknown module'
 // errors regardless of what virtualFiles or stdlibFiles are configured.
 export const STDLIB_MODULES = [
-    'aes', 'collections', 'copy', 'elementmaker', 'encodings', 'enum',
+    'aes', 'collections', 'copy', 'dataclasses', 'elementmaker', 'encodings', 'enum',
     'functools', 'gettext', 'itertools', 'math', 'numpy', 'operator',
     'pythonize', 'random', 're', 'react', 'traceback', 'typing', 'uuid',
     // Pseudo-modules for language feature flags (from __python__ import ...)
@@ -423,24 +423,23 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
 
     this.handle_for_in = function() {
         const node = this.current_node;
+        const add_loop_var = (cnode) => {
+            if (cnode instanceof RS.AST_Seq) {
+                cnode.to_array().forEach(add_loop_var);
+            } else if (cnode instanceof RS.AST_Array) {
+                cnode.elements.forEach(add_loop_var);
+            } else if (cnode instanceof RS.AST_SymbolRef) {
+                this.current_node = cnode;
+                cnode.lint_visited = true;
+                this.add_binding(cnode.name).is_loop = true;
+                this.current_node = node;
+            }
+        };
         if (node.init instanceof RS.AST_SymbolRef) {
             this.add_binding(node.init.name).is_loop = true;
             node.init.lint_visited = true;
         } else if (node.init instanceof RS.AST_Array) {
-            node.init.elements.forEach(cnode => {
-                if (cnode instanceof RS.AST_Seq) cnode = cnode.to_array();
-                if (cnode instanceof RS.AST_SymbolRef) cnode = [cnode];
-                if (Array.isArray(cnode)) {
-                    cnode.forEach(elem => {
-                        if (elem instanceof RS.AST_SymbolRef) {
-                            this.current_node = elem;
-                            elem.lint_visited = true;
-                            this.add_binding(elem.name).is_loop = true;
-                            this.current_node = node;
-                        }
-                    });
-                }
-            });
+            node.init.elements.forEach(add_loop_var);
         }
     };
 

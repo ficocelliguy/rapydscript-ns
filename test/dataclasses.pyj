@@ -1,0 +1,253 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# dataclasses.pyj
+# Tests for the dataclasses standard library.
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+from dataclasses import dataclass, field, fields, asdict, astuple, replace, is_dataclass, MISSING
+
+# ── 1. Basic @dataclass: __init__, __repr__, __eq__ ───────────────────────────
+
+@dataclass
+class _Point:
+    x: float
+    y: float
+
+p1 = _Point(1, 2)
+ae(p1.x, 1)
+ae(p1.y, 2)
+ae(repr(p1), '_Point(x=1, y=2)')
+ok(p1 == _Point(1, 2))
+ok(p1 is not _Point(1, 2))   # different instances
+ok(not (p1 == _Point(1, 9)))
+
+# ── 2. Default values ─────────────────────────────────────────────────────────
+
+@dataclass
+class _Config:
+    name: str
+    debug: bool = False
+    count: int = 0
+
+c1 = _Config('myapp')
+ae(c1.name, 'myapp')
+ok(c1.debug is False)
+ae(c1.count, 0)
+
+c2 = _Config('other', True, 5)
+ae(c2.name, 'other')
+ok(c2.debug is True)
+ae(c2.count, 5)
+
+# ── 3. Keyword arguments ──────────────────────────────────────────────────────
+
+c3 = _Config(name='test', debug=True)
+ae(c3.name, 'test')
+ok(c3.debug is True)
+ae(c3.count, 0)
+
+# ── 4. field() with default_factory ──────────────────────────────────────────
+
+@dataclass
+class _Container:
+    items: list = field(default_factory=list)
+    label: str = 'default'
+
+a = _Container()
+b = _Container()
+# Each instance gets its own list
+a.items.push(1)
+ae(a.items.length, 1)
+ae(b.items.length, 0)
+ae(a.label, 'default')
+
+d = _Container(label='custom')
+ae(d.label, 'custom')
+
+# ── 5. field() repr=False ─────────────────────────────────────────────────────
+
+@dataclass
+class _Hidden:
+    public: str
+    secret: str = field('s3cr3t', repr=False)
+
+h = _Hidden("visible")
+ae(repr(h), '_Hidden(public="visible")')
+ae(h.secret, 's3cr3t')
+
+# ── 6. field() init=False ─────────────────────────────────────────────────────
+
+@dataclass
+class _WithPostInit:
+    x: int
+    y: int
+    dist: int = field(init=False, repr=True)
+
+    def __post_init__(self):
+        this.dist = this.x + this.y
+
+w = _WithPostInit(3, 4)
+ae(w.x, 3)
+ae(w.y, 4)
+ae(w.dist, 7)
+
+# ── 7. fields() returns Field objects ────────────────────────────────────────
+
+fs = fields(_Point)
+ae(fs.length, 2)
+ae(fs[0].name, 'x')
+ae(fs[1].name, 'y')
+
+# Also works on an instance
+fs2 = fields(p1)
+ae(fs2.length, 2)
+ae(fs2[0].name, 'x')
+
+# ── 8. asdict() ───────────────────────────────────────────────────────────────
+
+@dataclass
+class _Inner:
+    value: int
+
+@dataclass
+class _Outer:
+    inner: object
+    tag: str
+
+d_obj = _Outer(_Inner(42), 'hello')
+d_dict = asdict(d_obj)
+ae(d_dict['tag'], 'hello')
+ae(d_dict['inner']['value'], 42)
+
+# ── 9. astuple() ──────────────────────────────────────────────────────────────
+
+pt = _Point(3, 4)
+t = astuple(pt)
+ae(t[0], 3)
+ae(t[1], 4)
+
+# ── 10. replace() ────────────────────────────────────────────────────────────
+
+p2 = _Point(1, 2)
+p3 = replace(p2, y=99)
+ae(p3.x, 1)
+ae(p3.y, 99)
+ae(p2.y, 2)          # original unchanged
+
+# ── 11. is_dataclass() ───────────────────────────────────────────────────────
+
+ok(is_dataclass(_Point))
+ok(is_dataclass(p1))
+ok(not is_dataclass(42))
+ok(not is_dataclass('hello'))
+ok(not is_dataclass({}))
+ok(not is_dataclass(None))
+
+# ── 12. @dataclass(order=True) ───────────────────────────────────────────────
+# Note: RapydScript's < / > operators do not dispatch to __lt__/__gt__, so
+# order=True is tested by calling the generated comparison methods directly.
+
+@dataclass(order=True)
+class _Version:
+    major: int
+    minor: int
+
+v1 = _Version(1, 0)
+v2 = _Version(1, 5)
+v3 = _Version(2, 0)
+
+ok(v1.__lt__(v2))
+ok(v2.__lt__(v3))
+ok(v3.__gt__(v1))
+ok(v1.__le__(v1))
+ok(v1.__ge__(v1))
+ok(v2.__ge__(v1))
+ok(not v1.__lt__(v1))
+
+# ── 13. @dataclass(frozen=True) ──────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class _ImmutablePoint:
+    x: int
+    y: int
+
+ip = _ImmutablePoint(1, 2)
+ae(ip.x, 1)
+
+# Assigning to a frozen dataclass field raises an error (TypeError in JS,
+# since writable:false is enforced via Object.defineProperty).
+_frozen_error = None
+try:
+    ip.x = 99
+except Exception as e:
+    _frozen_error = str(e)
+ok(_frozen_error is not None)
+
+# ── 14. Inheritance ───────────────────────────────────────────────────────────
+
+@dataclass
+class _Base:
+    x: int
+    y: int = 0
+
+@dataclass
+class _Child(_Base):
+    z: str = 'default'
+
+ch = _Child(x=1, y=2, z='hi')
+ae(ch.x, 1)
+ae(ch.y, 2)
+ae(ch.z, 'hi')
+
+ch2 = _Child(10)
+ae(ch2.x, 10)
+ae(ch2.y, 0)
+ae(ch2.z, 'default')
+
+# repr shows all fields including inherited
+# (RapydScript repr() uses double quotes for strings, like JavaScript)
+r = repr(ch2)
+ok('x=10' in r)
+ok('y=0' in r)
+ok('z="default"' in r)
+
+# ── 15. MISSING sentinel ──────────────────────────────────────────────────────
+
+ae(repr(MISSING), 'MISSING')
+
+# ── 16. Multiple independent dataclasses ─────────────────────────────────────
+
+@dataclass
+class _A:
+    val: int = 1
+
+@dataclass
+class _B:
+    val: int = 2
+
+ok(_A().val is 1)
+ok(_B().val is 2)
+
+# ── 17. @dataclass as decorator factory (explicit parens, no args) ────────────
+
+@dataclass()
+class _Explicit:
+    name: str = 'x'
+
+ex = _Explicit()
+ae(ex.name, 'x')
+ae(repr(ex), '_Explicit(name="x")')
+
+# ── 18. Nested list field with asdict ────────────────────────────────────────
+
+@dataclass
+class _WithList:
+    numbers: list = field(default_factory=list)
+
+wl = _WithList([1, 2, 3])
+d2 = asdict(wl)
+ade(d2['numbers'], [1, 2, 3])

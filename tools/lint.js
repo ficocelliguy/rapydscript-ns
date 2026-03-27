@@ -353,28 +353,25 @@ function Linter(toplevel, filename, code, options) {
 
     this.handle_for_in = function() {
         var node = this.current_node;
+        var self = this;
+        var add_loop_var = function(cnode) {
+            if (cnode instanceof RapydScript.AST_Seq) {
+                cnode.to_array().forEach(add_loop_var);
+            } else if (cnode instanceof RapydScript.AST_Array) {
+                cnode.elements.forEach(add_loop_var);
+            } else if (cnode instanceof RapydScript.AST_SymbolRef) {
+                self.current_node = cnode;
+                cnode.lint_visited = true;
+                self.add_binding(cnode.name).is_loop = true;
+                self.current_node = node;
+            }
+        };
         if (node.init instanceof RapydScript.AST_SymbolRef) {
             this.add_binding(node.init.name).is_loop = true;
             node.init.lint_visited = true;
         } else if (node.init instanceof RapydScript.AST_Array) {
-            // destructuring assignment: for a, b in []
-            for (var i = 0; i < node.init.elements.length; i++) {
-                var cnode = node.init.elements[i];
-                if (cnode instanceof RapydScript.AST_Seq) cnode = cnode.to_array();
-                if (cnode instanceof RapydScript.AST_SymbolRef) cnode = [cnode];
-                if (Array.isArray(cnode)) {
-                    for (var j = 0; j < cnode.length; j++) {
-                        var elem = cnode[j];
-                        if (elem instanceof RapydScript.AST_SymbolRef) {
-                            this.current_node = elem;
-                            elem.lint_visited = true;
-                            this.add_binding(elem.name).is_loop = true;
-                            this.current_node = node;
-                        }
-                    }
-                }
-            }
- 
+            // destructuring assignment: for a, b in [] or for (a, b), c in []
+            node.init.elements.forEach(add_loop_var);
         }
     };
 

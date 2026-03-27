@@ -177,14 +177,14 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `numpy`       | ✅           | Full numpy-like library in `src/lib/numpy.pyj`; `numpy.random` and `numpy.linalg` sub-modules |
 | `copy`        | ✅           | `copy()` shallow copy and `deepcopy()` (circular-ref-safe via memo Map); `__copy__` / `__deepcopy__(memo)` hooks honoured; handles list, set, frozenset, dict, class instances, and plain JS objects |
 | `typing`      | ✅           | `TYPE_CHECKING`, `Any`, `Union`, `Optional`, `ClassVar`, `Final`, `Literal`, `NoReturn`, `List`, `Dict`, `Set`, `FrozenSet`, `Tuple`, `Type`, `Callable`, `Iterator`, `Iterable`, `Generator`, `Sequence`, `MutableSequence`, `Mapping`, `MutableMapping`, `Awaitable`, `Coroutine`, `AsyncGenerator`, `AsyncIterator`, `AsyncIterable`, `IO`, `TextIO`, `BinaryIO`, `Pattern`, `Match`, `TypeVar`, `Generic`, `Protocol`, `cast`, `overload`, `no_type_check`, `no_type_check_decorator`, `runtime_checkable`, `get_type_hints`, `TypedDict`, `NamedTuple`, `AnyStr`, `Text` — all available in `src/lib/typing.pyj` |
-| `dataclasses` | ❌           | `@dataclass`, `field()`, `asdict()`, `astuple()` not available                                |
+| `dataclasses` | ✅           | `@dataclass`, `field()`, `asdict()`, `astuple()`, `replace()`, `fields()`, `is_dataclass()`, `MISSING` in `src/lib/dataclasses.pyj`; `frozen=True`, `order=True`, inheritance supported; note: `field()` first positional arg is the default value (JS reserved word `default` cannot be used as a kwarg) |
 | `contextlib`  | ❌           | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available                |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
 | `json`        | ❌           | No Python wrapper; JS `JSON.parse` / `JSON.stringify` work directly via verbatim JS           |
 | `datetime`    | ❌           | `date`, `time`, `datetime`, `timedelta` not available                                         |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `asyncio`     | ❌           | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await`    |
-| `enum`        | ❌           | `Enum`, `IntEnum`, `Flag` not available                                                       |
+| `enum`        | ✅           | `Enum` base class in `src/lib/enum.pyj`; `.name`, `.value`, iteration, `isinstance` checks; `IntEnum`/`Flag` not available |
 | `abc`         | ❌           | `ABC`, `abstractmethod` not available                                                         |
 | `io`          | ❌           | `StringIO`, `BytesIO` not available                                                           |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |

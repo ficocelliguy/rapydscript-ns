@@ -456,10 +456,13 @@ def print_list_comprehension(self, output):
                 body_out.print(result_obj)
             # Locally scope all loop variables (outer and inner clauses)
             def decl_loop_vars(init_node):
+                # Recursively declare all leaf variable names from nested tuples/seqs
                 if is_node_type(init_node, AST_Array):
                     for i in init_node.elements:
-                        body_out.comma()
-                        i.print(body_out)
+                        decl_loop_vars(i)
+                elif is_node_type(init_node, AST_Seq):
+                    for i in init_node.to_array():
+                        decl_loop_vars(i)
                 else:
                     body_out.comma()
                     init_node.print(body_out)

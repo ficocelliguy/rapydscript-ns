@@ -2243,17 +2243,28 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 if is_('punc', ')'):
                     next()
                     return new AST_Array({'elements':[]})
-                ex = expression(True)
+                ex = expression(False)
                 if is_('keyword', 'for'):
                     ret = read_comprehension(new AST_GeneratorComprehension({'statement': ex}), ')')
                     S.in_parenthesized_expr = False
                     return ret
+                if is_('punc', ','):
+                    # Tuple literal: (a,) or (a, b, c, ...) — compile to JS array
+                    elements = [ex]
+                    while is_('punc', ','):
+                        next()
+                        if is_('punc', ')'):
+                            break  # trailing comma is OK
+                        elements.push(expression(False))
+                    expect(')')
+                    arr = new AST_Array({'elements': elements, 'start': start, 'end': prev()})
+                    S.in_parenthesized_expr = False
+                    return subscripts(arr, allow_calls)
                 ex.start = start
                 ex.end = S.token
                 if is_node_type(ex, AST_SymbolRef):
                     ex.parens = True
-                if not is_node_type(ex, AST_GeneratorComprehension):
-                    expect(")")
+                expect(")")
                 if is_node_type(ex, AST_UnaryPrefix):
                     ex.parenthesized = True
                 S.in_parenthesized_expr = False
