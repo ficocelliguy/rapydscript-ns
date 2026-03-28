@@ -1112,9 +1112,35 @@ RapydScript dicts (but not arbitrary javascript objects). You can also define
 the ``__eq__(self, other)`` method in your classes to have these operators work
 for your own types.
 
-RapydScript does not overload the ordering operators ```(>, <, >=,
-<=)``` as doing so would be a big performance impact (function calls in
-JavaScript are very slow). So using them on containers is useless.
+The ordering operators ``<``, ``>``, ``<=``, ``>=`` dispatch to Python-style
+dunder methods and compare lists lexicographically — just like Python:
+
+```py
+from __python__ import overload_operators  # on by default
+
+# List comparison — lexicographic order
+assert [1, 2] < [1, 3]     # True  (first differing element: 2 < 3)
+assert [1, 2] < [1, 2, 0]  # True  (prefix is smaller)
+assert [2] > [1, 99]       # True  (first element dominates)
+
+# Works with custom __lt__ / __gt__ / __le__ / __ge__ on objects
+class Version:
+    def __init__(self, major, minor):
+        self.major = major
+        self.minor = minor
+    def __lt__(self, other):
+        return (self.major, self.minor) < (other.major, other.minor)
+
+v1 = Version(1, 5)
+v2 = Version(2, 0)
+assert v1 < v2   # dispatches to __lt__
+
+# Incompatible types raise TypeError, just like Python
+try:
+    result = [1] < 42
+except TypeError as e:
+    print(e)   # '<' not supported between instances of 'list' and 'int'
+```
 
 Chained comparisons work just like Python — each middle operand is evaluated only once:
 
@@ -1122,7 +1148,7 @@ Chained comparisons work just like Python — each middle operand is evaluated o
 # All of these work correctly, including mixed-direction chains
 assert 1 < 2 < 3      # True
 assert 1 < 2 > 0      # True  (1<2 AND 2>0)
-assert 1 < 2 > 3 == False  # 1<2 AND 2>3 = True AND False = False
+assert [1] < [2] < [3]   # True  (lexicographic chain)
 ```
 
 ### Python Truthiness and `__bool__`
@@ -1983,18 +2009,22 @@ Regular Expressions
 ----------------------
 
 RapydScript includes a ```re``` module that mimics the interface of the Python
-re module. However, it uses the JavaScript regular expression functionality
-under the hood, which has several differences from the Python regular
-expression engine. Most importantly:
+re module. It uses the JavaScript regular expression engine under the hood, so
+it supports the full feature set available in modern JS runtimes:
 
-  - it does not support lookbehind and group existence assertions
-  - it does not support unicode (on ES 6 runtimes, unicode is supported, but
-	with a different syntax). You can test for the presence of unicode support with
-	```re.supports_unicode```. 
-  - The ``MatchObject``'s ``start()`` and ``end()`` method cannot return correct values
-    for subgroups for some kinds of regular expressions, for example, those
-	with nested captures. This is because the JavaScript regex API does not expose
-	this information, so it has to be guessed via a heuristic.
+  - **Lookbehind assertions** — both positive `(?<=...)` and negative `(?<!...)`
+    are fully supported (ES2018+), including variable-width lookbehind.
+  - **Unicode** — the `u` flag is added automatically on ES2015+ runtimes.
+    `re.supports_unicode` reflects whether the runtime supports it.
+  - **`re.fullmatch()`** — matches the entire string against the pattern.
+  - **`re.S` / `re.DOTALL`** — make `.` match newlines; `re.S` is now the
+    canonical alias (matching Python), with `re.D` kept for compatibility.
+  - **`re.NOFLAG`** (= 0) — the Python 3.11 no-flags sentinel.
+  - **`MatchObject.start()`/`.end()`** — return accurate positions for all
+    sub-groups on runtimes that support the ES2022 `d` (hasIndices) flag
+    (Node 18+, Chrome 90+). On older runtimes a heuristic is used.
+  - **Conditional groups** `(?(id)yes|no)` — not supported in JavaScript;
+    an `re.error` is raised if they appear in the pattern.
 
 You can use the JavaScript regex literal syntax, including verbose regex
 literals, as shown below. In verbose mode, whitespace is ignored and # comments
@@ -2009,6 +2039,11 @@ re.match(///
   a  # a comment
   b  # Another comment
   ///, 'ab')
+
+# Lookbehind and fullmatch
+re.sub(r'(?<=\d)px', '', '12px 3em')   # '12 3em'
+re.fullmatch(r'\w+', 'hello')           # MatchObject
+re.fullmatch(r'\w+', 'hello world')     # None
 ```
 
 JSX Support

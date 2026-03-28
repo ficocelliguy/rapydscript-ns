@@ -1,0 +1,173 @@
+from __python__ import overload_operators
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _raises(fn, exc_type):
+    """Return True if fn() raises exc_type, False otherwise."""
+    try:
+        fn()
+    except exc_type:
+        return True
+    return False
+
+# ── 1. Numeric comparisons (should still work correctly) ─────────────────────
+
+assert 1 < 2
+assert not (2 < 1)
+assert 2 > 1
+assert not (1 > 2)
+assert 1 <= 1
+assert 2 <= 3
+assert not (3 <= 2)
+assert 3 >= 3
+assert 3 >= 2
+assert not (2 >= 3)
+
+# ── 2. String comparisons ────────────────────────────────────────────────────
+
+assert 'abc' < 'abd'
+assert 'abc' <= 'abc'
+assert 'z' > 'a'
+assert 'abc' >= 'abc'
+assert not ('b' < 'a')
+
+# ── 3. List lexicographic ordering ───────────────────────────────────────────
+
+# First differing element determines order
+assert [1, 2] < [1, 3]
+assert not ([1, 3] < [1, 2])
+
+# Prefix rule: shorter list with equal prefix is smaller
+assert [1, 2] < [1, 2, 0]
+assert not ([1, 2, 0] < [1, 2])
+
+# First element dominates
+assert [2] > [1, 99]
+assert not ([1, 99] > [2])
+
+# Equal lists
+assert [1, 2] <= [1, 2]
+assert [1, 2] >= [1, 2]
+assert not ([1, 2] < [1, 2])
+assert not ([1, 2] > [1, 2])
+
+# Empty lists
+assert [] < [1]
+assert [] <= []
+assert [1] > []
+assert not ([] > [])
+
+# ── 4. Nested list lexicographic ordering ────────────────────────────────────
+
+assert [[1, 2], [3]] < [[1, 2], [4]]
+assert [[1], [2]] < [[1], [2], []]
+
+# ── 5. Bool operands (bool is int in Python) ─────────────────────────────────
+
+assert not (True < True)
+assert False < True
+assert True > False
+assert True >= True
+
+# ── 6. Custom __lt__ / __le__ / __gt__ / __ge__ dispatch ────────────────────
+
+class Vec:
+    def __init__(self, x):
+        self.x = x
+    def __lt__(self, other):
+        return self.x < other.x
+    def __le__(self, other):
+        return self.x <= other.x
+    def __gt__(self, other):
+        return self.x > other.x
+    def __ge__(self, other):
+        return self.x >= other.x
+
+v1 = Vec(1)
+v2 = Vec(2)
+v3 = Vec(2)
+
+assert v1 < v2
+assert not (v2 < v1)
+assert v2 > v1
+assert not (v1 > v2)
+assert v1 <= v2
+assert v2 <= v3
+assert v2 >= v3
+assert v2 >= v1
+assert not (v1 >= v2)
+
+# ── 7. Reflected dunder dispatch ─────────────────────────────────────────────
+# When left has no __gt__, Python calls right.__lt__
+
+class LtOnly:
+    """Only defines __lt__; reflected ops depend on the right-hand operand."""
+    def __init__(self, x):
+        self.x = x
+    def __lt__(self, other):
+        return self.x < other.x
+
+a = LtOnly(1)
+b = LtOnly(2)
+
+assert a < b        # a.__lt__(b)
+assert b > a        # b.__gt__ absent → ρσ_op_gt falls back → ρσ_op_lt(a, b) → a.__lt__(b)
+
+# ── 8. TypeError for incompatible types ──────────────────────────────────────
+
+assert _raises(def(): return 1 < 'x';, TypeError)
+assert _raises(def(): return 'x' < 1;, TypeError)
+assert _raises(def(): return [1] < 1;, TypeError)
+assert _raises(def(): return 1 < [1];, TypeError)
+assert _raises(def(): return 1 > 'x';, TypeError)
+assert _raises(def(): return 1 <= 'x';, TypeError)
+assert _raises(def(): return 1 >= 'x';, TypeError)
+
+# ── 9. TypeError message contains operator symbol ────────────────────────────
+
+def _err_msg(fn):
+    try:
+        fn()
+    except TypeError as e:
+        return str(e)
+    return ''
+
+msg = _err_msg(def(): return 1 < 'x';)
+assert "'<'" in msg, msg
+assert 'int' in msg, msg
+assert 'str' in msg, msg
+
+msg = _err_msg(def(): return 1 > [1];)
+assert "'>'" in msg, msg
+
+msg = _err_msg(def(): return 1 <= {};)
+assert "'<='" in msg, msg
+
+msg = _err_msg(def(): return 1 >= {};)
+assert "'>='" in msg, msg
+
+# ── 10. Chained comparisons with overloaded ops ───────────────────────────────
+
+assert 1 < 2 < 3
+assert not (1 < 2 < 2)
+assert 3 > 2 > 1
+assert 1 <= 1 <= 2
+assert [1] < [2] < [3]
+assert [3] > [2] > [1]
+
+# Mixed direction chain
+assert 1 < 2 > 0
+assert not (1 < 2 > 3)
+
+# ── 11. Chained comparison: middle expression evaluated once ─────────────────
+
+counter = [0]
+def inc_and_return(val):
+    counter[0] += 1
+    return val
+
+# a < inc_and_return(b) < c  — middle must be evaluated exactly once
+assert 1 < inc_and_return(2) < 3
+assert counter[0] == 1, counter[0]
+
+print('All comparison_ops tests passed.')

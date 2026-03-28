@@ -412,6 +412,64 @@ def ρσ_op_rshift(a, b):
     if b is not None and jstype(b.__rrshift__) is 'function': return b.__rrshift__(a)
     return a >> b
 
+# Ordered-comparison operator overloading helpers.
+# ρσ_op_lt dispatches __lt__ (forward) then __gt__ (reflected), handles lists
+# lexicographically, enforces type compatibility, and raises TypeError otherwise.
+# ρσ_op_gt / ρσ_op_ge delegate to ρσ_op_lt / ρσ_op_le after dunder checks.
+def ρσ_op_lt(a, b):
+    if a is not None and jstype(a.__lt__) is 'function': return a.__lt__(b)
+    if b is not None and jstype(b.__gt__) is 'function': return b.__gt__(a)
+    if Array.isArray(a) and Array.isArray(b):
+        n = Math.min(a.length, b.length)
+        for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
+            ea = v'a[ρσ_ci]'
+            eb = v'b[ρσ_ci]'
+            if ρσ_op_lt(ea, eb): return True
+            if ρσ_op_lt(eb, ea): return False
+        return v'a.length < b.length'
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a < b'
+    if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a < b'
+    raise TypeError("'<' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+
+def ρσ_op_le(a, b):
+    if a is not None and jstype(a.__le__) is 'function': return a.__le__(b)
+    if b is not None and jstype(b.__ge__) is 'function': return b.__ge__(a)
+    if Array.isArray(a) and Array.isArray(b):
+        n = Math.min(a.length, b.length)
+        for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
+            ea = v'a[ρσ_ci]'
+            eb = v'b[ρσ_ci]'
+            if ρσ_op_lt(ea, eb): return True
+            if ρσ_op_lt(eb, ea): return False
+        return v'a.length <= b.length'
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a <= b'
+    if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a <= b'
+    raise TypeError("'<=' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+
+def ρσ_op_gt(a, b):
+    if a is not None and jstype(a.__gt__) is 'function': return a.__gt__(b)
+    if b is not None and jstype(b.__lt__) is 'function': return b.__lt__(a)
+    if Array.isArray(a) and Array.isArray(b): return ρσ_op_lt(b, a)
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a > b'
+    if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a > b'
+    raise TypeError("'>' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+
+def ρσ_op_ge(a, b):
+    if a is not None and jstype(a.__ge__) is 'function': return a.__ge__(b)
+    if b is not None and jstype(b.__le__) is 'function': return b.__le__(a)
+    if Array.isArray(a) and Array.isArray(b): return ρσ_op_le(b, a)
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a >= b'
+    if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a >= b'
+    raise TypeError("'>=' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+
 # List-concatenation helpers (always available, no overload_operators required).
 # ρσ_list_add: used for the + operator; creates a new list when both sides are arrays.
 # NOTE: the fallback uses v'a + b' (verbatim JS) to avoid recursive self-compilation.

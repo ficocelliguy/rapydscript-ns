@@ -38,8 +38,36 @@ assrt.equal(']', re.match('[]]', ']').group())
 
 assrt.throws(def():re.search(r'(?(1)a|b)b', 'ab');, re.error)
 
-# Test lookbehind assertions
+# Test positive lookbehind assertions
 assrt.equal('acdb', re.sub(r'(?<=a)b', 'c', 'abdb'))
+
+# Test negative lookbehind assertions
+assrt.equal('accd', re.sub(r'(?<!a)b', 'c', 'acbd'))
+
+# Test variable-width lookbehind (ES2018+)
+assrt.equal('c', re.search(r'(?<=ab+)c', 'abbc').group())
+
+# Test fullmatch
+assrt.ok(re.fullmatch(r'\w+', 'hello') is not None)
+assrt.ok(re.fullmatch(r'\w+', 'hello world') is None)
+assrt.ok(re.fullmatch(r'\w+', '') is None)
+assrt.equal(re.fullmatch(r'(\w+)', 'hello').group(1), 'hello')
+assrt.ok(re.fullmatch(r'[a-z]+', 'hello') is not None)
+assrt.ok(re.fullmatch(r'[a-z]+', 'hello!') is None)
+
+# Test accurate group start/end positions (ES2022 'd' flag; falls back to heuristic)
+m = re.match(r'(a)(b)(c)', 'abc')
+assrt.equal(m.start(1), 0)
+assrt.equal(m.end(1), 1)
+assrt.equal(m.start(2), 1)
+assrt.equal(m.end(2), 2)
+assrt.equal(m.start(3), 2)
+assrt.equal(m.end(3), 3)
+
+# Test NOFLAG and S (DOTALL) aliases
+assrt.equal(re.NOFLAG, 0)
+assrt.equal(re.S, re.DOTALL)
+assrt.equal(re.search('.+', 'a\nb', flags=re.S).group(), 'a\nb')
 
 # Test named groups
 assrt.equal('aa', re.sub(r'(?P<a>a)b', r'\g<a>\1', 'ab'))

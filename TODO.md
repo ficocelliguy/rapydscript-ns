@@ -15,7 +15,7 @@
 - examples of using js libraries in rapydscript in readme?
 
 
-I would like you to add support for [  python eval and exec ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [ <, >, <=, >= on lists / containers (python-style, not the javascript type coercion fallthrough) ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 # Example: Tuple Literals
 
@@ -254,4 +254,73 @@ try:
     result = 'hello' - 1
 except TypeError as e:
     print(e)   # unsupported operand type(s) for -: 'str' and 'int'
+```
+
+# Example: Full PCRE regex (lookbehind, unicode, fullmatch)
+
+```py
+import re
+
+# Positive lookbehind — strip 'px' only when preceded by a digit
+print(re.sub(r'(?<=\d)px', '', '12px 3em 7px'))  # '12 3em 7'
+
+# Negative lookbehind — replace 'b' not preceded by 'a'
+print(re.sub(r'(?<!a)b', 'X', 'ab cb'))  # 'ab cX'
+
+# fullmatch — entire string must satisfy the pattern
+print(re.fullmatch(r'\d+', '42'))       # <re.MatchObject ...>
+print(re.fullmatch(r'\d+', '42abc'))    # None
+
+# Named groups work with lookbehind
+m = re.search(r'(?P<word>\w+)(?<=\d)', 'price99')
+print(m.group('word'))  # 'price99'
+print(m.end())          # 8
+```
+
+## Example: Ordered Comparisons on Lists and Custom Objects
+
+```py
+from __python__ import overload_operators  # on by default
+
+# Lists compare lexicographically — same semantics as Python
+print([1, 2] < [1, 3])     # True   (first differing element: 2 < 3)
+print([1, 2] < [1, 2, 0])  # True   (shorter prefix is less)
+print([3] > [2, 99])       # True   (first element dominates)
+print([1, 2] <= [1, 2])    # True   (equal lists are <=)
+print([1] >= [1, 0])       # False
+
+# Custom __lt__ / __le__ / __gt__ / __ge__ are dispatched automatically
+class Version:
+    def __init__(self, major, minor):
+        self.major = major
+        self.minor = minor
+    def __lt__(self, other):
+        if self.major != other.major:
+            return self.major < other.major
+        return self.minor < other.minor
+    def __le__(self, other):
+        return self is other or self.__lt__(other)
+    def __gt__(self, other):
+        return other.__lt__(self)
+    def __ge__(self, other):
+        return other.__le__(self)
+    def __repr__(self):
+        return f"Version({self.major}, {self.minor})"
+
+v1 = Version(1, 9)
+v2 = Version(2, 0)
+v3 = Version(2, 0)
+print(v1 < v2)   # True
+print(v2 <= v3)  # True  (equal)
+print(v2 > v1)   # True
+
+# Chained comparisons with lists
+assert [1] < [2] < [3]   # True
+assert [3] > [2] > [1]   # True
+
+# Incompatible types raise TypeError
+try:
+    result = [1, 2] < 5
+except TypeError as e:
+    print(e)   # '<' not supported between instances of 'list' and 'int'
 ```

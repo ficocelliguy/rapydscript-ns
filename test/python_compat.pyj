@@ -115,20 +115,22 @@ _a8 += [3, 4]
 ade(_a8, [1, 2, 3, 4])
 ade(_b8, [1, 2, 3, 4])  # _b8 still points to same object, now extended
 
-# ── 8. Ordering operators on lists — JS string coercion ──────────────────────
+# ── 8. Ordering operators on lists — behaviour depends on overload_operators ──
 # Python: [10] < [9] compares element-wise → False (10 > 9).
-# RapydScript: < coerces to string → '10' < '9' is True (char comparison).
-# This is a common gotcha: single-element lists with multi-digit numbers.
+# Without overload_operators (tested here): < falls through to JS string
+# coercion → '[10]' < '[9]' → True (char comparison on the first differing
+# digit: '1' < '9'). This is a common gotcha with multi-digit numbers.
+#
+# With overload_operators (the default when using rapydscript compile or the
+# web-repl), < dispatches through ρσ_op_lt which does lexicographic comparison
+# of list elements — matching Python semantics ([10] < [9] → False).
 
 # RapydScript lists have a Python-style __str__, so [10].toString() = '[10]'.
-# String compare of '[10]' vs '[9]': '[' = '[', then '1' < '9' → [10] < [9] is True.
-ok([10] < [9])       # True in RapydScript (string: '[10]' < '[9]')
-ae([9] < [10], False)  # False   (string: '[9]' > '[10]')
+# String compare of '[10]' vs '[9]': '[' = '[', then '1' < '9' → True.
+ok([10] < [9])       # True (string: '[10]' < '[9]') — no overload_operators
+ae([9] < [10], False)  # False (string: '[9]' > '[10]')
 
-# Compare: Python uses numeric element-wise ordering, so [10] > [9] (10 > 9).
-# RapydScript gives the opposite result for these specific values.
-
-# For correct numeric comparisons, compare elements explicitly:
+# Direct numeric comparison is always unambiguous:
 ok(10 > 9)           # direct numeric comparison always works
 
 # ── 9. List sort() — Python numeric sort (jssort() for JS lexicographic) ──────

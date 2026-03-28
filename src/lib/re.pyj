@@ -22,13 +22,17 @@ _NAME_PAT = /^[a-zA-Z ]/
 I = IGNORECASE = 2
 L = LOCALE = 4
 M = MULTILINE = 8
-D = DOTALL = 16
+S = D = DOTALL = 16  # re.S is the canonical Python alias; re.D kept for compat
 U = UNICODE = 32
 X = VERBOSE = 64
 DEBUG = 128
 A = ASCII = 256
+NOFLAG = 0
 
 supports_unicode = RegExp.prototype.unicode is not undefined
+
+# ES2022 'd' (hasIndices) flag gives exact group start/end offsets
+_supports_indices = v"(function(){try{new RegExp('a','d');return true;}catch(e){return false;}})()"
 
 _RE_ESCAPE = /[-\/\\^$*+?.()|[\]{}]/g
 
@@ -240,6 +244,18 @@ class MatchObject:
         match = self._groups
         self._start = v'Array(match.length)'
         self._end = v'Array(match.length)'
+        # ES2022: use accurate per-group indices when the 'd' flag is present
+        if match.indices is not undefined:
+            for v'var i = 0; i < match.indices.length; i++':
+                pair = match.indices[i]  # noqa:undef
+                if pair is undefined:
+                    self._start[i] = -1
+                    self._end[i] = -1
+                else:
+                    self._start[i] = pair[0]
+                    self._end[i] = pair[1]
+            return
+        # Fallback heuristic for environments without 'd' flag
         self._start[0] = self._start_pos
         self._end[0] = self._start_pos + match[0].length
         offset = self._start_pos
@@ -358,6 +374,8 @@ class RegexObject:
         if self.flags & MULTILINE: modifiers += 'm'
         if not (self.flags & ASCII) and supports_unicode:
             modifiers += 'u'
+        if _supports_indices:
+            modifiers += 'd'
         self._modifiers = modifiers + 'g'
         self._pattern = RegExp(self.js_pattern, self._modifiers)
 
@@ -424,6 +442,19 @@ class RegexObject:
     def sub(self, repl, string, count=0):
         return self.subn(repl, string, count)[0]
 
+    def fullmatch(self, string, pos=0, endpos=None):
+        if endpos is not None:
+            string = string[:endpos]
+        end = string.length
+        # Sticky 'y' + no 'm': anchors match to exactly pos..end
+        mods = self._modifiers.replace('g', 'y').replace('m', '')
+        pat = RegExp(self.js_pattern + '$', mods)
+        pat.lastIndex = pos
+        m = pat.exec(string)
+        if m is None or m.index is not pos or m.index + m[0].length is not end:
+            return None
+        return MatchObject(self, m, pos, endpos)
+
 def _get_from_cache(pattern, flags):
     if isinstance(pattern, RegExp):
         pattern = pattern.source
@@ -445,6 +476,9 @@ def search(pattern, string, flags=0):
 
 def match(pattern, string, flags=0):
     return _get_from_cache(pattern, flags).match(string)
+
+def fullmatch(pattern, string, flags=0):
+    return _get_from_cache(pattern, flags).fullmatch(string)
 
 def split(pattern, string, maxsplit=0, flags=0):
     return _get_from_cache(pattern, flags).split(string)

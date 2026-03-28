@@ -201,6 +201,10 @@ overloaded_binary_ops = {
     '^':  'ρσ_op_xor',
     '<<': 'ρσ_op_lshift',
     '>>': 'ρσ_op_rshift',
+    '<':  'ρσ_op_lt',
+    '>':  'ρσ_op_gt',
+    '<=': 'ρσ_op_le',
+    '>=': 'ρσ_op_ge',
 }
 
 # Maps augmented-assignment operators to their overloading helper names.
@@ -221,6 +225,55 @@ overloaded_augmented_ops = {
 
 
 def print_binary_op(self, output):
+    if comparators[self.operator] and is_node_type(self.left, AST_Binary) and comparators[self.left.operator]:
+        # A chained comparison such as a < b < c
+        # With overload_operators: ρσ_op_lt(a, b) && ρσ_op_lt(b, c)
+        # Without:                 a < b && b < c
+        if is_node_type(self.left.right, AST_Symbol):
+            # Middle is a simple variable — no caching needed.
+            # self.left.print recurses into print_binary_op and handles overloaded case.
+            self.left.print(output)
+            leftvar = self.left.right.name
+        else:
+            # Middle is a complex expression — must cache to avoid double evaluation.
+            if self.left.overloaded and overloaded_binary_ops[self.left.operator]:
+                output.print(overloaded_binary_ops[self.left.operator] + '(')
+                self.left.left.print(output)
+                output.comma()
+                output.with_parens(def():
+                    nonlocal leftvar
+                    output.assign("ρσ_cond_temp")
+                    self.left.right.print(output)
+                    leftvar = "ρσ_cond_temp"
+                )
+                output.print(')')
+            else:
+                self.left.left.print(output)
+                output.space()
+                output.print(self.left.operator)
+                output.space()
+                output.with_parens(def():
+                    nonlocal leftvar
+                    output.assign("ρσ_cond_temp")
+                    self.left.right.print(output)
+                    leftvar = "ρσ_cond_temp"
+                )
+        output.space()
+        output.print("&&")
+        output.space()
+        if self.overloaded and overloaded_binary_ops[self.operator]:
+            output.print(overloaded_binary_ops[self.operator] + '(')
+            output.print(leftvar)
+            output.comma()
+            self.right.print(output)
+            output.print(')')
+        else:
+            output.print(leftvar)
+            output.space()
+            output.print(self.operator)
+            output.space()
+            self.right.print(output)
+        return
     if self.overloaded and overloaded_binary_ops[self.operator]:
         output.print(overloaded_binary_ops[self.operator] + '(')
         self.left.print(output)
@@ -235,34 +288,6 @@ def print_binary_op(self, output):
             output.comma()
             self.right.print(output)
         )
-    elif comparators[self.operator] and is_node_type(self.left, AST_Binary) and comparators[self.left.operator]:
-        # A chained comparison such as a < b < c
-        if is_node_type(self.left.right, AST_Symbol):
-            # left side compares against a regular variable,
-            # no caching needed
-            self.left.print(output)
-            leftvar = self.left.right.name
-        else:
-            # some logic is being performed, let's cache it
-            self.left.left.print(output)
-            output.space()
-            output.print(self.left.operator)
-            output.space()
-            output.with_parens(def():
-                nonlocal leftvar
-                output.assign("ρσ_cond_temp")
-                self.left.right.print(output)
-                leftvar = "ρσ_cond_temp"
-            )
-
-        output.space()
-        output.print("&&")
-        output.space()
-        output.print(leftvar)
-        output.space()
-        output.print(self.operator)
-        output.space()
-        self.right.print(output)
     elif self.operator is '//':
         output.print('Math.floor')
         output.with_parens(def():
