@@ -1074,7 +1074,16 @@ operator:
 [1] + 'b'     # TypeError: unsupported operand type(s) for +: 'list' and 'str'
 ```
 
-This matches Python's behaviour exactly. When ``overload_operators`` is
+This type-checking is controlled by the ``strict_arithmetic`` flag, which is
+**on by default** when ``overload_operators`` is active.  To revert to
+JavaScript's silent coercion behaviour (e.g. ``1 + 'x'`` → ``'1x'``) without
+disabling dunder dispatch, use:
+
+```py
+from __python__ import no_strict_arithmetic
+```
+
+When ``overload_operators`` is
 disabled (``from __python__ import no_overload_operators``) the operators
 compile directly to JavaScript and no type checking is performed.
 
@@ -3550,13 +3559,14 @@ below:
   in a scope.
 
 - Operator overloading is enabled by default via the ``overload_operators``
-  flag, so ``[1] + [1]`` produces a new list, ``'ha' * 3`` produces
-  ``'hahaha'``, and mixing incompatible types raises ``TypeError`` (e.g.
-  ``1 + 'x'`` raises ``TypeError: unsupported operand type(s) for +: 'int'
-  and 'str'``), all matching Python semantics. For plain numbers, strings, and
-  booleans there is no performance penalty when no dunder method is defined.
-  Use ``from __python__ import no_overload_operators`` to disable it in a
-  scope and revert to JavaScript's silent coercion behaviour.
+  flag, so ``[1] + [1]`` produces a new list and ``'ha' * 3`` produces
+  ``'hahaha'``.  Type-checking is controlled by the separate ``strict_arithmetic``
+  flag (also on by default): mixing incompatible types raises ``TypeError``
+  (e.g. ``1 + 'x'`` → ``TypeError: unsupported operand type(s) for +: 'int'
+  and 'str'``).  Use ``from __python__ import no_strict_arithmetic`` to keep
+  dunder dispatch but revert to JavaScript's silent coercion for unrecognised
+  type combinations.  Use ``from __python__ import no_overload_operators`` to
+  disable operator overloading entirely.
 
 - There are many more keywords than in Python. Because RapydScript compiles
   down to JavaScript, the set of keywords is all the keywords of Python + all
@@ -3605,7 +3615,8 @@ with no flags enabled, pass ``--legacy-rapydscript`` on the command line.
 |---|---|
 | `dict_literals` | `{k: v}` literals create Python `dict` objects instead of plain JS objects. On by default. |
 | `overload_getitem` | `obj[key]` dispatches to `__getitem__` / `__setitem__` / `__delitem__` on objects that define them. On by default. |
-| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. Also enforces Python-style type coercion: incompatible operand types (e.g. `int + str`) raise `TypeError` instead of silently coercing as JavaScript would. On by default. |
+| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. On by default. |
+| `strict_arithmetic` | When `overload_operators` is active, incompatible operand types (e.g. `int + str`) raise `TypeError` instead of silently coercing as JavaScript would. On by default; disable with `from __python__ import no_strict_arithmetic` to revert to JavaScript coercion behaviour. Internal RapydScript library code is unaffected. |
 | `truthiness` | Boolean tests and `bool()` dispatch to `__bool__` and treat empty containers as falsy, matching Python semantics. On by default. |
 | `bound_methods` | Method references (`obj.method`) are automatically bound to their object, so they can be passed as callbacks without losing `self`. On by default. |
 | `hash_literals` | `{k: v}` creates a Python `dict` (alias for `dict_literals`; kept for backward compatibility). On by default. |

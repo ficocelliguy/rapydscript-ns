@@ -6,7 +6,7 @@
 # raise TypeError instead of silently coercing (as JavaScript would).
 # overload_operators must be active for the ρσ_op_* helpers to be dispatched.
 
-from __python__ import overload_operators
+from __python__ import overload_operators, strict_arithmetic
 
 ae  = assrt.equal
 ade = assrt.deepEqual

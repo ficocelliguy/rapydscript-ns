@@ -187,7 +187,7 @@ function_ops = {
     'nin': '!ρσ_in',
 }
 
-# Maps binary operators to their overloading helper function names.
+# Maps binary operators to their overloading helper function names (strict_arithmetic on).
 overloaded_binary_ops = {
     '+':  'ρσ_op_add',
     '-':  'ρσ_op_sub',
@@ -207,7 +207,28 @@ overloaded_binary_ops = {
     '>=': 'ρσ_op_ge',
 }
 
-# Maps augmented-assignment operators to their overloading helper names.
+# Maps binary operators to no-strict helpers (overload_operators on, strict_arithmetic off).
+# Operators that never threw TypeError reuse the same helper; others use _ns variants.
+overloaded_binary_ops_ns = {
+    '+':  'ρσ_op_add_ns',
+    '-':  'ρσ_op_sub_ns',
+    '*':  'ρσ_op_mul_ns',
+    '/':  'ρσ_op_truediv_ns',
+    '//': 'ρσ_op_floordiv_ns',
+    '%':  'ρσ_op_mod_ns',
+    '**': 'ρσ_op_pow_ns',
+    '&':  'ρσ_op_and',
+    '|':  'ρσ_op_or',
+    '^':  'ρσ_op_xor',
+    '<<': 'ρσ_op_lshift',
+    '>>': 'ρσ_op_rshift',
+    '<':  'ρσ_op_lt_ns',
+    '>':  'ρσ_op_gt_ns',
+    '<=': 'ρσ_op_le_ns',
+    '>=': 'ρσ_op_ge_ns',
+}
+
+# Maps augmented-assignment operators to their overloading helper names (strict_arithmetic on).
 overloaded_augmented_ops = {
     '+=':  'ρσ_op_iadd',
     '-=':  'ρσ_op_isub',
@@ -216,6 +237,22 @@ overloaded_augmented_ops = {
     '//=': 'ρσ_op_ifloordiv',
     '%=':  'ρσ_op_imod',
     '**=': 'ρσ_op_ipow',
+    '&=':  'ρσ_op_iand',
+    '|=':  'ρσ_op_ior',
+    '^=':  'ρσ_op_ixor',
+    '<<=': 'ρσ_op_ilshift',
+    '>>=': 'ρσ_op_irshift',
+}
+
+# Maps augmented-assignment operators to no-strict helpers (strict_arithmetic off).
+overloaded_augmented_ops_ns = {
+    '+=':  'ρσ_op_iadd_ns',
+    '-=':  'ρσ_op_isub_ns',
+    '*=':  'ρσ_op_imul_ns',
+    '/=':  'ρσ_op_itruediv_ns',
+    '//=': 'ρσ_op_ifloordiv_ns',
+    '%=':  'ρσ_op_imod_ns',
+    '**=': 'ρσ_op_ipow_ns',
     '&=':  'ρσ_op_iand',
     '|=':  'ρσ_op_ior',
     '^=':  'ρσ_op_ixor',
@@ -236,8 +273,9 @@ def print_binary_op(self, output):
             leftvar = self.left.right.name
         else:
             # Middle is a complex expression — must cache to avoid double evaluation.
-            if self.left.overloaded and overloaded_binary_ops[self.left.operator]:
-                output.print(overloaded_binary_ops[self.left.operator] + '(')
+            left_ops_map = overloaded_binary_ops if self.left.strict_arith else overloaded_binary_ops_ns
+            if self.left.overloaded and left_ops_map[self.left.operator]:
+                output.print(left_ops_map[self.left.operator] + '(')
                 self.left.left.print(output)
                 output.comma()
                 output.with_parens(def():
@@ -258,11 +296,12 @@ def print_binary_op(self, output):
                     self.left.right.print(output)
                     leftvar = "ρσ_cond_temp"
                 )
+        ops_map = overloaded_binary_ops if self.strict_arith else overloaded_binary_ops_ns
         output.space()
         output.print("&&")
         output.space()
-        if self.overloaded and overloaded_binary_ops[self.operator]:
-            output.print(overloaded_binary_ops[self.operator] + '(')
+        if self.overloaded and ops_map[self.operator]:
+            output.print(ops_map[self.operator] + '(')
             output.print(leftvar)
             output.comma()
             self.right.print(output)
@@ -274,8 +313,9 @@ def print_binary_op(self, output):
             output.space()
             self.right.print(output)
         return
-    if self.overloaded and overloaded_binary_ops[self.operator]:
-        output.print(overloaded_binary_ops[self.operator] + '(')
+    ops_map = overloaded_binary_ops if self.strict_arith else overloaded_binary_ops_ns
+    if self.overloaded and ops_map[self.operator]:
+        output.print(ops_map[self.operator] + '(')
         self.left.print(output)
         output.comma()
         self.right.print(output)
@@ -425,7 +465,8 @@ def print_assignment(self, output):
 
 def print_assign(self, output):
     if self.overloaded and overloaded_augmented_ops[self.operator]:
-        helper = overloaded_augmented_ops[self.operator]
+        aug_map = overloaded_augmented_ops if self.strict_arith else overloaded_augmented_ops_ns
+        helper = aug_map[self.operator]
         output.assign(self.left)
         output.print(helper + '(')
         self.left.print(output)

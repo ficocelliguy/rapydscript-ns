@@ -988,6 +988,7 @@ class AST_Binary(AST_Node):
         'operator': "[string] the operator",
         'right': "[AST_Node] right-hand side expression",
         'overloaded': "[bool] Whether to use Python-style operator overloading dispatch",
+        'strict_arith': "[bool] Whether incompatible operand types raise TypeError (default True when overloaded; disable with no_strict_arithmetic)",
         'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 

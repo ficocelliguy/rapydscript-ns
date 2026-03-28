@@ -1,0 +1,88 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# arithmetic_nostrict.pyj
+# Tests for no_strict_arithmetic: when strict_arithmetic is disabled, incompatible
+# operand types fall back to JavaScript's native coercion instead of raising TypeError.
+# overload_operators must be active for the ρσ_op_*_ns helpers to be dispatched.
+
+from __python__ import overload_operators, no_strict_arithmetic
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+def _no_error(fn):
+    try:
+        fn()
+        return True
+    except:
+        return False
+
+# ── 1. Valid numeric arithmetic still works ───────────────────────────────────
+
+ae(1 + 2, 3)
+ae(10 - 3, 7)
+ae(3 * 4, 12)
+ae(7 / 2, 3.5)
+ae(7 // 2, 3)
+ae(7 % 3, 1)
+ae(2 ** 8, 256)
+
+# ── 2. Valid string concatenation still works ─────────────────────────────────
+
+ae('hello' + ' world', 'hello world')
+
+# ── 3. Valid list concatenation still works ───────────────────────────────────
+
+ade([1, 2] + [3, 4], [1, 2, 3, 4])
+
+# ── 4. String / list repetition still works ──────────────────────────────────
+
+ae('ha' * 3, 'hahaha')
+ae(3 * 'ha', 'hahaha')
+ade([0] * 3, [0, 0, 0])
+
+# ── 5. Mixed types do NOT raise TypeError ─────────────────────────────────────
+
+ok(_no_error(def(): return 1 + 'x';))
+ok(_no_error(def(): return 'x' + 1;))
+ok(_no_error(def(): return 1 - 'x';))
+ok(_no_error(def(): return None + 1;))
+
+# ── 6. JS coercion semantics for mixed types ──────────────────────────────────
+
+# int + str coerces via JS (number becomes string)
+ae(1 + 'x', '1x')
+ae('x' + 2, 'x2')
+
+# number - string coerces string to NaN
+ok(isNaN(1 - 'x'))
+
+# ── 7. Dunder methods still dispatch ──────────────────────────────────────────
+
+class _Meter:
+    def __init__(self, n):
+        self.n = n
+    def __add__(self, other):
+        return _Meter(self.n + other.n)
+    def __mul__(self, scalar):
+        return _Meter(self.n * scalar)
+
+m = _Meter(3) + _Meter(4)
+ae(m.n, 7)
+m2 = _Meter(5) * 2
+ae(m2.n, 10)
+
+# ── 8. Augmented assignment does not raise TypeError ──────────────────────────
+
+ok(_no_error(def():
+    x = 1
+    x += 'oops'
+))
+
+# ── 9. Comparison operators fall through to JS ────────────────────────────────
+
+# JS comparisons with mixed types don't throw; they may produce surprising results
+ok(_no_error(def(): return 1 < 'x';))
+ok(_no_error(def(): return None >= 0;))

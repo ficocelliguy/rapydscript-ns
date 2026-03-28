@@ -555,6 +555,126 @@ def ρσ_op_irshift(a, b):
     if a is not None and jstype(a.__irshift__) is 'function': return a.__irshift__(b)
     return ρσ_op_rshift(a, b)
 
+# No-strict (ns) variants: same dunder dispatch but JS native fallback instead of TypeError.
+# Used when overload_operators is active but strict_arithmetic is disabled
+# (from __python__ import no_strict_arithmetic).
+def ρσ_op_add_ns(a, b):
+    if a is not None and jstype(a.__add__) is 'function': return a.__add__(b)
+    if b is not None and jstype(b.__radd__) is 'function': return b.__radd__(a)
+    if Array.isArray(a) and Array.isArray(b): return ρσ_list_constructor(a.concat(b))
+    return v'a + b'
+
+def ρσ_op_sub_ns(a, b):
+    if a is not None and jstype(a.__sub__) is 'function': return a.__sub__(b)
+    if b is not None and jstype(b.__rsub__) is 'function': return b.__rsub__(a)
+    return v'a - b'
+
+def ρσ_op_mul_ns(a, b):
+    if a is not None and jstype(a.__mul__) is 'function': return a.__mul__(b)
+    if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(b)
+    if (tb is 'string' or v'b instanceof String') and (ta is 'number' or ta is 'boolean'): return b.repeat(a)
+    if Array.isArray(a) and (tb is 'number' or tb is 'boolean'):
+        result = v'[]'
+        for v'var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++':
+            result = result.concat(a)  # noqa:undef
+        return ρσ_list_constructor(result)
+    if Array.isArray(b) and (ta is 'number' or ta is 'boolean'):
+        result = v'[]'
+        for v'var ρσ_mi = 0; ρσ_mi < a; ρσ_mi++':
+            result = result.concat(b)  # noqa:undef
+        return ρσ_list_constructor(result)
+    return v'a * b'
+
+def ρσ_op_truediv_ns(a, b):
+    if a is not None and jstype(a.__truediv__) is 'function': return a.__truediv__(b)
+    if b is not None and jstype(b.__rtruediv__) is 'function': return b.__rtruediv__(a)
+    return v'a / b'
+
+def ρσ_op_floordiv_ns(a, b):
+    if a is not None and jstype(a.__floordiv__) is 'function': return a.__floordiv__(b)
+    if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
+    return Math.floor(v'a / b')
+
+def ρσ_op_mod_ns(a, b):
+    if a is not None and jstype(a.__mod__) is 'function': return a.__mod__(b)
+    if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
+    return v'a % b'
+
+def ρσ_op_pow_ns(a, b):
+    if a is not None and jstype(a.__pow__) is 'function': return a.__pow__(b)
+    if b is not None and jstype(b.__rpow__) is 'function': return b.__rpow__(a)
+    return Math.pow(a, b)
+
+def ρσ_op_lt_ns(a, b):
+    if a is not None and jstype(a.__lt__) is 'function': return a.__lt__(b)
+    if b is not None and jstype(b.__gt__) is 'function': return b.__gt__(a)
+    if Array.isArray(a) and Array.isArray(b):
+        n = Math.min(a.length, b.length)
+        for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
+            ea = v'a[ρσ_ci]'
+            eb = v'b[ρσ_ci]'
+            if ρσ_op_lt_ns(ea, eb): return True
+            if ρσ_op_lt_ns(eb, ea): return False
+        return v'a.length < b.length'
+    return v'a < b'
+
+def ρσ_op_le_ns(a, b):
+    if a is not None and jstype(a.__le__) is 'function': return a.__le__(b)
+    if b is not None and jstype(b.__ge__) is 'function': return b.__ge__(a)
+    if Array.isArray(a) and Array.isArray(b):
+        n = Math.min(a.length, b.length)
+        for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
+            ea = v'a[ρσ_ci]'
+            eb = v'b[ρσ_ci]'
+            if ρσ_op_lt_ns(ea, eb): return True
+            if ρσ_op_lt_ns(eb, ea): return False
+        return v'a.length <= b.length'
+    return v'a <= b'
+
+def ρσ_op_gt_ns(a, b):
+    if a is not None and jstype(a.__gt__) is 'function': return a.__gt__(b)
+    if b is not None and jstype(b.__lt__) is 'function': return b.__lt__(a)
+    if Array.isArray(a) and Array.isArray(b): return ρσ_op_lt_ns(b, a)
+    return v'a > b'
+
+def ρσ_op_ge_ns(a, b):
+    if a is not None and jstype(a.__ge__) is 'function': return a.__ge__(b)
+    if b is not None and jstype(b.__le__) is 'function': return b.__le__(a)
+    if Array.isArray(a) and Array.isArray(b): return ρσ_op_le_ns(b, a)
+    return v'a >= b'
+
+# No-strict augmented-assignment helpers
+def ρσ_op_iadd_ns(a, b):
+    if a is not None and jstype(a.__iadd__) is 'function': return a.__iadd__(b)
+    return ρσ_op_add_ns(a, b)
+
+def ρσ_op_isub_ns(a, b):
+    if a is not None and jstype(a.__isub__) is 'function': return a.__isub__(b)
+    return ρσ_op_sub_ns(a, b)
+
+def ρσ_op_imul_ns(a, b):
+    if a is not None and jstype(a.__imul__) is 'function': return a.__imul__(b)
+    return ρσ_op_mul_ns(a, b)
+
+def ρσ_op_itruediv_ns(a, b):
+    if a is not None and jstype(a.__itruediv__) is 'function': return a.__itruediv__(b)
+    return ρσ_op_truediv_ns(a, b)
+
+def ρσ_op_ifloordiv_ns(a, b):
+    if a is not None and jstype(a.__ifloordiv__) is 'function': return a.__ifloordiv__(b)
+    return ρσ_op_floordiv_ns(a, b)
+
+def ρσ_op_imod_ns(a, b):
+    if a is not None and jstype(a.__imod__) is 'function': return a.__imod__(b)
+    return ρσ_op_mod_ns(a, b)
+
+def ρσ_op_ipow_ns(a, b):
+    if a is not None and jstype(a.__ipow__) is 'function': return a.__ipow__(b)
+    return ρσ_op_pow_ns(a, b)
+
 def ρσ_instanceof():
     obj = arguments[0]
     bases = ''
