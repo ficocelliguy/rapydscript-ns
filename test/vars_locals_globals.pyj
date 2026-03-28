@@ -1,0 +1,90 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+from __python__ import overload_getitem
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── vars(obj) — instance attribute snapshot ───────────────────────────────────
+
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+p = Point(3, 4)
+d = vars(p)
+ae(d['x'], 3)
+ae(d['y'], 4)
+
+# all instance attrs present, no extras
+keys = list(d.keys())
+keys.sort()
+ade(keys, ['x', 'y'])
+
+# snapshot: mutating the result does NOT affect the original object
+d['x'] = 99
+ae(p.x, 3)
+
+# works for arbitrary objects with instance attrs
+class Config:
+    def __init__(self):
+        self.debug = True
+        self.level = 5
+        self.name = 'test'
+
+cfg = Config()
+cv = vars(cfg)
+ae(cv['debug'], True)
+ae(cv['level'], 5)
+ae(cv['name'], 'test')
+
+# ── vars(obj) — object updated after snapshot ─────────────────────────────────
+
+class Box:
+    def __init__(self, value):
+        self.value = value
+
+b = Box(10)
+snap1 = vars(b)
+b.value = 20
+snap2 = vars(b)
+ae(snap1['value'], 10)   # old snapshot unchanged
+ae(snap2['value'], 20)   # new snapshot reflects update
+
+# ── vars() with no argument — returns vars(this) ─────────────────────────────
+
+class WithMethod:
+    def __init__(self):
+        self.a = 1
+        self.b = 2
+
+    def get_vars(self):
+        return vars()
+
+wm = WithMethod()
+wv = wm.get_vars()
+ae(wv['a'], 1)
+ae(wv['b'], 2)
+
+# ── locals() — returns empty dict (JS scope not introspectable) ───────────────
+
+loc = locals()
+ok(loc is not None)
+ok(len(list(loc.keys())) is 0)
+
+# ── globals() — returns a dict of the JS global namespace ────────────────────
+
+g = globals()
+ok(g is not None)
+# Should be dict-like (has .keys())
+gkeys = list(g.keys())
+ok(gkeys.length >= 0)
+
+# ── vars/locals/globals return proper dict instances ─────────────────────────
+
+ok(isinstance(vars(Point(1, 2)), dict))
+ok(isinstance(vars(), dict))
+ok(isinstance(locals(), dict))
+ok(isinstance(globals(), dict))

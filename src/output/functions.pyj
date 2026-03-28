@@ -451,6 +451,13 @@ def print_function_call(self, output):
                     a.print(output)
             )
         elif (is_node_type(self.expression, AST_SymbolRef) and
+              self.expression.name is 'vars' and self.args.length is 0):
+            # vars() with no args → vars(this) so it captures the caller's instance
+            output.print('ρσ_vars')
+            output.with_parens(def():
+                output.print('this')
+            )
+        elif (is_node_type(self.expression, AST_SymbolRef) and
               (self.expression.name is 'eval' or self.expression.name is 'exec') and
               self.args.length >= 1 and is_node_type(self.args[0], AST_String)):
             # Compile-time RapydScript → JS transformation for eval/exec string literals.

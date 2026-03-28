@@ -1555,6 +1555,41 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_vars_locals_globals",
+        description: "vars(), locals(), globals() work in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_getitem",
+                "class Point:",
+                "    def __init__(self, x, y):",
+                "        self.x = x",
+                "        self.y = y",
+                "p = Point(7, 9)",
+                "d = vars(p)",
+                "assrt.equal(d['x'], 7)",
+                "assrt.equal(d['y'], 9)",
+                // snapshot — mutation does not affect original
+                "d['x'] = 0",
+                "assrt.equal(p.x, 7)",
+                // vars() with no arg returns empty dict
+                "v = vars()",
+                "assrt.ok(v is not None)",
+                "assrt.ok(isinstance(v, dict))",
+                // locals() returns empty dict
+                "loc = locals()",
+                "assrt.ok(isinstance(loc, dict))",
+                // globals() returns dict
+                "g = globals()",
+                "assrt.ok(isinstance(g, dict))",
+                // vars(obj) returns dict instance
+                "assrt.ok(isinstance(vars(Point(1, 2)), dict))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

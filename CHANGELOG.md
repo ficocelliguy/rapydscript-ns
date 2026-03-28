@@ -1,3 +1,21 @@
+version 0.9.0
+=======================
+  * All optional Python compatibility features are now enabled by default. See Python Feature Coverage from the README
+  * Add `enum` standard library module
+  * Add `dataclasses` standard library module
+  * Add `abc` standard library module (`ABC`, `abstractmethod`, `Protocol`)
+  * Add `typing` standard library module
+  * Add support for `eval()` and `exec()` to run python/rapydscript code. Please use this responsibly.
+  * Add support for `vars()` and `globals()` builtins
+  * Add support for complex numbers and complex number literals
+  * Add support for `bytes` literals and the `ByteString` type
+  * Add support for `__format__` dunder method
+  * Add support for Python-style container comparison (chained `<`/`>`)
+  * Add support for strict `zip()` behavior
+  * Add support for `object()`, `int.bit_length()`, and `float.is_integer()`
+  * Prevent JavaScript-style arithmetic type coercion when attempting to sum invalid mixed data types
+
+
 version 0.8.4
 =======================
   * Added support for jsx

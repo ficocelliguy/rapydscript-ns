@@ -542,6 +542,59 @@ def ρσ_eval(expr, globals, locals):
     '''
 ρσ_eval.__name__ = 'eval'
 
+def ρσ_vars(obj):
+    # vars(obj) -> dict of obj's own instance attributes (like Python's obj.__dict__)
+    # vars()    -> compiler rewrites to vars(this) — see output/functions.pyj
+    v'''
+    var _d;
+    if (typeof ρσ_dict === "function") {
+        _d = new ρσ_dict();
+        if (obj !== undefined && obj !== null) {
+            Object.keys(obj).forEach(function(k) {
+                if (k.charCodeAt(0) !== 0x03c1) { _d.jsmap.set(k, obj[k]); }
+            });
+        }
+    } else {
+        _d = Object.create(null);
+        if (obj !== undefined && obj !== null) {
+            Object.keys(obj).forEach(function(k) {
+                if (k.charCodeAt(0) !== 0x03c1) { _d[k] = obj[k]; }
+            });
+        }
+    }
+    '''
+    return v'_d'
+ρσ_vars.__name__ = 'vars'
+
+def ρσ_locals():
+    # In JavaScript, local scope cannot be introspected at runtime.
+    # Returns an empty dict as an approximation.
+    v'''
+    var _d;
+    if (typeof ρσ_dict === "function") { _d = new ρσ_dict(); } else { _d = Object.create(null); }
+    '''
+    return v'_d'
+ρσ_locals.__name__ = 'locals'
+
+def ρσ_globals():
+    # Returns a snapshot dict of the JS global object's own enumerable properties.
+    # In a browser this covers window.*; in Node.js this covers globalThis/global.*.
+    # Note: module-level RapydScript variables compiled inside an IIFE/module
+    # wrapper will NOT appear here — use a plain dict to share state instead.
+    v'''
+    var _g = (typeof globalThis !== "undefined") ? globalThis : (typeof window !== "undefined" ? window : (typeof global !== "undefined" ? global : {}));
+    var _d;
+    if (typeof ρσ_dict === "function") {
+        _d = new ρσ_dict();
+        Object.keys(_g).forEach(function(k) { _d.jsmap.set(k, _g[k]); });
+    } else {
+        _d = Object.create(null);
+        Object.keys(_g).forEach(function(k) { _d[k] = _g[k]; });
+    }
+    '''
+    return v'_d'
+ρσ_globals.__name__ = 'globals'
+
 def ρσ_abs(x):
     if x is not None and jstype(x.__abs__) is 'function':
         return x.__abs__()
@@ -746,6 +799,7 @@ v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'
 v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next'
 v'var exec = ρσ_exec'
+v'var vars = ρσ_vars, locals = ρσ_locals, globals = ρσ_globals'
 v'var ρσ_Ellipsis = Object.freeze({toString: function(){return "Ellipsis";}, __repr__: function(){return "Ellipsis";}})'
 v'var Ellipsis = ρσ_Ellipsis'
 v'var slice = ρσ_slice'

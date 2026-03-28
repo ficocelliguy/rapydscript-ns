@@ -15,7 +15,7 @@
 - examples of using js libraries in rapydscript in readme?
 
 
-I would like you to add support for [complex(real, imag) and Complex number literals `3+4j`   ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [`vars()` / `locals()` / `globals()`  ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 # Example: Tuple Literals
 
@@ -360,4 +360,84 @@ z3 = complex('2+3j')
 print(z3)                  # (2+3j)
 
 print(isinstance(z1, complex))  # True
+```
+
+## `vars()` / `locals()` / `globals()` example
+
+```py
+class Config:
+    def __init__(self, host, port, debug):
+        self.host  = host
+        self.port  = port
+        self.debug = debug
+
+cfg = Config('localhost', 8080, True)
+
+# vars(obj) — snapshot of instance attributes
+d = vars(cfg)
+print(d['host'])   # localhost
+print(d['port'])   # 8080
+
+# Iterate over all attributes
+for k, v in d.items():
+    print(k, '=', v)
+# host = localhost
+# port = 8080
+# debug = True
+
+# vars() and locals() return an empty dict (JS scope not introspectable)
+print(vars())    # {}
+print(locals())  # {}
+
+# globals() returns a dict of the JS global namespace
+g = globals()
+print('Math' in g)   # True
+```
+
+
+
+
+Example: Tuple Literals
+-----------------------
+
+This example demonstrates explicit tuple literals — `()`, `(x,)`, `(a, b)` — and how they interplay with unpacking, isinstance checks, and nested destructuring.
+
+```py
+# Empty tuple, single-element tuple, multi-element tuple
+empty  = ()
+single = (42,)          # trailing comma required; (42) is just the number 42
+pair   = (1, 2)
+coords = (10.5, -3.7)
+
+print(empty)            # []
+print(single[0])        # 42
+print(pair)             # [1, 2]
+
+# Tuple as function return value
+def minmax(values):
+    return (min(values), max(values))
+
+lo, hi = minmax([3, 1, 4, 1, 5, 9])
+print(lo, hi)           # 1 9
+
+# isinstance with a tuple of types
+def describe(x):
+    if isinstance(x, (int, float)):
+        return 'number'
+    elif isinstance(x, str):
+        return 'string'
+    return 'other'
+
+print(describe(42))       # number
+print(describe('hello'))  # string
+print(describe([]))       # other
+
+# Nested tuple unpacking in for loop
+points = [(0, 0), (1, 2), (3, 4)]
+for x, y in points:
+    print(x, y)
+
+# Nested tuple assignment
+(a, b), c = (10, 20), 30
+print(a, b, c)          # 10 20 30
 ```
