@@ -1590,6 +1590,101 @@ var TESTS = [
         },
     },
 
+    // -------------------------------------------------------------------------
+    // Context-persistence tests: compile WITHOUT keep_baselib, run in the repl
+    // vm context.  These catch "ReferenceError: ρσ_X is not defined" bugs that
+    // only surface when baselib symbols are `let`-declared (not `var` / function
+    // declarations) and therefore don't persist between vm.runInContext calls.
+    // -------------------------------------------------------------------------
+
+    {
+        name: "repl_in_operator_persistence",
+        description: "ρσ_in accessible after baselib init — 'in' operator regression in web-repl context",
+        run: function () {
+            var repl = RS.web_repl();
+            // Compile WITHOUT keep_baselib so the output does not include the
+            // baselib — the compiled code references ρσ_in from the persistent ctx.
+            var js = repl.compile([
+                "assert 'x' in ['x', 'y', 'z'], \"'x' in list should be True\"",
+                "assert 'a' not in ['x', 'y', 'z'], \"'a' not in list should be True\"",
+                "assert 2 in {1: 'one', 2: 'two'}, '2 in dict should be True'",
+                // Original failing case: 'Math' in globals() must not throw
+                "g = globals()",
+                "result = 'Math' in g",  // just must not throw ReferenceError
+            ].join("\n"), {export_main: true, tree_shake: false});
+            repl.runjs(js);
+        },
+    },
+
+    {
+        name: "repl_kwargs_persistence",
+        description: "ρσ_desugar_kwargs accessible after baselib init — **kwargs in web-repl context",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "def greet(name, greeting='Hello'):",
+                "    return greeting + ', ' + name + '!'",
+                "result = greet('World', greeting='Hi')",
+                "assert result == 'Hi, World!', 'kwargs call should produce Hi, World!'",
+            ].join("\n"), {export_main: true, tree_shake: false});
+            repl.runjs(js);
+        },
+    },
+
+    {
+        name: "repl_nameerror_persistence",
+        description: "NameError accessible after baselib init — except NameError in web-repl context",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "caught = False",
+                "try:",
+                "    raise NameError('test error')",
+                "except NameError:",
+                "    caught = True",
+                "assert caught, 'NameError should be catchable in except clause'",
+            ].join("\n"), {export_main: true, tree_shake: false});
+            repl.runjs(js);
+        },
+    },
+
+    {
+        name: "repl_getattr_persistence",
+        description: "ρσ_JS_Proxy/ρσ_attr_proxy_handler accessible after baselib init — __getattr__ in web-repl context",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "class Magic:",
+                "    def __getattr__(self, name):",
+                "        return name + '_value'",
+                "m = Magic()",
+                "assert m.foo == 'foo_value', '__getattr__ should return foo_value'",
+                "assert m.bar == 'bar_value', '__getattr__ should return bar_value'",
+            ].join("\n"), {export_main: true, tree_shake: false});
+            repl.runjs(js);
+        },
+    },
+
+    {
+        name: "repl_exists_persistence",
+        description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                // fns['key'] is a subscript (not SymbolRef) — emits ρσ_exists.c(fns['key'])()
+                "def get_val(): return 42",
+                "fns = {'key': get_val}",
+                "result = fns['key']?()",
+                "assert result == 42, 'existential call via subscript should return 42'",
+                // None value: dict lookup miss returns None, existential function call returns undefined
+                "missing = fns.get('nokey')",
+                "result2 = missing?()",
+                "assert result2 is undefined, 'existential call on None should return undefined'",
+            ].join("\n"), {export_main: true, tree_shake: false});
+            repl.runjs(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

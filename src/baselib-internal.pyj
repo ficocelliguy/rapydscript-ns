@@ -95,27 +95,16 @@ def ρσ_new(parent, cls):
         return parent.__new__.apply(parent, v'Array.prototype.slice.call(arguments, 1)')
     return v'Object.create(cls.prototype)'
 
-ρσ_in = (def ():
-    if jstype(Map) is 'function' and jstype(Set) is 'function':
-        return def(val, arr):
-            if jstype(arr) is 'string':
-                return arr.indexOf(val) is not -1
-            if jstype(arr.__contains__) is 'function':
-                return arr.__contains__(val)
-            if v'arr instanceof Map || arr instanceof Set':
-                return arr.has(val)
-            if ρσ_arraylike(arr):
-                return ρσ_list_contains.call(arr, val)
-            return Object.prototype.hasOwnProperty.call(arr, val)
-    return def(val, arr):
-        if jstype(arr) is 'string':
-            return arr.indexOf(val) is not -1
-        if jstype(arr.__contains__) is 'function':
-            return arr.__contains__(val)
-        if ρσ_arraylike(arr):
-            return ρσ_list_contains.call(arr, val)
-        return Object.prototype.hasOwnProperty.call(arr, val)
-)()
+def ρσ_in(val, arr):
+    if jstype(arr) is 'string':
+        return arr.indexOf(val) is not -1
+    if jstype(arr.__contains__) is 'function':
+        return arr.__contains__(val)
+    if jstype(Map) is 'function' and (v'arr instanceof Map' or v'arr instanceof Set'):
+        return arr.has(val)
+    if ρσ_arraylike(arr):
+        return ρσ_list_contains.call(arr, val)
+    return Object.prototype.hasOwnProperty.call(arr, val)
 
 def ρσ_Iterable(iterable):
     # Once ES6 is mature, change AST_ForIn to use the iterator protocol and get
@@ -133,31 +122,20 @@ def ρσ_Iterable(iterable):
     # so we can use 'for ... in' syntax with objects, as we would with dicts in python
     return Object.keys(iterable)
 
-ρσ_desugar_kwargs = (def ():
-    if jstype(Object.assign) is 'function':
-        return def():
-            ans = Object.create(None)
-            ans[ρσ_kwargs_symbol] = True
-            for v'var i = 0; i < arguments.length; i++':
-                arg = arguments[i]
-                if v'arg && arg.jsmap && typeof arg.jsmap.forEach === "function"':
-                    v'arg.jsmap.forEach(function(v, k) { ans[k] = v; })'
-                else:
-                    Object.assign(ans, arg)
-            return ans
-    return def():
-        ans = Object.create(None)
-        ans[ρσ_kwargs_symbol] = True
-        for v'var i = 0; i < arguments.length; i++':
-            arg = arguments[i]
-            if v'arg && arg.jsmap && typeof arg.jsmap.forEach === "function"':
-                v'arg.jsmap.forEach(function(v, k) { ans[k] = v; })'
-            else:
-                keys = Object.keys(arg)
-                for v'var j = 0; j < keys.length; j++':
-                    ans[keys[j]] = arg[keys[j]]
-        return ans
-)()
+def ρσ_desugar_kwargs():
+    ans = Object.create(None)
+    ans[ρσ_kwargs_symbol] = True
+    for v'var i = 0; i < arguments.length; i++':
+        arg = arguments[i]
+        if v'arg && arg.jsmap && typeof arg.jsmap.forEach === "function"':
+            v'arg.jsmap.forEach(function(v, k) { ans[k] = v; })'
+        elif jstype(Object.assign) is 'function':
+            Object.assign(ans, arg)
+        else:
+            keys = Object.keys(arg)
+            for v'var j = 0; j < keys.length; j++':
+                ans[keys[j]] = arg[keys[j]]
+    return ans
 
 def ρσ_interpolate_kwargs(f, supplied_args):
     if not f.__argnames__:
@@ -267,6 +245,7 @@ def ρσ_splice(arr, val, start, end):
     ,'e': def(expr, alt):
         return alt if expr is undefined or expr is None else expr
 }
+v'(typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : global)["ρσ_exists"] = ρσ_exists'
 
 def ρσ_mixin():
     # Implement a depth-first left-to-right method resolution order This is not
@@ -709,10 +688,10 @@ def ρσ_instanceof():
 # that define any of the four attribute dunders.
 
 # Cache the JS Proxy constructor with a ρσ_ name to avoid collisions with user-defined 'Proxy' classes.
-ρσ_JS_Proxy = v'typeof Proxy === "function" ? Proxy : null'
+v'var ρσ_JS_Proxy = typeof Proxy === "function" ? Proxy : null'
 
 # Symbol (or fallback string key) used to retrieve the raw underlying target from a wrapped proxy.
-ρσ_proxy_target_symbol = v'typeof Symbol === "function" ? Symbol("ρσ_proxy_target") : "__ρσ_proxy_target__"'
+v'var ρσ_proxy_target_symbol = typeof Symbol === "function" ? Symbol("ρσ_proxy_target") : "__ρσ_proxy_target__"'
 
 ρσ_attr_proxy_handler = {
     'get': def(target, prop, receiver):
@@ -753,6 +732,7 @@ def ρσ_instanceof():
             return True
         return v'Reflect.deleteProperty(target, prop)'
 }
+v'(typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : global)["ρσ_attr_proxy_handler"] = ρσ_attr_proxy_handler'
 
 def ρσ_object_setattr(obj, name, value):
     # Bypass __setattr__ and set directly on the underlying object.

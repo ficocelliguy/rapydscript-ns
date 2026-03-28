@@ -81,6 +81,10 @@ ok(g is not None)
 # Should be dict-like (has .keys())
 gkeys = list(g.keys())
 ok(gkeys.length >= 0)
+# Built-in globals (non-enumerable on globalThis) must be present
+ok('Math' in g)
+ok('Object' in g)
+ok('Array' in g)
 
 # ── vars/locals/globals return proper dict instances ─────────────────────────
 

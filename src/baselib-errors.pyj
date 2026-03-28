@@ -3,7 +3,7 @@
 # Copyright: 2015, Kovid Goyal <kovid at kovidgoyal.net>
 # globals: ρσ_str
 
-NameError = ReferenceError
+v'var NameError = ReferenceError'
 
 class Exception(Error):
 

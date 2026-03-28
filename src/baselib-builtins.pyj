@@ -586,10 +586,10 @@ def ρσ_globals():
     var _d;
     if (typeof ρσ_dict === "function") {
         _d = new ρσ_dict();
-        Object.keys(_g).forEach(function(k) { _d.jsmap.set(k, _g[k]); });
+        Object.getOwnPropertyNames(_g).forEach(function(k) { _d.jsmap.set(k, _g[k]); });
     } else {
         _d = Object.create(null);
-        Object.keys(_g).forEach(function(k) { _d[k] = _g[k]; });
+        Object.getOwnPropertyNames(_g).forEach(function(k) { _d[k] = _g[k]; });
     }
     '''
     return v'_d'
