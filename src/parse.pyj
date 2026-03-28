@@ -144,7 +144,7 @@ PRECEDENCE = (def(a, ret):
 
 STATEMENTS_WITH_LABELS = array_to_hash([ "for", "do", "while", "switch" ])
 
-ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "string", "bytes_literal", "regexp", "name", "js" ])
+ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "imaginary", "string", "bytes_literal", "regexp", "name", "js" ])
 
 compile_time_decorators = ['staticmethod', 'classmethod', 'external', 'property']
 
@@ -2184,6 +2184,16 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'start': tok,
                 'end': tok,
                 'value': tok.value
+            })
+        elif tmp_ is "imaginary":
+            return new AST_Call({
+                'start': tok,
+                'end': tok,
+                'expression': new AST_SymbolRef({'name': 'complex', 'start': tok, 'end': tok}),
+                'args': [
+                    new AST_Number({'start': tok, 'end': tok, 'value': 0}),
+                    new AST_Number({'start': tok, 'end': tok, 'value': tok.value})
+                ]
             })
         elif tmp_ is "string":
             return string_()

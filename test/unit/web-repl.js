@@ -1417,6 +1417,35 @@ var TESTS = [
     // ── eval / exec ───────────────────────────────────────────────────────
 
     {
+        name: "bundle_zip_strict",
+        description: "zip(strict=True) raises ValueError on length mismatch in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                // equal-length: no error
+                "assrt.deepEqual(list(zip([1,2], [3,4], strict=True)), [[1,3],[2,4]])",
+                // zero iterables with strict: empty result, no error
+                "assrt.deepEqual(list(zip(strict=True)), [])",
+                // first longer than second
+                "err1 = False",
+                "try:",
+                "    list(zip([1,2], [3], strict=True))",
+                "except ValueError:",
+                "    err1 = True",
+                "assrt.ok(err1)",
+                // second longer than first
+                "err2 = False",
+                "try:",
+                "    list(zip([1], [3,4], strict=True))",
+                "except ValueError:",
+                "    err2 = True",
+                "assrt.ok(err2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_eval_exec",
         description: "eval and exec builtins work in the web-repl bundle",
         run: function () {
@@ -1444,6 +1473,83 @@ var TESTS = [
                 "def _add(a, b): out.push(a + b);",
                 "exec('fn(10, 7)', {'fn': _add, 'out': out})",
                 "assrt.equal(out[0], 17)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── complex numbers ───────────────────────────────────────────────────────
+
+    {
+        name: "bundle_complex_constructor",
+        description: "complex() constructor and .real/.imag attributes work in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "c = complex(3, 4)",
+                "assrt.equal(c.real, 3)",
+                "assrt.equal(c.imag, 4)",
+                "c0 = complex()",
+                "assrt.equal(c0.real, 0)",
+                "assrt.equal(c0.imag, 0)",
+                "c1 = complex(5)",
+                "assrt.equal(c1.real, 5)",
+                "assrt.equal(c1.imag, 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_complex_j_literal",
+        description: "j-suffix imaginary literal compiles and runs correctly in bundled compiler",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "c = 4j",
+                "assrt.equal(c.real, 0)",
+                "assrt.equal(c.imag, 4)",
+                "c2 = 3+4j",
+                "assrt.equal(c2.real, 3)",
+                "assrt.equal(c2.imag, 4)",
+                "assrt.ok(isinstance(c, complex))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_complex_arithmetic",
+        description: "complex arithmetic (+, -, *, /) and abs() work in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "a = complex(1, 2)",
+                "b = complex(3, 4)",
+                "assrt.ok(a + b == complex(4, 6))",
+                "assrt.ok(b - a == complex(2, 2))",
+                "assrt.ok(a * b == complex(-5, 10))",
+                "assrt.ok(b / complex(1, 0) == b)",
+                "assrt.equal(abs(complex(3, 4)), 5)",
+                "assrt.ok(-complex(3, 4) == complex(-3, -4))",
+                "assrt.ok(complex(3, 4).conjugate() == complex(3, -4))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_complex_repr",
+        description: "repr() and str() of complex produce Python-style notation in bundled baselib",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.equal(repr(complex(0, 0)), '0j')",
+                "assrt.equal(repr(complex(1, 0)), '(1+0j)')",
+                "assrt.equal(repr(complex(0, 1)), '1j')",
+                "assrt.equal(repr(complex(3, 4)), '(3+4j)')",
+                "assrt.equal(repr(complex(3, -4)), '(3-4j)')",
+                "assrt.equal(str(complex(3, 4)), '(3+4j)')",
             ].join("\n"));
             run_js(js);
         },

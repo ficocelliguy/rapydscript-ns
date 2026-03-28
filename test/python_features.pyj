@@ -553,9 +553,20 @@ ae(g.next().value,    1)
 ae(g.next('hello').value, 'hello')
 
 # ── 27. zip(strict=True) ─────────────────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — zip() silently truncates to shortest.
+# STATUS: ✓ WORKS — equal-length iterables succeed; mismatched raise ValueError.
 
 ade(list(zip([1, 2], [3, 4])), [[1, 3], [2, 4]])  # basic zip still works
+ade(list(zip([1, 2], [3, 4], strict=True)), [[1, 3], [2, 4]])  # strict, equal lengths OK
+try:
+    list(zip([1, 2], [3], strict=True))
+    ae(True, False)  # should not reach here
+except ValueError:
+    pass  # expected: first iterable longer
+try:
+    list(zip([1], [3, 4], strict=True))
+    ae(True, False)  # should not reach here
+except ValueError:
+    pass  # expected: second iterable longer
 
 # ── 28. Walrus operator := ────────────────────────────────────────────────────
 # STATUS: ✓ WORKS — hoisting in if/while conditions; comprehension filter scope
@@ -901,11 +912,25 @@ ae(_c(), 2)
 ae(_c(), 3)
 
 # ── 42. Complex number literals 3+4j ─────────────────────────────────────────
-# STATUS: ✗ NOT SUPPORTED — no j suffix; no complex type.
-# SKIP:
-#   c = 3+4j
-#   ae(c.real, 3)
-#   ae(c.imag, 4)
+# STATUS: ✓ SUPPORTED — j suffix, complex() builtin, arithmetic, abs(), conjugate()
+def _test_complex():
+    from __python__ import overload_operators
+    c = 3+4j
+    ae(c.real, 3)
+    ae(c.imag, 4)
+    ae(abs(c), 5.0)
+    ade(c.conjugate(), complex(3, -4))
+    ade(c + complex(1, 2), complex(4, 6))
+    ade(c - complex(1, 1), complex(2, 3))
+    ade(c * complex(0, 1), complex(-4, 3))
+    ade(c / complex(1, 0), complex(3, 4))
+    ade(complex(5), complex(5, 0))
+    ade(complex(), complex(0, 0))
+    ae(repr(1j), '1j')
+    ae(repr(complex(3, -4)), '(3-4j)')
+    ade(1 + 2j, complex(1, 2))
+    ade(-1j, complex(0, -1))
+_test_complex()
 
 # ── 43. b'...' bytes literals ────────────────────────────────────────────────
 # STATUS: ✗ NOT SUPPORTED — no b prefix; no native bytes type.

@@ -79,6 +79,11 @@ const STUBS = [
         return_type: 'str',
         doc: 'Return the string representing a character at Unicode code point i.' }),
 
+    new BuiltinInfo({ name: 'complex', kind: 'class',
+        params: [p('real_or_string', { optional: true }), p('imag', { type: 'number', optional: true })],
+        return_type: 'complex',
+        doc: 'Create a complex number.\n\nForms:\n- `complex()` → `0j`\n- `complex(x)` → `x+0j` (from int/float/bool/complex), or parse Python complex string\n- `complex(real, imag)` → `real + imag*j`\n\nLiteral syntax: `4j` is equivalent to `complex(0, 4)`, and `3+4j` creates a complex number via addition.\n\nAttributes:\n- `.real` — the real part (float)\n- `.imag` — the imaginary part (float)\n\nMethods:\n- `.conjugate()` — return the complex conjugate `(real - imag*j)`\n\nSupports: `+`, `-`, `*`, `/`, `**`, unary `-`/`+`, `abs()`, `bool()`, `==`, `repr()`, `str()`.\n\nExample:\n\n    c = complex(3, 4)\n    c.real            # 3\n    c.imag            # 4\n    abs(c)            # 5.0\n    c.conjugate()     # (3-4j)\n    c * complex(1, 2) # (-5+10j)\n    3 + 4j            # (3+4j)  — literal syntax' }),
+
     new BuiltinInfo({ name: 'dict', kind: 'class',
         params: [p('**kwargs', { rest: true })],
         return_type: 'dict',
@@ -270,9 +275,9 @@ const STUBS = [
         doc: 'Return the type of an object.' }),
 
     new BuiltinInfo({ name: 'zip',
-        params: [p('*iterables', { rest: true })],
+        params: [p('*iterables', { rest: true }), p('strict', { optional: true })],
         return_type: 'iterable',
-        doc: 'Return an iterator of tuples, where each tuple groups the i-th element from each iterable.' }),
+        doc: 'Return an iterator of tuples, where each tuple groups the i-th element from each iterable. With strict=True, raises ValueError if the iterables have different lengths.' }),
 
     // ── RapydScript-specific ──────────────────────────────────────────────
     new BuiltinInfo({ name: 'jstype',

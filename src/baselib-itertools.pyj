@@ -2,7 +2,7 @@
 # License: BSD
 # Copyright: 2015, Kovid Goyal <kovid at kovidgoyal.net>
 
-# globals: ρσ_iterator_symbol, ρσ_bool
+# globals: ρσ_iterator_symbol, ρσ_bool, ρσ_kwargs_symbol
 
 def sum(iterable, start):
     if Array.isArray(iterable):
@@ -52,17 +52,30 @@ def filter(func_or_none, iterable):
     return ans
 
 def zip():
-    iterators = new Array(arguments.length)
-    for v'var i = 0; i < arguments.length; i++':
+    n = arguments.length
+    strict = False
+    if n > 0 and v'typeof arguments[n - 1] === "object" && arguments[n - 1] !== null' and arguments[n-1][ρσ_kwargs_symbol] is True:
+        strict = arguments[n-1]['strict'] or False
+        n -= 1
+    iterators = new Array(n)
+    for v'var i = 0; i < n; i++':
         iterators[i] = iter(arguments[i])  # noqa:undef
-    ans = v"{'_iterators':iterators}"
+    ans = v"{'_iterators':iterators, '_strict':strict}"
     ans[ρσ_iterator_symbol] = def():
         return this
     ans['next'] = def():
+        if not this._iterators.length:
+            return v"{'done':true}"
         args = new Array(this._iterators.length)
         for v'var i = 0; i < this._iterators.length; i++':
             r = this._iterators[i].next()
             if r.done:
+                if this._strict:
+                    for v'var j = i + 1; j < this._iterators.length; j++':
+                        if not this._iterators[j].next().done:
+                            raise ValueError('zip() has arguments with different lengths')
+                    if v'i > 0':
+                        raise ValueError('zip() has arguments with different lengths')
                 return v"{'done':true}"
             args[i] = r.value  # noqa:undef
         return v"{'done':false, 'value':args}"

@@ -363,6 +363,8 @@ def tokenizer(raw_text, filename):
                 return False
             elif ch is '.':
                 return (has_dot = True) if not has_dot and not has_x and not has_e else False
+            elif ch is 'j' or ch is 'J':
+                return False  # imaginary suffix — stop here; handled after loop
             return is_alphanumeric_char(ch.charCodeAt(0))
         )
         if prefix:
@@ -370,6 +372,9 @@ def tokenizer(raw_text, filename):
 
         valid = parse_js_number(num)
         if not isNaN(valid):
+            if peek() is 'j' or peek() is 'J':
+                next()
+                return token("imaginary", valid)
             return token("num", valid)
         else:
             parse_error("Invalid syntax: " + num)

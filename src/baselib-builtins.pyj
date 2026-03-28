@@ -542,8 +542,205 @@ def ρσ_eval(expr, globals, locals):
     '''
 ρσ_eval.__name__ = 'eval'
 
-v'var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
-v'var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
+def ρσ_abs(x):
+    if x is not None and jstype(x.__abs__) is 'function':
+        return x.__abs__()
+    return Math.abs(x)
+ρσ_abs.__name__ = 'abs'
+
+class ρσ_complex:
+    def __init__(self, real, imag):
+        nargs = arguments.length
+        if nargs is 0:
+            self.real = 0.0
+            self.imag = 0.0
+        elif nargs >= 2:
+            if jstype(real) is not 'number' and jstype(real) is not 'boolean':
+                raise TypeError("complex() first argument must be a number, not '" + jstype(real) + "'")
+            if jstype(imag) is not 'number' and jstype(imag) is not 'boolean':
+                raise TypeError("complex() second argument must be a number, not '" + jstype(imag) + "'")
+            self.real = +real
+            self.imag = +imag
+        else:
+            x = real
+            if v'x instanceof ρσ_complex':
+                self.real = x.real
+                self.imag = x.imag
+            elif jstype(x) is 'number' or jstype(x) is 'boolean':
+                self.real = +x
+                self.imag = 0.0
+            elif jstype(x) is 'string' or v'x instanceof String':
+                s = String(x).trim()
+                m_mixed = v'/^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)([+-](?:(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)?)[jJ]$/.exec(s)'
+                m_imag  = v'/^([+-]?(?:(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)?)[jJ]$/.exec(s)'
+                m_real  = v'/^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)$/.exec(s)'
+                if m_mixed:
+                    self.real = parseFloat(m_mixed[1])
+                    ims = m_mixed[2]
+                    if ims is '+': self.imag = 1.0
+                    elif ims is '-': self.imag = -1.0
+                    else: self.imag = parseFloat(ims)
+                elif m_imag:
+                    self.real = 0.0
+                    ims = m_imag[1]
+                    if not ims or ims is '+': self.imag = 1.0
+                    elif ims is '-': self.imag = -1.0
+                    else: self.imag = parseFloat(ims)
+                elif m_real:
+                    self.real = parseFloat(m_real[1])
+                    self.imag = 0.0
+                else:
+                    raise ValueError("complex() arg is a malformed string")
+            else:
+                raise TypeError("complex() argument must be a string or a number")
+
+    def __add__(self, other):
+        if v'other instanceof ρσ_complex':
+            return new ρσ_complex(self.real + other.real, self.imag + other.imag)
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return new ρσ_complex(self.real + other, self.imag)
+        raise TypeError("unsupported operand type(s) for +: 'complex' and '" + jstype(other) + "'")
+
+    def __radd__(self, other):
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return new ρσ_complex(other + self.real, self.imag)
+        if v'other instanceof ρσ_complex':
+            return new ρσ_complex(other.real + self.real, other.imag + self.imag)
+        raise TypeError("unsupported operand type(s) for +: '" + jstype(other) + "' and 'complex'")
+
+    def __sub__(self, other):
+        if v'other instanceof ρσ_complex':
+            return new ρσ_complex(self.real - other.real, self.imag - other.imag)
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return new ρσ_complex(self.real - other, self.imag)
+        raise TypeError("unsupported operand type(s) for -: 'complex' and '" + jstype(other) + "'")
+
+    def __rsub__(self, other):
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return new ρσ_complex(other - self.real, -self.imag)
+        if v'other instanceof ρσ_complex':
+            return new ρσ_complex(other.real - self.real, other.imag - self.imag)
+        raise TypeError("unsupported operand type(s) for -: '" + jstype(other) + "' and 'complex'")
+
+    def __mul__(self, other):
+        if v'other instanceof ρσ_complex':
+            return new ρσ_complex(
+                self.real * other.real - self.imag * other.imag,
+                self.real * other.imag + self.imag * other.real
+            )
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return new ρσ_complex(self.real * other, self.imag * other)
+        raise TypeError("unsupported operand type(s) for *: 'complex' and '" + jstype(other) + "'")
+
+    def __rmul__(self, other):
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return new ρσ_complex(other * self.real, other * self.imag)
+        if v'other instanceof ρσ_complex':
+            return new ρσ_complex(
+                other.real * self.real - other.imag * self.imag,
+                other.real * self.imag + other.imag * self.real
+            )
+        raise TypeError("unsupported operand type(s) for *: '" + jstype(other) + "' and 'complex'")
+
+    def __truediv__(self, other):
+        if v'other instanceof ρσ_complex':
+            denom = other.real * other.real + other.imag * other.imag
+            if denom is 0: raise ZeroDivisionError('complex division by zero')
+            return new ρσ_complex(
+                (self.real * other.real + self.imag * other.imag) / denom,
+                (self.imag * other.real - self.real * other.imag) / denom
+            )
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            if other is 0: raise ZeroDivisionError('complex division by zero')
+            return new ρσ_complex(self.real / other, self.imag / other)
+        raise TypeError("unsupported operand type(s) for /: 'complex' and '" + jstype(other) + "'")
+
+    def __rtruediv__(self, other):
+        denom = self.real * self.real + self.imag * self.imag
+        if denom is 0: raise ZeroDivisionError('complex division by zero')
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return new ρσ_complex(other * self.real / denom, -other * self.imag / denom)
+        if v'other instanceof ρσ_complex':
+            return new ρσ_complex(
+                (other.real * self.real + other.imag * self.imag) / denom,
+                (other.imag * self.real - other.real * self.imag) / denom
+            )
+        raise TypeError("unsupported operand type(s) for /: '" + jstype(other) + "' and 'complex'")
+
+    def __pow__(self, other):
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            r = Math.sqrt(self.real * self.real + self.imag * self.imag)
+            if r is 0: return new ρσ_complex(0, 0)
+            theta = Math.atan2(self.imag, self.real)
+            rn = Math.pow(r, other)
+            return new ρσ_complex(rn * Math.cos(other * theta), rn * Math.sin(other * theta))
+        if v'other instanceof ρσ_complex':
+            r = Math.sqrt(self.real * self.real + self.imag * self.imag)
+            if r is 0: return new ρσ_complex(0, 0)
+            theta = Math.atan2(self.imag, self.real)
+            log_r = Math.log(r)
+            c = other.real
+            d = other.imag
+            re_prod = c * log_r - d * theta
+            im_prod = d * log_r + c * theta
+            exp_re = Math.exp(re_prod)
+            return new ρσ_complex(exp_re * Math.cos(im_prod), exp_re * Math.sin(im_prod))
+        raise TypeError("unsupported operand type(s) for **: 'complex' and '" + jstype(other) + "'")
+
+    def __rpow__(self, other):
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            base = new ρσ_complex(other, 0)
+            return base.__pow__(self)
+        if v'other instanceof ρσ_complex':
+            return other.__pow__(self)
+        raise TypeError("unsupported operand type(s) for **: '" + jstype(other) + "' and 'complex'")
+
+    def __neg__(self):
+        return new ρσ_complex(-self.real, -self.imag)
+
+    def __pos__(self):
+        return new ρσ_complex(self.real, self.imag)
+
+    def __abs__(self):
+        return Math.sqrt(self.real * self.real + self.imag * self.imag)
+
+    def __bool__(self):
+        return self.real is not 0 or self.imag is not 0
+
+    def __eq__(self, other):
+        if v'other instanceof ρσ_complex':
+            return self.real is other.real and self.imag is other.imag
+        if jstype(other) is 'number' or jstype(other) is 'boolean':
+            return self.imag is 0 and self.real is other
+        return False
+
+    def __hash__(self):
+        if self.imag is 0:
+            return self.real | 0
+        return v'(self.real * 1000003 ^ self.imag) | 0'
+
+    def conjugate(self):
+        return new ρσ_complex(self.real, -self.imag)
+
+    def __repr__(self):
+        r = self.real
+        i = self.imag
+        if r is 0 and i is 0: return '0j'
+        r_str = String(r)
+        i_str = String(i)
+        if r is 0:
+            return i_str + 'j'
+        if i >= 0 or isNaN(i):
+            return '(' + r_str + '+' + i_str + 'j)'
+        return '(' + r_str + i_str + 'j)'
+
+    def __str__(self):
+        return self.__repr__()
+
+ρσ_complex.__name__ = 'complex'
+
+v'var abs = ρσ_abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
+v'var float = ρσ_float, int = ρσ_int, complex = ρσ_complex, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
 v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__'
 v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round'
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'

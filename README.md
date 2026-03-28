@@ -1459,6 +1459,48 @@ Executes a RapydScript code string and always returns `None`, like Python's
 > through unchanged.  `exec(code)` cannot modify the caller's local variables,
 > matching Python 3 semantics.
 
+### Complex numbers
+
+RapydScript supports Python's complex number type via the `complex` builtin and
+the `j`/`J` imaginary literal suffix.
+
+```py
+# Imaginary literal suffix
+z = 4j          # complex(0, 4)
+w = 3 + 4j      # complex(3, 4)   — parsed as 3 + complex(0, 4)
+
+# Constructor
+z1 = complex(3, 4)    # real=3, imag=4
+z2 = complex(5)       # real=5, imag=0
+z3 = complex()        # 0+0j
+z4 = complex('2-3j')  # string parsing
+
+# Attributes
+print(z1.real)   # 3
+print(z1.imag)   # 4
+
+# Methods
+print(z1.conjugate())   # (3-4j)
+print(abs(z1))          # 5.0  — dispatches __abs__
+
+# Arithmetic (requires overload_operators, which is on by default)
+from __python__ import overload_operators
+print(z1 + z2)   # (8+4j)
+print(z1 - z2)   # (-2+4j)
+print(z1 * z2)   # (15+20j)
+print(z1 / z2)   # (0.6+0.8j)
+
+# Truthiness, repr, isinstance
+print(bool(complex(0, 0)))   # False
+print(repr(z1))              # (3+4j)
+print(isinstance(z1, complex))  # True
+```
+
+The `j`/`J` suffix is handled at the tokenizer level: `4j` is parsed into an
+`AST_Call(complex, 0, 4)` node, so it composes naturally with all other
+expressions. Mixed expressions like `3 + 4j` work without `overload_operators`
+because `ρσ_list_add` dispatches `__radd__` on the right operand.
+
 ### Attribute-Access Dunders
 
 RapydScript supports the four Python attribute-interception hooks:

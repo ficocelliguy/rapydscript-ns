@@ -478,6 +478,8 @@ def ρσ_list_add(a, b):
         return ρσ_list_constructor(a.concat(b))
     if a is not None and a is not undefined and jstype(a.__add__) is 'function':
         return a.__add__(b)
+    if b is not None and b is not undefined and jstype(b.__radd__) is 'function':
+        return b.__radd__(a)
     return v'a + b'
 
 # ρσ_list_iadd: used for +=; extends a in-place when both sides are arrays (Python semantics).

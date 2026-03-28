@@ -50,6 +50,7 @@
 | f-strings, `str.format()`, `format()` builtin, all common `str.*` methods | Fully supported |
 | `abs()`, `divmod()`, `any()`, `all()`, `sum()`, `min()`, `max()` | All work |
 | `sorted()`, `reversed()`, `zip()`, `map()`, `filter()` | All work |
+| `zip(strict=True)` | Raises `ValueError` when iterables have different lengths; equal-length iterables work normally |
 | `set` with full union/intersection/difference API | Fully supported |
 | `isinstance()`, `hasattr()`, `getattr()`, `setattr()`, `dir()` | All work |
 | `bin()`, `hex()`, `oct()`, `chr()`, `ord()` | All work |
@@ -82,6 +83,7 @@
 | `float.is_integer()` | Returns `True` if the float has no fractional part (i.e. is a whole number), `False` otherwise. `float('inf').is_integer()` and `float('nan').is_integer()` both return `False`, matching Python semantics. Added to `Number.prototype` in the baselib so it works on any numeric literal or variable. |
 | `int.bit_length()` | Returns the number of bits needed to represent the integer in binary, excluding the sign and leading zeros. `(0).bit_length()` → `0`; `(255).bit_length()` → `8`; `(256).bit_length()` → `9`; sign is ignored (`(-5).bit_length()` → `3`). Added to `Number.prototype` in the baselib. |
 | Arithmetic type coercion — `TypeError` on incompatible operands | `1 + '1'` raises `TypeError: unsupported operand type(s) for +: 'int' and 'str'`; all arithmetic operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`) enforce compatible types in their `ρσ_op_*` helpers. `bool` is treated as numeric (like Python's `int` subclass). Activated by `overload_operators` (on by default). String `+` string and numeric `+` numeric are allowed; mixed types raise `TypeError` with a Python-style message. |
+| `complex(real=0, imag=0)` and complex literals `3+4j` | Full complex number type via `ρσ_complex` class. `complex(real, imag)`, `complex(string)` (parses `'3+4j'`), and `j`/`J` imaginary literal suffix (e.g. `4j`, `3.5J`). Attributes: `.real`, `.imag`. Methods: `conjugate()`, `__abs__()`, `__bool__()`, `__repr__()`, `__str__()`. Arithmetic: `+`, `-`, `*`, `/`, `**` via dunder methods (or operator overloading with `overload_operators`). `abs(z)` dispatches `__abs__`. `isinstance(z, complex)` works. String representation matches Python: `(3+4j)`, `4j`, `(3-0j)`. |
 | `eval(expr[, globals[, locals]])` | String literals are compiled as **RapydScript source** at compile time (the compiler parses and transpiles the string, just like Python's `eval` takes Python source). `eval(expr)` maps to native JS direct `eval` for scope access. `eval(expr, globals)` / `eval(expr, globals, locals)` use `Function` constructor with explicit bindings; `locals` override `globals`. Runtime `ρσ_` helpers referenced in the compiled string are automatically injected into the Function scope. Only string *literals* are transformed at compile time; dynamic strings are passed through unchanged. |
 | `exec(code[, globals[, locals]])` | String literals are compiled as **RapydScript source** at compile time. Executes the compiled code string; always returns `None`. Without `globals`/`locals` uses native `eval` (scope access). With `globals`/`locals` uses `Function` constructor — mutable objects (lists, dicts) passed in `globals` are accessible by reference, so side-effects are visible after the call. `ρσ_dict` instances (created when `dict_literals` flag is active) are correctly unwrapped via their `jsmap` backing store. |
 
@@ -139,26 +141,16 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 
 ## ❌ Not Supported — Missing from Baselib (runtime)
 
-| Feature                             | Priority                                                   |
-|-------------------------------------|------------------------------------------------------------|
-| `vars()` / `locals()` / `globals()` | 🟢 Low — not defined; use direct attribute access          |
-| `complex(real, imag)`               | 🟢 Low — no complex number type                            |
-| `input(prompt)`                     | 🔴 N/A — no simple cli input in browser; use `prompt()`    |
-| `compile()`                         | 🔴 N/A — Python compile/code objects have no JS equivalent |
-| `memoryview(obj)`                   | 🔴 N/A — no buffer protocol in browser context             |
-| `open(path)`                        | 🔴 N/A — no filesystem access in browser context           |
-
----
-
-## ❌ Not Supported — Parser / Syntax Level
-
-| Feature                                       | Priority                                                             |
-|-----------------------------------------------|----------------------------------------------------------------------|
-| `from module import *` (star imports)         | 🟢 Low — intentionally unsupported (by design, to prevent namespace pollution) |
-| `zip(strict=True)`                            | 🟢 Low                                                               |
-| `__slots__` enforcement                       | 🟢 Low — accepted but does not restrict attribute assignment         |
-| Complex number literals `3+4j`                | 🟢 Low — no `j` suffix; no complex type                              |
-| `__del__` destructor / finalizer              | 🟢 Low — JS has no guaranteed finalizer                              |
+| Feature                               | Priority                                                                      |
+|---------------------------------------|-------------------------------------------------------------------------------|
+| `vars()` / `locals()` / `globals()`   | 🟢 Low — not defined; use direct attribute access                             |
+| `__slots__` enforcement               | 🟢 Low — accepted but does not restrict attribute assignment                  |
+| `input(prompt)`                       | 🔴 N/A — no simple cli input in browser; use `prompt()`                       |
+| `compile()`                           | 🔴 N/A — Python compile/code objects have no JS equivalent                    |
+| `memoryview(obj)`                     | 🔴 N/A — no buffer protocol in browser context                                |
+| `open(path)`                          | 🔴 N/A — no filesystem access in browser context                              |
+| `from module import *` (star imports) | 🔴 N/A —intentionally unsupported (by design, to prevent namespace pollution) |
+| `__del__` destructor / finalizer      | 🔴 N/A — JS has no guaranteed finalizer                                       |
 
 ---
 
@@ -206,28 +198,24 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 
 Features that exist in RapydScript but behave differently from standard Python:
 
-| Feature | Python Behavior | RapydScript Behavior |
-|---|---|---|
-| `is` / `is not` | Object identity | Strict equality `===` / `!==` |
-| `//` floor division on floats | `math.floor(a/b)` always | Correct for integers; uses `Math.floor` (same result for well-behaved floats) |
-| `%` on negative numbers | Python modulo (always non-negative) | JS remainder (can be negative) |
-| `int` / `float` distinction | Separate types | Both are JS `number`; `isinstance(x, int)` and `isinstance(x, float)` use heuristics |
-| `dict` key ordering | Insertion order guaranteed (3.7+) | Depends on JS engine (V8 preserves insertion order in practice) |
+| Feature | Python Behavior | RapydScript Behavior                                                                                                                                                                                                       |
+|---|---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `is` / `is not` | Object identity | Strict equality `===` / `!==`, which is not object/pointer comparison for JS primitives  |
+| `//` floor division on floats | `math.floor(a/b)` always | uses `Math.floor` - same result for well-behaved floats                                                                                                                                                                    |
+| `%` on negative numbers | Python modulo (always non-negative) | JS remainder (can be negative)                                                                                                                                                                                             |
 | `global` / `nonlocal` scoping | Full cross-scope declaration | `global` works for module-level; if a variable exists in both an intermediate outer scope **and** the module-level scope, the outer scope takes precedence (differs from Python where `global` always forces module-level) |
-| `Exception.message` | Not standard; use `.args[0]` | `.message` is the standard attribute (JS `Error` style) |
-| `re` module | Full PCRE (lookbehind, full unicode, conditional groups) | No lookbehind; limited unicode property escapes; no `(?(1)...)` conditional groups |
-| Function call argument count | Too few args → `TypeError`; too many → `TypeError` | Too few args → extra params are `undefined`; too many → extras silently discarded. No `TypeError` is raised in either case. |
-| Positional-only param enforcement | Passing by keyword raises `TypeError` | Passing by keyword is silently ignored — the named arg is discarded and the parameter gets `undefined` (no error raised) |
-| Keyword-only param enforcement | Passing positionally raises `TypeError` | Passing positionally raises no error — the extra positional arg is silently discarded and the default value is used |
-| `is` / `is not` with `NaN` | `math.nan is math.nan` → `True` (same object) | `x is NaN` compiles to `isNaN(x)` (not `x === NaN`), making NaN checks work correctly |
-| `<`, `>`, `<=`, `>=` on lists / containers | Element-wise lexicographic comparison | Falls through to JS coercion — operands are stringified first (e.g. `[10] < [9]` is `True` because `'[10]' < '[9]'`). Comparison dunders (`__lt__` etc.) can be defined and called directly but are not auto-dispatched by these operators. |
-| Default `{}` dict — numeric keys | Integer keys are stored as integers | Numeric keys are auto-coerced to strings by the JS engine: `d[1]` and `d['1']` refer to the same slot |
-| Default `{}` dict — attribute access | `d.foo` raises `AttributeError` | `d.foo` and `d['foo']` access the same slot; keys are also properties |
-| String encoding | Unicode strings (full code-point aware) | UTF-16 — non-BMP characters (e.g. emoji) are stored as surrogate pairs. Use `str.uchrs()`, `str.uslice()`, `str.ulen()` for code-point-aware operations. |
-| Multiple inheritance MRO | C3 linearization (MRO) always deterministic | Built on JS prototype chain; may differ from Python's C3 MRO in complex or diamond-inheritance hierarchies |
-| Generators — output format | Native Python generator objects | Down-compiled to ES5 state-machine switch statements by default; pass `--js-version 6` for native ES6 generators (smaller and faster) |
-| Reserved keywords | Python keywords only | All JavaScript reserved words (`default`, `switch`, `delete`, `void`, `typeof`, etc.) are also reserved in RapydScript, since it compiles to JS |
-| `parenthesized with (A() as a, B() as b):` | Multiple context managers in parenthesized form (3.10+) | Not meaningful in a browser/event-driven context; multi-context `with` without parens works |
+| `Exception.message` | Not standard; use `.args[0]` | `.message` is the standard attribute (JS `Error` style)                                                                                                                                                                    |
+| Function call argument count | Too few args → `TypeError`; too many → `TypeError` | Too few args → extra params are `undefined`; too many → extras silently discarded. No `TypeError` is raised in either case.                                                                                                |
+| Positional-only param enforcement | Passing by keyword raises `TypeError` | Passing by keyword is silently ignored — the named arg is discarded and the parameter gets `undefined` (no error raised)                                                                                                   |
+| Keyword-only param enforcement | Passing positionally raises `TypeError` | Passing positionally raises no error — the extra positional arg is silently discarded and the default value is used                                                                                                        |
+| Default `{}` dict — numeric keys | Integer keys are stored as integers | Numeric keys are auto-coerced to strings by the JS engine: `d[1]` and `d['1']` refer to the same slot                                                                                                                      |
+| Default `{}` dict — attribute access | `d.foo` raises `AttributeError` | `d.foo` and `d['foo']` access the same slot; keys are also properties                                                                                                                                                      |
+| String encoding | Unicode strings (full code-point aware) | UTF-16 — non-BMP characters (e.g. emoji) are stored as surrogate pairs. Use `str.uchrs()`, `str.uslice()`, `str.ulen()` for code-point-aware operations.                                                                   |
+| Multiple inheritance MRO | C3 linearization (MRO) always deterministic | Built on JS prototype chain; may differ from Python's C3 MRO in complex or diamond-inheritance hierarchies                                                                                                                 |
+| Generators — output format | Native Python generator objects | Down-compiled to ES5 state-machine switch statements by default; pass `--js-version 6` for native ES6 generators (smaller and faster)                                                                                      |
+| `dict` key ordering | Insertion order guaranteed (3.7+) | Depends on JS engine (V8 preserves insertion order in practice)                                                                                                                                                            |
+| Reserved keywords | Python keywords only | All JavaScript reserved words (`default`, `switch`, `delete`, `void`, `typeof`, etc.) are also reserved in RapydScript, since it compiles to JS                                                                            |
+| `parenthesized with (A() as a, B() as b):` | Multiple context managers in parenthesized form (3.10+) | Not meaningful in a browser/event-driven context; multi-context `with` without parens works                                                                                                                                |
 
 ---
 

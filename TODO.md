@@ -15,7 +15,7 @@
 - examples of using js libraries in rapydscript in readme?
 
 
-I would like you to add support for [ <, >, <=, >= on lists / containers (python-style, not the javascript type coercion fallthrough) ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [complex(real, imag) and Complex number literals `3+4j`   ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Please ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Please make sure it works in the web-repl too. Please also update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Please also add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 # Example: Tuple Literals
 
@@ -323,4 +323,41 @@ try:
     result = [1, 2] < 5
 except TypeError as e:
     print(e)   # '<' not supported between instances of 'list' and 'int'
+```
+
+# Example: zip(strict=True)
+
+```py
+keys = ['a', 'b', 'c']
+values = [1, 2, 3]
+
+# Paired iteration — strict mode ensures lengths match
+for k, v in zip(keys, values, strict=True):
+    print(k, v)   # a 1 / b 2 / c 3
+
+# Mismatched lengths raise ValueError
+try:
+    list(zip([1, 2], [10], strict=True))
+except ValueError as e:
+    print(e)   # zip() has arguments with different lengths
+```
+
+# Example: Complex Numbers
+
+```py
+# Complex number literals and arithmetic
+z1 = 3 + 4j
+z2 = complex(1, -2)
+
+print(z1.real, z1.imag)   # 3 4
+print(abs(z1))             # 5.0
+print(z1.conjugate())      # (3-4j)
+print(z1 + z2)             # (4+2j)
+print(z1 * z2)             # (11-2j)
+
+# String parsing
+z3 = complex('2+3j')
+print(z3)                  # (2+3j)
+
+print(isinstance(z1, complex))  # True
 ```
