@@ -947,21 +947,1663 @@ if (!ρσ_slice.prototype.__eq__.__argnames__) Object.defineProperties(ρσ_slic
 if (!ρσ_slice.prototype.__hash__.__module__) Object.defineProperties(ρσ_slice.prototype.__hash__, {
     __module__ : {value: "__main__"}
 });
+ρσ_slice.prototype.__format__ = function __format__ () {
+        if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(ρσ_slice.prototype, "__bases__", {value: []});
 ρσ_slice.__name__ = "ρσ_slice";
 ρσ_slice.__qualname__ = "ρσ_slice";
 ρσ_slice.__module__ = "__main__";
 Object.defineProperty(ρσ_slice.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
 
-var abs = Math.abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type;
-var float = ρσ_float, int = ρσ_int, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike;
+function ρσ_object() {
+    if (!(this instanceof ρσ_object)) return new ρσ_object(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ρσ_object.prototype.__init__.apply(this, arguments);
+}
+ρσ_object.prototype.__init__ = function __init__() {
+    var self = this;
+};
+if (!ρσ_object.prototype.__init__.__module__) Object.defineProperties(ρσ_object.prototype.__init__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_object.__argnames__ = ρσ_object.prototype.__init__.__argnames__;
+ρσ_object.__handles_kwarg_interpolation__ = ρσ_object.prototype.__init__.__handles_kwarg_interpolation__;
+ρσ_object.prototype.__repr__ = function __repr__() {
+    var self = this;
+    if (this.ρσ_object_id === undefined) this.ρσ_object_id = ++ρσ_hash_id_counter;
+    return ρσ_list_add(ρσ_list_add("<object object at 0x", this.ρσ_object_id.toString(16)), ">");
+};
+if (!ρσ_object.prototype.__repr__.__module__) Object.defineProperties(ρσ_object.prototype.__repr__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_object.prototype.__str__ = function __str__() {
+    var self = this;
+    return self.__repr__();
+};
+if (!ρσ_object.prototype.__str__.__module__) Object.defineProperties(ρσ_object.prototype.__str__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_object.prototype.__eq__ = function __eq__(other) {
+    var self = this;
+    return self === other;
+};
+if (!ρσ_object.prototype.__eq__.__argnames__) Object.defineProperties(ρσ_object.prototype.__eq__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_object.prototype.__hash__ = function __hash__() {
+    var self = this;
+    if (this.ρσ_object_id === undefined) this.ρσ_object_id = ++ρσ_hash_id_counter;
+    return self.ρσ_object_id;
+};
+if (!ρσ_object.prototype.__hash__.__module__) Object.defineProperties(ρσ_object.prototype.__hash__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_object.prototype.__format__ = function __format__ () {
+        if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
+Object.defineProperty(ρσ_object.prototype, "__bases__", {value: []});
+ρσ_object.__name__ = "ρσ_object";
+ρσ_object.__qualname__ = "ρσ_object";
+ρσ_object.__module__ = "__main__";
+Object.defineProperty(ρσ_object.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+
+ρσ_object.__name__ = "object";
+function ρσ_exec(code, globals, locals) {
+    if (globals === undefined) {
+        eval(code);
+        return null;
+    }
+    
+    function _ρσ_to_obj(d) {
+        if (d == null) return {};
+        if (typeof ρσ_dict === "function" && d instanceof ρσ_dict) {
+            var _r = {}; d.jsmap.forEach(function(v, k) { _r[k] = v; }); return _r;
+        }
+        return Object.assign({}, d);
+    }
+    var _ctx = _ρσ_to_obj(globals);
+    if (locals !== undefined) Object.assign(_ctx, _ρσ_to_obj(locals));
+    var _rσ_refs = code.match(/ρσ_\w+/g) || [];
+    _rσ_refs.forEach(function(name) {
+        if (!Object.prototype.hasOwnProperty.call(_ctx, name)) {
+            try { var _v = eval(name); if (_v !== undefined) _ctx[name] = _v; } catch(e) {}
+        }
+    });
+    var _keys = Object.keys(_ctx);
+    var _vals = _keys.map(function(k) { return _ctx[k]; });
+    Function.apply(null, _keys.concat([code])).apply(null, _vals);
+    ;
+    return null;
+};
+if (!ρσ_exec.__argnames__) Object.defineProperties(ρσ_exec, {
+    __argnames__ : {value: ["code", "globals", "locals"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_exec.__name__ = "exec";
+function ρσ_eval(expr, globals, locals) {
+    
+    function _ρσ_to_obj(d) {
+        if (d == null) return {};
+        if (typeof ρσ_dict === "function" && d instanceof ρσ_dict) {
+            var _r = {}; d.jsmap.forEach(function(v, k) { _r[k] = v; }); return _r;
+        }
+        return Object.assign({}, d);
+    }
+    var _ctx = (globals !== undefined) ? _ρσ_to_obj(globals) : {};
+    if (locals !== undefined) Object.assign(_ctx, _ρσ_to_obj(locals));
+    var _rσ_refs = expr.match(/ρσ_\w+/g) || [];
+    _rσ_refs.forEach(function(name) {
+        if (!Object.prototype.hasOwnProperty.call(_ctx, name)) {
+            try { var _v = eval(name); if (_v !== undefined) _ctx[name] = _v; } catch(e) {}
+        }
+    });
+    var _keys = Object.keys(_ctx);
+    var _vals = _keys.map(function(k) { return _ctx[k]; });
+    return Function.apply(null, _keys.concat(['return (' + expr + ')'])).apply(null, _vals);
+    ;
+};
+if (!ρσ_eval.__argnames__) Object.defineProperties(ρσ_eval, {
+    __argnames__ : {value: ["expr", "globals", "locals"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_eval.__name__ = "eval";
+function ρσ_vars(obj) {
+    
+    var _d;
+    if (typeof ρσ_dict === "function") {
+        _d = new ρσ_dict();
+        if (obj !== undefined && obj !== null) {
+            Object.keys(obj).forEach(function(k) {
+                if (k.charCodeAt(0) !== 0x03c1) { _d.jsmap.set(k, obj[k]); }
+            });
+        }
+    } else {
+        _d = Object.create(null);
+        if (obj !== undefined && obj !== null) {
+            Object.keys(obj).forEach(function(k) {
+                if (k.charCodeAt(0) !== 0x03c1) { _d[k] = obj[k]; }
+            });
+        }
+    }
+    ;
+    return _d;
+};
+if (!ρσ_vars.__argnames__) Object.defineProperties(ρσ_vars, {
+    __argnames__ : {value: ["obj"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_vars.__name__ = "vars";
+function ρσ_locals() {
+    
+    var _d;
+    if (typeof ρσ_dict === "function") { _d = new ρσ_dict(); } else { _d = Object.create(null); }
+    ;
+    return _d;
+};
+if (!ρσ_locals.__module__) Object.defineProperties(ρσ_locals, {
+    __module__ : {value: "__main__"}
+});
+
+ρσ_locals.__name__ = "locals";
+function ρσ_globals() {
+    
+    var _g = (typeof globalThis !== "undefined") ? globalThis : (typeof window !== "undefined" ? window : (typeof global !== "undefined" ? global : {}));
+    var _d;
+    if (typeof ρσ_dict === "function") {
+        _d = new ρσ_dict();
+        Object.keys(_g).forEach(function(k) { _d.jsmap.set(k, _g[k]); });
+    } else {
+        _d = Object.create(null);
+        Object.keys(_g).forEach(function(k) { _d[k] = _g[k]; });
+    }
+    ;
+    return _d;
+};
+if (!ρσ_globals.__module__) Object.defineProperties(ρσ_globals, {
+    __module__ : {value: "__main__"}
+});
+
+ρσ_globals.__name__ = "globals";
+function ρσ_abs(x) {
+    if (x !== null && typeof x.__abs__ === "function") {
+        return x.__abs__();
+    }
+    return Math.abs(x);
+};
+if (!ρσ_abs.__argnames__) Object.defineProperties(ρσ_abs, {
+    __argnames__ : {value: ["x"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_abs.__name__ = "abs";
+function ρσ_complex() {
+    if (!(this instanceof ρσ_complex)) return new ρσ_complex(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ρσ_complex.prototype.__init__.apply(this, arguments);
+}
+ρσ_complex.prototype.__init__ = function __init__(real, imag) {
+    var self = this;
+    var nargs, x, s, m_mixed, m_imag, m_real, ims;
+    nargs = arguments.length;
+    if (nargs === 0) {
+        self.real = 0;
+        self.imag = 0;
+    } else if (nargs >= 2) {
+        if (typeof real !== "number" && typeof real !== "boolean") {
+            throw new TypeError(ρσ_list_add(ρσ_list_add("complex() first argument must be a number, not '", typeof real), "'"));
+        }
+        if (typeof imag !== "number" && typeof imag !== "boolean") {
+            throw new TypeError(ρσ_list_add(ρσ_list_add("complex() second argument must be a number, not '", typeof imag), "'"));
+        }
+        self.real = +real;
+        self.imag = +imag;
+    } else {
+        x = real;
+        if (x instanceof ρσ_complex) {
+            self.real = x.real;
+            self.imag = x.imag;
+        } else if (typeof x === "number" || typeof x === "boolean") {
+            self.real = +x;
+            self.imag = 0;
+        } else if (typeof x === "string" || x instanceof String) {
+            s = new String(x).trim();
+            m_mixed = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)([+-](?:(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)?)[jJ]$/.exec(s);
+            m_imag = /^([+-]?(?:(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)?)[jJ]$/.exec(s);
+            m_real = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)$/.exec(s);
+            if (m_mixed) {
+                self.real = parseFloat(m_mixed[1]);
+                ims = m_mixed[2];
+                if (ims === "+") {
+                    self.imag = 1;
+                } else if (ims === "-") {
+                    self.imag = -1;
+                } else {
+                    self.imag = parseFloat(ims);
+                }
+            } else if (m_imag) {
+                self.real = 0;
+                ims = m_imag[1];
+                if (!ims || ims === "+") {
+                    self.imag = 1;
+                } else if (ims === "-") {
+                    self.imag = -1;
+                } else {
+                    self.imag = parseFloat(ims);
+                }
+            } else if (m_real) {
+                self.real = parseFloat(m_real[1]);
+                self.imag = 0;
+            } else {
+                throw new ValueError("complex() arg is a malformed string");
+            }
+        } else {
+            throw new TypeError("complex() argument must be a string or a number");
+        }
+    }
+};
+if (!ρσ_complex.prototype.__init__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__init__, {
+    __argnames__ : {value: ["real", "imag"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.__argnames__ = ρσ_complex.prototype.__init__.__argnames__;
+ρσ_complex.__handles_kwarg_interpolation__ = ρσ_complex.prototype.__init__.__handles_kwarg_interpolation__;
+ρσ_complex.prototype.__add__ = function __add__(other) {
+    var self = this;
+    if (other instanceof ρσ_complex) {
+        return new ρσ_complex(ρσ_list_add(self.real, other.real), ρσ_list_add(self.imag, other.imag));
+    }
+    if (typeof other === "number" || typeof other === "boolean") {
+        return new ρσ_complex(ρσ_list_add(self.real, other), self.imag);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for +: 'complex' and '", typeof other), "'"));
+};
+if (!ρσ_complex.prototype.__add__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__add__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__radd__ = function __radd__(other) {
+    var self = this;
+    if (typeof other === "number" || typeof other === "boolean") {
+        return new ρσ_complex(ρσ_list_add(other, self.real), self.imag);
+    }
+    if (other instanceof ρσ_complex) {
+        return new ρσ_complex(ρσ_list_add(other.real, self.real), ρσ_list_add(other.imag, self.imag));
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for +: '", typeof other), "' and 'complex'"));
+};
+if (!ρσ_complex.prototype.__radd__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__radd__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__sub__ = function __sub__(other) {
+    var self = this;
+    if (other instanceof ρσ_complex) {
+        return new ρσ_complex(self.real - other.real, self.imag - other.imag);
+    }
+    if (typeof other === "number" || typeof other === "boolean") {
+        return new ρσ_complex(self.real - other, self.imag);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for -: 'complex' and '", typeof other), "'"));
+};
+if (!ρσ_complex.prototype.__sub__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__sub__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__rsub__ = function __rsub__(other) {
+    var self = this;
+    if (typeof other === "number" || typeof other === "boolean") {
+        return new ρσ_complex(other - self.real, -self.imag);
+    }
+    if (other instanceof ρσ_complex) {
+        return new ρσ_complex(other.real - self.real, other.imag - self.imag);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for -: '", typeof other), "' and 'complex'"));
+};
+if (!ρσ_complex.prototype.__rsub__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__rsub__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__mul__ = function __mul__(other) {
+    var self = this;
+    if (other instanceof ρσ_complex) {
+        return new ρσ_complex(self.real * other.real - self.imag * other.imag, ρσ_list_add(self.real * other.imag, self.imag * other.real));
+    }
+    if (typeof other === "number" || typeof other === "boolean") {
+        return new ρσ_complex(self.real * other, self.imag * other);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for *: 'complex' and '", typeof other), "'"));
+};
+if (!ρσ_complex.prototype.__mul__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__mul__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__rmul__ = function __rmul__(other) {
+    var self = this;
+    if (typeof other === "number" || typeof other === "boolean") {
+        return new ρσ_complex(other * self.real, other * self.imag);
+    }
+    if (other instanceof ρσ_complex) {
+        return new ρσ_complex(other.real * self.real - other.imag * self.imag, ρσ_list_add(other.real * self.imag, other.imag * self.real));
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for *: '", typeof other), "' and 'complex'"));
+};
+if (!ρσ_complex.prototype.__rmul__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__rmul__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__truediv__ = function __truediv__(other) {
+    var self = this;
+    var denom;
+    if (other instanceof ρσ_complex) {
+        denom = ρσ_list_add(other.real * other.real, other.imag * other.imag);
+        if (denom === 0) {
+            throw new ZeroDivisionError("complex division by zero");
+        }
+        return new ρσ_complex((ρσ_list_add(self.real * other.real, self.imag * other.imag)) / denom, (self.imag * other.real - self.real * other.imag) / denom);
+    }
+    if (typeof other === "number" || typeof other === "boolean") {
+        if (other === 0) {
+            throw new ZeroDivisionError("complex division by zero");
+        }
+        return new ρσ_complex(self.real / other, self.imag / other);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for /: 'complex' and '", typeof other), "'"));
+};
+if (!ρσ_complex.prototype.__truediv__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__truediv__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__rtruediv__ = function __rtruediv__(other) {
+    var self = this;
+    var denom;
+    denom = ρσ_list_add(self.real * self.real, self.imag * self.imag);
+    if (denom === 0) {
+        throw new ZeroDivisionError("complex division by zero");
+    }
+    if (typeof other === "number" || typeof other === "boolean") {
+        return new ρσ_complex(other * self.real / denom, -other * self.imag / denom);
+    }
+    if (other instanceof ρσ_complex) {
+        return new ρσ_complex((ρσ_list_add(other.real * self.real, other.imag * self.imag)) / denom, (other.imag * self.real - other.real * self.imag) / denom);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for /: '", typeof other), "' and 'complex'"));
+};
+if (!ρσ_complex.prototype.__rtruediv__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__rtruediv__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__pow__ = function __pow__(other) {
+    var self = this;
+    var r, theta, rn, log_r, c, d, re_prod, im_prod, exp_re;
+    if (typeof other === "number" || typeof other === "boolean") {
+        r = Math.sqrt(ρσ_list_add(self.real * self.real, self.imag * self.imag));
+        if (r === 0) {
+            return new ρσ_complex(0, 0);
+        }
+        theta = Math.atan2(self.imag, self.real);
+        rn = Math.pow(r, other);
+        return new ρσ_complex(rn * Math.cos(other * theta), rn * Math.sin(other * theta));
+    }
+    if (other instanceof ρσ_complex) {
+        r = Math.sqrt(ρσ_list_add(self.real * self.real, self.imag * self.imag));
+        if (r === 0) {
+            return new ρσ_complex(0, 0);
+        }
+        theta = Math.atan2(self.imag, self.real);
+        log_r = Math.log(r);
+        c = other.real;
+        d = other.imag;
+        re_prod = c * log_r - d * theta;
+        im_prod = ρσ_list_add(d * log_r, c * theta);
+        exp_re = Math.exp(re_prod);
+        return new ρσ_complex(exp_re * Math.cos(im_prod), exp_re * Math.sin(im_prod));
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for **: 'complex' and '", typeof other), "'"));
+};
+if (!ρσ_complex.prototype.__pow__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__pow__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__rpow__ = function __rpow__(other) {
+    var self = this;
+    var base;
+    if (typeof other === "number" || typeof other === "boolean") {
+        base = new ρσ_complex(other, 0);
+        return base.__pow__(self);
+    }
+    if (other instanceof ρσ_complex) {
+        return other.__pow__(self);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for **: '", typeof other), "' and 'complex'"));
+};
+if (!ρσ_complex.prototype.__rpow__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__rpow__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__neg__ = function __neg__() {
+    var self = this;
+    return new ρσ_complex(-self.real, -self.imag);
+};
+if (!ρσ_complex.prototype.__neg__.__module__) Object.defineProperties(ρσ_complex.prototype.__neg__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__pos__ = function __pos__() {
+    var self = this;
+    return new ρσ_complex(self.real, self.imag);
+};
+if (!ρσ_complex.prototype.__pos__.__module__) Object.defineProperties(ρσ_complex.prototype.__pos__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__abs__ = function __abs__() {
+    var self = this;
+    return Math.sqrt(ρσ_list_add(self.real * self.real, self.imag * self.imag));
+};
+if (!ρσ_complex.prototype.__abs__.__module__) Object.defineProperties(ρσ_complex.prototype.__abs__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__bool__ = function __bool__() {
+    var self = this;
+    return self.real !== 0 || self.imag !== 0;
+};
+if (!ρσ_complex.prototype.__bool__.__module__) Object.defineProperties(ρσ_complex.prototype.__bool__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__eq__ = function __eq__(other) {
+    var self = this;
+    if (other instanceof ρσ_complex) {
+        return self.real === other.real && self.imag === other.imag;
+    }
+    if (typeof other === "number" || typeof other === "boolean") {
+        return self.imag === 0 && self.real === other;
+    }
+    return false;
+};
+if (!ρσ_complex.prototype.__eq__.__argnames__) Object.defineProperties(ρσ_complex.prototype.__eq__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__hash__ = function __hash__() {
+    var self = this;
+    if (self.imag === 0) {
+        return self.real | 0;
+    }
+    return (self.real * 1000003 ^ self.imag) | 0;
+};
+if (!ρσ_complex.prototype.__hash__.__module__) Object.defineProperties(ρσ_complex.prototype.__hash__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.conjugate = function conjugate() {
+    var self = this;
+    return new ρσ_complex(self.real, -self.imag);
+};
+if (!ρσ_complex.prototype.conjugate.__module__) Object.defineProperties(ρσ_complex.prototype.conjugate, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__repr__ = function __repr__() {
+    var self = this;
+    var r, i, r_str, i_str;
+    r = self.real;
+    i = self.imag;
+    if (r === 0 && i === 0) {
+        return "0j";
+    }
+    r_str = new String(r);
+    i_str = new String(i);
+    if (r === 0) {
+        return ρσ_list_add(i_str, "j");
+    }
+    if (i >= 0 || isNaN(i)) {
+        return ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("(", r_str), "+"), i_str), "j)");
+    }
+    return ρσ_list_add(ρσ_list_add(ρσ_list_add("(", r_str), i_str), "j)");
+};
+if (!ρσ_complex.prototype.__repr__.__module__) Object.defineProperties(ρσ_complex.prototype.__repr__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__str__ = function __str__() {
+    var self = this;
+    return self.__repr__();
+};
+if (!ρσ_complex.prototype.__str__.__module__) Object.defineProperties(ρσ_complex.prototype.__str__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_complex.prototype.__format__ = function __format__ () {
+        if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
+Object.defineProperty(ρσ_complex.prototype, "__bases__", {value: []});
+ρσ_complex.__name__ = "ρσ_complex";
+ρσ_complex.__qualname__ = "ρσ_complex";
+ρσ_complex.__module__ = "__main__";
+Object.defineProperty(ρσ_complex.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+
+ρσ_complex.__name__ = "complex";
+var abs = ρσ_abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type;
+var float = ρσ_float, int = ρσ_int, complex = ρσ_complex, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike;
 var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__;
 var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round;
 var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len;
 var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next;
+var exec = ρσ_exec;
+var vars = ρσ_vars, locals = ρσ_locals, globals = ρσ_globals;
 var ρσ_Ellipsis = Object.freeze({toString: function(){return "Ellipsis";}, __repr__: function(){return "Ellipsis";}});
 var Ellipsis = ρσ_Ellipsis;
-var slice = ρσ_slice;function ρσ_equals(a, b) {
+var slice = ρσ_slice;
+var object = ρσ_object;
+Number.prototype.is_integer = function() { return isFinite(+this) && (+this) % 1 === 0; };
+Number.prototype.bit_length = function() { var n = Math.abs(Math.trunc(+this)); if (n === 0) return 0; return Math.floor(Math.log2(n)) + 1; };function ρσ_bytes_utf8_encode(s) {
+    var out, c, i, c2, cp;
+    if (typeof TextEncoder !== "undefined") {
+        return Array.from(new TextEncoder().encode(s));
+    }
+    out = ρσ_list_decorate([]);
+    for (var i = 0; i < s.length; i++) {
+        c = s.charCodeAt(i);
+        if (c < 128) {
+            out.push(c);
+        } else if (c < 2048) {
+            out.push(192 | c >> 6);
+            out.push(128 | c & 63);
+        } else if (c >= 55296 && c <= 56319) {
+            i = ρσ_list_iadd(i, 1);
+            c2 = s.charCodeAt(i);
+            cp = ρσ_list_add(ρσ_list_add(65536, (c - 55296 << 10)), (c2 - 56320));
+            out.push(240 | cp >> 18);
+            out.push(128 | cp >> 12 & 63);
+            out.push(128 | cp >> 6 & 63);
+            out.push(128 | cp & 63);
+        } else {
+            out.push(224 | c >> 12);
+            out.push(128 | c >> 6 & 63);
+            out.push(128 | c & 63);
+        }
+    }
+    return out;
+};
+if (!ρσ_bytes_utf8_encode.__argnames__) Object.defineProperties(ρσ_bytes_utf8_encode, {
+    __argnames__ : {value: ["s"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_bytes_utf8_decode(data) {
+    var out, i, b, cp;
+    if (typeof TextDecoder !== "undefined") {
+        return new TextDecoder("utf-8").decode(new Uint8Array(data));
+    }
+    out = ρσ_list_decorate([]);
+    i = 0;
+    while (i < data.length) {
+        b = data[(typeof i === "number" && i < 0) ? data.length + i : i];
+        if (b < 128) {
+            out.push(String.fromCharCode(b));
+            i = ρσ_list_iadd(i, 1);
+        } else if (b < 224) {
+            cp = (b & 31) << 6 | data[ρσ_bound_index(ρσ_list_add(i, 1), data)] & 63;
+            out.push(String.fromCharCode(cp));
+            i = ρσ_list_iadd(i, 2);
+        } else if (b < 240) {
+            cp = (b & 15) << 12 | (data[ρσ_bound_index(ρσ_list_add(i, 1), data)] & 63) << 6 | data[ρσ_bound_index(ρσ_list_add(i, 2), data)] & 63;
+            out.push(String.fromCharCode(cp));
+            i = ρσ_list_iadd(i, 3);
+        } else {
+            cp = (b & 7) << 18 | (data[ρσ_bound_index(ρσ_list_add(i, 1), data)] & 63) << 12 | (data[ρσ_bound_index(ρσ_list_add(i, 2), data)] & 63) << 6 | data[ρσ_bound_index(ρσ_list_add(i, 3), data)] & 63;
+            cp -= 65536;
+            out.push(String.fromCharCode(ρσ_list_add(55296, (cp >> 10))));
+            out.push(String.fromCharCode(ρσ_list_add(56320, (cp & 1023))));
+            i = ρσ_list_iadd(i, 4);
+        }
+    }
+    return out.join("");
+};
+if (!ρσ_bytes_utf8_decode.__argnames__) Object.defineProperties(ρσ_bytes_utf8_decode, {
+    __argnames__ : {value: ["data"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_bytes_latin1_encode(s) {
+    var out, c;
+    out = ρσ_list_decorate([]);
+    for (var i = 0; i < s.length; i++) {
+        c = s.charCodeAt(i);
+        if (c > 255) {
+            throw UnicodeEncodeError("latin-1", s, i, ρσ_list_add(i, 1), "ordinal not in range(256)");
+        }
+        out.push(c);
+    }
+    return out;
+};
+if (!ρσ_bytes_latin1_encode.__argnames__) Object.defineProperties(ρσ_bytes_latin1_encode, {
+    __argnames__ : {value: ["s"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_bytes_latin1_decode(data) {
+    var chars;
+    chars = ρσ_list_decorate([]);
+    for (var i = 0; i < data.length; i++) {
+        chars.push(String.fromCharCode(data[(typeof i === "number" && i < 0) ? data.length + i : i]));
+    }
+    return chars.join("");
+};
+if (!ρσ_bytes_latin1_decode.__argnames__) Object.defineProperties(ρσ_bytes_latin1_decode, {
+    __argnames__ : {value: ["data"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_bytes_from_source(source, encoding, errors) {
+    var data, n, enc, b, x, iterator, result;
+    data = ρσ_list_decorate([]);
+    if (arguments.length === 0 || source === null || source === undefined) {
+    } else if (typeof source === "number") {
+        n = source | 0;
+        if (n < 0) {
+            throw new ValueError("negative count");
+        }
+        for (var i = 0; i < n; i++) {
+            data.push(0);
+        }
+    } else if (typeof source === "string") {
+        enc = (encoding || "utf-8").toLowerCase().replace(/-|_/g, "");
+        if (enc === "utf8") {
+            data = ρσ_bytes_utf8_encode(source);
+        } else if (enc === "latin1" || enc === "iso88591" || enc === "ascii") {
+            data = ρσ_bytes_latin1_encode(source);
+        } else {
+            throw LookupError(ρσ_list_add("unknown encoding: ", (encoding || "utf-8")));
+        }
+    } else if (source instanceof ρσ_bytes || source instanceof ρσ_bytearray) {
+        data = source._data.slice();
+    } else if (source instanceof Uint8Array || source instanceof Int8Array) {
+        for (var i = 0; i < source.length; i++) {
+            data.push(source[(typeof i === "number" && i < 0) ? source.length + i : i] & 255);
+        }
+    } else if (ρσ_arraylike(source) || Array.isArray(source)) {
+        var ρσ_Iter0 = ρσ_Iterable(source);
+        for (var ρσ_Index0 = 0; ρσ_Index0 < ρσ_Iter0.length; ρσ_Index0++) {
+            x = ρσ_Iter0[ρσ_Index0];
+            b = x | 0;
+            if (b < 0 || b > 255) {
+                throw new ValueError("bytes must be in range(0, 256)");
+            }
+            data.push(b);
+        }
+    } else if (typeof source[ρσ_iterator_symbol] === "function") {
+        iterator = source[ρσ_iterator_symbol]();
+        result = iterator.next();
+        while (!result.done) {
+            b = result.value | 0;
+            if (b < 0 || b > 255) {
+                throw new ValueError("bytes must be in range(0, 256)");
+            }
+            data.push(b);
+            result = iterator.next();
+        }
+    } else {
+        throw new TypeError(ρσ_list_add(ρσ_list_add("cannot convert '", typeof source), "' object to bytes-like object"));
+    }
+    return data;
+};
+if (!ρσ_bytes_from_source.__argnames__) Object.defineProperties(ρσ_bytes_from_source, {
+    __argnames__ : {value: ["source", "encoding", "errors"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_bytes_sync(obj) {
+    var data, old_len, new_len;
+    data = obj._data;
+    old_len = obj.length | 0;
+    new_len = data.length;
+    for (var i = new_len; i < old_len; i++) {
+        delete obj[i];
+    }
+    for (var i = 0; i < new_len; i++) {
+        obj[(typeof i === "number" && i < 0) ? obj.length + i : i] = data[(typeof i === "number" && i < 0) ? data.length + i : i];
+    }
+    obj.length = new_len;
+};
+if (!ρσ_bytes_sync.__argnames__) Object.defineProperties(ρσ_bytes_sync, {
+    __argnames__ : {value: ["obj"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_bytes_find(haystack, needle, start) {
+    var hl, nl, ok;
+    hl = haystack.length;
+    nl = needle.length;
+    if (nl === 0) {
+        return start;
+    }
+    for (var i = start; i <= hl - nl; i++) {
+        ok = true;
+        for (var j = 0; j < nl; j++) {
+            if (haystack[ρσ_bound_index(ρσ_list_add(i, j), haystack)] !== needle[(typeof j === "number" && j < 0) ? needle.length + j : j]) {
+                ok = false;
+                break;
+            }
+        }
+        if (ok) {
+            return i;
+        }
+    }
+    return -1;
+};
+if (!ρσ_bytes_find.__argnames__) Object.defineProperties(ρσ_bytes_find, {
+    __argnames__ : {value: ["haystack", "needle", "start"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_bytes() {
+    if (!(this instanceof ρσ_bytes)) return new ρσ_bytes(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ρσ_bytes.prototype.__init__.apply(this, arguments);
+}
+ρσ_bytes.prototype.__init__ = function __init__(source, encoding, errors) {
+    var self = this;
+    self._data = ρσ_bytes_from_source.apply(null, arguments);
+    ρσ_bytes_sync(self);
+};
+if (!ρσ_bytes.prototype.__init__.__argnames__) Object.defineProperties(ρσ_bytes.prototype.__init__, {
+    __argnames__ : {value: ["source", "encoding", "errors"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.__argnames__ = ρσ_bytes.prototype.__init__.__argnames__;
+ρσ_bytes.__handles_kwarg_interpolation__ = ρσ_bytes.prototype.__init__.__handles_kwarg_interpolation__;
+ρσ_bytes.prototype.__len__ = function __len__() {
+    var self = this;
+    return self._data.length;
+};
+if (!ρσ_bytes.prototype.__len__.__module__) Object.defineProperties(ρσ_bytes.prototype.__len__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__getitem__ = function __getitem__(key) {
+    var self = this;
+    var indices, start, stop, step, result, n;
+    if (key instanceof ρσ_slice) {
+        indices = key.indices(self._data.length);
+        start = indices[0];
+        stop = indices[1];
+        step = indices[2];
+        result = ρσ_list_decorate([]);
+        if (step > 0) {
+            for (var i = start; i < stop; i += step) {
+                result.push((ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]);
+            }
+        } else {
+            for (var i = start; i > stop; i += step) {
+                result.push((ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]);
+            }
+        }
+        return new ρσ_bytes(result);
+    }
+    n = key | 0;
+    if (n < 0) {
+        n = ρσ_list_iadd(n, self._data.length);
+    }
+    if (n < 0 || n >= self._data.length) {
+        throw new IndexError("index out of range");
+    }
+    return (ρσ_expr_temp = self._data)[(typeof n === "number" && n < 0) ? ρσ_expr_temp.length + n : n];
+};
+if (!ρσ_bytes.prototype.__getitem__.__argnames__) Object.defineProperties(ρσ_bytes.prototype.__getitem__, {
+    __argnames__ : {value: ["key"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__contains__ = function __contains__(item) {
+    var self = this;
+    var b;
+    if (item instanceof ρσ_bytes || item instanceof ρσ_bytearray) {
+        return ρσ_bytes_find(self._data, item._data, 0) >= 0;
+    }
+    b = item | 0;
+    for (var i = 0; i < this._data.length; i++) {
+        if ((ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] === b) {
+            return true;
+        }
+    }
+    return false;
+};
+if (!ρσ_bytes.prototype.__contains__.__argnames__) Object.defineProperties(ρσ_bytes.prototype.__contains__, {
+    __argnames__ : {value: ["item"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__add__ = function __add__(other) {
+    var self = this;
+    if (!((other instanceof ρσ_bytes || other instanceof ρσ_bytearray))) {
+        throw new TypeError("can't concat bytes-like objects of different types");
+    }
+    return new ρσ_bytes(self._data.concat(other._data));
+};
+if (!ρσ_bytes.prototype.__add__.__argnames__) Object.defineProperties(ρσ_bytes.prototype.__add__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__mul__ = function __mul__(n) {
+    var self = this;
+    var result;
+    result = ρσ_list_decorate([]);
+    for (var k = 0; k < n; k++) {
+        for (var j = 0; j < this._data.length; j++) {
+            result.push((ρσ_expr_temp = self._data)[(typeof j === "number" && j < 0) ? ρσ_expr_temp.length + j : j]);
+        }
+    }
+    return new ρσ_bytes(result);
+};
+if (!ρσ_bytes.prototype.__mul__.__argnames__) Object.defineProperties(ρσ_bytes.prototype.__mul__, {
+    __argnames__ : {value: ["n"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__rmul__ = function __rmul__(n) {
+    var self = this;
+    return self.__mul__(n);
+};
+if (!ρσ_bytes.prototype.__rmul__.__argnames__) Object.defineProperties(ρσ_bytes.prototype.__rmul__, {
+    __argnames__ : {value: ["n"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__eq__ = function __eq__(other) {
+    var self = this;
+    if (!((other instanceof ρσ_bytes || other instanceof ρσ_bytearray))) {
+        return false;
+    }
+    if (self._data.length !== other._data.length) {
+        return false;
+    }
+    for (var i = 0; i < this._data.length; i++) {
+        if ((ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] !== (ρσ_expr_temp = other._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]) {
+            return false;
+        }
+    }
+    return true;
+};
+if (!ρσ_bytes.prototype.__eq__.__argnames__) Object.defineProperties(ρσ_bytes.prototype.__eq__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__iter__ = function __iter__() {
+    var self = this;
+    return iter(self._data);
+};
+if (!ρσ_bytes.prototype.__iter__.__module__) Object.defineProperties(ρσ_bytes.prototype.__iter__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype[ρσ_iterator_symbol] = ρσ_bytes.prototype.__iter__;
+ρσ_bytes.prototype.__bool__ = function __bool__() {
+    var self = this;
+    return self._data.length > 0;
+};
+if (!ρσ_bytes.prototype.__bool__.__module__) Object.defineProperties(ρσ_bytes.prototype.__bool__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__repr__ = function __repr__() {
+    var self = this;
+    var parts, b, h;
+    parts = ρσ_list_decorate([ "b'" ]);
+    for (var i = 0; i < this._data.length; i++) {
+        b = (ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i];
+        if (b === 9) {
+            parts.push("\\t");
+        } else if (b === 10) {
+            parts.push("\\n");
+        } else if (b === 13) {
+            parts.push("\\r");
+        } else if (b === 39) {
+            parts.push("\\'");
+        } else if (b === 92) {
+            parts.push("\\\\");
+        } else if (b >= 32 && b < 127) {
+            parts.push(String.fromCharCode(b));
+        } else {
+            h = b.toString(16);
+            parts.push(ρσ_list_add(ρσ_list_add("\\x", ((h.length < 2) ? "0" : "")), h));
+        }
+    }
+    parts.push("'");
+    return parts.join("");
+};
+if (!ρσ_bytes.prototype.__repr__.__module__) Object.defineProperties(ρσ_bytes.prototype.__repr__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__str__ = function __str__() {
+    var self = this;
+    return self.__repr__();
+};
+if (!ρσ_bytes.prototype.__str__.__module__) Object.defineProperties(ρσ_bytes.prototype.__str__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__hash__ = function __hash__() {
+    var self = this;
+    var h;
+    h = 5381;
+    for (var i = 0; i < this._data.length; i++) {
+        h = ρσ_list_add((h << 5), h) ^ (ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i];
+        h = h | 0;
+    }
+    return h;
+};
+if (!ρσ_bytes.prototype.__hash__.__module__) Object.defineProperties(ρσ_bytes.prototype.__hash__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.hex = function hex(sep, bytes_per_sep) {
+    var self = this;
+    var parts, h, n, grouped, i;
+    parts = ρσ_list_decorate([]);
+    for (var i = 0; i < this._data.length; i++) {
+        h = (ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i].toString(16);
+        parts.push(ρσ_list_add(((h.length < 2) ? "0" : ""), h));
+    }
+    if (sep !== undefined && sep !== null && parts.length > 0) {
+        n = (bytes_per_sep === undefined || bytes_per_sep === null) ? 1 : bytes_per_sep | 0;
+        if (n < 0) {
+            n = -n;
+            grouped = ρσ_list_decorate([]);
+            i = parts.length;
+            while (i > 0) {
+                grouped.unshift(parts.slice(max(0, i - n), i).join(""));
+                i -= n;
+            }
+            return grouped.join(sep);
+        } else {
+            grouped = ρσ_list_decorate([]);
+            for (var i = 0; i < parts.length; i += n) {
+                grouped.push(parts.slice(i, ρσ_list_add(i, n)).join(""));
+            }
+            return grouped.join(sep);
+        }
+    }
+    return parts.join("");
+};
+if (!ρσ_bytes.prototype.hex.__argnames__) Object.defineProperties(ρσ_bytes.prototype.hex, {
+    __argnames__ : {value: ["sep", "bytes_per_sep"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.decode = function decode(encoding, errors) {
+    var self = this;
+    var enc;
+    enc = (encoding || "utf-8").toLowerCase().replace(/-|_/g, "");
+    if (enc === "utf8") {
+        return ρσ_bytes_utf8_decode(self._data);
+    } else if (enc === "latin1" || enc === "iso88591" || enc === "ascii") {
+        return ρσ_bytes_latin1_decode(self._data);
+    } else {
+        throw LookupError(ρσ_list_add("unknown encoding: ", (encoding || "utf-8")));
+    }
+};
+if (!ρσ_bytes.prototype.decode.__argnames__) Object.defineProperties(ρσ_bytes.prototype.decode, {
+    __argnames__ : {value: ["encoding", "errors"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.fromhex = function fromhex(s) {
+    var data, val;
+    s = s.replace(/ /g, "");
+    if (s.length % 2 !== 0) {
+        throw new ValueError("non-hexadecimal number found in fromhex() arg");
+    }
+    data = ρσ_list_decorate([]);
+    for (var i = 0; i < s.length; i += 2) {
+        val = parseInt(s.slice(i, ρσ_list_add(i, 2)), 16);
+        if (isNaN(val)) {
+            throw new ValueError(ρσ_list_add("non-hexadecimal number found in fromhex() arg at position ", str(i)));
+        }
+        data.push(val);
+    }
+    return new ρσ_bytes(data);
+};
+if (!ρσ_bytes.fromhex.__argnames__) Object.defineProperties(ρσ_bytes.fromhex, {
+    __argnames__ : {value: ["s"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.count = function count(sub, start, end) {
+    var self = this;
+    var needle, s, e, n, pos, found;
+    needle = (typeof sub === "number") ? ρσ_list_decorate([ sub | 0 ]) : sub._data;
+    s = (start === undefined) ? 0 : start | 0;
+    e = (end === undefined) ? self._data.length : end | 0;
+    n = 0;
+    pos = s;
+    while (pos <= e - needle.length) {
+        found = ρσ_bytes_find(self._data, needle, pos);
+        if (found < 0 || ρσ_list_add(found, needle.length) > e) {
+            break;
+        }
+        n = ρσ_list_iadd(n, 1);
+        pos = ρσ_list_add(found, max(1, needle.length));
+    }
+    return n;
+};
+if (!ρσ_bytes.prototype.count.__argnames__) Object.defineProperties(ρσ_bytes.prototype.count, {
+    __argnames__ : {value: ["sub", "start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.find = function find(sub, start, end) {
+    var self = this;
+    var needle, s, e, pos;
+    needle = (typeof sub === "number") ? ρσ_list_decorate([ sub | 0 ]) : sub._data;
+    s = (start === undefined) ? 0 : start | 0;
+    e = (end === undefined) ? self._data.length : end | 0;
+    pos = ρσ_bytes_find(self._data, needle, s);
+    if (pos >= 0 && ρσ_list_add(pos, needle.length) <= e) {
+        return pos;
+    }
+    return -1;
+};
+if (!ρσ_bytes.prototype.find.__argnames__) Object.defineProperties(ρσ_bytes.prototype.find, {
+    __argnames__ : {value: ["sub", "start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.index = function index(sub, start, end) {
+    var self = this;
+    var pos;
+    pos = self.find(sub, start, end);
+    if (pos < 0) {
+        throw new ValueError("subsequence not found");
+    }
+    return pos;
+};
+if (!ρσ_bytes.prototype.index.__argnames__) Object.defineProperties(ρσ_bytes.prototype.index, {
+    __argnames__ : {value: ["sub", "start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.rfind = function rfind(sub, start, end) {
+    var self = this;
+    var needle, s, e, last, pos, found;
+    needle = (typeof sub === "number") ? ρσ_list_decorate([ sub | 0 ]) : sub._data;
+    s = (start === undefined) ? 0 : start | 0;
+    e = (end === undefined) ? self._data.length : end | 0;
+    last = -1;
+    pos = s;
+    while (pos <= e - needle.length) {
+        found = ρσ_bytes_find(self._data, needle, pos);
+        if (found < 0 || ρσ_list_add(found, needle.length) > e) {
+            break;
+        }
+        last = found;
+        pos = ρσ_list_add(found, max(1, needle.length));
+    }
+    return last;
+};
+if (!ρσ_bytes.prototype.rfind.__argnames__) Object.defineProperties(ρσ_bytes.prototype.rfind, {
+    __argnames__ : {value: ["sub", "start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.rindex = function rindex(sub, start, end) {
+    var self = this;
+    var pos;
+    pos = self.rfind(sub, start, end);
+    if (pos < 0) {
+        throw new ValueError("subsequence not found");
+    }
+    return pos;
+};
+if (!ρσ_bytes.prototype.rindex.__argnames__) Object.defineProperties(ρσ_bytes.prototype.rindex, {
+    __argnames__ : {value: ["sub", "start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.startswith = function startswith(prefix, start, end) {
+    var self = this;
+    var s, e, pdata;
+    s = (start === undefined) ? 0 : start | 0;
+    e = (end === undefined) ? self._data.length : end | 0;
+    pdata = (typeof prefix === "number") ? ρσ_list_decorate([ prefix | 0 ]) : prefix._data;
+    if (pdata.length > e - s) {
+        return false;
+    }
+    for (var i = 0; i < pdata.length; i++) {
+        if ((ρσ_expr_temp = self._data)[ρσ_bound_index(ρσ_list_add(s, i), ρσ_expr_temp)] !== pdata[(typeof i === "number" && i < 0) ? pdata.length + i : i]) {
+            return false;
+        }
+    }
+    return true;
+};
+if (!ρσ_bytes.prototype.startswith.__argnames__) Object.defineProperties(ρσ_bytes.prototype.startswith, {
+    __argnames__ : {value: ["prefix", "start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.endswith = function endswith(suffix, start, end) {
+    var self = this;
+    var s, e, sdata, offset;
+    s = (start === undefined) ? 0 : start | 0;
+    e = (end === undefined) ? self._data.length : end | 0;
+    sdata = (typeof suffix === "number") ? ρσ_list_decorate([ suffix | 0 ]) : suffix._data;
+    if (sdata.length > e - s) {
+        return false;
+    }
+    offset = e - sdata.length;
+    for (var i = 0; i < sdata.length; i++) {
+        if ((ρσ_expr_temp = self._data)[ρσ_bound_index(ρσ_list_add(offset, i), ρσ_expr_temp)] !== sdata[(typeof i === "number" && i < 0) ? sdata.length + i : i]) {
+            return false;
+        }
+    }
+    return true;
+};
+if (!ρσ_bytes.prototype.endswith.__argnames__) Object.defineProperties(ρσ_bytes.prototype.endswith, {
+    __argnames__ : {value: ["suffix", "start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.join = function join(iterable) {
+    var self = this;
+    var parts, item, result;
+    parts = ρσ_list_decorate([]);
+    var ρσ_Iter1 = ρσ_Iterable(iterable);
+    for (var ρσ_Index1 = 0; ρσ_Index1 < ρσ_Iter1.length; ρσ_Index1++) {
+        item = ρσ_Iter1[ρσ_Index1];
+        if (!((item instanceof ρσ_bytes || item instanceof ρσ_bytearray))) {
+            throw new TypeError("sequence item must be a bytes-like object");
+        }
+        parts.push(item._data);
+    }
+    result = ρσ_list_decorate([]);
+    for (var i = 0; i < parts.length; i++) {
+        if (i > 0) {
+            for (var j = 0; j < this._data.length; j++) {
+                result.push((ρσ_expr_temp = self._data)[(typeof j === "number" && j < 0) ? ρσ_expr_temp.length + j : j]);
+            }
+        }
+        for (var j = 0; j < parts[i].length; j++) {
+            result.push((ρσ_expr_temp = parts[(typeof i === "number" && i < 0) ? parts.length + i : i])[(typeof j === "number" && j < 0) ? ρσ_expr_temp.length + j : j]);
+        }
+    }
+    return new ρσ_bytes(result);
+};
+if (!ρσ_bytes.prototype.join.__argnames__) Object.defineProperties(ρσ_bytes.prototype.join, {
+    __argnames__ : {value: ["iterable"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.split = function split(sep, maxsplit) {
+    var self = this;
+    var result, i, n, j, needle, pos, splits, found;
+    if (maxsplit === undefined) {
+        maxsplit = -1;
+    }
+    if (sep === null || sep === undefined || typeof sep === "string") {
+        result = ρσ_list_decorate([]);
+        i = 0;
+        n = self._data.length;
+        while (i < n) {
+            while (i < n && (ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] <= 32) {
+                i = ρσ_list_iadd(i, 1);
+            }
+            if (i >= n) {
+                break;
+            }
+            j = i;
+            while (j < n && (ρσ_expr_temp = self._data)[(typeof j === "number" && j < 0) ? ρσ_expr_temp.length + j : j] > 32) {
+                j = ρσ_list_iadd(j, 1);
+            }
+            result.push(new ρσ_bytes(self._data.slice(i, j)));
+            i = j;
+            if (maxsplit >= 0 && result.length >= maxsplit) {
+                while (i < n && (ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] <= 32) {
+                    i = ρσ_list_iadd(i, 1);
+                }
+                if (i < n) {
+                    result.push(new ρσ_bytes(self._data.slice(i)));
+                }
+                break;
+            }
+        }
+        return result;
+    }
+    needle = sep._data;
+    result = ρσ_list_decorate([]);
+    pos = 0;
+    splits = 0;
+    while (true) {
+        found = ρσ_bytes_find(self._data, needle, pos);
+        if (found < 0 || maxsplit >= 0 && splits >= maxsplit) {
+            result.push(new ρσ_bytes(self._data.slice(pos)));
+            break;
+        }
+        result.push(new ρσ_bytes(self._data.slice(pos, found)));
+        pos = ρσ_list_add(found, needle.length);
+        splits = ρσ_list_iadd(splits, 1);
+    }
+    return result;
+};
+if (!ρσ_bytes.prototype.split.__argnames__) Object.defineProperties(ρσ_bytes.prototype.split, {
+    __argnames__ : {value: ["sep", "maxsplit"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.replace = function replace(old, replacement, count) {
+    var self = this;
+    var odata, ndata, result, pos, n, limit, found;
+    odata = old._data;
+    ndata = replacement._data;
+    result = ρσ_list_decorate([]);
+    pos = 0;
+    n = 0;
+    limit = (count !== undefined && count !== null) ? count : -1;
+    while (pos <= self._data.length) {
+        found = ρσ_bytes_find(self._data, odata, pos);
+        if (found < 0 || limit >= 0 && n >= limit) {
+            for (var i = pos; i < this._data.length; i++) {
+                result.push((ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]);
+            }
+            break;
+        }
+        for (var i = pos; i < found; i++) {
+            result.push((ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]);
+        }
+        for (var i = 0; i < ndata.length; i++) {
+            result.push(ndata[(typeof i === "number" && i < 0) ? ndata.length + i : i]);
+        }
+        pos = ρσ_list_add(found, odata.length);
+        n = ρσ_list_iadd(n, 1);
+        if (odata.length === 0) {
+            if (pos < self._data.length) {
+                result.push((ρσ_expr_temp = self._data)[(typeof pos === "number" && pos < 0) ? ρσ_expr_temp.length + pos : pos]);
+                pos = ρσ_list_iadd(pos, 1);
+            } else {
+                break;
+            }
+        }
+    }
+    return new ρσ_bytes(result);
+};
+if (!ρσ_bytes.prototype.replace.__argnames__) Object.defineProperties(ρσ_bytes.prototype.replace, {
+    __argnames__ : {value: ["old", "replacement", "count"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.strip = function strip(chars) {
+    var self = this;
+    return self.lstrip(chars).rstrip(chars);
+};
+if (!ρσ_bytes.prototype.strip.__argnames__) Object.defineProperties(ρσ_bytes.prototype.strip, {
+    __argnames__ : {value: ["chars"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.lstrip = function lstrip(chars) {
+    var self = this;
+    var is_ws, cdata, i, b;
+    is_ws = chars === null || chars === undefined;
+    cdata = (is_ws) ? ρσ_list_decorate([]) : chars._data;
+    i = 0;
+    while (i < self._data.length) {
+        b = (ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i];
+        if (is_ws) {
+            if (b > 32) {
+                break;
+            }
+        } else {
+            if (cdata.indexOf(b) < 0) {
+                break;
+            }
+        }
+        i = ρσ_list_iadd(i, 1);
+    }
+    return new ρσ_bytes(self._data.slice(i));
+};
+if (!ρσ_bytes.prototype.lstrip.__argnames__) Object.defineProperties(ρσ_bytes.prototype.lstrip, {
+    __argnames__ : {value: ["chars"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.rstrip = function rstrip(chars) {
+    var self = this;
+    var is_ws, cdata, i, b;
+    is_ws = chars === null || chars === undefined;
+    cdata = (is_ws) ? ρσ_list_decorate([]) : chars._data;
+    i = self._data.length - 1;
+    while (i >= 0) {
+        b = (ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i];
+        if (is_ws) {
+            if (b > 32) {
+                break;
+            }
+        } else {
+            if (cdata.indexOf(b) < 0) {
+                break;
+            }
+        }
+        i -= 1;
+    }
+    return new ρσ_bytes(self._data.slice(0, ρσ_list_add(i, 1)));
+};
+if (!ρσ_bytes.prototype.rstrip.__argnames__) Object.defineProperties(ρσ_bytes.prototype.rstrip, {
+    __argnames__ : {value: ["chars"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.upper = function upper() {
+    var self = this;
+    var data, b;
+    data = self._data.slice();
+    for (var i = 0; i < data.length; i++) {
+        b = data[(typeof i === "number" && i < 0) ? data.length + i : i];
+        if (b >= 97 && b <= 122) {
+            data[(typeof i === "number" && i < 0) ? data.length + i : i] = b - 32;
+        }
+    }
+    return new ρσ_bytes(data);
+};
+if (!ρσ_bytes.prototype.upper.__module__) Object.defineProperties(ρσ_bytes.prototype.upper, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.lower = function lower() {
+    var self = this;
+    var data, b;
+    data = self._data.slice();
+    for (var i = 0; i < data.length; i++) {
+        b = data[(typeof i === "number" && i < 0) ? data.length + i : i];
+        if (b >= 65 && b <= 90) {
+            data[(typeof i === "number" && i < 0) ? data.length + i : i] = ρσ_list_add(b, 32);
+        }
+    }
+    return new ρσ_bytes(data);
+};
+if (!ρσ_bytes.prototype.lower.__module__) Object.defineProperties(ρσ_bytes.prototype.lower, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.copy = function copy() {
+    var self = this;
+    return new ρσ_bytes(self._data.slice());
+};
+if (!ρσ_bytes.prototype.copy.__module__) Object.defineProperties(ρσ_bytes.prototype.copy, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.slice = function slice(start, end) {
+    var self = this;
+    return new ρσ_bytes(self._data.slice(start, end));
+};
+if (!ρσ_bytes.prototype.slice.__argnames__) Object.defineProperties(ρσ_bytes.prototype.slice, {
+    __argnames__ : {value: ["start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.filter = function filter(fn) {
+    var self = this;
+    return new ρσ_bytes(self._data.filter(fn));
+};
+if (!ρσ_bytes.prototype.filter.__argnames__) Object.defineProperties(ρσ_bytes.prototype.filter, {
+    __argnames__ : {value: ["fn"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytes.prototype.__format__ = function __format__ () {
+        if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
+Object.defineProperty(ρσ_bytes.prototype, "__bases__", {value: []});
+ρσ_bytes.__name__ = "ρσ_bytes";
+ρσ_bytes.__qualname__ = "ρσ_bytes";
+ρσ_bytes.__module__ = "__main__";
+Object.defineProperty(ρσ_bytes.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+
+
+ρσ_bytes.__name__ = "bytes";
+function ρσ_bytearray() {
+    if (!(this instanceof ρσ_bytearray)) return new ρσ_bytearray(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    ρσ_bytearray.prototype.__init__.apply(this, arguments);
+}
+ρσ_extends(ρσ_bytearray, ρσ_bytes);
+ρσ_bytearray.prototype.__init__ = function __init__(source, encoding, errors) {
+    var self = this;
+    self._data = ρσ_bytes_from_source.apply(null, arguments);
+    ρσ_bytes_sync(self);
+};
+if (!ρσ_bytearray.prototype.__init__.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.__init__, {
+    __argnames__ : {value: ["source", "encoding", "errors"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.__argnames__ = ρσ_bytearray.prototype.__init__.__argnames__;
+ρσ_bytearray.__handles_kwarg_interpolation__ = ρσ_bytearray.prototype.__init__.__handles_kwarg_interpolation__;
+ρσ_bytearray.prototype.__setitem__ = function __setitem__(key, val) {
+    var self = this;
+    var indices, start, stop, step, src, positions, n, b;
+    if (key instanceof ρσ_slice) {
+        indices = key.indices(self._data.length);
+        start = indices[0];
+        stop = indices[1];
+        step = indices[2];
+        if (val instanceof ρσ_bytes || val instanceof ρσ_bytearray) {
+            src = val._data;
+        } else {
+            src = ρσ_bytes_from_source(val);
+        }
+        if (step === 1) {
+            self._data.splice.apply(self._data, ρσ_list_decorate([ start, stop - start ]).concat(src));
+        } else {
+            positions = ρσ_list_decorate([]);
+            if (step > 0) {
+                for (var i = start; i < stop; i += step) {
+                    positions.push(i);
+                }
+            } else {
+                for (var i = start; i > stop; i += step) {
+                    positions.push(i);
+                }
+            }
+            if (src.length !== positions.length) {
+                throw new ValueError(ρσ_list_add(ρσ_list_add(ρσ_list_add("attempt to assign bytes of size ", str(src.length)), " to extended slice of size "), str(positions.length)));
+            }
+            for (var i = 0; i < positions.length; i++) {
+                (ρσ_expr_temp = self._data)[ρσ_bound_index(positions[(typeof i === "number" && i < 0) ? positions.length + i : i], ρσ_expr_temp)] = src[(typeof i === "number" && i < 0) ? src.length + i : i];
+            }
+        }
+        ρσ_bytes_sync(self);
+    } else {
+        n = key | 0;
+        if (n < 0) {
+            n = ρσ_list_iadd(n, self._data.length);
+        }
+        if (n < 0 || n >= self._data.length) {
+            throw new IndexError("index out of range");
+        }
+        b = val | 0;
+        if (b < 0 || b > 255) {
+            throw new ValueError("byte must be in range(0, 256)");
+        }
+        (ρσ_expr_temp = self._data)[(typeof n === "number" && n < 0) ? ρσ_expr_temp.length + n : n] = b;
+        self[(typeof n === "number" && n < 0) ? self.length + n : n] = b;
+    }
+};
+if (!ρσ_bytearray.prototype.__setitem__.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.__setitem__, {
+    __argnames__ : {value: ["key", "val"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.__add__ = function __add__(other) {
+    var self = this;
+    if (!((other instanceof ρσ_bytes || other instanceof ρσ_bytearray))) {
+        throw new TypeError("can't concat bytes-like objects of different types");
+    }
+    return new ρσ_bytearray(self._data.concat(other._data));
+};
+if (!ρσ_bytearray.prototype.__add__.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.__add__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.__iadd__ = function __iadd__(other) {
+    var self = this;
+    if (!((other instanceof ρσ_bytes || other instanceof ρσ_bytearray))) {
+        throw new TypeError("can't concat bytes-like objects of different types");
+    }
+    for (var i = 0; i < other._data.length; i++) {
+        self._data.push((ρσ_expr_temp = other._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]);
+    }
+    ρσ_bytes_sync(self);
+    return self;
+};
+if (!ρσ_bytearray.prototype.__iadd__.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.__iadd__, {
+    __argnames__ : {value: ["other"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.__mul__ = function __mul__(n) {
+    var self = this;
+    var result;
+    result = ρσ_list_decorate([]);
+    for (var k = 0; k < n; k++) {
+        for (var j = 0; j < this._data.length; j++) {
+            result.push((ρσ_expr_temp = self._data)[(typeof j === "number" && j < 0) ? ρσ_expr_temp.length + j : j]);
+        }
+    }
+    return new ρσ_bytearray(result);
+};
+if (!ρσ_bytearray.prototype.__mul__.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.__mul__, {
+    __argnames__ : {value: ["n"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.__repr__ = function __repr__() {
+    var self = this;
+    var b;
+    b = ρσ_bytes.prototype.__repr__.call(self);
+    return ρσ_list_add(ρσ_list_add("bytearray(", b), ")");
+};
+if (!ρσ_bytearray.prototype.__repr__.__module__) Object.defineProperties(ρσ_bytearray.prototype.__repr__, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.append = function append(item) {
+    var self = this;
+    var b, idx;
+    b = item | 0;
+    if (b < 0 || b > 255) {
+        throw new ValueError("byte must be in range(0, 256)");
+    }
+    idx = self._data.length;
+    self._data.push(b);
+    self[(typeof idx === "number" && idx < 0) ? self.length + idx : idx] = b;
+    self.length = self._data.length;
+};
+if (!ρσ_bytearray.prototype.append.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.append, {
+    __argnames__ : {value: ["item"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.extend = function extend(iterable) {
+    var self = this;
+    var b, x;
+    if (iterable instanceof ρσ_bytes || iterable instanceof ρσ_bytearray) {
+        for (var i = 0; i < iterable._data.length; i++) {
+            self._data.push((ρσ_expr_temp = iterable._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]);
+        }
+    } else {
+        var ρσ_Iter2 = ρσ_Iterable(iterable);
+        for (var ρσ_Index2 = 0; ρσ_Index2 < ρσ_Iter2.length; ρσ_Index2++) {
+            x = ρσ_Iter2[ρσ_Index2];
+            b = x | 0;
+            if (b < 0 || b > 255) {
+                throw new ValueError("byte must be in range(0, 256)");
+            }
+            self._data.push(b);
+        }
+    }
+    ρσ_bytes_sync(self);
+};
+if (!ρσ_bytearray.prototype.extend.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.extend, {
+    __argnames__ : {value: ["iterable"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.insert = function insert(idx, item) {
+    var self = this;
+    var n, b;
+    n = idx | 0;
+    if (n < 0) {
+        n = max(0, ρσ_list_add(self._data.length, n));
+    }
+    b = item | 0;
+    if (b < 0 || b > 255) {
+        throw new ValueError("byte must be in range(0, 256)");
+    }
+    self._data.splice(n, 0, b);
+    ρσ_bytes_sync(self);
+};
+if (!ρσ_bytearray.prototype.insert.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.insert, {
+    __argnames__ : {value: ["idx", "item"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.pop = function pop(idx) {
+    var self = this;
+    var n, val;
+    n = (idx === undefined) ? self._data.length - 1 : idx | 0;
+    if (n < 0) {
+        n = ρσ_list_iadd(n, self._data.length);
+    }
+    if (n < 0 || n >= self._data.length) {
+        throw new IndexError("pop index out of range");
+    }
+    val = self._data.splice(n, 1)[0];
+    ρσ_bytes_sync(self);
+    return val;
+};
+if (!ρσ_bytearray.prototype.pop.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.pop, {
+    __argnames__ : {value: ["idx"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.remove = function remove(item) {
+    var self = this;
+    var b;
+    b = item | 0;
+    for (var i = 0; i < this._data.length; i++) {
+        if ((ρσ_expr_temp = self._data)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i] === b) {
+            self._data.splice(i, 1);
+            ρσ_bytes_sync(self);
+            return;
+        }
+    }
+    throw new ValueError(ρσ_list_add(str(item), " is not in bytearray"));
+};
+if (!ρσ_bytearray.prototype.remove.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.remove, {
+    __argnames__ : {value: ["item"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.reverse = function reverse() {
+    var self = this;
+    self._data.reverse();
+    ρσ_bytes_sync(self);
+};
+if (!ρσ_bytearray.prototype.reverse.__module__) Object.defineProperties(ρσ_bytearray.prototype.reverse, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.clear = function clear() {
+    var self = this;
+    self._data.length = 0;
+    ρσ_bytes_sync(self);
+};
+if (!ρσ_bytearray.prototype.clear.__module__) Object.defineProperties(ρσ_bytearray.prototype.clear, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.copy = function copy() {
+    var self = this;
+    return new ρσ_bytearray(self._data.slice());
+};
+if (!ρσ_bytearray.prototype.copy.__module__) Object.defineProperties(ρσ_bytearray.prototype.copy, {
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.slice = function slice(start, end) {
+    var self = this;
+    return new ρσ_bytearray(self._data.slice(start, end));
+};
+if (!ρσ_bytearray.prototype.slice.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.slice, {
+    __argnames__ : {value: ["start", "end"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.filter = function filter(fn) {
+    var self = this;
+    return new ρσ_bytearray(self._data.filter(fn));
+};
+if (!ρσ_bytearray.prototype.filter.__argnames__) Object.defineProperties(ρσ_bytearray.prototype.filter, {
+    __argnames__ : {value: ["fn"]},
+    __module__ : {value: "__main__"}
+});
+ρσ_bytearray.prototype.__str__ = function __str__ () {
+    if(ρσ_bytes.prototype.__str__) return ρσ_bytes.prototype.__str__.call(this);
+return this.__repr__();
+};
+ρσ_bytearray.prototype.__format__ = function __format__ () {
+    if(ρσ_bytes.prototype.__format__) return ρσ_bytes.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
+Object.defineProperty(ρσ_bytearray.prototype, "__bases__", {value: [ρσ_bytes]});
+ρσ_bytearray.__name__ = "ρσ_bytearray";
+ρσ_bytearray.__qualname__ = "ρσ_bytearray";
+ρσ_bytearray.__module__ = "__main__";
+Object.defineProperty(ρσ_bytearray.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+if (typeof ρσ_bytes.__init_subclass__ === "function") ρσ_bytes.__init_subclass__.call(ρσ_bytearray);
+
+ρσ_bytearray.__name__ = "bytearray";
+var bytes = ρσ_bytes, bytearray = ρσ_bytearray;function ρσ_equals(a, b) {
     var ρσ_unpack, akeys, bkeys, key;
     if (a === b) {
         return true;
@@ -3023,6 +4665,11 @@ Exception.prototype.__str__ = function __str__ () {
     if(Error.prototype.__str__) return Error.prototype.__str__.call(this);
 return this.__repr__();
 };
+Exception.prototype.__format__ = function __format__ () {
+    if(Error.prototype.__format__) return Error.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(Exception.prototype, "__bases__", {value: [Error]});
 Exception.__name__ = "Exception";
 Exception.__qualname__ = "Exception";
@@ -3047,13 +4694,18 @@ AttributeError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+AttributeError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(AttributeError.prototype, "__bases__", {value: [Exception]});
 AttributeError.__name__ = "AttributeError";
 AttributeError.__qualname__ = "AttributeError";
 AttributeError.__module__ = "__main__";
 Object.defineProperty(AttributeError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(AttributeError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(AttributeError);
 
 function IndexError() {
     if (!(this instanceof IndexError)) return new IndexError(...arguments);
@@ -3072,13 +4724,18 @@ IndexError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+IndexError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(IndexError.prototype, "__bases__", {value: [Exception]});
 IndexError.__name__ = "IndexError";
 IndexError.__qualname__ = "IndexError";
 IndexError.__module__ = "__main__";
 Object.defineProperty(IndexError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(IndexError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(IndexError);
 
 function KeyError() {
     if (!(this instanceof KeyError)) return new KeyError(...arguments);
@@ -3097,13 +4754,18 @@ KeyError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+KeyError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(KeyError.prototype, "__bases__", {value: [Exception]});
 KeyError.__name__ = "KeyError";
 KeyError.__qualname__ = "KeyError";
 KeyError.__module__ = "__main__";
 Object.defineProperty(KeyError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(KeyError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(KeyError);
 
 function ValueError() {
     if (!(this instanceof ValueError)) return new ValueError(...arguments);
@@ -3122,13 +4784,18 @@ ValueError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+ValueError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(ValueError.prototype, "__bases__", {value: [Exception]});
 ValueError.__name__ = "ValueError";
 ValueError.__qualname__ = "ValueError";
 ValueError.__module__ = "__main__";
 Object.defineProperty(ValueError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ValueError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ValueError);
 
 function UnicodeDecodeError() {
     if (!(this instanceof UnicodeDecodeError)) return new UnicodeDecodeError(...arguments);
@@ -3147,13 +4814,18 @@ UnicodeDecodeError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+UnicodeDecodeError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(UnicodeDecodeError.prototype, "__bases__", {value: [Exception]});
 UnicodeDecodeError.__name__ = "UnicodeDecodeError";
 UnicodeDecodeError.__qualname__ = "UnicodeDecodeError";
 UnicodeDecodeError.__module__ = "__main__";
 Object.defineProperty(UnicodeDecodeError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(UnicodeDecodeError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(UnicodeDecodeError);
 
 function AssertionError() {
     if (!(this instanceof AssertionError)) return new AssertionError(...arguments);
@@ -3172,13 +4844,18 @@ AssertionError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+AssertionError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(AssertionError.prototype, "__bases__", {value: [Exception]});
 AssertionError.__name__ = "AssertionError";
 AssertionError.__qualname__ = "AssertionError";
 AssertionError.__module__ = "__main__";
 Object.defineProperty(AssertionError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(AssertionError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(AssertionError);
 
 function ZeroDivisionError() {
     if (!(this instanceof ZeroDivisionError)) return new ZeroDivisionError(...arguments);
@@ -3197,13 +4874,18 @@ ZeroDivisionError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+ZeroDivisionError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(ZeroDivisionError.prototype, "__bases__", {value: [Exception]});
 ZeroDivisionError.__name__ = "ZeroDivisionError";
 ZeroDivisionError.__qualname__ = "ZeroDivisionError";
 ZeroDivisionError.__module__ = "__main__";
 Object.defineProperty(ZeroDivisionError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ZeroDivisionError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ZeroDivisionError);
 
 function StopIteration() {
     if (!(this instanceof StopIteration)) return new StopIteration(...arguments);
@@ -3222,13 +4904,18 @@ StopIteration.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+StopIteration.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(StopIteration.prototype, "__bases__", {value: [Exception]});
 StopIteration.__name__ = "StopIteration";
 StopIteration.__qualname__ = "StopIteration";
 StopIteration.__module__ = "__main__";
 Object.defineProperty(StopIteration.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(StopIteration);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(StopIteration);
 
 function ImportError() {
     if (!(this instanceof ImportError)) return new ImportError(...arguments);
@@ -3247,13 +4934,18 @@ ImportError.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
 };
+ImportError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(ImportError.prototype, "__bases__", {value: [Exception]});
 ImportError.__name__ = "ImportError";
 ImportError.__qualname__ = "ImportError";
 ImportError.__module__ = "__main__";
 Object.defineProperty(ImportError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ImportError);
 
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(ImportError);
 
 function ModuleNotFoundError() {
     if (!(this instanceof ModuleNotFoundError)) return new ModuleNotFoundError(...arguments);
@@ -3272,13 +4964,18 @@ ModuleNotFoundError.prototype.__str__ = function __str__ () {
     if(ImportError.prototype.__str__) return ImportError.prototype.__str__.call(this);
 return this.__repr__();
 };
+ModuleNotFoundError.prototype.__format__ = function __format__ () {
+    if(ImportError.prototype.__format__) return ImportError.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
 Object.defineProperty(ModuleNotFoundError.prototype, "__bases__", {value: [ImportError]});
 ModuleNotFoundError.__name__ = "ModuleNotFoundError";
 ModuleNotFoundError.__qualname__ = "ModuleNotFoundError";
 ModuleNotFoundError.__module__ = "__main__";
 Object.defineProperty(ModuleNotFoundError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-if (typeof ImportError.__init_subclass__ === "function") ImportError.__init_subclass__.call(ModuleNotFoundError);
 
+if (typeof ImportError.__init_subclass__ === "function") ImportError.__init_subclass__.call(ModuleNotFoundError);
 
 function _is_exc_class(obj) {
     return typeof obj === "function" && (obj === Error || obj.prototype && ρσ_instanceof(obj.prototype, Error));
@@ -3440,6 +5137,11 @@ if (!ExceptionGroup.prototype.__repr__.__module__) Object.defineProperties(Excep
 ExceptionGroup.prototype.__str__ = function __str__ () {
     if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
+};
+ExceptionGroup.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
 };
 Object.defineProperty(ExceptionGroup.prototype, "__bases__", {value: [Exception]});
 ExceptionGroup.__name__ = "ExceptionGroup";
@@ -4008,14 +5710,54 @@ if (!ρσ_mixin.__module__) Object.defineProperties(ρσ_mixin, {
     __module__ : {value: "__main__"}
 });
 
+function ρσ_arith_type_name(v) {
+    var t;
+    if (v === null || v === undefined) {
+        return "NoneType";
+    }
+    t = typeof v;
+    if (t === "boolean") {
+        return "bool";
+    }
+    if (t === "number") {
+        return (Number.isInteger(v)) ? "int" : "float";
+    }
+    if (t === "string" || v instanceof String) {
+        return "str";
+    }
+    if (Array.isArray(v)) {
+        return "list";
+    }
+    if (v.constructor && v.constructor.__name__) {
+        return v.constructor.__name__;
+    }
+    return t;
+};
+if (!ρσ_arith_type_name.__argnames__) Object.defineProperties(ρσ_arith_type_name, {
+    __argnames__ : {value: ["v"]},
+    __module__ : {value: "__main__"}
+});
+
 function ρσ_op_add(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__add__ === "function") {
         return a.__add__(b);
     }
     if (b !== null && typeof b.__radd__ === "function") {
         return b.__radd__(a);
     }
-    return ρσ_list_add(a, b);
+    if (Array.isArray(a) && Array.isArray(b)) {
+        return ρσ_list_constructor(a.concat(b));
+    }
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a + b;
+    }
+    if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
+        return a + b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for +: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_add.__argnames__) Object.defineProperties(ρσ_op_add, {
     __argnames__ : {value: ["a", "b"]},
@@ -4023,13 +5765,19 @@ if (!ρσ_op_add.__argnames__) Object.defineProperties(ρσ_op_add, {
 });
 
 function ρσ_op_sub(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__sub__ === "function") {
         return a.__sub__(b);
     }
     if (b !== null && typeof b.__rsub__ === "function") {
         return b.__rsub__(a);
     }
-    return a - b;
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a - b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for -: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_sub.__argnames__) Object.defineProperties(ρσ_op_sub, {
     __argnames__ : {value: ["a", "b"]},
@@ -4037,34 +5785,39 @@ if (!ρσ_op_sub.__argnames__) Object.defineProperties(ρσ_op_sub, {
 });
 
 function ρσ_op_mul(a, b) {
-    var result;
+    var ta, tb, result;
     if (a !== null && typeof a.__mul__ === "function") {
         return a.__mul__(b);
     }
     if (b !== null && typeof b.__rmul__ === "function") {
         return b.__rmul__(a);
     }
-    if ((typeof a === "string" || a instanceof String) && typeof b === "number") {
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "string" || a instanceof String) && (tb === "number" || tb === "boolean")) {
         return a.repeat(b);
     }
-    if ((typeof b === "string" || b instanceof String) && typeof a === "number") {
+    if ((tb === "string" || b instanceof String) && (ta === "number" || ta === "boolean")) {
         return b.repeat(a);
     }
-    if (Array.isArray(a) && typeof b === "number") {
+    if (Array.isArray(a) && (tb === "number" || tb === "boolean")) {
         result = [];
         for (var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++) {
             result = result.concat(a);
         }
         return ρσ_list_constructor(result);
     }
-    if (Array.isArray(b) && typeof a === "number") {
+    if (Array.isArray(b) && (ta === "number" || ta === "boolean")) {
         result = [];
         for (var ρσ_mi = 0; ρσ_mi < a; ρσ_mi++) {
             result = result.concat(b);
         }
         return ρσ_list_constructor(result);
     }
-    return a * b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a * b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for *: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_mul.__argnames__) Object.defineProperties(ρσ_op_mul, {
     __argnames__ : {value: ["a", "b"]},
@@ -4072,13 +5825,19 @@ if (!ρσ_op_mul.__argnames__) Object.defineProperties(ρσ_op_mul, {
 });
 
 function ρσ_op_truediv(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__truediv__ === "function") {
         return a.__truediv__(b);
     }
     if (b !== null && typeof b.__rtruediv__ === "function") {
         return b.__rtruediv__(a);
     }
-    return a / b;
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a / b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for /: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_truediv.__argnames__) Object.defineProperties(ρσ_op_truediv, {
     __argnames__ : {value: ["a", "b"]},
@@ -4086,13 +5845,19 @@ if (!ρσ_op_truediv.__argnames__) Object.defineProperties(ρσ_op_truediv, {
 });
 
 function ρσ_op_floordiv(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__floordiv__ === "function") {
         return a.__floordiv__(b);
     }
     if (b !== null && typeof b.__rfloordiv__ === "function") {
         return b.__rfloordiv__(a);
     }
-    return Math.floor(a / b);
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return Math.floor(a / b);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for //: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_floordiv.__argnames__) Object.defineProperties(ρσ_op_floordiv, {
     __argnames__ : {value: ["a", "b"]},
@@ -4100,13 +5865,19 @@ if (!ρσ_op_floordiv.__argnames__) Object.defineProperties(ρσ_op_floordiv, {
 });
 
 function ρσ_op_mod(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__mod__ === "function") {
         return a.__mod__(b);
     }
     if (b !== null && typeof b.__rmod__ === "function") {
         return b.__rmod__(a);
     }
-    return a % b;
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a % b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for %: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_mod.__argnames__) Object.defineProperties(ρσ_op_mod, {
     __argnames__ : {value: ["a", "b"]},
@@ -4114,13 +5885,19 @@ if (!ρσ_op_mod.__argnames__) Object.defineProperties(ρσ_op_mod, {
 });
 
 function ρσ_op_pow(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__pow__ === "function") {
         return a.__pow__(b);
     }
     if (b !== null && typeof b.__rpow__ === "function") {
         return b.__rpow__(a);
     }
-    return Math.pow(a, b);
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return Math.pow(a, b);
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for **: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_pow.__argnames__) Object.defineProperties(ρσ_op_pow, {
     __argnames__ : {value: ["a", "b"]},
@@ -4197,9 +5974,141 @@ if (!ρσ_op_rshift.__argnames__) Object.defineProperties(ρσ_op_rshift, {
     __module__ : {value: "__main__"}
 });
 
+function ρσ_op_lt(a, b) {
+    var n, ea, eb, ta, tb;
+    if (a !== null && typeof a.__lt__ === "function") {
+        return a.__lt__(b);
+    }
+    if (b !== null && typeof b.__gt__ === "function") {
+        return b.__gt__(a);
+    }
+    if (Array.isArray(a) && Array.isArray(b)) {
+        n = Math.min(a.length, b.length);
+        for (var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++) {
+            ea = a[ρσ_ci];
+            eb = b[ρσ_ci];
+            if (ρσ_op_lt(ea, eb)) {
+                return true;
+            }
+            if (ρσ_op_lt(eb, ea)) {
+                return false;
+            }
+        }
+        return a.length < b.length;
+    }
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a < b;
+    }
+    if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
+        return a < b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("'<' not supported between instances of '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+};
+if (!ρσ_op_lt.__argnames__) Object.defineProperties(ρσ_op_lt, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_le(a, b) {
+    var n, ea, eb, ta, tb;
+    if (a !== null && typeof a.__le__ === "function") {
+        return a.__le__(b);
+    }
+    if (b !== null && typeof b.__ge__ === "function") {
+        return b.__ge__(a);
+    }
+    if (Array.isArray(a) && Array.isArray(b)) {
+        n = Math.min(a.length, b.length);
+        for (var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++) {
+            ea = a[ρσ_ci];
+            eb = b[ρσ_ci];
+            if (ρσ_op_lt(ea, eb)) {
+                return true;
+            }
+            if (ρσ_op_lt(eb, ea)) {
+                return false;
+            }
+        }
+        return a.length <= b.length;
+    }
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a <= b;
+    }
+    if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
+        return a <= b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("'<=' not supported between instances of '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+};
+if (!ρσ_op_le.__argnames__) Object.defineProperties(ρσ_op_le, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_gt(a, b) {
+    var ta, tb;
+    if (a !== null && typeof a.__gt__ === "function") {
+        return a.__gt__(b);
+    }
+    if (b !== null && typeof b.__lt__ === "function") {
+        return b.__lt__(a);
+    }
+    if (Array.isArray(a) && Array.isArray(b)) {
+        return ρσ_op_lt(b, a);
+    }
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a > b;
+    }
+    if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
+        return a > b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("'>' not supported between instances of '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+};
+if (!ρσ_op_gt.__argnames__) Object.defineProperties(ρσ_op_gt, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
+function ρσ_op_ge(a, b) {
+    var ta, tb;
+    if (a !== null && typeof a.__ge__ === "function") {
+        return a.__ge__(b);
+    }
+    if (b !== null && typeof b.__le__ === "function") {
+        return b.__le__(a);
+    }
+    if (Array.isArray(a) && Array.isArray(b)) {
+        return ρσ_op_le(b, a);
+    }
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a >= b;
+    }
+    if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
+        return a >= b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("'>=' not supported between instances of '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+};
+if (!ρσ_op_ge.__argnames__) Object.defineProperties(ρσ_op_ge, {
+    __argnames__ : {value: ["a", "b"]},
+    __module__ : {value: "__main__"}
+});
+
 function ρσ_list_add(a, b) {
     if (Array.isArray(a) && Array.isArray(b)) {
         return ρσ_list_constructor(a.concat(b));
+    }
+    if (a !== null && a !== undefined && typeof a.__add__ === "function") {
+        return a.__add__(b);
+    }
+    if (b !== null && b !== undefined && typeof b.__radd__ === "function") {
+        return b.__radd__(a);
     }
     return a + b;
 };
@@ -4212,6 +6121,12 @@ function ρσ_list_iadd(a, b) {
     if (Array.isArray(a) && Array.isArray(b)) {
         Array.prototype.push.apply(a, b);
         return a;
+    }
+    if (a !== null && a !== undefined && typeof a.__iadd__ === "function") {
+        return a.__iadd__(b);
+    }
+    if (a !== null && a !== undefined && typeof a.__add__ === "function") {
+        return a.__add__(b);
     }
     return a + b;
 };
@@ -4646,12 +6561,18 @@ if (!filter.__argnames__) Object.defineProperties(filter, {
 });
 
 function zip() {
-    var iterators, ans;
-    iterators = new Array(arguments.length);
-    for (var i = 0; i < arguments.length; i++) {
+    var n, strict, iterators, ans;
+    n = arguments.length;
+    strict = false;
+    if (n > 0 && typeof arguments[n - 1] === "object" && arguments[n - 1] !== null && arguments[ρσ_bound_index(n - 1, arguments)][ρσ_kwargs_symbol] === true) {
+        strict = arguments[ρσ_bound_index(n - 1, arguments)]["strict"] || false;
+        n -= 1;
+    }
+    iterators = new Array(n);
+    for (var i = 0; i < n; i++) {
         iterators[(typeof i === "number" && i < 0) ? iterators.length + i : i] = iter(arguments[(typeof i === "number" && i < 0) ? arguments.length + i : i]);
     }
-    ans = {'_iterators':iterators};
+    ans = {'_iterators':iterators, '_strict':strict};
     ans[ρσ_iterator_symbol] = (function() {
         var ρσ_anonfunc = function () {
             return this;
@@ -4664,10 +6585,23 @@ function zip() {
     ans["next"] = (function() {
         var ρσ_anonfunc = function () {
             var args, r;
+            if (!this._iterators.length) {
+                return {'done':true};
+            }
             args = new Array(this._iterators.length);
             for (var i = 0; i < this._iterators.length; i++) {
                 r = (ρσ_expr_temp = this._iterators)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i].next();
                 if (r.done) {
+                    if (this._strict) {
+                        for (var j = i + 1; j < this._iterators.length; j++) {
+                            if (!(ρσ_expr_temp = this._iterators)[(typeof j === "number" && j < 0) ? ρσ_expr_temp.length + j : j].next().done) {
+                                throw new ValueError("zip() has arguments with different lengths");
+                            }
+                        }
+                        if (i > 0) {
+                            throw new ValueError("zip() has arguments with different lengths");
+                        }
+                    }
                     return {'done':true};
                 }
                 args[(typeof i === "number" && i < 0) ? args.length + i : i] = r.value;
@@ -4734,7 +6668,7 @@ if (!all.__argnames__) Object.defineProperties(all, {
     __argnames__ : {value: ["iterable"]},
     __module__ : {value: "__main__"}
 });
-let decimal_sep, define_str_func, ρσ_unpack, ρσ_orig_split, ρσ_orig_replace;
+let decimal_sep, define_str_func, ρσ_orig_split, ρσ_orig_replace;
 decimal_sep = 1.1.toLocaleString()[1];
 function ρσ_repr_js_builtin(x, as_array) {
     var ans, b, keys, key;
@@ -4907,9 +6841,8 @@ define_str_func = (function() {
     });
     return ρσ_anonfunc;
 })();
-ρσ_unpack = [String.prototype.split.call.bind(String.prototype.split), String.prototype.replace.call.bind(String.prototype.replace)];
-ρσ_orig_split = ρσ_unpack[0];
-ρσ_orig_replace = ρσ_unpack[1];
+ρσ_orig_split = String.prototype.split.call.bind(String.prototype.split);
+ρσ_orig_replace = String.prototype.replace.call.bind(String.prototype.replace);
 define_str_func("format", (function() {
     var ρσ_anonfunc = function () {
         var template, args, kwargs, explicit, implicit, idx, split, ans, pos, in_brace, markup, ch;
@@ -5274,9 +7207,20 @@ define_str_func("format", (function() {
             if (typeof object === "function") {
                 object = object();
             }
-            ans = ρσ_list_add("", object);
-            if (format_spec) {
-                ans = apply_formatting(ans, format_spec);
+            if (transformer === "r") {
+                object = ρσ_repr(object);
+            } else if (transformer === "s") {
+                object = ρσ_str(object);
+            } else if (transformer === "a") {
+                object = ρσ_repr(object);
+            }
+            if (!transformer && object !== null && object !== undefined && typeof object.__format__ === "function") {
+                ans = object.__format__(format_spec || "");
+            } else {
+                ans = ρσ_list_add("", object);
+                if (format_spec) {
+                    ans = apply_formatting(ans, format_spec);
+                }
             }
             if (ends_with_equal) {
                 ans = ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("", ρσ_str.format("{}", key)), "="), ρσ_str.format("{}", ans)), "");
@@ -5867,6 +7811,19 @@ define_str_func("split", (function() {
     });
     return ρσ_anonfunc;
 })());
+String.prototype.split = (function() {
+    var ρσ_anonfunc = function (sep, limit) {
+        if (sep === undefined) {
+            return ρσ_str.prototype.split.call(this);
+        }
+        return ρσ_orig_split(this, sep, limit);
+    };
+    if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+        __argnames__ : {value: ["sep", "limit"]},
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
 define_str_func("rsplit", (function() {
     var ρσ_anonfunc = function (sep, maxsplit) {
         var split, ans, is_space, pos, current, spc, ch, end, idx;
@@ -6268,6 +8225,11 @@ var str = ρσ_str, repr = ρσ_repr, format = ρσ_format;;
         DefaultsError.prototype.__str__ = function __str__ () {
             if(ValueError.prototype.__str__) return ValueError.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        DefaultsError.prototype.__format__ = function __format__ () {
+            if(ValueError.prototype.__format__) return ValueError.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(DefaultsError.prototype, "__bases__", {value: [ValueError]});
         DefaultsError.__name__ = "DefaultsError";
@@ -6686,6 +8648,11 @@ return this.__repr__();
             if(Error.prototype.__str__) return Error.prototype.__str__.call(this);
 return this.__repr__();
         };
+        SyntaxError.prototype.__format__ = function __format__ () {
+            if(Error.prototype.__format__) return Error.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(SyntaxError.prototype, "__bases__", {value: [Error]});
         SyntaxError.__name__ = "SyntaxError";
         SyntaxError.__qualname__ = "SyntaxError";
@@ -6710,13 +8677,18 @@ return this.__repr__();
             if(SyntaxError.prototype.__str__) return SyntaxError.prototype.__str__.call(this);
 return this.__repr__();
         };
+        ImportError.prototype.__format__ = function __format__ () {
+            if(SyntaxError.prototype.__format__) return SyntaxError.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(ImportError.prototype, "__bases__", {value: [SyntaxError]});
         ImportError.__name__ = "ImportError";
         ImportError.__qualname__ = "ImportError";
         ImportError.__module__ = "errors";
         Object.defineProperty(ImportError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof SyntaxError.__init_subclass__ === "function") SyntaxError.__init_subclass__.call(ImportError);
         
+        if (typeof SyntaxError.__init_subclass__ === "function") SyntaxError.__init_subclass__.call(ImportError);
 
         ρσ_modules.errors.SyntaxError = SyntaxError;
         ρσ_modules.errors.ImportError = ImportError;
@@ -6808,6 +8780,10 @@ return this.__repr__();
         AST.prototype.__str__ = function __str__ () {
             return this.__repr__();
         };
+        AST.prototype.__format__ = function __format__ () {
+                        if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST.prototype, "__bases__", {value: []});
         AST.__name__ = "AST";
         AST.__qualname__ = "AST";
@@ -6832,12 +8808,16 @@ return this.__repr__();
             if(AST.prototype.__str__) return AST.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Token.prototype.__format__ = function __format__ () {
+            if(AST.prototype.__format__) return AST.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Token.prototype, "__bases__", {value: [AST]});
         AST_Token.__name__ = "AST_Token";
         AST_Token.__qualname__ = "AST_Token";
         AST_Token.__module__ = "ast";
         Object.defineProperty(AST_Token.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST.__init_subclass__ === "function") AST.__init_subclass__.call(AST_Token);
         AST_Token.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["type"] = "The type of the token";
@@ -6852,6 +8832,7 @@ return this.__repr__();
             ρσ_d["leading_whitespace"] = "The leading whitespace for the line on which this token occurs";
             return ρσ_d;
         }).call(this);
+        if (typeof AST.__init_subclass__ === "function") AST.__init_subclass__.call(AST_Token);
 
         function AST_Node() {
             if (!(this instanceof AST_Node)) return new AST_Node(...arguments);
@@ -7003,18 +8984,23 @@ return this.__repr__();
             if(AST.prototype.__str__) return AST.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Node.prototype.__format__ = function __format__ () {
+            if(AST.prototype.__format__) return AST.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Node.prototype, "__bases__", {value: [AST]});
         AST_Node.__name__ = "AST_Node";
         AST_Node.__qualname__ = "AST_Node";
         AST_Node.__module__ = "ast";
         Object.defineProperty(AST_Node.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST.__init_subclass__ === "function") AST.__init_subclass__.call(AST_Node);
         AST_Node.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["start"] = "[AST_Token] The first token of this node";
             ρσ_d["end"] = "[AST_Token] The last token of this node";
             return ρσ_d;
         }).call(this);
+        if (typeof AST.__init_subclass__ === "function") AST.__init_subclass__.call(AST_Node);
 
         function AST_Statement() {
             if (!(this instanceof AST_Statement)) return new AST_Statement(...arguments);
@@ -7032,6 +9018,11 @@ return this.__repr__();
         AST_Statement.prototype.__str__ = function __str__ () {
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Statement.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Statement.prototype, "__bases__", {value: [AST_Node]});
         AST_Statement.__name__ = "AST_Statement";
@@ -7057,6 +9048,11 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Debugger.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Debugger.prototype, "__bases__", {value: [AST_Statement]});
         AST_Debugger.__name__ = "AST_Debugger";
         AST_Debugger.__qualname__ = "AST_Debugger";
@@ -7081,18 +9077,23 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Directive.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Directive.prototype, "__bases__", {value: [AST_Statement]});
         AST_Directive.__name__ = "AST_Directive";
         AST_Directive.__qualname__ = "AST_Directive";
         AST_Directive.__module__ = "ast";
         Object.defineProperty(AST_Directive.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Directive);
         AST_Directive.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[string] The value of this directive as a plain string (it's not an AST_String!)";
             ρσ_d["scope"] = "[AST_Scope/S] The scope that this directive affects";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Directive);
 
         function AST_SimpleStatement() {
             if (!(this instanceof AST_SimpleStatement)) return new AST_SimpleStatement(...arguments);
@@ -7127,17 +9128,22 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_SimpleStatement.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_SimpleStatement.prototype, "__bases__", {value: [AST_Statement]});
         AST_SimpleStatement.__name__ = "AST_SimpleStatement";
         AST_SimpleStatement.__qualname__ = "AST_SimpleStatement";
         AST_SimpleStatement.__module__ = "ast";
         Object.defineProperty(AST_SimpleStatement.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_SimpleStatement);
         AST_SimpleStatement.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["body"] = "[AST_Node] an expression node (should not be instanceof AST_Statement)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_SimpleStatement);
 
         function AST_AnnotatedAssign() {
             if (!(this instanceof AST_AnnotatedAssign)) return new AST_AnnotatedAssign(...arguments);
@@ -7176,12 +9182,16 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_AnnotatedAssign.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_AnnotatedAssign.prototype, "__bases__", {value: [AST_Statement]});
         AST_AnnotatedAssign.__name__ = "AST_AnnotatedAssign";
         AST_AnnotatedAssign.__qualname__ = "AST_AnnotatedAssign";
         AST_AnnotatedAssign.__module__ = "ast";
         Object.defineProperty(AST_AnnotatedAssign.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_AnnotatedAssign);
         AST_AnnotatedAssign.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["target"] = "[AST_SymbolRef|AST_Dot] the variable being annotated";
@@ -7189,6 +9199,7 @@ return this.__repr__();
             ρσ_d["value"] = "[AST_Node?] the assigned value, or null if no assignment";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_AnnotatedAssign);
 
         function AST_Assert() {
             if (!(this instanceof AST_Assert)) return new AST_Assert(...arguments);
@@ -7226,12 +9237,16 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Assert.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Assert.prototype, "__bases__", {value: [AST_Statement]});
         AST_Assert.__name__ = "AST_Assert";
         AST_Assert.__qualname__ = "AST_Assert";
         AST_Assert.__module__ = "ast";
         Object.defineProperty(AST_Assert.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Assert);
         AST_Assert.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["condition"] = "[AST_Node] the expression that should be tested";
@@ -7239,6 +9254,7 @@ return this.__repr__();
             ρσ_d["python_truthiness"] = "[bool] Whether to use Python truthiness (from __python__ import truthiness)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Assert);
 
         function walk_body(node, visitor) {
             var stat;
@@ -7290,17 +9306,22 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Block.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Block.prototype, "__bases__", {value: [AST_Statement]});
         AST_Block.__name__ = "AST_Block";
         AST_Block.__qualname__ = "AST_Block";
         AST_Block.__module__ = "ast";
         Object.defineProperty(AST_Block.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Block);
         AST_Block.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["body"] = "[AST_Statement*] an array of statements";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Block);
 
         function AST_BlockStatement() {
             if (!(this instanceof AST_BlockStatement)) return new AST_BlockStatement(...arguments);
@@ -7318,6 +9339,11 @@ return this.__repr__();
         AST_BlockStatement.prototype.__str__ = function __str__ () {
             if(AST_Block.prototype.__str__) return AST_Block.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_BlockStatement.prototype.__format__ = function __format__ () {
+            if(AST_Block.prototype.__format__) return AST_Block.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_BlockStatement.prototype, "__bases__", {value: [AST_Block]});
         AST_BlockStatement.__name__ = "AST_BlockStatement";
@@ -7351,17 +9377,22 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_EmptyStatement.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_EmptyStatement.prototype, "__bases__", {value: [AST_Statement]});
         AST_EmptyStatement.__name__ = "AST_EmptyStatement";
         AST_EmptyStatement.__qualname__ = "AST_EmptyStatement";
         AST_EmptyStatement.__module__ = "ast";
         Object.defineProperty(AST_EmptyStatement.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_EmptyStatement);
         AST_EmptyStatement.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["stype"] = "[string] the type of empty statement. Is ; for semicolons";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_EmptyStatement);
 
         function AST_StatementWithBody() {
             if (!(this instanceof AST_StatementWithBody)) return new AST_StatementWithBody(...arguments);
@@ -7396,17 +9427,22 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_StatementWithBody.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_StatementWithBody.prototype, "__bases__", {value: [AST_Statement]});
         AST_StatementWithBody.__name__ = "AST_StatementWithBody";
         AST_StatementWithBody.__qualname__ = "AST_StatementWithBody";
         AST_StatementWithBody.__module__ = "ast";
         Object.defineProperty(AST_StatementWithBody.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_StatementWithBody);
         AST_StatementWithBody.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["body"] = "[AST_Statement] the body; this should always be present, even if it's an AST_EmptyStatement";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_StatementWithBody);
 
         function AST_DWLoop() {
             if (!(this instanceof AST_DWLoop)) return new AST_DWLoop(...arguments);
@@ -7442,18 +9478,23 @@ return this.__repr__();
             if(AST_StatementWithBody.prototype.__str__) return AST_StatementWithBody.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_DWLoop.prototype.__format__ = function __format__ () {
+            if(AST_StatementWithBody.prototype.__format__) return AST_StatementWithBody.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_DWLoop.prototype, "__bases__", {value: [AST_StatementWithBody]});
         AST_DWLoop.__name__ = "AST_DWLoop";
         AST_DWLoop.__qualname__ = "AST_DWLoop";
         AST_DWLoop.__module__ = "ast";
         Object.defineProperty(AST_DWLoop.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_DWLoop);
         AST_DWLoop.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["condition"] = "[AST_Node] the loop condition.  Should not be instanceof AST_Statement";
             ρσ_d["python_truthiness"] = "[bool] Whether to use Python truthiness (from __python__ import truthiness)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_DWLoop);
 
         function AST_Do() {
             if (!(this instanceof AST_Do)) return new AST_Do(...arguments);
@@ -7471,6 +9512,11 @@ return this.__repr__();
         AST_Do.prototype.__str__ = function __str__ () {
             if(AST_DWLoop.prototype.__str__) return AST_DWLoop.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Do.prototype.__format__ = function __format__ () {
+            if(AST_DWLoop.prototype.__format__) return AST_DWLoop.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Do.prototype, "__bases__", {value: [AST_DWLoop]});
         AST_Do.__name__ = "AST_Do";
@@ -7516,17 +9562,22 @@ return this.__repr__();
             if(AST_DWLoop.prototype.__str__) return AST_DWLoop.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_While.prototype.__format__ = function __format__ () {
+            if(AST_DWLoop.prototype.__format__) return AST_DWLoop.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_While.prototype, "__bases__", {value: [AST_DWLoop]});
         AST_While.__name__ = "AST_While";
         AST_While.__qualname__ = "AST_While";
         AST_While.__module__ = "ast";
         Object.defineProperty(AST_While.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_DWLoop.__init_subclass__ === "function") AST_DWLoop.__init_subclass__.call(AST_While);
         AST_While.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["belse"] = "[AST_Else?] the `else` clause, run when loop exits without `break`";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_DWLoop.__init_subclass__ === "function") AST_DWLoop.__init_subclass__.call(AST_While);
 
         function AST_ForIn() {
             if (!(this instanceof AST_ForIn)) return new AST_ForIn(...arguments);
@@ -7569,12 +9620,16 @@ return this.__repr__();
             if(AST_StatementWithBody.prototype.__str__) return AST_StatementWithBody.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ForIn.prototype.__format__ = function __format__ () {
+            if(AST_StatementWithBody.prototype.__format__) return AST_StatementWithBody.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ForIn.prototype, "__bases__", {value: [AST_StatementWithBody]});
         AST_ForIn.__name__ = "AST_ForIn";
         AST_ForIn.__qualname__ = "AST_ForIn";
         AST_ForIn.__module__ = "ast";
         Object.defineProperty(AST_ForIn.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_ForIn);
         AST_ForIn.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["init"] = "[AST_Node] the `for/in` initialization code";
@@ -7583,6 +9638,7 @@ return this.__repr__();
             ρσ_d["belse"] = "[AST_Else?] the `else` clause, run when no break occurred";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_ForIn);
 
         function AST_ForJS() {
             if (!(this instanceof AST_ForJS)) return new AST_ForJS(...arguments);
@@ -7601,17 +9657,22 @@ return this.__repr__();
             if(AST_StatementWithBody.prototype.__str__) return AST_StatementWithBody.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ForJS.prototype.__format__ = function __format__ () {
+            if(AST_StatementWithBody.prototype.__format__) return AST_StatementWithBody.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ForJS.prototype, "__bases__", {value: [AST_StatementWithBody]});
         AST_ForJS.__name__ = "AST_ForJS";
         AST_ForJS.__qualname__ = "AST_ForJS";
         AST_ForJS.__module__ = "ast";
         Object.defineProperty(AST_ForJS.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_ForJS);
         AST_ForJS.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["condition"] = "[AST_Verbatim] raw JavaScript conditional";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_ForJS);
 
         function AST_ListComprehension() {
             if (!(this instanceof AST_ListComprehension)) return new AST_ListComprehension(...arguments);
@@ -7661,12 +9722,16 @@ return this.__repr__();
             if(AST_ForIn.prototype.__str__) return AST_ForIn.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ListComprehension.prototype.__format__ = function __format__ () {
+            if(AST_ForIn.prototype.__format__) return AST_ForIn.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ListComprehension.prototype, "__bases__", {value: [AST_ForIn]});
         AST_ListComprehension.__name__ = "AST_ListComprehension";
         AST_ListComprehension.__qualname__ = "AST_ListComprehension";
         AST_ListComprehension.__module__ = "ast";
         Object.defineProperty(AST_ListComprehension.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_ForIn.__init_subclass__ === "function") AST_ForIn.__init_subclass__.call(AST_ListComprehension);
         AST_ListComprehension.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["condition"] = "[AST_Node] the `if` condition for the first for-clause";
@@ -7674,6 +9739,7 @@ return this.__repr__();
             ρσ_d["clauses"] = "[Array] additional for-clauses for nested comprehensions";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_ForIn.__init_subclass__ === "function") AST_ForIn.__init_subclass__.call(AST_ListComprehension);
 
         function AST_SetComprehension() {
             if (!(this instanceof AST_SetComprehension)) return new AST_SetComprehension(...arguments);
@@ -7691,6 +9757,11 @@ return this.__repr__();
         AST_SetComprehension.prototype.__str__ = function __str__ () {
             if(AST_ListComprehension.prototype.__str__) return AST_ListComprehension.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_SetComprehension.prototype.__format__ = function __format__ () {
+            if(AST_ListComprehension.prototype.__format__) return AST_ListComprehension.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_SetComprehension.prototype, "__bases__", {value: [AST_ListComprehension]});
         AST_SetComprehension.__name__ = "AST_SetComprehension";
@@ -7748,12 +9819,16 @@ return this.__repr__();
             if(AST_ListComprehension.prototype.__str__) return AST_ListComprehension.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_DictComprehension.prototype.__format__ = function __format__ () {
+            if(AST_ListComprehension.prototype.__format__) return AST_ListComprehension.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_DictComprehension.prototype, "__bases__", {value: [AST_ListComprehension]});
         AST_DictComprehension.__name__ = "AST_DictComprehension";
         AST_DictComprehension.__qualname__ = "AST_DictComprehension";
         AST_DictComprehension.__module__ = "ast";
         Object.defineProperty(AST_DictComprehension.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_ListComprehension.__init_subclass__ === "function") AST_ListComprehension.__init_subclass__.call(AST_DictComprehension);
         AST_DictComprehension.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value_statement"] = "[AST_Node] statement to perform on each value before returning it";
@@ -7761,6 +9836,7 @@ return this.__repr__();
             ρσ_d["is_jshash"] = "[bool] True if this comprehension is for a js hash";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_ListComprehension.__init_subclass__ === "function") AST_ListComprehension.__init_subclass__.call(AST_DictComprehension);
 
         function AST_GeneratorComprehension() {
             if (!(this instanceof AST_GeneratorComprehension)) return new AST_GeneratorComprehension(...arguments);
@@ -7778,6 +9854,11 @@ return this.__repr__();
         AST_GeneratorComprehension.prototype.__str__ = function __str__ () {
             if(AST_ListComprehension.prototype.__str__) return AST_ListComprehension.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_GeneratorComprehension.prototype.__format__ = function __format__ () {
+            if(AST_ListComprehension.prototype.__format__) return AST_ListComprehension.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_GeneratorComprehension.prototype, "__bases__", {value: [AST_ListComprehension]});
         AST_GeneratorComprehension.__name__ = "AST_GeneratorComprehension";
@@ -7825,17 +9906,22 @@ return this.__repr__();
             if(AST_StatementWithBody.prototype.__str__) return AST_StatementWithBody.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_With.prototype.__format__ = function __format__ () {
+            if(AST_StatementWithBody.prototype.__format__) return AST_StatementWithBody.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_With.prototype, "__bases__", {value: [AST_StatementWithBody]});
         AST_With.__name__ = "AST_With";
         AST_With.__qualname__ = "AST_With";
         AST_With.__module__ = "ast";
         Object.defineProperty(AST_With.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_With);
         AST_With.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["clauses"] = "[AST_WithClause*] the `with` clauses (comma separated)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_With);
 
         function AST_WithClause() {
             if (!(this instanceof AST_WithClause)) return new AST_WithClause(...arguments);
@@ -7873,18 +9959,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_WithClause.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_WithClause.prototype, "__bases__", {value: [AST_Node]});
         AST_WithClause.__name__ = "AST_WithClause";
         AST_WithClause.__qualname__ = "AST_WithClause";
         AST_WithClause.__module__ = "ast";
         Object.defineProperty(AST_WithClause.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_WithClause);
         AST_WithClause.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] the expression";
             ρσ_d["alias"] = "[AST_SymbolAlias?] optional alias for this expression";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_WithClause);
 
         function AST_MatchPattern() {
             if (!(this instanceof AST_MatchPattern)) return new AST_MatchPattern(...arguments);
@@ -7902,6 +9993,11 @@ return this.__repr__();
         AST_MatchPattern.prototype.__str__ = function __str__ () {
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_MatchPattern.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_MatchPattern.prototype, "__bases__", {value: [AST_Node]});
         AST_MatchPattern.__name__ = "AST_MatchPattern";
@@ -7927,6 +10023,11 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchWildcard.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchWildcard.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchWildcard.__name__ = "AST_MatchWildcard";
         AST_MatchWildcard.__qualname__ = "AST_MatchWildcard";
@@ -7951,17 +10052,22 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchCapture.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchCapture.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchCapture.__name__ = "AST_MatchCapture";
         AST_MatchCapture.__qualname__ = "AST_MatchCapture";
         AST_MatchCapture.__module__ = "ast";
         Object.defineProperty(AST_MatchCapture.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchCapture);
         AST_MatchCapture.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[string] the variable name to capture into";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchCapture);
 
         function AST_MatchLiteral() {
             if (!(this instanceof AST_MatchLiteral)) return new AST_MatchLiteral(...arguments);
@@ -7996,17 +10102,22 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchLiteral.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchLiteral.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchLiteral.__name__ = "AST_MatchLiteral";
         AST_MatchLiteral.__qualname__ = "AST_MatchLiteral";
         AST_MatchLiteral.__module__ = "ast";
         Object.defineProperty(AST_MatchLiteral.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchLiteral);
         AST_MatchLiteral.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[AST_Node] the literal value (or dotted name) to match against";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchLiteral);
 
         function AST_MatchOr() {
             if (!(this instanceof AST_MatchOr)) return new AST_MatchOr(...arguments);
@@ -8046,17 +10157,22 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchOr.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchOr.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchOr.__name__ = "AST_MatchOr";
         AST_MatchOr.__qualname__ = "AST_MatchOr";
         AST_MatchOr.__module__ = "ast";
         Object.defineProperty(AST_MatchOr.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchOr);
         AST_MatchOr.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["patterns"] = "[AST_MatchPattern*] the alternative patterns";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchOr);
 
         function AST_MatchAs() {
             if (!(this instanceof AST_MatchAs)) return new AST_MatchAs(...arguments);
@@ -8093,18 +10209,23 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchAs.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchAs.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchAs.__name__ = "AST_MatchAs";
         AST_MatchAs.__qualname__ = "AST_MatchAs";
         AST_MatchAs.__module__ = "ast";
         Object.defineProperty(AST_MatchAs.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchAs);
         AST_MatchAs.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["pattern"] = "[AST_MatchPattern?] the inner pattern, or None for a bare catch-all";
             ρσ_d["name"] = "[string] the variable name to bind the matched value to";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchAs);
 
         function AST_MatchStar() {
             if (!(this instanceof AST_MatchStar)) return new AST_MatchStar(...arguments);
@@ -8123,17 +10244,22 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchStar.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchStar.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchStar.__name__ = "AST_MatchStar";
         AST_MatchStar.__qualname__ = "AST_MatchStar";
         AST_MatchStar.__module__ = "ast";
         Object.defineProperty(AST_MatchStar.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchStar);
         AST_MatchStar.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[string?] the capture name, or None for *_ (discard)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchStar);
 
         function AST_MatchSequence() {
             if (!(this instanceof AST_MatchSequence)) return new AST_MatchSequence(...arguments);
@@ -8173,17 +10299,22 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchSequence.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchSequence.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchSequence.__name__ = "AST_MatchSequence";
         AST_MatchSequence.__qualname__ = "AST_MatchSequence";
         AST_MatchSequence.__module__ = "ast";
         Object.defineProperty(AST_MatchSequence.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchSequence);
         AST_MatchSequence.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["elements"] = "[AST_MatchPattern*] the element patterns (may include AST_MatchStar)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchSequence);
 
         function AST_MatchMapping() {
             if (!(this instanceof AST_MatchMapping)) return new AST_MatchMapping(...arguments);
@@ -8228,12 +10359,16 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchMapping.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchMapping.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchMapping.__name__ = "AST_MatchMapping";
         AST_MatchMapping.__qualname__ = "AST_MatchMapping";
         AST_MatchMapping.__module__ = "ast";
         Object.defineProperty(AST_MatchMapping.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchMapping);
         AST_MatchMapping.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["keys"] = "[AST_Node*] the key expressions (literals)";
@@ -8241,6 +10376,7 @@ return this.__repr__();
             ρσ_d["rest_name"] = "[string?] capture name for remaining items (**rest), or None";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchMapping);
 
         function AST_MatchClass() {
             if (!(this instanceof AST_MatchClass)) return new AST_MatchClass(...arguments);
@@ -8286,12 +10422,16 @@ return this.__repr__();
             if(AST_MatchPattern.prototype.__str__) return AST_MatchPattern.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchClass.prototype.__format__ = function __format__ () {
+            if(AST_MatchPattern.prototype.__format__) return AST_MatchPattern.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchClass.prototype, "__bases__", {value: [AST_MatchPattern]});
         AST_MatchClass.__name__ = "AST_MatchClass";
         AST_MatchClass.__qualname__ = "AST_MatchClass";
         AST_MatchClass.__module__ = "ast";
         Object.defineProperty(AST_MatchClass.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchClass);
         AST_MatchClass.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["cls"] = "[AST_Node] the class reference expression";
@@ -8300,6 +10440,7 @@ return this.__repr__();
             ρσ_d["values"] = "[AST_MatchPattern*] keyword argument value patterns";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_MatchPattern.__init_subclass__ === "function") AST_MatchPattern.__init_subclass__.call(AST_MatchClass);
 
         function AST_MatchCase() {
             if (!(this instanceof AST_MatchCase)) return new AST_MatchCase(...arguments);
@@ -8338,12 +10479,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_MatchCase.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_MatchCase.prototype, "__bases__", {value: [AST_Node]});
         AST_MatchCase.__name__ = "AST_MatchCase";
         AST_MatchCase.__qualname__ = "AST_MatchCase";
         AST_MatchCase.__module__ = "ast";
         Object.defineProperty(AST_MatchCase.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_MatchCase);
         AST_MatchCase.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["pattern"] = "[AST_MatchPattern] the pattern to match";
@@ -8351,6 +10496,7 @@ return this.__repr__();
             ρσ_d["body"] = "[AST_Statement] the body to execute when the pattern matches";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_MatchCase);
 
         function AST_Match() {
             if (!(this instanceof AST_Match)) return new AST_Match(...arguments);
@@ -8391,18 +10537,23 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Match.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Match.prototype, "__bases__", {value: [AST_Statement]});
         AST_Match.__name__ = "AST_Match";
         AST_Match.__qualname__ = "AST_Match";
         AST_Match.__module__ = "ast";
         Object.defineProperty(AST_Match.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Match);
         AST_Match.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["subject"] = "[AST_Node] the expression being matched";
             ρσ_d["cases"] = "[AST_MatchCase*] the case clauses";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Match);
 
         function AST_Scope() {
             if (!(this instanceof AST_Scope)) return new AST_Scope(...arguments);
@@ -8421,18 +10572,23 @@ return this.__repr__();
             if(AST_Block.prototype.__str__) return AST_Block.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Scope.prototype.__format__ = function __format__ () {
+            if(AST_Block.prototype.__format__) return AST_Block.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Scope.prototype, "__bases__", {value: [AST_Block]});
         AST_Scope.__name__ = "AST_Scope";
         AST_Scope.__qualname__ = "AST_Scope";
         AST_Scope.__module__ = "ast";
         Object.defineProperty(AST_Scope.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Block.__init_subclass__ === "function") AST_Block.__init_subclass__.call(AST_Scope);
         AST_Scope.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["localvars"] = "[SymbolDef*] list of variables local to this scope";
             ρσ_d["docstrings"] = "[AST_String*] list of docstrings for this scope";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Block.__init_subclass__ === "function") AST_Block.__init_subclass__.call(AST_Scope);
 
         function AST_Toplevel() {
             if (!(this instanceof AST_Toplevel)) return new AST_Toplevel(...arguments);
@@ -8451,12 +10607,16 @@ return this.__repr__();
             if(AST_Scope.prototype.__str__) return AST_Scope.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Toplevel.prototype.__format__ = function __format__ () {
+            if(AST_Scope.prototype.__format__) return AST_Scope.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Toplevel.prototype, "__bases__", {value: [AST_Scope]});
         AST_Toplevel.__name__ = "AST_Toplevel";
         AST_Toplevel.__qualname__ = "AST_Toplevel";
         AST_Toplevel.__module__ = "ast";
         Object.defineProperty(AST_Toplevel.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Scope.__init_subclass__ === "function") AST_Scope.__init_subclass__.call(AST_Toplevel);
         AST_Toplevel.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["globals"] = "[Object/S] a map of name -> SymbolDef for all undeclared names";
@@ -8474,6 +10634,7 @@ return this.__repr__();
             ρσ_d["comments_after"] = "[array] True iff there were comments before this token";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Scope.__init_subclass__ === "function") AST_Scope.__init_subclass__.call(AST_Toplevel);
 
         function AST_Import() {
             if (!(this instanceof AST_Import)) return new AST_Import(...arguments);
@@ -8518,12 +10679,16 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Import.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Import.prototype, "__bases__", {value: [AST_Statement]});
         AST_Import.__name__ = "AST_Import";
         AST_Import.__qualname__ = "AST_Import";
         AST_Import.__module__ = "ast";
         Object.defineProperty(AST_Import.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Import);
         AST_Import.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["module"] = "[AST_SymbolVar] name of the module we're importing";
@@ -8533,6 +10698,7 @@ return this.__repr__();
             ρσ_d["body"] = "[AST_TopLevel] parsed contents of the imported file";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Import);
 
         function AST_Imports() {
             if (!(this instanceof AST_Imports)) return new AST_Imports(...arguments);
@@ -8572,17 +10738,22 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Imports.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Imports.prototype, "__bases__", {value: [AST_Statement]});
         AST_Imports.__name__ = "AST_Imports";
         AST_Imports.__qualname__ = "AST_Imports";
         AST_Imports.__module__ = "ast";
         Object.defineProperty(AST_Imports.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Imports);
         AST_Imports.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["imports"] = "[AST_Import+] array of imports";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Imports);
 
         function AST_Decorator() {
             if (!(this instanceof AST_Decorator)) return new AST_Decorator(...arguments);
@@ -8619,17 +10790,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Decorator.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Decorator.prototype, "__bases__", {value: [AST_Node]});
         AST_Decorator.__name__ = "AST_Decorator";
         AST_Decorator.__qualname__ = "AST_Decorator";
         AST_Decorator.__module__ = "ast";
         Object.defineProperty(AST_Decorator.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Decorator);
         AST_Decorator.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] the decorator expression";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Decorator);
 
         function AST_Lambda() {
             if (!(this instanceof AST_Lambda)) return new AST_Lambda(...arguments);
@@ -8686,12 +10862,16 @@ return this.__repr__();
             if(AST_Scope.prototype.__str__) return AST_Scope.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Lambda.prototype.__format__ = function __format__ () {
+            if(AST_Scope.prototype.__format__) return AST_Scope.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Lambda.prototype, "__bases__", {value: [AST_Scope]});
         AST_Lambda.__name__ = "AST_Lambda";
         AST_Lambda.__qualname__ = "AST_Lambda";
         AST_Lambda.__module__ = "ast";
         Object.defineProperty(AST_Lambda.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Scope.__init_subclass__ === "function") AST_Scope.__init_subclass__.call(AST_Lambda);
         AST_Lambda.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[AST_SymbolDeclaration?] the name of this function";
@@ -8704,6 +10884,7 @@ return this.__repr__();
             ρσ_d["return_annotation"] = "[AST_Node?] The return type annotation provided (if any)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Scope.__init_subclass__ === "function") AST_Scope.__init_subclass__.call(AST_Lambda);
 
         function AST_Function() {
             if (!(this instanceof AST_Function)) return new AST_Function(...arguments);
@@ -8721,6 +10902,11 @@ return this.__repr__();
         AST_Function.prototype.__str__ = function __str__ () {
             if(AST_Lambda.prototype.__str__) return AST_Lambda.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Function.prototype.__format__ = function __format__ () {
+            if(AST_Lambda.prototype.__format__) return AST_Lambda.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Function.prototype, "__bases__", {value: [AST_Lambda]});
         AST_Function.__name__ = "AST_Function";
@@ -8779,12 +10965,16 @@ return this.__repr__();
             if(AST_Scope.prototype.__str__) return AST_Scope.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Class.prototype.__format__ = function __format__ () {
+            if(AST_Scope.prototype.__format__) return AST_Scope.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Class.prototype, "__bases__", {value: [AST_Scope]});
         AST_Class.__name__ = "AST_Class";
         AST_Class.__qualname__ = "AST_Class";
         AST_Class.__module__ = "ast";
         Object.defineProperty(AST_Class.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Scope.__init_subclass__ === "function") AST_Scope.__init_subclass__.call(AST_Class);
         AST_Class.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[AST_SymbolDeclaration?] the name of this class";
@@ -8805,6 +10995,7 @@ return this.__repr__();
             ρσ_d["class_kwargs"] = "[array] keyword arguments from class header (e.g. class C(Base, key=val):) as [[key_node, value_node], ...]";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Scope.__init_subclass__ === "function") AST_Scope.__init_subclass__.call(AST_Class);
 
         function AST_Method() {
             if (!(this instanceof AST_Method)) return new AST_Method(...arguments);
@@ -8823,12 +11014,16 @@ return this.__repr__();
             if(AST_Lambda.prototype.__str__) return AST_Lambda.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Method.prototype.__format__ = function __format__ () {
+            if(AST_Lambda.prototype.__format__) return AST_Lambda.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Method.prototype, "__bases__", {value: [AST_Lambda]});
         AST_Method.__name__ = "AST_Method";
         AST_Method.__qualname__ = "AST_Method";
         AST_Method.__module__ = "ast";
         Object.defineProperty(AST_Method.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Lambda.__init_subclass__ === "function") AST_Lambda.__init_subclass__.call(AST_Method);
         AST_Method.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["static"] = "[boolean] true if method is static";
@@ -8837,6 +11032,7 @@ return this.__repr__();
             ρσ_d["is_setter"] = "[boolean] true if method is a property setter";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Lambda.__init_subclass__ === "function") AST_Lambda.__init_subclass__.call(AST_Method);
 
         function AST_Jump() {
             if (!(this instanceof AST_Jump)) return new AST_Jump(...arguments);
@@ -8854,6 +11050,11 @@ return this.__repr__();
         AST_Jump.prototype.__str__ = function __str__ () {
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Jump.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Jump.prototype, "__bases__", {value: [AST_Statement]});
         AST_Jump.__name__ = "AST_Jump";
@@ -8897,17 +11098,22 @@ return this.__repr__();
             if(AST_Jump.prototype.__str__) return AST_Jump.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Exit.prototype.__format__ = function __format__ () {
+            if(AST_Jump.prototype.__format__) return AST_Jump.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Exit.prototype, "__bases__", {value: [AST_Jump]});
         AST_Exit.__name__ = "AST_Exit";
         AST_Exit.__qualname__ = "AST_Exit";
         AST_Exit.__module__ = "ast";
         Object.defineProperty(AST_Exit.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Jump.__init_subclass__ === "function") AST_Jump.__init_subclass__.call(AST_Exit);
         AST_Exit.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[AST_Node?] the value returned or thrown by this statement; could be null for AST_Return";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Jump.__init_subclass__ === "function") AST_Jump.__init_subclass__.call(AST_Exit);
 
         function AST_Return() {
             if (!(this instanceof AST_Return)) return new AST_Return(...arguments);
@@ -8925,6 +11131,11 @@ return this.__repr__();
         AST_Return.prototype.__str__ = function __str__ () {
             if(AST_Exit.prototype.__str__) return AST_Exit.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Return.prototype.__format__ = function __format__ () {
+            if(AST_Exit.prototype.__format__) return AST_Exit.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Return.prototype, "__bases__", {value: [AST_Exit]});
         AST_Return.__name__ = "AST_Return";
@@ -8950,17 +11161,22 @@ return this.__repr__();
             if(AST_Return.prototype.__str__) return AST_Return.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Yield.prototype.__format__ = function __format__ () {
+            if(AST_Return.prototype.__format__) return AST_Return.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Yield.prototype, "__bases__", {value: [AST_Return]});
         AST_Yield.__name__ = "AST_Yield";
         AST_Yield.__qualname__ = "AST_Yield";
         AST_Yield.__module__ = "ast";
         Object.defineProperty(AST_Yield.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Return.__init_subclass__ === "function") AST_Return.__init_subclass__.call(AST_Yield);
         AST_Yield.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["is_yield_from"] = "[bool] True iff this is a yield from, False otherwise";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Return.__init_subclass__ === "function") AST_Return.__init_subclass__.call(AST_Yield);
 
         function AST_Await() {
             if (!(this instanceof AST_Await)) return new AST_Await(...arguments);
@@ -8997,17 +11213,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Await.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Await.prototype, "__bases__", {value: [AST_Node]});
         AST_Await.__name__ = "AST_Await";
         AST_Await.__qualname__ = "AST_Await";
         AST_Await.__module__ = "ast";
         Object.defineProperty(AST_Await.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Await);
         AST_Await.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[AST_Node] the expression being awaited";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Await);
 
         function AST_Throw() {
             if (!(this instanceof AST_Throw)) return new AST_Throw(...arguments);
@@ -9026,17 +11247,22 @@ return this.__repr__();
             if(AST_Exit.prototype.__str__) return AST_Exit.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Throw.prototype.__format__ = function __format__ () {
+            if(AST_Exit.prototype.__format__) return AST_Exit.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Throw.prototype, "__bases__", {value: [AST_Exit]});
         AST_Throw.__name__ = "AST_Throw";
         AST_Throw.__qualname__ = "AST_Throw";
         AST_Throw.__module__ = "ast";
         Object.defineProperty(AST_Throw.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Exit.__init_subclass__ === "function") AST_Exit.__init_subclass__.call(AST_Throw);
         AST_Throw.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["cause"] = "[AST_Node?] the __cause__ of the exception (from `raise X from Y`); may be None";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Exit.__init_subclass__ === "function") AST_Exit.__init_subclass__.call(AST_Throw);
 
         function AST_LoopControl() {
             if (!(this instanceof AST_LoopControl)) return new AST_LoopControl(...arguments);
@@ -9054,6 +11280,11 @@ return this.__repr__();
         AST_LoopControl.prototype.__str__ = function __str__ () {
             if(AST_Jump.prototype.__str__) return AST_Jump.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_LoopControl.prototype.__format__ = function __format__ () {
+            if(AST_Jump.prototype.__format__) return AST_Jump.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_LoopControl.prototype, "__bases__", {value: [AST_Jump]});
         AST_LoopControl.__name__ = "AST_LoopControl";
@@ -9079,6 +11310,11 @@ return this.__repr__();
             if(AST_LoopControl.prototype.__str__) return AST_LoopControl.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Break.prototype.__format__ = function __format__ () {
+            if(AST_LoopControl.prototype.__format__) return AST_LoopControl.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Break.prototype, "__bases__", {value: [AST_LoopControl]});
         AST_Break.__name__ = "AST_Break";
         AST_Break.__qualname__ = "AST_Break";
@@ -9102,6 +11338,11 @@ return this.__repr__();
         AST_Continue.prototype.__str__ = function __str__ () {
             if(AST_LoopControl.prototype.__str__) return AST_LoopControl.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Continue.prototype.__format__ = function __format__ () {
+            if(AST_LoopControl.prototype.__format__) return AST_LoopControl.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Continue.prototype, "__bases__", {value: [AST_LoopControl]});
         AST_Continue.__name__ = "AST_Continue";
@@ -9147,12 +11388,16 @@ return this.__repr__();
             if(AST_StatementWithBody.prototype.__str__) return AST_StatementWithBody.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_If.prototype.__format__ = function __format__ () {
+            if(AST_StatementWithBody.prototype.__format__) return AST_StatementWithBody.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_If.prototype, "__bases__", {value: [AST_StatementWithBody]});
         AST_If.__name__ = "AST_If";
         AST_If.__qualname__ = "AST_If";
         AST_If.__module__ = "ast";
         Object.defineProperty(AST_If.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_If);
         AST_If.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["condition"] = "[AST_Node] the `if` condition";
@@ -9160,6 +11405,7 @@ return this.__repr__();
             ρσ_d["python_truthiness"] = "[bool] Whether to use Python truthiness (from __python__ import truthiness)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_StatementWithBody.__init_subclass__ === "function") AST_StatementWithBody.__init_subclass__.call(AST_If);
 
         function AST_Try() {
             if (!(this instanceof AST_Try)) return new AST_Try(...arguments);
@@ -9203,12 +11449,16 @@ return this.__repr__();
             if(AST_Block.prototype.__str__) return AST_Block.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Try.prototype.__format__ = function __format__ () {
+            if(AST_Block.prototype.__format__) return AST_Block.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Try.prototype, "__bases__", {value: [AST_Block]});
         AST_Try.__name__ = "AST_Try";
         AST_Try.__qualname__ = "AST_Try";
         AST_Try.__module__ = "ast";
         Object.defineProperty(AST_Try.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Block.__init_subclass__ === "function") AST_Block.__init_subclass__.call(AST_Try);
         AST_Try.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["bcatch"] = "[AST_Catch?] the catch block, or null if not present";
@@ -9216,6 +11466,7 @@ return this.__repr__();
             ρσ_d["belse"] = "[AST_Else?] the else block for null if not present";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Block.__init_subclass__ === "function") AST_Block.__init_subclass__.call(AST_Try);
 
         function AST_Catch() {
             if (!(this instanceof AST_Catch)) return new AST_Catch(...arguments);
@@ -9233,6 +11484,11 @@ return this.__repr__();
         AST_Catch.prototype.__str__ = function __str__ () {
             if(AST_Block.prototype.__str__) return AST_Block.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Catch.prototype.__format__ = function __format__ () {
+            if(AST_Block.prototype.__format__) return AST_Block.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Catch.prototype, "__bases__", {value: [AST_Block]});
         AST_Catch.__name__ = "AST_Catch";
@@ -9285,12 +11541,16 @@ return this.__repr__();
             if(AST_Block.prototype.__str__) return AST_Block.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Except.prototype.__format__ = function __format__ () {
+            if(AST_Block.prototype.__format__) return AST_Block.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Except.prototype, "__bases__", {value: [AST_Block]});
         AST_Except.__name__ = "AST_Except";
         AST_Except.__qualname__ = "AST_Except";
         AST_Except.__module__ = "ast";
         Object.defineProperty(AST_Except.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Block.__init_subclass__ === "function") AST_Block.__init_subclass__.call(AST_Except);
         AST_Except.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["argname"] = "[AST_SymbolCatch] symbol for the exception";
@@ -9298,6 +11558,7 @@ return this.__repr__();
             ρσ_d["is_star"] = "[bool] True for except* (exception group) clauses";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Block.__init_subclass__ === "function") AST_Block.__init_subclass__.call(AST_Except);
 
         function AST_Finally() {
             if (!(this instanceof AST_Finally)) return new AST_Finally(...arguments);
@@ -9315,6 +11576,11 @@ return this.__repr__();
         AST_Finally.prototype.__str__ = function __str__ () {
             if(AST_Block.prototype.__str__) return AST_Block.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Finally.prototype.__format__ = function __format__ () {
+            if(AST_Block.prototype.__format__) return AST_Block.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Finally.prototype, "__bases__", {value: [AST_Block]});
         AST_Finally.__name__ = "AST_Finally";
@@ -9339,6 +11605,11 @@ return this.__repr__();
         AST_Else.prototype.__str__ = function __str__ () {
             if(AST_Block.prototype.__str__) return AST_Block.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Else.prototype.__format__ = function __format__ () {
+            if(AST_Block.prototype.__format__) return AST_Block.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Else.prototype, "__bases__", {value: [AST_Block]});
         AST_Else.__name__ = "AST_Else";
@@ -9385,17 +11656,22 @@ return this.__repr__();
             if(AST_Statement.prototype.__str__) return AST_Statement.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Definitions.prototype.__format__ = function __format__ () {
+            if(AST_Statement.prototype.__format__) return AST_Statement.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Definitions.prototype, "__bases__", {value: [AST_Statement]});
         AST_Definitions.__name__ = "AST_Definitions";
         AST_Definitions.__qualname__ = "AST_Definitions";
         AST_Definitions.__module__ = "ast";
         Object.defineProperty(AST_Definitions.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Definitions);
         AST_Definitions.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["definitions"] = "[AST_VarDef*] array of variable definitions";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Statement.__init_subclass__ === "function") AST_Statement.__init_subclass__.call(AST_Definitions);
 
         function AST_Var() {
             if (!(this instanceof AST_Var)) return new AST_Var(...arguments);
@@ -9413,6 +11689,11 @@ return this.__repr__();
         AST_Var.prototype.__str__ = function __str__ () {
             if(AST_Definitions.prototype.__str__) return AST_Definitions.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Var.prototype.__format__ = function __format__ () {
+            if(AST_Definitions.prototype.__format__) return AST_Definitions.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Var.prototype, "__bases__", {value: [AST_Definitions]});
         AST_Var.__name__ = "AST_Var";
@@ -9457,18 +11738,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_VarDef.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_VarDef.prototype, "__bases__", {value: [AST_Node]});
         AST_VarDef.__name__ = "AST_VarDef";
         AST_VarDef.__qualname__ = "AST_VarDef";
         AST_VarDef.__module__ = "ast";
         Object.defineProperty(AST_VarDef.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_VarDef);
         AST_VarDef.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[AST_SymbolVar|AST_SymbolNonlocal] name of the variable";
             ρσ_d["value"] = "[AST_Node?] initializer, or null if there's no initializer";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_VarDef);
 
         function AST_BaseCall() {
             if (!(this instanceof AST_BaseCall)) return new AST_BaseCall(...arguments);
@@ -9487,17 +11773,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_BaseCall.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_BaseCall.prototype, "__bases__", {value: [AST_Node]});
         AST_BaseCall.__name__ = "AST_BaseCall";
         AST_BaseCall.__qualname__ = "AST_BaseCall";
         AST_BaseCall.__module__ = "ast";
         Object.defineProperty(AST_BaseCall.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_BaseCall);
         AST_BaseCall.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["args"] = "[AST_Node*] array of arguments";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_BaseCall);
 
         function AST_Call() {
             if (!(this instanceof AST_Call)) return new AST_Call(...arguments);
@@ -9553,18 +11844,23 @@ return this.__repr__();
             if(AST_BaseCall.prototype.__str__) return AST_BaseCall.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Call.prototype.__format__ = function __format__ () {
+            if(AST_BaseCall.prototype.__format__) return AST_BaseCall.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Call.prototype, "__bases__", {value: [AST_BaseCall]});
         AST_Call.__name__ = "AST_Call";
         AST_Call.__qualname__ = "AST_Call";
         AST_Call.__module__ = "ast";
         Object.defineProperty(AST_Call.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_BaseCall.__init_subclass__ === "function") AST_BaseCall.__init_subclass__.call(AST_Call);
         AST_Call.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] expression to invoke as function";
             ρσ_d["python_truthiness"] = "[bool] Whether to use Python truthiness for __call__ dispatch";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_BaseCall.__init_subclass__ === "function") AST_BaseCall.__init_subclass__.call(AST_Call);
 
         function AST_ClassCall() {
             if (!(this instanceof AST_ClassCall)) return new AST_ClassCall(...arguments);
@@ -9616,12 +11912,16 @@ return this.__repr__();
             if(AST_BaseCall.prototype.__str__) return AST_BaseCall.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ClassCall.prototype.__format__ = function __format__ () {
+            if(AST_BaseCall.prototype.__format__) return AST_BaseCall.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ClassCall.prototype, "__bases__", {value: [AST_BaseCall]});
         AST_ClassCall.__name__ = "AST_ClassCall";
         AST_ClassCall.__qualname__ = "AST_ClassCall";
         AST_ClassCall.__module__ = "ast";
         Object.defineProperty(AST_ClassCall.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_BaseCall.__init_subclass__ === "function") AST_BaseCall.__init_subclass__.call(AST_ClassCall);
         AST_ClassCall.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["class"] = "[string] name of the class method belongs to";
@@ -9629,6 +11929,7 @@ return this.__repr__();
             ρσ_d["static"] = "[boolean] defines whether the method is static";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_BaseCall.__init_subclass__ === "function") AST_BaseCall.__init_subclass__.call(AST_ClassCall);
 
         function AST_Super() {
             if (!(this instanceof AST_Super)) return new AST_Super(...arguments);
@@ -9665,18 +11966,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Super.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Super.prototype, "__bases__", {value: [AST_Node]});
         AST_Super.__name__ = "AST_Super";
         AST_Super.__qualname__ = "AST_Super";
         AST_Super.__module__ = "ast";
         Object.defineProperty(AST_Super.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Super);
         AST_Super.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["parent"] = "[AST_Node] the parent class expression";
             ρσ_d["class_name"] = "[string] name of the class where super() appears";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Super);
 
         function AST_New() {
             if (!(this instanceof AST_New)) return new AST_New(...arguments);
@@ -9694,6 +12000,11 @@ return this.__repr__();
         AST_New.prototype.__str__ = function __str__ () {
             if(AST_Call.prototype.__str__) return AST_Call.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_New.prototype.__format__ = function __format__ () {
+            if(AST_Call.prototype.__format__) return AST_Call.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_New.prototype, "__bases__", {value: [AST_Call]});
         AST_New.__name__ = "AST_New";
@@ -9812,18 +12123,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Seq.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Seq.prototype, "__bases__", {value: [AST_Node]});
         AST_Seq.__name__ = "AST_Seq";
         AST_Seq.__qualname__ = "AST_Seq";
         AST_Seq.__module__ = "ast";
         Object.defineProperty(AST_Seq.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Seq);
         AST_Seq.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["car"] = "[AST_Node] first element in sequence";
             ρσ_d["cdr"] = "[AST_Node] second element in sequence";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Seq);
 
         function AST_PropAccess() {
             if (!(this instanceof AST_PropAccess)) return new AST_PropAccess(...arguments);
@@ -9842,18 +12158,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_PropAccess.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_PropAccess.prototype, "__bases__", {value: [AST_Node]});
         AST_PropAccess.__name__ = "AST_PropAccess";
         AST_PropAccess.__qualname__ = "AST_PropAccess";
         AST_PropAccess.__module__ = "ast";
         Object.defineProperty(AST_PropAccess.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_PropAccess);
         AST_PropAccess.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] the “container” expression";
             ρσ_d["property"] = "[AST_Node|string] the property to access.  For AST_Dot this is always a plain string, while for AST_Sub it's an arbitrary AST_Node";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_PropAccess);
 
         function AST_Dot() {
             if (!(this instanceof AST_Dot)) return new AST_Dot(...arguments);
@@ -9887,6 +12208,11 @@ return this.__repr__();
         AST_Dot.prototype.__str__ = function __str__ () {
             if(AST_PropAccess.prototype.__str__) return AST_PropAccess.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Dot.prototype.__format__ = function __format__ () {
+            if(AST_PropAccess.prototype.__format__) return AST_PropAccess.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Dot.prototype, "__bases__", {value: [AST_PropAccess]});
         AST_Dot.__name__ = "AST_Dot";
@@ -9928,6 +12254,11 @@ return this.__repr__();
         AST_Sub.prototype.__str__ = function __str__ () {
             if(AST_PropAccess.prototype.__str__) return AST_PropAccess.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Sub.prototype.__format__ = function __format__ () {
+            if(AST_PropAccess.prototype.__format__) return AST_PropAccess.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Sub.prototype, "__bases__", {value: [AST_PropAccess]});
         AST_Sub.__name__ = "AST_Sub";
@@ -9973,18 +12304,23 @@ return this.__repr__();
             if(AST_PropAccess.prototype.__str__) return AST_PropAccess.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ItemAccess.prototype.__format__ = function __format__ () {
+            if(AST_PropAccess.prototype.__format__) return AST_PropAccess.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ItemAccess.prototype, "__bases__", {value: [AST_PropAccess]});
         AST_ItemAccess.__name__ = "AST_ItemAccess";
         AST_ItemAccess.__qualname__ = "AST_ItemAccess";
         AST_ItemAccess.__module__ = "ast";
         Object.defineProperty(AST_ItemAccess.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_PropAccess.__init_subclass__ === "function") AST_PropAccess.__init_subclass__.call(AST_ItemAccess);
         AST_ItemAccess.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["assignment"] = "[AST_Node or None] Not None if this is an assignment (a[x] = y) rather than a simple access";
             ρσ_d["assign_operator"] = "[String] The operator for a assignment like += or empty string if plain assignment";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_PropAccess.__init_subclass__ === "function") AST_PropAccess.__init_subclass__.call(AST_ItemAccess);
 
         function AST_Splice() {
             if (!(this instanceof AST_Splice)) return new AST_Splice(...arguments);
@@ -10023,18 +12359,23 @@ return this.__repr__();
             if(AST_PropAccess.prototype.__str__) return AST_PropAccess.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Splice.prototype.__format__ = function __format__ () {
+            if(AST_PropAccess.prototype.__format__) return AST_PropAccess.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Splice.prototype, "__bases__", {value: [AST_PropAccess]});
         AST_Splice.__name__ = "AST_Splice";
         AST_Splice.__qualname__ = "AST_Splice";
         AST_Splice.__module__ = "ast";
         Object.defineProperty(AST_Splice.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_PropAccess.__init_subclass__ === "function") AST_PropAccess.__init_subclass__.call(AST_Splice);
         AST_Splice.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["property2"] = "[AST_Node] the 2nd property to access - typically ending index for the array.";
             ρσ_d["assignment"] = "[AST_Node] The data being spliced in.";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_PropAccess.__init_subclass__ === "function") AST_PropAccess.__init_subclass__.call(AST_Splice);
 
         function AST_Unary() {
             if (!(this instanceof AST_Unary)) return new AST_Unary(...arguments);
@@ -10069,12 +12410,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Unary.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Unary.prototype, "__bases__", {value: [AST_Node]});
         AST_Unary.__name__ = "AST_Unary";
         AST_Unary.__qualname__ = "AST_Unary";
         AST_Unary.__module__ = "ast";
         Object.defineProperty(AST_Unary.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Unary);
         AST_Unary.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["operator"] = "[string] the operator";
@@ -10084,6 +12429,7 @@ return this.__repr__();
             ρσ_d["python_truthiness"] = "[bool] Whether to use Python truthiness (from __python__ import truthiness)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Unary);
 
         function AST_UnaryPrefix() {
             if (!(this instanceof AST_UnaryPrefix)) return new AST_UnaryPrefix(...arguments);
@@ -10101,6 +12447,11 @@ return this.__repr__();
         AST_UnaryPrefix.prototype.__str__ = function __str__ () {
             if(AST_Unary.prototype.__str__) return AST_Unary.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_UnaryPrefix.prototype.__format__ = function __format__ () {
+            if(AST_Unary.prototype.__format__) return AST_Unary.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_UnaryPrefix.prototype, "__bases__", {value: [AST_Unary]});
         AST_UnaryPrefix.__name__ = "AST_UnaryPrefix";
@@ -10143,12 +12494,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Binary.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Binary.prototype, "__bases__", {value: [AST_Node]});
         AST_Binary.__name__ = "AST_Binary";
         AST_Binary.__qualname__ = "AST_Binary";
         AST_Binary.__module__ = "ast";
         Object.defineProperty(AST_Binary.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Binary);
         AST_Binary.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["left"] = "[AST_Node] left-hand side expression";
@@ -10158,6 +12513,7 @@ return this.__repr__();
             ρσ_d["python_truthiness"] = "[bool] Whether to use Python truthiness (from __python__ import truthiness)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Binary);
 
         function AST_Existential() {
             if (!(this instanceof AST_Existential)) return new AST_Existential(...arguments);
@@ -10195,18 +12551,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Existential.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Existential.prototype, "__bases__", {value: [AST_Node]});
         AST_Existential.__name__ = "AST_Existential";
         AST_Existential.__qualname__ = "AST_Existential";
         AST_Existential.__module__ = "ast";
         Object.defineProperty(AST_Existential.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Existential);
         AST_Existential.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] The expression whose existence we need to check";
             ρσ_d["after"] = "[None|string|AST_Node] is None when there is nothing following this operator, is a string when there is as AST_PropAccess following this operator, is an AST_Node if it is used a a shorthand for the conditional ternary, i.e. a ? b == a if a? else b";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Existential);
 
         function AST_Conditional() {
             if (!(this instanceof AST_Conditional)) return new AST_Conditional(...arguments);
@@ -10243,12 +12604,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Conditional.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Conditional.prototype, "__bases__", {value: [AST_Node]});
         AST_Conditional.__name__ = "AST_Conditional";
         AST_Conditional.__qualname__ = "AST_Conditional";
         AST_Conditional.__module__ = "ast";
         Object.defineProperty(AST_Conditional.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Conditional);
         AST_Conditional.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["condition"] = "[AST_Node]";
@@ -10257,6 +12622,7 @@ return this.__repr__();
             ρσ_d["python_truthiness"] = "[bool] Whether to use Python truthiness (from __python__ import truthiness)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Conditional);
 
         function AST_Assign() {
             if (!(this instanceof AST_Assign)) return new AST_Assign(...arguments);
@@ -10336,6 +12702,11 @@ return this.__repr__();
             if(AST_Binary.prototype.__str__) return AST_Binary.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Assign.prototype.__format__ = function __format__ () {
+            if(AST_Binary.prototype.__format__) return AST_Binary.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Assign.prototype, "__bases__", {value: [AST_Binary]});
         AST_Assign.__name__ = "AST_Assign";
         AST_Assign.__qualname__ = "AST_Assign";
@@ -10377,18 +12748,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_NamedExpr.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_NamedExpr.prototype, "__bases__", {value: [AST_Node]});
         AST_NamedExpr.__name__ = "AST_NamedExpr";
         AST_NamedExpr.__qualname__ = "AST_NamedExpr";
         AST_NamedExpr.__module__ = "ast";
         Object.defineProperty(AST_NamedExpr.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_NamedExpr);
         AST_NamedExpr.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[AST_SymbolRef] the symbol being assigned to";
             ρσ_d["value"] = "[AST_Node] the value expression";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_NamedExpr);
 
         function AST_Starred() {
             if (!(this instanceof AST_Starred)) return new AST_Starred(...arguments);
@@ -10423,17 +12799,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Starred.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Starred.prototype, "__bases__", {value: [AST_Node]});
         AST_Starred.__name__ = "AST_Starred";
         AST_Starred.__qualname__ = "AST_Starred";
         AST_Starred.__module__ = "ast";
         Object.defineProperty(AST_Starred.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Starred);
         AST_Starred.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_SymbolRef] the symbol being collected into";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Starred);
 
         function AST_Array() {
             if (!(this instanceof AST_Array)) return new AST_Array(...arguments);
@@ -10504,17 +12885,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Array.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Array.prototype, "__bases__", {value: [AST_Node]});
         AST_Array.__name__ = "AST_Array";
         AST_Array.__qualname__ = "AST_Array";
         AST_Array.__module__ = "ast";
         Object.defineProperty(AST_Array.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Array);
         AST_Array.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["elements"] = "[AST_Node*] array of elements";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Array);
 
         function AST_Object() {
             if (!(this instanceof AST_Object)) return new AST_Object(...arguments);
@@ -10554,12 +12940,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Object.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Object.prototype, "__bases__", {value: [AST_Node]});
         AST_Object.__name__ = "AST_Object";
         AST_Object.__qualname__ = "AST_Object";
         AST_Object.__module__ = "ast";
         Object.defineProperty(AST_Object.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Object);
         AST_Object.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["properties"] = "[AST_ObjectProperty*] array of properties";
@@ -10567,6 +12957,7 @@ return this.__repr__();
             ρσ_d["is_jshash"] = "[bool] True if this object is a js hash literal";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Object);
 
         function AST_ExpressiveObject() {
             if (!(this instanceof AST_ExpressiveObject)) return new AST_ExpressiveObject(...arguments);
@@ -10584,6 +12975,11 @@ return this.__repr__();
         AST_ExpressiveObject.prototype.__str__ = function __str__ () {
             if(AST_Object.prototype.__str__) return AST_Object.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_ExpressiveObject.prototype.__format__ = function __format__ () {
+            if(AST_Object.prototype.__format__) return AST_Object.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_ExpressiveObject.prototype, "__bases__", {value: [AST_Object]});
         AST_ExpressiveObject.__name__ = "AST_ExpressiveObject";
@@ -10626,12 +13022,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ObjectProperty.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ObjectProperty.prototype, "__bases__", {value: [AST_Node]});
         AST_ObjectProperty.__name__ = "AST_ObjectProperty";
         AST_ObjectProperty.__qualname__ = "AST_ObjectProperty";
         AST_ObjectProperty.__module__ = "ast";
         Object.defineProperty(AST_ObjectProperty.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_ObjectProperty);
         AST_ObjectProperty.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["key"] = "[AST_Node] the property expression";
@@ -10639,6 +13039,7 @@ return this.__repr__();
             ρσ_d["quoted"] = "";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_ObjectProperty);
 
         function AST_ObjectKeyVal() {
             if (!(this instanceof AST_ObjectKeyVal)) return new AST_ObjectKeyVal(...arguments);
@@ -10656,6 +13057,11 @@ return this.__repr__();
         AST_ObjectKeyVal.prototype.__str__ = function __str__ () {
             if(AST_ObjectProperty.prototype.__str__) return AST_ObjectProperty.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_ObjectKeyVal.prototype.__format__ = function __format__ () {
+            if(AST_ObjectProperty.prototype.__format__) return AST_ObjectProperty.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_ObjectKeyVal.prototype, "__bases__", {value: [AST_ObjectProperty]});
         AST_ObjectKeyVal.__name__ = "AST_ObjectKeyVal";
@@ -10697,17 +13103,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ObjectSpread.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ObjectSpread.prototype, "__bases__", {value: [AST_Node]});
         AST_ObjectSpread.__name__ = "AST_ObjectSpread";
         AST_ObjectSpread.__qualname__ = "AST_ObjectSpread";
         AST_ObjectSpread.__module__ = "ast";
         Object.defineProperty(AST_ObjectSpread.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_ObjectSpread);
         AST_ObjectSpread.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[AST_Node] the expression being spread";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_ObjectSpread);
 
         function AST_Spread() {
             if (!(this instanceof AST_Spread)) return new AST_Spread(...arguments);
@@ -10742,17 +13153,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Spread.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Spread.prototype, "__bases__", {value: [AST_Node]});
         AST_Spread.__name__ = "AST_Spread";
         AST_Spread.__qualname__ = "AST_Spread";
         AST_Spread.__module__ = "ast";
         Object.defineProperty(AST_Spread.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Spread);
         AST_Spread.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] the expression being spread";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Spread);
 
         function AST_Set() {
             if (!(this instanceof AST_Set)) return new AST_Set(...arguments);
@@ -10792,17 +13208,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Set.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Set.prototype, "__bases__", {value: [AST_Node]});
         AST_Set.__name__ = "AST_Set";
         AST_Set.__qualname__ = "AST_Set";
         AST_Set.__module__ = "ast";
         Object.defineProperty(AST_Set.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Set);
         AST_Set.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["items"] = "[AST_SetItem*] array of items";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Set);
 
         function AST_SetItem() {
             if (!(this instanceof AST_SetItem)) return new AST_SetItem(...arguments);
@@ -10837,17 +13258,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_SetItem.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_SetItem.prototype, "__bases__", {value: [AST_Node]});
         AST_SetItem.__name__ = "AST_SetItem";
         AST_SetItem.__qualname__ = "AST_SetItem";
         AST_SetItem.__module__ = "ast";
         Object.defineProperty(AST_SetItem.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_SetItem);
         AST_SetItem.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[AST_Node] The value of this item";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_SetItem);
 
         function AST_Symbol() {
             if (!(this instanceof AST_Symbol)) return new AST_Symbol(...arguments);
@@ -10866,12 +13292,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Symbol.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Symbol.prototype, "__bases__", {value: [AST_Node]});
         AST_Symbol.__name__ = "AST_Symbol";
         AST_Symbol.__qualname__ = "AST_Symbol";
         AST_Symbol.__module__ = "ast";
         Object.defineProperty(AST_Symbol.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Symbol);
         AST_Symbol.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[string] name of this symbol";
@@ -10879,6 +13309,7 @@ return this.__repr__();
             ρσ_d["thedef"] = "[SymbolDef/S] the definition of this symbol";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_Symbol);
 
         function AST_SymbolAlias() {
             if (!(this instanceof AST_SymbolAlias)) return new AST_SymbolAlias(...arguments);
@@ -10896,6 +13327,11 @@ return this.__repr__();
         AST_SymbolAlias.prototype.__str__ = function __str__ () {
             if(AST_Symbol.prototype.__str__) return AST_Symbol.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_SymbolAlias.prototype.__format__ = function __format__ () {
+            if(AST_Symbol.prototype.__format__) return AST_Symbol.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_SymbolAlias.prototype, "__bases__", {value: [AST_Symbol]});
         AST_SymbolAlias.__name__ = "AST_SymbolAlias";
@@ -10921,17 +13357,22 @@ return this.__repr__();
             if(AST_Symbol.prototype.__str__) return AST_Symbol.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_SymbolDeclaration.prototype.__format__ = function __format__ () {
+            if(AST_Symbol.prototype.__format__) return AST_Symbol.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_SymbolDeclaration.prototype, "__bases__", {value: [AST_Symbol]});
         AST_SymbolDeclaration.__name__ = "AST_SymbolDeclaration";
         AST_SymbolDeclaration.__qualname__ = "AST_SymbolDeclaration";
         AST_SymbolDeclaration.__module__ = "ast";
         Object.defineProperty(AST_SymbolDeclaration.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Symbol.__init_subclass__ === "function") AST_Symbol.__init_subclass__.call(AST_SymbolDeclaration);
         AST_SymbolDeclaration.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["init"] = "[AST_Node*/S] array of initializers for this declaration.";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Symbol.__init_subclass__ === "function") AST_Symbol.__init_subclass__.call(AST_SymbolDeclaration);
 
         function AST_SymbolVar() {
             if (!(this instanceof AST_SymbolVar)) return new AST_SymbolVar(...arguments);
@@ -10949,6 +13390,11 @@ return this.__repr__();
         AST_SymbolVar.prototype.__str__ = function __str__ () {
             if(AST_SymbolDeclaration.prototype.__str__) return AST_SymbolDeclaration.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_SymbolVar.prototype.__format__ = function __format__ () {
+            if(AST_SymbolDeclaration.prototype.__format__) return AST_SymbolDeclaration.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_SymbolVar.prototype, "__bases__", {value: [AST_SymbolDeclaration]});
         AST_SymbolVar.__name__ = "AST_SymbolVar";
@@ -10974,17 +13420,22 @@ return this.__repr__();
             if(AST_SymbolVar.prototype.__str__) return AST_SymbolVar.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_ImportedVar.prototype.__format__ = function __format__ () {
+            if(AST_SymbolVar.prototype.__format__) return AST_SymbolVar.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_ImportedVar.prototype, "__bases__", {value: [AST_SymbolVar]});
         AST_ImportedVar.__name__ = "AST_ImportedVar";
         AST_ImportedVar.__qualname__ = "AST_ImportedVar";
         AST_ImportedVar.__module__ = "ast";
         Object.defineProperty(AST_ImportedVar.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_SymbolVar.__init_subclass__ === "function") AST_SymbolVar.__init_subclass__.call(AST_ImportedVar);
         AST_ImportedVar.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["alias"] = "AST_SymbolAlias the alias for this imported symbol";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_SymbolVar.__init_subclass__ === "function") AST_SymbolVar.__init_subclass__.call(AST_ImportedVar);
 
         function AST_SymbolNonlocal() {
             if (!(this instanceof AST_SymbolNonlocal)) return new AST_SymbolNonlocal(...arguments);
@@ -11002,6 +13453,11 @@ return this.__repr__();
         AST_SymbolNonlocal.prototype.__str__ = function __str__ () {
             if(AST_SymbolDeclaration.prototype.__str__) return AST_SymbolDeclaration.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_SymbolNonlocal.prototype.__format__ = function __format__ () {
+            if(AST_SymbolDeclaration.prototype.__format__) return AST_SymbolDeclaration.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_SymbolNonlocal.prototype, "__bases__", {value: [AST_SymbolDeclaration]});
         AST_SymbolNonlocal.__name__ = "AST_SymbolNonlocal";
@@ -11027,17 +13483,22 @@ return this.__repr__();
             if(AST_SymbolVar.prototype.__str__) return AST_SymbolVar.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_SymbolFunarg.prototype.__format__ = function __format__ () {
+            if(AST_SymbolVar.prototype.__format__) return AST_SymbolVar.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_SymbolFunarg.prototype, "__bases__", {value: [AST_SymbolVar]});
         AST_SymbolFunarg.__name__ = "AST_SymbolFunarg";
         AST_SymbolFunarg.__qualname__ = "AST_SymbolFunarg";
         AST_SymbolFunarg.__module__ = "ast";
         Object.defineProperty(AST_SymbolFunarg.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_SymbolVar.__init_subclass__ === "function") AST_SymbolVar.__init_subclass__.call(AST_SymbolFunarg);
         AST_SymbolFunarg.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["annotation"] = "[AST_Node?] The annotation provided for this argument (if any)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_SymbolVar.__init_subclass__ === "function") AST_SymbolVar.__init_subclass__.call(AST_SymbolFunarg);
 
         function AST_SymbolDefun() {
             if (!(this instanceof AST_SymbolDefun)) return new AST_SymbolDefun(...arguments);
@@ -11055,6 +13516,11 @@ return this.__repr__();
         AST_SymbolDefun.prototype.__str__ = function __str__ () {
             if(AST_SymbolDeclaration.prototype.__str__) return AST_SymbolDeclaration.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_SymbolDefun.prototype.__format__ = function __format__ () {
+            if(AST_SymbolDeclaration.prototype.__format__) return AST_SymbolDeclaration.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_SymbolDefun.prototype, "__bases__", {value: [AST_SymbolDeclaration]});
         AST_SymbolDefun.__name__ = "AST_SymbolDefun";
@@ -11080,6 +13546,11 @@ return this.__repr__();
             if(AST_SymbolDeclaration.prototype.__str__) return AST_SymbolDeclaration.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_SymbolLambda.prototype.__format__ = function __format__ () {
+            if(AST_SymbolDeclaration.prototype.__format__) return AST_SymbolDeclaration.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_SymbolLambda.prototype, "__bases__", {value: [AST_SymbolDeclaration]});
         AST_SymbolLambda.__name__ = "AST_SymbolLambda";
         AST_SymbolLambda.__qualname__ = "AST_SymbolLambda";
@@ -11103,6 +13574,11 @@ return this.__repr__();
         AST_SymbolCatch.prototype.__str__ = function __str__ () {
             if(AST_SymbolDeclaration.prototype.__str__) return AST_SymbolDeclaration.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_SymbolCatch.prototype.__format__ = function __format__ () {
+            if(AST_SymbolDeclaration.prototype.__format__) return AST_SymbolDeclaration.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_SymbolCatch.prototype, "__bases__", {value: [AST_SymbolDeclaration]});
         AST_SymbolCatch.__name__ = "AST_SymbolCatch";
@@ -11128,17 +13604,22 @@ return this.__repr__();
             if(AST_Symbol.prototype.__str__) return AST_Symbol.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_SymbolRef.prototype.__format__ = function __format__ () {
+            if(AST_Symbol.prototype.__format__) return AST_Symbol.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_SymbolRef.prototype, "__bases__", {value: [AST_Symbol]});
         AST_SymbolRef.__name__ = "AST_SymbolRef";
         AST_SymbolRef.__qualname__ = "AST_SymbolRef";
         AST_SymbolRef.__module__ = "ast";
         Object.defineProperty(AST_SymbolRef.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Symbol.__init_subclass__ === "function") AST_Symbol.__init_subclass__.call(AST_SymbolRef);
         AST_SymbolRef.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["parens"] = "[boolean/S] if true, this variable is wrapped in parentheses";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Symbol.__init_subclass__ === "function") AST_Symbol.__init_subclass__.call(AST_SymbolRef);
 
         function AST_This() {
             if (!(this instanceof AST_This)) return new AST_This(...arguments);
@@ -11156,6 +13637,11 @@ return this.__repr__();
         AST_This.prototype.__str__ = function __str__ () {
             if(AST_Symbol.prototype.__str__) return AST_Symbol.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_This.prototype.__format__ = function __format__ () {
+            if(AST_Symbol.prototype.__format__) return AST_Symbol.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_This.prototype, "__bases__", {value: [AST_Symbol]});
         AST_This.__name__ = "AST_This";
@@ -11181,6 +13667,11 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Constant.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Constant.prototype, "__bases__", {value: [AST_Node]});
         AST_Constant.__name__ = "AST_Constant";
         AST_Constant.__qualname__ = "AST_Constant";
@@ -11205,17 +13696,22 @@ return this.__repr__();
             if(AST_Constant.prototype.__str__) return AST_Constant.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_String.prototype.__format__ = function __format__ () {
+            if(AST_Constant.prototype.__format__) return AST_Constant.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_String.prototype, "__bases__", {value: [AST_Constant]});
         AST_String.__name__ = "AST_String";
         AST_String.__qualname__ = "AST_String";
         AST_String.__module__ = "ast";
         Object.defineProperty(AST_String.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_String);
         AST_String.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[string] the contents of this string";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_String);
 
         function AST_Verbatim() {
             if (!(this instanceof AST_Verbatim)) return new AST_Verbatim(...arguments);
@@ -11234,17 +13730,22 @@ return this.__repr__();
             if(AST_Constant.prototype.__str__) return AST_Constant.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Verbatim.prototype.__format__ = function __format__ () {
+            if(AST_Constant.prototype.__format__) return AST_Constant.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Verbatim.prototype, "__bases__", {value: [AST_Constant]});
         AST_Verbatim.__name__ = "AST_Verbatim";
         AST_Verbatim.__qualname__ = "AST_Verbatim";
         AST_Verbatim.__module__ = "ast";
         Object.defineProperty(AST_Verbatim.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_Verbatim);
         AST_Verbatim.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[string] A string of raw JS code";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_Verbatim);
 
         function AST_Number() {
             if (!(this instanceof AST_Number)) return new AST_Number(...arguments);
@@ -11263,17 +13764,22 @@ return this.__repr__();
             if(AST_Constant.prototype.__str__) return AST_Constant.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Number.prototype.__format__ = function __format__ () {
+            if(AST_Constant.prototype.__format__) return AST_Constant.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Number.prototype, "__bases__", {value: [AST_Constant]});
         AST_Number.__name__ = "AST_Number";
         AST_Number.__qualname__ = "AST_Number";
         AST_Number.__module__ = "ast";
         Object.defineProperty(AST_Number.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_Number);
         AST_Number.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[number] the numeric value";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_Number);
 
         function AST_RegExp() {
             if (!(this instanceof AST_RegExp)) return new AST_RegExp(...arguments);
@@ -11292,17 +13798,22 @@ return this.__repr__();
             if(AST_Constant.prototype.__str__) return AST_Constant.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_RegExp.prototype.__format__ = function __format__ () {
+            if(AST_Constant.prototype.__format__) return AST_Constant.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_RegExp.prototype, "__bases__", {value: [AST_Constant]});
         AST_RegExp.__name__ = "AST_RegExp";
         AST_RegExp.__qualname__ = "AST_RegExp";
         AST_RegExp.__module__ = "ast";
         Object.defineProperty(AST_RegExp.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_RegExp);
         AST_RegExp.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[RegExp] the actual regexp";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Constant.__init_subclass__ === "function") AST_Constant.__init_subclass__.call(AST_RegExp);
 
         function AST_Atom() {
             if (!(this instanceof AST_Atom)) return new AST_Atom(...arguments);
@@ -11331,6 +13842,11 @@ return this.__repr__();
             if(AST_Constant.prototype.__str__) return AST_Constant.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Atom.prototype.__format__ = function __format__ () {
+            if(AST_Constant.prototype.__format__) return AST_Constant.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Atom.prototype, "__bases__", {value: [AST_Constant]});
         AST_Atom.__name__ = "AST_Atom";
         AST_Atom.__qualname__ = "AST_Atom";
@@ -11355,13 +13871,18 @@ return this.__repr__();
             if(AST_Atom.prototype.__str__) return AST_Atom.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Null.prototype.__format__ = function __format__ () {
+            if(AST_Atom.prototype.__format__) return AST_Atom.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Null.prototype, "__bases__", {value: [AST_Atom]});
         AST_Null.__name__ = "AST_Null";
         AST_Null.__qualname__ = "AST_Null";
         AST_Null.__module__ = "ast";
         Object.defineProperty(AST_Null.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Null);
         AST_Null.prototype.value = null;
+        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Null);
 
         function AST_Ellipsis() {
             if (!(this instanceof AST_Ellipsis)) return new AST_Ellipsis(...arguments);
@@ -11380,13 +13901,18 @@ return this.__repr__();
             if(AST_Atom.prototype.__str__) return AST_Atom.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Ellipsis.prototype.__format__ = function __format__ () {
+            if(AST_Atom.prototype.__format__) return AST_Atom.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Ellipsis.prototype, "__bases__", {value: [AST_Atom]});
         AST_Ellipsis.__name__ = "AST_Ellipsis";
         AST_Ellipsis.__qualname__ = "AST_Ellipsis";
         AST_Ellipsis.__module__ = "ast";
         Object.defineProperty(AST_Ellipsis.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Ellipsis);
         AST_Ellipsis.prototype.value = ρσ_Ellipsis;
+        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Ellipsis);
 
         function AST_NaN() {
             if (!(this instanceof AST_NaN)) return new AST_NaN(...arguments);
@@ -11405,13 +13931,18 @@ return this.__repr__();
             if(AST_Atom.prototype.__str__) return AST_Atom.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_NaN.prototype.__format__ = function __format__ () {
+            if(AST_Atom.prototype.__format__) return AST_Atom.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_NaN.prototype, "__bases__", {value: [AST_Atom]});
         AST_NaN.__name__ = "AST_NaN";
         AST_NaN.__qualname__ = "AST_NaN";
         AST_NaN.__module__ = "ast";
         Object.defineProperty(AST_NaN.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_NaN);
         AST_NaN.prototype.value = NaN;
+        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_NaN);
 
         function AST_Undefined() {
             if (!(this instanceof AST_Undefined)) return new AST_Undefined(...arguments);
@@ -11430,13 +13961,18 @@ return this.__repr__();
             if(AST_Atom.prototype.__str__) return AST_Atom.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Undefined.prototype.__format__ = function __format__ () {
+            if(AST_Atom.prototype.__format__) return AST_Atom.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Undefined.prototype, "__bases__", {value: [AST_Atom]});
         AST_Undefined.__name__ = "AST_Undefined";
         AST_Undefined.__qualname__ = "AST_Undefined";
         AST_Undefined.__module__ = "ast";
         Object.defineProperty(AST_Undefined.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Undefined);
         AST_Undefined.prototype.value = undefined;
+        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Undefined);
 
         function AST_Hole() {
             if (!(this instanceof AST_Hole)) return new AST_Hole(...arguments);
@@ -11455,13 +13991,18 @@ return this.__repr__();
             if(AST_Atom.prototype.__str__) return AST_Atom.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Hole.prototype.__format__ = function __format__ () {
+            if(AST_Atom.prototype.__format__) return AST_Atom.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Hole.prototype, "__bases__", {value: [AST_Atom]});
         AST_Hole.__name__ = "AST_Hole";
         AST_Hole.__qualname__ = "AST_Hole";
         AST_Hole.__module__ = "ast";
         Object.defineProperty(AST_Hole.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Hole);
         AST_Hole.prototype.value = undefined;
+        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Hole);
 
         function AST_Infinity() {
             if (!(this instanceof AST_Infinity)) return new AST_Infinity(...arguments);
@@ -11480,13 +14021,18 @@ return this.__repr__();
             if(AST_Atom.prototype.__str__) return AST_Atom.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_Infinity.prototype.__format__ = function __format__ () {
+            if(AST_Atom.prototype.__format__) return AST_Atom.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_Infinity.prototype, "__bases__", {value: [AST_Atom]});
         AST_Infinity.__name__ = "AST_Infinity";
         AST_Infinity.__qualname__ = "AST_Infinity";
         AST_Infinity.__module__ = "ast";
         Object.defineProperty(AST_Infinity.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Infinity);
         AST_Infinity.prototype.value = Infinity;
+        if (typeof AST_Atom.__init_subclass__ === "function") AST_Atom.__init_subclass__.call(AST_Infinity);
 
         function AST_Boolean() {
             if (!(this instanceof AST_Boolean)) return new AST_Boolean(...arguments);
@@ -11504,6 +14050,11 @@ return this.__repr__();
         AST_Boolean.prototype.__str__ = function __str__ () {
             if(AST_Atom.prototype.__str__) return AST_Atom.prototype.__str__.call(this);
 return this.__repr__();
+        };
+        AST_Boolean.prototype.__format__ = function __format__ () {
+            if(AST_Atom.prototype.__format__) return AST_Atom.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
         };
         Object.defineProperty(AST_Boolean.prototype, "__bases__", {value: [AST_Atom]});
         AST_Boolean.__name__ = "AST_Boolean";
@@ -11529,13 +14080,18 @@ return this.__repr__();
             if(AST_Boolean.prototype.__str__) return AST_Boolean.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_False.prototype.__format__ = function __format__ () {
+            if(AST_Boolean.prototype.__format__) return AST_Boolean.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_False.prototype, "__bases__", {value: [AST_Boolean]});
         AST_False.__name__ = "AST_False";
         AST_False.__qualname__ = "AST_False";
         AST_False.__module__ = "ast";
         Object.defineProperty(AST_False.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Boolean.__init_subclass__ === "function") AST_Boolean.__init_subclass__.call(AST_False);
         AST_False.prototype.value = false;
+        if (typeof AST_Boolean.__init_subclass__ === "function") AST_Boolean.__init_subclass__.call(AST_False);
 
         function AST_True() {
             if (!(this instanceof AST_True)) return new AST_True(...arguments);
@@ -11554,13 +14110,18 @@ return this.__repr__();
             if(AST_Boolean.prototype.__str__) return AST_Boolean.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_True.prototype.__format__ = function __format__ () {
+            if(AST_Boolean.prototype.__format__) return AST_Boolean.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_True.prototype, "__bases__", {value: [AST_Boolean]});
         AST_True.__name__ = "AST_True";
         AST_True.__qualname__ = "AST_True";
         AST_True.__module__ = "ast";
         Object.defineProperty(AST_True.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Boolean.__init_subclass__ === "function") AST_Boolean.__init_subclass__.call(AST_True);
         AST_True.prototype.value = true;
+        if (typeof AST_Boolean.__init_subclass__ === "function") AST_Boolean.__init_subclass__.call(AST_True);
 
         function TreeWalker() {
             if (!(this instanceof TreeWalker)) return new TreeWalker(...arguments);
@@ -11673,6 +14234,10 @@ return this.__repr__();
         TreeWalker.prototype.__str__ = function __str__ () {
             return this.__repr__();
         };
+        TreeWalker.prototype.__format__ = function __format__ () {
+                        if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(TreeWalker.prototype, "__bases__", {value: []});
         TreeWalker.__name__ = "TreeWalker";
         TreeWalker.__qualname__ = "TreeWalker";
@@ -11722,12 +14287,16 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_JSXElement.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_JSXElement.prototype, "__bases__", {value: [AST_Node]});
         AST_JSXElement.__name__ = "AST_JSXElement";
         AST_JSXElement.__qualname__ = "AST_JSXElement";
         AST_JSXElement.__module__ = "ast";
         Object.defineProperty(AST_JSXElement.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXElement);
         AST_JSXElement.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["tag"] = "[string] The tag name (e.g. 'div', 'MyComponent')";
@@ -11736,6 +14305,7 @@ return this.__repr__();
             ρσ_d["self_closing"] = "[bool] Whether self-closing (no children)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXElement);
 
         function AST_JSXFragment() {
             if (!(this instanceof AST_JSXFragment)) return new AST_JSXFragment(...arguments);
@@ -11775,17 +14345,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_JSXFragment.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_JSXFragment.prototype, "__bases__", {value: [AST_Node]});
         AST_JSXFragment.__name__ = "AST_JSXFragment";
         AST_JSXFragment.__qualname__ = "AST_JSXFragment";
         AST_JSXFragment.__module__ = "ast";
         Object.defineProperty(AST_JSXFragment.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXFragment);
         AST_JSXFragment.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["children"] = "[AST_Node[]] The children";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXFragment);
 
         function AST_JSXAttribute() {
             if (!(this instanceof AST_JSXAttribute)) return new AST_JSXAttribute(...arguments);
@@ -11822,18 +14397,23 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_JSXAttribute.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_JSXAttribute.prototype, "__bases__", {value: [AST_Node]});
         AST_JSXAttribute.__name__ = "AST_JSXAttribute";
         AST_JSXAttribute.__qualname__ = "AST_JSXAttribute";
         AST_JSXAttribute.__module__ = "ast";
         Object.defineProperty(AST_JSXAttribute.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXAttribute);
         AST_JSXAttribute.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["name"] = "[string] The attribute name";
             ρσ_d["value"] = "[AST_Node|null] The value (null for boolean attrs)";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXAttribute);
 
         function AST_JSXSpread() {
             if (!(this instanceof AST_JSXSpread)) return new AST_JSXSpread(...arguments);
@@ -11868,17 +14448,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_JSXSpread.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_JSXSpread.prototype, "__bases__", {value: [AST_Node]});
         AST_JSXSpread.__name__ = "AST_JSXSpread";
         AST_JSXSpread.__qualname__ = "AST_JSXSpread";
         AST_JSXSpread.__module__ = "ast";
         Object.defineProperty(AST_JSXSpread.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXSpread);
         AST_JSXSpread.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] The spread expression";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXSpread);
 
         function AST_JSXText() {
             if (!(this instanceof AST_JSXText)) return new AST_JSXText(...arguments);
@@ -11897,17 +14482,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_JSXText.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_JSXText.prototype, "__bases__", {value: [AST_Node]});
         AST_JSXText.__name__ = "AST_JSXText";
         AST_JSXText.__qualname__ = "AST_JSXText";
         AST_JSXText.__module__ = "ast";
         Object.defineProperty(AST_JSXText.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXText);
         AST_JSXText.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["value"] = "[string] The text content";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXText);
 
         function AST_JSXExprContainer() {
             if (!(this instanceof AST_JSXExprContainer)) return new AST_JSXExprContainer(...arguments);
@@ -11942,17 +14532,22 @@ return this.__repr__();
             if(AST_Node.prototype.__str__) return AST_Node.prototype.__str__.call(this);
 return this.__repr__();
         };
+        AST_JSXExprContainer.prototype.__format__ = function __format__ () {
+            if(AST_Node.prototype.__format__) return AST_Node.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(AST_JSXExprContainer.prototype, "__bases__", {value: [AST_Node]});
         AST_JSXExprContainer.__name__ = "AST_JSXExprContainer";
         AST_JSXExprContainer.__qualname__ = "AST_JSXExprContainer";
         AST_JSXExprContainer.__module__ = "ast";
         Object.defineProperty(AST_JSXExprContainer.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXExprContainer);
         AST_JSXExprContainer.prototype.properties = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["expression"] = "[AST_Node] The expression";
             return ρσ_d;
         }).call(this);
+        if (typeof AST_Node.__init_subclass__ === "function") AST_Node.__init_subclass__.call(AST_JSXExprContainer);
 
         function Found() {
             if (!(this instanceof Found)) return new Found(...arguments);
@@ -11971,13 +14566,18 @@ return this.__repr__();
             if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
 return this.__repr__();
         };
+        Found.prototype.__format__ = function __format__ () {
+            if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+            if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(Found.prototype, "__bases__", {value: [Exception]});
         Found.__name__ = "Found";
         Found.__qualname__ = "Found";
         Found.__module__ = "ast";
         Object.defineProperty(Found.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(Found);
         
+        if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(Found);
 
         function has_calls(expression) {
             if (!expression) {
@@ -12294,7 +14894,7 @@ return this.__repr__();
         PUNC_CHARS = make_predicate(characters("[]{}(),;:?"));
         KEYWORDS = "as assert async await break class continue def del do elif else except finally for from global if import in is lambda new nonlocal pass raise return yield try while with or and not";
         KEYWORDS_ATOM = "False None True";
-        RESERVED_WORDS = "break case class catch const continue debugger default delete do else export extends finally for function if import in instanceof new return switch this throw try typeof var void while with yield enum implements static private package let public protected interface await null true false";
+        RESERVED_WORDS = "break case class catch const continue debugger default delete do else export extends finally for function if import in instanceof new return switch this throw try typeof var void while with yield implements static private package let public protected interface await null true false";
         KEYWORDS_BEFORE_EXPRESSION = "return yield new del raise elif else if";
         ALL_KEYWORDS = ρσ_list_add(ρσ_list_add(KEYWORDS, " "), KEYWORDS_ATOM);
         KEYWORDS = make_predicate(KEYWORDS);
@@ -12307,7 +14907,7 @@ return this.__repr__();
             var ρσ_Iter49 = ρσ_Iterable(val);
             for (var ρσ_Index49 = 0; ρσ_Index49 < ρσ_Iter49.length; ρσ_Index49++) {
                 ch = ρσ_Iter49[ρσ_Index49];
-                if ("vrufVRUF".indexOf(ch) === -1) {
+                if ("vrufbVRUFB".indexOf(ch) === -1) {
                     return false;
                 }
             }
@@ -12698,6 +15298,8 @@ return this.__repr__();
                             return false;
                         } else if (ch === ".") {
                             return (!has_dot && !has_x && !has_e) ? has_dot = true : false;
+                        } else if (ch === "j" || ch === "J") {
+                            return false;
                         }
                         return is_alphanumeric_char(ch.charCodeAt(0));
                     };
@@ -12712,6 +15314,10 @@ return this.__repr__();
                 }
                 valid = parse_js_number(num);
                 if (!isNaN(valid)) {
+                    if (peek() === "j" || peek() === "J") {
+                        next();
+                        return token("imaginary", valid);
+                    }
                     return token("num", valid);
                 } else {
                     parse_error(ρσ_list_add("Invalid syntax: ", num));
@@ -13184,7 +15790,7 @@ return this.__repr__();
                 }
                 if (is_identifier_start(code)) {
                     tok = read_word();
-                    if ("'\"".indexOf(peek()) !== -1 && is_string_modifier(tok.value)) {
+                    if ((peek() === "'" || peek() === "\"") && is_string_modifier(tok.value)) {
                         mods = tok.value.toLowerCase();
                         start_pos_for_string = S.tokpos;
                         stok = read_string(mods.indexOf("r") !== -1, mods.indexOf("v") !== -1);
@@ -13194,7 +15800,7 @@ return this.__repr__();
                             return handle_interpolated_string(stok.value, tok);
                         }
                         tok.value = stok.value;
-                        tok.type = stok.type;
+                        tok.type = (mods.indexOf("b") !== -1) ? "bytes_literal" : stok.type;
                     }
                     return tok;
                 }
@@ -13404,7 +16010,7 @@ return this.__repr__();
         var is_token = ρσ_modules.tokenizer.is_token;
         var RESERVED_WORDS = ρσ_modules.tokenizer.RESERVED_WORDS;
 
-        COMPILER_VERSION = "9dfdc78a03cfb5df66b24c184f23a29acc90079e";
+        COMPILER_VERSION = "ae0f5d2dce810c1606134fced7e47ca108aaa192";
         PYTHON_FLAGS = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["dict_literals"] = true;
@@ -13543,7 +16149,7 @@ return this.__repr__();
             return ρσ_anonfunc;
         })()(ρσ_list_decorate([ ρσ_list_decorate([ "||" ]), ρσ_list_decorate([ "&&" ]), ρσ_list_decorate([ "|" ]), ρσ_list_decorate([ "^" ]), ρσ_list_decorate([ "&" ]), ρσ_list_decorate([ "==", "===", "!=", "!==" ]), ρσ_list_decorate([ "<", ">", "<=", ">=", "in", "nin", "instanceof" ]), ρσ_list_decorate([ ">>", "<<", ">>>" ]), ρσ_list_decorate([ "+", "-" ]), ρσ_list_decorate([ "*", "/", "//", "%" ]), ρσ_list_decorate([ "**" ]) ]), Object.create(null));
         STATEMENTS_WITH_LABELS = array_to_hash(ρσ_list_decorate([ "for", "do", "while", "switch" ]));
-        ATOMIC_START_TOKEN = array_to_hash(ρσ_list_decorate([ "atom", "num", "string", "regexp", "name", "js" ]));
+        ATOMIC_START_TOKEN = array_to_hash(ρσ_list_decorate([ "atom", "num", "imaginary", "string", "bytes_literal", "regexp", "name", "js" ]));
         compile_time_decorators = ρσ_list_decorate([ "staticmethod", "classmethod", "external", "property" ]);
         function has_simple_decorator(decorators, name) {
             var remove, s;
@@ -14119,7 +16725,7 @@ return this.__repr__();
                     if (p && !S.token.nlb && ATOMIC_START_TOKEN[ρσ_bound_index(p.type, ATOMIC_START_TOKEN)] && !is_("punc", ":")) {
                         unexpected();
                     }
-                    if (tmp_ === "string") {
+                    if (tmp_ === "string" || tmp_ === "bytes_literal") {
                         return simple_statement();
                     } else if (tmp_ === "shebang") {
                         tmp_ = S.token.value;
@@ -14158,7 +16764,7 @@ return this.__repr__();
                     } else if (tmp_ === "name") {
                         if (S.token.value === "match") {
                             p = peek();
-                            if (p.type === "name" || p.type === "string" || p.type === "num" || p.type === "atom" || p.type === "js" || p.type === "punc" && (p.value === "[" || p.value === "(")) {
+                            if (p.type === "name" || p.type === "string" || p.type === "bytes_literal" || p.type === "num" || p.type === "atom" || p.type === "js" || p.type === "punc" && (p.value === "[" || p.value === "(")) {
                                 next();
                                 return match_();
                             }
@@ -14935,7 +17541,28 @@ return this.__repr__();
             })());
 
             function simple_statement(tmp) {
+                var start, annotation, value;
+                start = S.token;
                 tmp = expression(true);
+                if (is_("punc", ":")) {
+                    next();
+                    annotation = maybe_conditional();
+                    value = null;
+                    if (is_("operator", "=")) {
+                        next();
+                        value = expression(true);
+                    }
+                    semicolon();
+                    return new AST_AnnotatedAssign((function(){
+                        var ρσ_d = Object.create(null);
+                        ρσ_d["start"] = start;
+                        ρσ_d["target"] = tmp;
+                        ρσ_d["annotation"] = annotation;
+                        ρσ_d["value"] = value;
+                        ρσ_d["end"] = prev();
+                        return ρσ_d;
+                    }).call(this));
+                }
                 semicolon();
                 return new AST_SimpleStatement((function(){
                     var ρσ_d = Object.create(null);
@@ -15118,17 +17745,17 @@ return this.__repr__();
             function get_class_in_scope(expr) {
                 var s, referenced_path, class_name;
                 if (is_node_type(expr, AST_SymbolRef)) {
-                    if (has_prop(NATIVE_CLASSES, expr.name)) {
-                        return NATIVE_CLASSES[ρσ_bound_index(expr.name, NATIVE_CLASSES)];
-                    }
-                    if (has_prop(ERROR_CLASSES, expr.name)) {
-                        return ERROR_CLASSES[ρσ_bound_index(expr.name, ERROR_CLASSES)];
-                    }
                     for (var ρσ_Index72 = S.classes.length - 1; ρσ_Index72 > -1; ρσ_Index72-=1) {
                         s = ρσ_Index72;
                         if (has_prop((ρσ_expr_temp = S.classes)[(typeof s === "number" && s < 0) ? ρσ_expr_temp.length + s : s], expr.name)) {
                             return (ρσ_expr_temp = (ρσ_expr_temp = S.classes)[(typeof s === "number" && s < 0) ? ρσ_expr_temp.length + s : s])[ρσ_bound_index(expr.name, ρσ_expr_temp)];
                         }
+                    }
+                    if (has_prop(NATIVE_CLASSES, expr.name)) {
+                        return NATIVE_CLASSES[ρσ_bound_index(expr.name, NATIVE_CLASSES)];
+                    }
+                    if (has_prop(ERROR_CLASSES, expr.name)) {
+                        return ERROR_CLASSES[ρσ_bound_index(expr.name, ERROR_CLASSES)];
                     }
                 } else if (is_node_type(expr, AST_Dot)) {
                     referenced_path = ρσ_list_decorate([]);
@@ -16423,7 +19050,7 @@ return this.__repr__();
                         var ρσ_d = Object.create(null);
                         ρσ_d["start"] = S.token;
                         ρσ_d["name"] = as_symbol(symbol_class);
-                        ρσ_d["value"] = (is_("operator", "=")) ? (next(), expression(false)) : null;
+                        ρσ_d["value"] = (is_("operator", "=")) ? ρσ_list_decorate([ next(), expression(false) ]) : null;
                         ρσ_d["end"] = prev();
                         return ρσ_d;
                     }).call(this)));
@@ -16511,6 +19138,50 @@ return this.__repr__();
                 __module__ : {value: "parse"}
             });
 
+            function bytes_literal_() {
+                var parts, start, end_tok, value;
+                parts = [];
+                start = S.token;
+                while (true) {
+                    parts.push(S.token.value);
+                    if (peek().type !== "bytes_literal") {
+                        break;
+                    }
+                    next();
+                }
+                end_tok = S.token;
+                value = parts.join("");
+                return new AST_Call((function(){
+                    var ρσ_d = Object.create(null);
+                    ρσ_d["start"] = start;
+                    ρσ_d["end"] = end_tok;
+                    ρσ_d["expression"] = new AST_SymbolRef((function(){
+                        var ρσ_d = Object.create(null);
+                        ρσ_d["name"] = "bytes";
+                        ρσ_d["start"] = start;
+                        ρσ_d["end"] = start;
+                        return ρσ_d;
+                    }).call(this));
+                    ρσ_d["args"] = ρσ_list_decorate([ new AST_String((function(){
+                        var ρσ_d = Object.create(null);
+                        ρσ_d["start"] = start;
+                        ρσ_d["end"] = end_tok;
+                        ρσ_d["value"] = value;
+                        return ρσ_d;
+                    }).call(this)), new AST_String((function(){
+                        var ρσ_d = Object.create(null);
+                        ρσ_d["start"] = start;
+                        ρσ_d["end"] = end_tok;
+                        ρσ_d["value"] = "latin-1";
+                        return ρσ_d;
+                    }).call(this)) ]);
+                    return ρσ_d;
+                }).call(this));
+            };
+            if (!bytes_literal_.__module__) Object.defineProperties(bytes_literal_, {
+                __module__ : {value: "parse"}
+            });
+
             function token_as_atom_node() {
                 var tok, tmp_, tmp__;
                 tok = S.token;
@@ -16525,8 +19196,37 @@ return this.__repr__();
                         ρσ_d["value"] = tok.value;
                         return ρσ_d;
                     }).call(this));
+                } else if (tmp_ === "imaginary") {
+                    return new AST_Call((function(){
+                        var ρσ_d = Object.create(null);
+                        ρσ_d["start"] = tok;
+                        ρσ_d["end"] = tok;
+                        ρσ_d["expression"] = new AST_SymbolRef((function(){
+                            var ρσ_d = Object.create(null);
+                            ρσ_d["name"] = "complex";
+                            ρσ_d["start"] = tok;
+                            ρσ_d["end"] = tok;
+                            return ρσ_d;
+                        }).call(this));
+                        ρσ_d["args"] = ρσ_list_decorate([ new AST_Number((function(){
+                            var ρσ_d = Object.create(null);
+                            ρσ_d["start"] = tok;
+                            ρσ_d["end"] = tok;
+                            ρσ_d["value"] = 0;
+                            return ρσ_d;
+                        }).call(this)), new AST_Number((function(){
+                            var ρσ_d = Object.create(null);
+                            ρσ_d["start"] = tok;
+                            ρσ_d["end"] = tok;
+                            ρσ_d["value"] = tok.value;
+                            return ρσ_d;
+                        }).call(this)) ]);
+                        return ρσ_d;
+                    }).call(this));
                 } else if (tmp_ === "string") {
                     return string_();
+                } else if (tmp_ === "bytes_literal") {
+                    return bytes_literal_();
                 } else if (tmp_ === "regexp") {
                     return new AST_RegExp((function(){
                         var ρσ_d = Object.create(null);
@@ -16592,7 +19292,7 @@ return this.__repr__();
             });
 
             function expr_atom(allow_calls) {
-                var start, tmp_, ex, ret, cls, func;
+                var start, tmp_, ex, ret, elements, arr, cls, func;
                 if (is_("operator", "new")) {
                     return new_();
                 }
@@ -16610,7 +19310,7 @@ return this.__repr__();
                                 return ρσ_d;
                             }).call(this));
                         }
-                        ex = expression(true);
+                        ex = expression(false);
                         if (is_("keyword", "for")) {
                             ret = read_comprehension(new AST_GeneratorComprehension((function(){
                                 var ρσ_d = Object.create(null);
@@ -16620,14 +19320,32 @@ return this.__repr__();
                             S.in_parenthesized_expr = false;
                             return ret;
                         }
+                        if (is_("punc", ",")) {
+                            elements = ρσ_list_decorate([ ex ]);
+                            while (is_("punc", ",")) {
+                                next();
+                                if (is_("punc", ")")) {
+                                    break;
+                                }
+                                elements.push(expression(false));
+                            }
+                            expect(")");
+                            arr = new AST_Array((function(){
+                                var ρσ_d = Object.create(null);
+                                ρσ_d["elements"] = elements;
+                                ρσ_d["start"] = start;
+                                ρσ_d["end"] = prev();
+                                return ρσ_d;
+                            }).call(this));
+                            S.in_parenthesized_expr = false;
+                            return subscripts(arr, allow_calls);
+                        }
                         ex.start = start;
                         ex.end = S.token;
                         if (is_node_type(ex, AST_SymbolRef)) {
                             ex.parens = true;
                         }
-                        if (!is_node_type(ex, AST_GeneratorComprehension)) {
-                            expect(")");
-                        }
+                        expect(")");
                         if (is_node_type(ex, AST_UnaryPrefix)) {
                             ex.parenthesized = true;
                         }
@@ -19112,6 +21830,10 @@ return this.__repr__();
         OutputStream.prototype.__str__ = function __str__ () {
             return this.__repr__();
         };
+        OutputStream.prototype.__format__ = function __format__ () {
+                        if (!arguments[0]) return this.__str__();
+            throw new TypeError("unsupported format specification");
+        };
         Object.defineProperty(OutputStream.prototype, "__bases__", {value: []});
         OutputStream.__name__ = "OutputStream";
         OutputStream.__qualname__ = "OutputStream";
@@ -21109,8 +23831,13 @@ return this.__repr__();
                                     var ρσ_Iter129 = ρσ_Iterable(init_node.elements);
                                     for (var ρσ_Index129 = 0; ρσ_Index129 < ρσ_Iter129.length; ρσ_Index129++) {
                                         i = ρσ_Iter129[ρσ_Index129];
-                                        body_out.comma();
-                                        i.print(body_out);
+                                        decl_loop_vars(i);
+                                    }
+                                } else if (is_node_type(init_node, AST_Seq)) {
+                                    var ρσ_Iter130 = ρσ_Iterable(init_node.to_array());
+                                    for (var ρσ_Index130 = 0; ρσ_Index130 < ρσ_Iter130.length; ρσ_Index130++) {
+                                        i = ρσ_Iter130[ρσ_Index130];
+                                        decl_loop_vars(i);
                                     }
                                 } else {
                                     body_out.comma();
@@ -21123,9 +23850,9 @@ return this.__repr__();
                             });
 
                             decl_loop_vars(self.init);
-                            var ρσ_Iter130 = ρσ_Iterable(clauses);
-                            for (var ρσ_Index130 = 0; ρσ_Index130 < ρσ_Iter130.length; ρσ_Index130++) {
-                                clause = ρσ_Iter130[ρσ_Index130];
+                            var ρσ_Iter131 = ρσ_Iterable(clauses);
+                            for (var ρσ_Index131 = 0; ρσ_Index131 < ρσ_Iter131.length; ρσ_Index131++) {
+                                clause = ρσ_Iter131[ρσ_Index131];
                                 decl_loop_vars(clause.init);
                             }
                             body_out.end_statement();
@@ -21244,9 +23971,9 @@ return this.__repr__();
             if (is_node_type(prop, AST_Array) && prop.is_subscript_tuple) {
                 expr.print(output);
                 output.print("[[");
-                var ρσ_Iter131 = ρσ_Iterable(enumerate(prop.elements));
-                for (var ρσ_Index131 = 0; ρσ_Index131 < ρσ_Iter131.length; ρσ_Index131++) {
-                    ρσ_unpack = ρσ_Iter131[ρσ_Index131];
+                var ρσ_Iter132 = ρσ_Iterable(enumerate(prop.elements));
+                for (var ρσ_Index132 = 0; ρσ_Index132 < ρσ_Iter132.length; ρσ_Index132++) {
+                    ρσ_unpack = ρσ_Iter132[ρσ_Index132];
                     i = ρσ_unpack[0];
                     elem = ρσ_unpack[1];
                     if (i) {
@@ -21262,7 +23989,7 @@ return this.__repr__();
                 [output.print("["), prop.print(output), output.print("]")];
                 return;
             }
-            is_negative_number = is_node_type(prop, AST_Unary) && prop.operator === "-" && is_node_type(prop.expression, AST_Number);
+            is_negative_number = is_node_type(prop, AST_Unary) && prop.operator === "-" && is_node_type(prop.expression, AST_Number) && !prop.overloaded;
             is_repeatable = is_node_type(expr, AST_SymbolRef);
             if (is_repeatable) {
                 expr.print(output);
@@ -21510,6 +24237,10 @@ return this.__repr__();
             ρσ_d["^"] = "ρσ_op_xor";
             ρσ_d["<<"] = "ρσ_op_lshift";
             ρσ_d[">>"] = "ρσ_op_rshift";
+            ρσ_d["<"] = "ρσ_op_lt";
+            ρσ_d[">"] = "ρσ_op_gt";
+            ρσ_d["<="] = "ρσ_op_le";
+            ρσ_d[">="] = "ρσ_op_ge";
             return ρσ_d;
         }).call(this);
         overloaded_augmented_ops = (function(){
@@ -21530,6 +24261,63 @@ return this.__repr__();
         }).call(this);
         function print_binary_op(self, output) {
             var leftvar, left, nan_check, is_and;
+            if (comparators[ρσ_bound_index(self.operator, comparators)] && is_node_type(self.left, AST_Binary) && comparators[ρσ_bound_index(self.left.operator, comparators)]) {
+                if (is_node_type(self.left.right, AST_Symbol)) {
+                    self.left.print(output);
+                    leftvar = self.left.right.name;
+                } else {
+                    if (self.left.overloaded && overloaded_binary_ops[ρσ_bound_index(self.left.operator, overloaded_binary_ops)]) {
+                        output.print(ρσ_list_add(overloaded_binary_ops[ρσ_bound_index(self.left.operator, overloaded_binary_ops)], "("));
+                        self.left.left.print(output);
+                        output.comma();
+                        output.with_parens((function() {
+                            var ρσ_anonfunc = function () {
+                                output.assign("ρσ_cond_temp");
+                                self.left.right.print(output);
+                                leftvar = "ρσ_cond_temp";
+                            };
+                            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                                __module__ : {value: "output.operators"}
+                            });
+                            return ρσ_anonfunc;
+                        })());
+                        output.print(")");
+                    } else {
+                        self.left.left.print(output);
+                        output.space();
+                        output.print(self.left.operator);
+                        output.space();
+                        output.with_parens((function() {
+                            var ρσ_anonfunc = function () {
+                                output.assign("ρσ_cond_temp");
+                                self.left.right.print(output);
+                                leftvar = "ρσ_cond_temp";
+                            };
+                            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                                __module__ : {value: "output.operators"}
+                            });
+                            return ρσ_anonfunc;
+                        })());
+                    }
+                }
+                output.space();
+                output.print("&&");
+                output.space();
+                if (self.overloaded && overloaded_binary_ops[ρσ_bound_index(self.operator, overloaded_binary_ops)]) {
+                    output.print(ρσ_list_add(overloaded_binary_ops[ρσ_bound_index(self.operator, overloaded_binary_ops)], "("));
+                    output.print(leftvar);
+                    output.comma();
+                    self.right.print(output);
+                    output.print(")");
+                } else {
+                    output.print(leftvar);
+                    output.space();
+                    output.print(self.operator);
+                    output.space();
+                    self.right.print(output);
+                }
+                return;
+            }
             if (self.overloaded && overloaded_binary_ops[ρσ_bound_index(self.operator, overloaded_binary_ops)]) {
                 output.print(ρσ_list_add(overloaded_binary_ops[ρσ_bound_index(self.operator, overloaded_binary_ops)], "("));
                 self.left.print(output);
@@ -21551,35 +24339,6 @@ return this.__repr__();
                     });
                     return ρσ_anonfunc;
                 })());
-            } else if (comparators[ρσ_bound_index(self.operator, comparators)] && is_node_type(self.left, AST_Binary) && comparators[ρσ_bound_index(self.left.operator, comparators)]) {
-                if (is_node_type(self.left.right, AST_Symbol)) {
-                    self.left.print(output);
-                    leftvar = self.left.right.name;
-                } else {
-                    self.left.left.print(output);
-                    output.space();
-                    output.print(self.left.operator);
-                    output.space();
-                    output.with_parens((function() {
-                        var ρσ_anonfunc = function () {
-                            output.assign("ρσ_cond_temp");
-                            self.left.right.print(output);
-                            leftvar = "ρσ_cond_temp";
-                        };
-                        if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
-                            __module__ : {value: "output.operators"}
-                        });
-                        return ρσ_anonfunc;
-                    })());
-                }
-                output.space();
-                output.print("&&");
-                output.space();
-                output.print(leftvar);
-                output.space();
-                output.print(self.operator);
-                output.space();
-                self.right.print(output);
             } else if (self.operator === "//") {
                 output.print("Math.floor");
                 output.with_parens((function() {
@@ -21729,9 +24488,9 @@ return this.__repr__();
                 flat = left.flatten();
                 flattened = flat.length > left.elements.length;
                 has_starred = false;
-                var ρσ_Iter132 = ρσ_Iterable(flat);
-                for (var ρσ_Index132 = 0; ρσ_Index132 < ρσ_Iter132.length; ρσ_Index132++) {
-                    elem = ρσ_Iter132[ρσ_Index132];
+                var ρσ_Iter133 = ρσ_Iterable(flat);
+                for (var ρσ_Index133 = 0; ρσ_Index133 < ρσ_Iter133.length; ρσ_Index133++) {
+                    elem = ρσ_Iter133[ρσ_Index133];
                     if (is_node_type(elem, AST_Starred)) {
                         has_starred = true;
                         break;
@@ -21833,9 +24592,9 @@ return this.__repr__();
                 left_hand_sides = ρσ_unpack[0];
                 rhs = ρσ_unpack[1];
                 is_compound_assign = false;
-                var ρσ_Iter133 = ρσ_Iterable(left_hand_sides);
-                for (var ρσ_Index133 = 0; ρσ_Index133 < ρσ_Iter133.length; ρσ_Index133++) {
-                    lhs = ρσ_Iter133[ρσ_Index133];
+                var ρσ_Iter134 = ρσ_Iterable(left_hand_sides);
+                for (var ρσ_Index134 = 0; ρσ_Index134 < ρσ_Iter134.length; ρσ_Index134++) {
+                    lhs = ρσ_Iter134[ρσ_Index134];
                     if (is_node_type(lhs, AST_Seq) || is_node_type(lhs, AST_Array) || is_node_type(lhs, AST_ItemAccess)) {
                         is_compound_assign = true;
                         break;
@@ -21854,9 +24613,9 @@ return this.__repr__();
                         ρσ_d["right"] = rhs;
                         return ρσ_d;
                     }).call(this)), output);
-                    var ρσ_Iter134 = ρσ_Iterable(left_hand_sides);
-                    for (var ρσ_Index134 = 0; ρσ_Index134 < ρσ_Iter134.length; ρσ_Index134++) {
-                        lhs = ρσ_Iter134[ρσ_Index134];
+                    var ρσ_Iter135 = ρσ_Iterable(left_hand_sides);
+                    for (var ρσ_Index135 = 0; ρσ_Index135 < ρσ_Iter135.length; ρσ_Index135++) {
+                        lhs = ρσ_Iter135[ρσ_Index135];
                         [output.end_statement(), output.indent()];
                         print_assignment(new AST_Assign((function(){
                             var ρσ_d = Object.create(null);
@@ -21867,9 +24626,9 @@ return this.__repr__();
                         }).call(this)), output);
                     }
                 } else {
-                    var ρσ_Iter135 = ρσ_Iterable(left_hand_sides);
-                    for (var ρσ_Index135 = 0; ρσ_Index135 < ρσ_Iter135.length; ρσ_Index135++) {
-                        lhs = ρσ_Iter135[ρσ_Index135];
+                    var ρσ_Iter136 = ρσ_Iterable(left_hand_sides);
+                    for (var ρσ_Index136 = 0; ρσ_Index136 < ρσ_Iter136.length; ρσ_Index136++) {
+                        lhs = ρσ_Iter136[ρσ_Index136];
                         output.spaced(lhs, "=", "");
                     }
                     rhs.print(output);
@@ -21996,9 +24755,12 @@ return this.__repr__();
         var has_calls = ρσ_modules.ast.has_calls;
         var AST_Dot = ρσ_modules.ast.AST_Dot;
         var AST_SymbolRef = ρσ_modules.ast.AST_SymbolRef;
+        var AST_String = ρσ_modules.ast.AST_String;
         var is_node_type = ρσ_modules.ast.is_node_type;
 
         var OutputStream = ρσ_modules["output.stream"].OutputStream;
+
+        var ρσ_rs_parse = ρσ_modules.parse.parse;
 
         var print_bracketed = ρσ_modules["output.statements"].print_bracketed;
 
@@ -22052,9 +24814,9 @@ return this.__repr__();
                 var ρσ_anonfunc = function () {
                     var ρσ_unpack, i, arg;
                     if (argnames && argnames.length && (argnames.is_simple_func === true || argnames.is_simple_func === undefined)) {
-                        var ρσ_Iter136 = ρσ_Iterable(enumerate((strip_first) ? argnames.slice(1) : argnames));
-                        for (var ρσ_Index136 = 0; ρσ_Index136 < ρσ_Iter136.length; ρσ_Index136++) {
-                            ρσ_unpack = ρσ_Iter136[ρσ_Index136];
+                        var ρσ_Iter137 = ρσ_Iterable(enumerate((strip_first) ? argnames.slice(1) : argnames));
+                        for (var ρσ_Index137 = 0; ρσ_Index137 < ρσ_Iter137.length; ρσ_Index137++) {
+                            ρσ_unpack = ρσ_Iter137[ρσ_Index137];
                             i = ρσ_unpack[0];
                             arg = ρσ_unpack[1];
                             if (i) {
@@ -22085,9 +24847,9 @@ return this.__repr__();
             fname = (node.name) ? node.name.name : anonfunc;
             kw = "arguments[arguments.length-1]";
             positional_count = 0;
-            var ρσ_Iter137 = ρσ_Iterable(enumerate(a));
-            for (var ρσ_Index137 = 0; ρσ_Index137 < ρσ_Iter137.length; ρσ_Index137++) {
-                ρσ_unpack = ρσ_Iter137[ρσ_Index137];
+            var ρσ_Iter138 = ρσ_Iterable(enumerate(a));
+            for (var ρσ_Index138 = 0; ρσ_Index138 < ρσ_Iter138.length; ρσ_Index138++) {
+                ρσ_unpack = ρσ_Iter138[ρσ_Index138];
                 c = ρσ_unpack[0];
                 arg = ρσ_unpack[1];
                 i = c - offset;
@@ -22126,9 +24888,9 @@ return this.__repr__();
                 output.spaced("if", ρσ_list_add("(", kw), "===", "null", "||", "typeof", kw, "!==", "\"object\"", "||", kw, "[ρσ_kwargs_symbol]", "!==", "true)", kw, "=", "{}");
                 output.end_statement();
                 if (a.has_defaults) {
-                    var ρσ_Iter138 = ρσ_Iterable(Object.keys(a.defaults));
-                    for (var ρσ_Index138 = 0; ρσ_Index138 < ρσ_Iter138.length; ρσ_Index138++) {
-                        dname = ρσ_Iter138[ρσ_Index138];
+                    var ρσ_Iter139 = ρσ_Iterable(Object.keys(a.defaults));
+                    for (var ρσ_Index139 = 0; ρσ_Index139 < ρσ_Iter139.length; ρσ_Index139++) {
+                        dname = ρσ_Iter139[ρσ_Index139];
                         is_posonly = false;
                         for (var qi = 0; qi < (a.posonly_count || 0); qi++) {
                             if (a[(typeof qi === "number" && qi < 0) ? a.length + qi : qi].name === dname) {
@@ -22171,9 +24933,9 @@ return this.__repr__();
                     }
                 }
                 if (a.bare_star) {
-                    var ρσ_Iter139 = ρσ_Iterable(a);
-                    for (var ρσ_Index139 = 0; ρσ_Index139 < ρσ_Iter139.length; ρσ_Index139++) {
-                        arg = ρσ_Iter139[ρσ_Index139];
+                    var ρσ_Iter140 = ρσ_Iterable(a);
+                    for (var ρσ_Index140 = 0; ρσ_Index140 < ρσ_Iter140.length; ρσ_Index140++) {
+                        arg = ρσ_Iter140[ρσ_Index140];
                         if (!arg.kwonly) {
                             continue;
                         }
@@ -22226,9 +24988,9 @@ return this.__repr__();
             if (self.return_annotation) {
                 return true;
             }
-            var ρσ_Iter140 = ρσ_Iterable(self.argnames);
-            for (var ρσ_Index140 = 0; ρσ_Index140 < ρσ_Iter140.length; ρσ_Index140++) {
-                arg = ρσ_Iter140[ρσ_Index140];
+            var ρσ_Iter141 = ρσ_Iterable(self.argnames);
+            for (var ρσ_Index141 = 0; ρσ_Index141 < ρσ_Iter141.length; ρσ_Index141++) {
+                arg = ρσ_Iter141[ρσ_Index141];
                 if (arg.annotation) {
                     return true;
                 }
@@ -22253,9 +25015,9 @@ return this.__repr__();
                         var ρσ_unpack, i, arg;
                         output.print("{");
                         if (self.argnames && self.argnames.length) {
-                            var ρσ_Iter141 = ρσ_Iterable(enumerate(self.argnames));
-                            for (var ρσ_Index141 = 0; ρσ_Index141 < ρσ_Iter141.length; ρσ_Index141++) {
-                                ρσ_unpack = ρσ_Iter141[ρσ_Index141];
+                            var ρσ_Iter142 = ρσ_Iterable(enumerate(self.argnames));
+                            for (var ρσ_Index142 = 0; ρσ_Index142 < ρσ_Iter142.length; ρσ_Index142++) {
+                                ρσ_unpack = ρσ_Iter142[ρσ_Index142];
                                 i = ρσ_unpack[0];
                                 arg = ρσ_unpack[1];
                                 if (arg.annotation) {
@@ -22287,9 +25049,9 @@ return this.__repr__();
                     var ρσ_anonfunc = function () {
                         var ρσ_unpack, i, k;
                         output.print("{");
-                        var ρσ_Iter142 = ρσ_Iterable(enumerate(dkeys));
-                        for (var ρσ_Index142 = 0; ρσ_Index142 < ρσ_Iter142.length; ρσ_Index142++) {
-                            ρσ_unpack = ρσ_Iter142[ρσ_Index142];
+                        var ρσ_Iter143 = ρσ_Iterable(enumerate(dkeys));
+                        for (var ρσ_Index143 = 0; ρσ_Index143 < ρσ_Iter143.length; ρσ_Index143++) {
+                            ρσ_unpack = ρσ_Iter143[ρσ_Index143];
                             i = ρσ_unpack[0];
                             k = ρσ_unpack[1];
                             [output.print(ρσ_list_add(k, ":")), defaults[(typeof k === "number" && k < 0) ? defaults.length + k : k].print(output)];
@@ -22317,9 +25079,9 @@ return this.__repr__();
                 })();
             }
             argnames_entries = [];
-            var ρσ_Iter143 = ρσ_Iterable(enumerate(self.argnames));
-            for (var ρσ_Index143 = 0; ρσ_Index143 < ρσ_Iter143.length; ρσ_Index143++) {
-                ρσ_unpack = ρσ_Iter143[ρσ_Index143];
+            var ρσ_Iter144 = ρσ_Iterable(enumerate(self.argnames));
+            for (var ρσ_Index144 = 0; ρσ_Index144 < ρσ_Iter144.length; ρσ_Index144++) {
+                ρσ_unpack = ρσ_Iter144[ρσ_Index144];
                 i = ρσ_unpack[0];
                 arg = ρσ_unpack[1];
                 if (strip_first && i === 0) {
@@ -22340,9 +25102,9 @@ return this.__repr__();
                     var ρσ_anonfunc = function () {
                         var ρσ_unpack, ei, entry;
                         output.print("[");
-                        var ρσ_Iter144 = ρσ_Iterable(enumerate(argnames_entries));
-                        for (var ρσ_Index144 = 0; ρσ_Index144 < ρσ_Iter144.length; ρσ_Index144++) {
-                            ρσ_unpack = ρσ_Iter144[ρσ_Index144];
+                        var ρσ_Iter145 = ρσ_Iterable(enumerate(argnames_entries));
+                        for (var ρσ_Index145 = 0; ρσ_Index145 < ρσ_Iter145.length; ρσ_Index145++) {
+                            ρσ_unpack = ρσ_Iter145[ρσ_Index145];
                             ei = ρσ_unpack[0];
                             entry = ρσ_unpack[1];
                             if (entry.posonly) {
@@ -22526,7 +25288,7 @@ return this.__repr__();
         });
 
         function print_function_call(self, output) {
-            var is_prototype_call, has_kwarg_items, has_kwarg_formals, has_kwargs, is_new, is_repeatable, ρσ_unpack, i, a;
+            var is_prototype_call, has_kwarg_items, has_kwarg_formals, has_kwargs, is_new, is_repeatable, fn_name, source, inner_ast, inner_os, compiled_js, ρσ_unpack, i, a;
             is_prototype_call = false;
             function print_function_name(no_call) {
                 if (is_node_type(self, AST_ClassCall)) {
@@ -22567,9 +25329,9 @@ return this.__repr__();
                 var ρσ_unpack, i, kwname, pair;
                 output.print("ρσ_desugar_kwargs(");
                 if (has_kwarg_items) {
-                    var ρσ_Iter145 = ρσ_Iterable(enumerate(self.args.kwarg_items));
-                    for (var ρσ_Index145 = 0; ρσ_Index145 < ρσ_Iter145.length; ρσ_Index145++) {
-                        ρσ_unpack = ρσ_Iter145[ρσ_Index145];
+                    var ρσ_Iter146 = ρσ_Iterable(enumerate(self.args.kwarg_items));
+                    for (var ρσ_Index146 = 0; ρσ_Index146 < ρσ_Iter146.length; ρσ_Index146++) {
+                        ρσ_unpack = ρσ_Iter146[ρσ_Index146];
                         i = ρσ_unpack[0];
                         kwname = ρσ_unpack[1];
                         if (i > 0) {
@@ -22585,9 +25347,9 @@ return this.__repr__();
                 }
                 if (has_kwarg_formals) {
                     output.print("{");
-                    var ρσ_Iter146 = ρσ_Iterable(enumerate(self.args.kwargs));
-                    for (var ρσ_Index146 = 0; ρσ_Index146 < ρσ_Iter146.length; ρσ_Index146++) {
-                        ρσ_unpack = ρσ_Iter146[ρσ_Index146];
+                    var ρσ_Iter147 = ρσ_Iterable(enumerate(self.args.kwargs));
+                    for (var ρσ_Index147 = 0; ρσ_Index147 < ρσ_Iter147.length; ρσ_Index147++) {
+                        ρσ_unpack = ρσ_Iter147[ρσ_Index147];
                         i = ρσ_unpack[0];
                         pair = ρσ_unpack[1];
                         if (i) {
@@ -22680,9 +25442,9 @@ return this.__repr__();
                     output.with_parens((function() {
                         var ρσ_anonfunc = function () {
                             var ρσ_unpack, i, a;
-                            var ρσ_Iter147 = ρσ_Iterable(enumerate(self.args));
-                            for (var ρσ_Index147 = 0; ρσ_Index147 < ρσ_Iter147.length; ρσ_Index147++) {
-                                ρσ_unpack = ρσ_Iter147[ρσ_Index147];
+                            var ρσ_Iter148 = ρσ_Iterable(enumerate(self.args));
+                            for (var ρσ_Index148 = 0; ρσ_Index148 < ρσ_Iter148.length; ρσ_Index148++) {
+                                ρσ_unpack = ρσ_Iter148[ρσ_Index148];
                                 i = ρσ_unpack[0];
                                 a = ρσ_unpack[1];
                                 if (i) {
@@ -22701,9 +25463,113 @@ return this.__repr__();
                     output.with_parens((function() {
                         var ρσ_anonfunc = function () {
                             var ρσ_unpack, i, a;
-                            var ρσ_Iter148 = ρσ_Iterable(enumerate(self.args));
-                            for (var ρσ_Index148 = 0; ρσ_Index148 < ρσ_Iter148.length; ρσ_Index148++) {
-                                ρσ_unpack = ρσ_Iter148[ρσ_Index148];
+                            var ρσ_Iter149 = ρσ_Iterable(enumerate(self.args));
+                            for (var ρσ_Index149 = 0; ρσ_Index149 < ρσ_Iter149.length; ρσ_Index149++) {
+                                ρσ_unpack = ρσ_Iter149[ρσ_Index149];
+                                i = ρσ_unpack[0];
+                                a = ρσ_unpack[1];
+                                if (i) {
+                                    output.comma();
+                                }
+                                a.print(output);
+                            }
+                        };
+                        if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                            __module__ : {value: "output.functions"}
+                        });
+                        return ρσ_anonfunc;
+                    })());
+                } else if (is_node_type(self.expression, AST_SymbolRef) && self.expression.name === "vars" && self.args.length === 0) {
+                    output.print("ρσ_vars");
+                    output.with_parens((function() {
+                        var ρσ_anonfunc = function () {
+                            output.print("this");
+                        };
+                        if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                            __module__ : {value: "output.functions"}
+                        });
+                        return ρσ_anonfunc;
+                    })());
+                } else if (is_node_type(self.expression, AST_SymbolRef) && (self.expression.name === "eval" || self.expression.name === "exec") && self.args.length >= 1 && is_node_type(self.args[0], AST_String)) {
+                    fn_name = self.expression.name;
+                    source = self.args[0].value;
+                    inner_ast = ρσ_rs_parse(source, (function(){
+                        var ρσ_d = Object.create(null);
+                        ρσ_d["filename"] = "<eval>";
+                        ρσ_d["module_id"] = "__eval__";
+                        ρσ_d["for_linting"] = true;
+                        ρσ_d["discard_asserts"] = output.options.discard_asserts;
+                        return ρσ_d;
+                    }).call(this));
+                    inner_os = new OutputStream((function(){
+                        var ρσ_d = Object.create(null);
+                        ρσ_d["beautify"] = false;
+                        ρσ_d["js_version"] = output.options.js_version;
+                        ρσ_d["private_scope"] = false;
+                        ρσ_d["write_name"] = false;
+                        ρσ_d["omit_baselib"] = true;
+                        ρσ_d["discard_asserts"] = output.options.discard_asserts;
+                        return ρσ_d;
+                    }).call(this));
+                    inner_ast.print(inner_os);
+                    compiled_js = inner_os.get().trim();
+                    function _print_extra_args() {
+                        var a;
+                        var ρσ_Iter150 = ρσ_Iterable(self.args.slice(1));
+                        for (var ρσ_Index150 = 0; ρσ_Index150 < ρσ_Iter150.length; ρσ_Index150++) {
+                            a = ρσ_Iter150[ρσ_Index150];
+                            output.comma();
+                            a.print(output);
+                        }
+                    };
+                    if (!_print_extra_args.__module__) Object.defineProperties(_print_extra_args, {
+                        __module__ : {value: "output.functions"}
+                    });
+
+                    if (fn_name === "eval" && self.args.length === 1) {
+                        output.print("eval");
+                        output.with_parens((function() {
+                            var ρσ_anonfunc = function () {
+                                output.print(JSON.stringify(compiled_js));
+                            };
+                            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                                __module__ : {value: "output.functions"}
+                            });
+                            return ρσ_anonfunc;
+                        })());
+                    } else if (fn_name === "eval") {
+                        output.print("ρσ_eval");
+                        output.with_parens((function() {
+                            var ρσ_anonfunc = function () {
+                                output.print(JSON.stringify(compiled_js));
+                                _print_extra_args();
+                            };
+                            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                                __module__ : {value: "output.functions"}
+                            });
+                            return ρσ_anonfunc;
+                        })());
+                    } else {
+                        output.print("ρσ_exec");
+                        output.with_parens((function() {
+                            var ρσ_anonfunc = function () {
+                                output.print(JSON.stringify(compiled_js));
+                                _print_extra_args();
+                            };
+                            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                                __module__ : {value: "output.functions"}
+                            });
+                            return ρσ_anonfunc;
+                        })());
+                    }
+                } else if (is_node_type(self.expression, AST_SymbolRef) && self.expression.name === "eval" && self.args.length > 1) {
+                    output.print("ρσ_eval");
+                    output.with_parens((function() {
+                        var ρσ_anonfunc = function () {
+                            var ρσ_unpack, i, a;
+                            var ρσ_Iter151 = ρσ_Iterable(enumerate(self.args));
+                            for (var ρσ_Index151 = 0; ρσ_Index151 < ρσ_Iter151.length; ρσ_Index151++) {
+                                ρσ_unpack = ρσ_Iter151[ρσ_Index151];
                                 i = ρσ_unpack[0];
                                 a = ρσ_unpack[1];
                                 if (i) {
@@ -22720,9 +25586,9 @@ return this.__repr__();
                 } else if (is_node_type(self.expression, AST_SymbolRef) && self.python_truthiness) {
                     output.print("ρσ_callable_call(");
                     print_function_name();
-                    var ρσ_Iter149 = ρσ_Iterable(enumerate(self.args));
-                    for (var ρσ_Index149 = 0; ρσ_Index149 < ρσ_Iter149.length; ρσ_Index149++) {
-                        ρσ_unpack = ρσ_Iter149[ρσ_Index149];
+                    var ρσ_Iter152 = ρσ_Iterable(enumerate(self.args));
+                    for (var ρσ_Index152 = 0; ρσ_Index152 < ρσ_Iter152.length; ρσ_Index152++) {
+                        ρσ_unpack = ρσ_Iter152[ρσ_Index152];
                         i = ρσ_unpack[0];
                         a = ρσ_unpack[1];
                         output.comma();
@@ -22734,15 +25600,19 @@ return this.__repr__();
                     output.with_parens((function() {
                         var ρσ_anonfunc = function () {
                             var ρσ_unpack, i, a;
-                            var ρσ_Iter150 = ρσ_Iterable(enumerate(self.args));
-                            for (var ρσ_Index150 = 0; ρσ_Index150 < ρσ_Iter150.length; ρσ_Index150++) {
-                                ρσ_unpack = ρσ_Iter150[ρσ_Index150];
-                                i = ρσ_unpack[0];
-                                a = ρσ_unpack[1];
-                                if (i) {
-                                    output.comma();
+                            if (is_node_type(self.expression, AST_Dot) && self.expression.property === "split" && !self.args.length) {
+                                output.print("\" \"");
+                            } else {
+                                var ρσ_Iter153 = ρσ_Iterable(enumerate(self.args));
+                                for (var ρσ_Index153 = 0; ρσ_Index153 < ρσ_Iter153.length; ρσ_Index153++) {
+                                    ρσ_unpack = ρσ_Iter153[ρσ_Index153];
+                                    i = ρσ_unpack[0];
+                                    a = ρσ_unpack[1];
+                                    if (i) {
+                                        output.comma();
+                                    }
+                                    a.print(output);
                                 }
-                                a.print(output);
                             }
                         };
                         if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
@@ -22821,6 +25691,8 @@ return this.__repr__();
         var __name__ = "output.classes";
         var AST_Class = ρσ_modules.ast.AST_Class;
         var AST_Method = ρσ_modules.ast.AST_Method;
+        var AST_AnnotatedAssign = ρσ_modules.ast.AST_AnnotatedAssign;
+        var AST_SymbolRef = ρσ_modules.ast.AST_SymbolRef;
         var is_node_type = ρσ_modules.ast.is_node_type;
 
         var decorate = ρσ_modules["output.functions"].decorate;
@@ -22832,7 +25704,7 @@ return this.__repr__();
         var has_prop = ρσ_modules.utils.has_prop;
 
         function print_class(output) {
-            var self, decorators, num, i, seen_methods, property_names, defined_methods, sname, attr, stmt, cname_str, kws, nested_name, di;
+            var self, decorators, num, i, seen_methods, property_names, defined_methods, sname, attr, stmt, cname_str, nested_name, annotated_field_names, kws, di;
             self = this;
             if (self.external) {
                 return;
@@ -23055,8 +25927,8 @@ return this.__repr__();
                 self.name.print(output);
                 output.spaced(".ρσ_decorators", "=", "[");
                 num = decorators.length;
-                for (var ρσ_Index151 = 0; ρσ_Index151 < num; ρσ_Index151++) {
-                    i = ρσ_Index151;
+                for (var ρσ_Index154 = 0; ρσ_Index154 < num; ρσ_Index154++) {
+                    i = ρσ_Index154;
                     decorators[(typeof i === "number" && i < 0) ? decorators.length + i : i].expression.print(output);
                     output.spaced((i < num - 1) ? "," : "]");
                 }
@@ -23095,9 +25967,9 @@ return this.__repr__();
                                         output.end_statement();
                                     }
                                 }
-                                var ρσ_Iter152 = ρσ_Iterable(self.bound);
-                                for (var ρσ_Index152 = 0; ρσ_Index152 < ρσ_Iter152.length; ρσ_Index152++) {
-                                    bname = ρσ_Iter152[ρσ_Index152];
+                                var ρσ_Iter155 = ρσ_Iterable(self.bound);
+                                for (var ρσ_Index155 = 0; ρσ_Index155 < ρσ_Iter155.length; ρσ_Index155++) {
+                                    bname = ρσ_Iter155[ρσ_Index155];
                                     if (seen_methods[(typeof bname === "number" && bname < 0) ? seen_methods.length + bname : bname] || (ρσ_expr_temp = self.dynamic_properties)[(typeof bname === "number" && bname < 0) ? ρσ_expr_temp.length + bname : bname]) {
                                         continue;
                                     }
@@ -23129,9 +26001,9 @@ return this.__repr__();
                         output.with_block((function() {
                             var ρσ_anonfunc = function () {
                                 var prop, name;
-                                var ρσ_Iter153 = ρσ_Iterable(property_names);
-                                for (var ρσ_Index153 = 0; ρσ_Index153 < ρσ_Iter153.length; ρσ_Index153++) {
-                                    name = ρσ_Iter153[ρσ_Index153];
+                                var ρσ_Iter156 = ρσ_Iterable(property_names);
+                                for (var ρσ_Index156 = 0; ρσ_Index156 < ρσ_Iter156.length; ρσ_Index156++) {
+                                    name = ρσ_Iter156[ρσ_Index156];
                                     prop = (ρσ_expr_temp = self.dynamic_properties)[(typeof name === "number" && name < 0) ? ρσ_expr_temp.length + name : name];
                                     [output.indent(), output.print(ρσ_list_add(JSON.stringify(name), ":")), output.space()];
                                     output.with_block((function() {
@@ -23200,9 +26072,9 @@ return this.__repr__();
                 })());
             }
             defined_methods = Object.create(null);
-            var ρσ_Iter154 = ρσ_Iterable(self.body);
-            for (var ρσ_Index154 = 0; ρσ_Index154 < ρσ_Iter154.length; ρσ_Index154++) {
-                stmt = ρσ_Iter154[ρσ_Index154];
+            var ρσ_Iter157 = ρσ_Iterable(self.body);
+            for (var ρσ_Index157 = 0; ρσ_Index157 < ρσ_Iter157.length; ρσ_Index157++) {
+                stmt = ρσ_Iter157[ρσ_Index157];
                 if (is_node_type(stmt, AST_Method)) {
                     if (stmt.is_getter || stmt.is_setter) {
                         continue;
@@ -23211,9 +26083,9 @@ return this.__repr__();
                     defined_methods[ρσ_bound_index(stmt.name.name, defined_methods)] = true;
                     sname = stmt.name.name;
                     if (sname === "__init__") {
-                        var ρσ_Iter155 = ρσ_Iterable(ρσ_list_decorate([ ".__argnames__", ".__handles_kwarg_interpolation__" ]));
-                        for (var ρσ_Index155 = 0; ρσ_Index155 < ρσ_Iter155.length; ρσ_Index155++) {
-                            attr = ρσ_Iter155[ρσ_Index155];
+                        var ρσ_Iter158 = ρσ_Iterable(ρσ_list_decorate([ ".__argnames__", ".__handles_kwarg_interpolation__" ]));
+                        for (var ρσ_Index158 = 0; ρσ_Index158 < ρσ_Iter158.length; ρσ_Index158++) {
+                            attr = ρσ_Iter158[ρσ_Index158];
                             [output.indent(), self.name.print(output), output.assign(attr)];
                             [self.name.print(output), output.print(ρσ_list_add(".prototype.__init__", attr)), 
                             output.end_statement()];
@@ -23261,6 +26133,24 @@ return this.__repr__();
                     return ρσ_anonfunc;
                 })());
             }
+            if (!defined_methods["__format__"]) {
+                define_default_method("__format__", (function() {
+                    var ρσ_anonfunc = function () {
+                        if (self.parent) {
+                            [output.print("if("), self.parent.print(output), output.spaced(".prototype.__format__)", "return", self.parent)];
+                            [output.print(".prototype.__format__.call(this, arguments[0])"), output.end_statement()];
+                        }
+                        [output.indent(), output.spaced("if", "(!arguments[0])", "return", "this.__str__()")];
+                        output.end_statement();
+                        [output.indent(), output.spaced("throw", "new TypeError(\"unsupported format specification\")")];
+                        output.end_statement();
+                    };
+                    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                        __module__ : {value: "output.classes"}
+                    });
+                    return ρσ_anonfunc;
+                })());
+            }
             if (defined_methods["__eq__"] && !defined_methods["__hash__"]) {
                 output.indent();
                 self.name.print(output);
@@ -23295,6 +26185,50 @@ return this.__repr__();
             self.name.print(output);
             output.print(".prototype, \"__class__\", {get: function() { return this.constructor; }, configurable: true})");
             output.end_statement();
+            var ρσ_Iter159 = ρσ_Iterable(self.statements);
+            for (var ρσ_Index159 = 0; ρσ_Index159 < ρσ_Iter159.length; ρσ_Index159++) {
+                stmt = ρσ_Iter159[ρσ_Index159];
+                if (is_node_type(stmt, AST_Class)) {
+                    output.indent();
+                    stmt.print(output);
+                    output.newline();
+                    nested_name = stmt.name.name;
+                    output.indent();
+                    self.name.print(output);
+                    output.print(ρσ_list_add(ρσ_list_add(ρσ_list_add(".", nested_name), " = "), nested_name));
+                    output.end_statement();
+                    output.indent();
+                    self.name.print(output);
+                    output.print(ρσ_list_add(ρσ_list_add(ρσ_list_add(".prototype.", nested_name), " = "), nested_name));
+                    output.end_statement();
+                } else if (!is_node_type(stmt, AST_Method)) {
+                    output.indent();
+                    stmt.print(output);
+                    output.newline();
+                }
+            }
+            annotated_field_names = ρσ_list_decorate([]);
+            var ρσ_Iter160 = ρσ_Iterable(self.statements);
+            for (var ρσ_Index160 = 0; ρσ_Index160 < ρσ_Iter160.length; ρσ_Index160++) {
+                stmt = ρσ_Iter160[ρσ_Index160];
+                if (is_node_type(stmt, AST_AnnotatedAssign) && is_node_type(stmt.target, AST_SymbolRef)) {
+                    annotated_field_names.push(stmt.target.name);
+                }
+            }
+            if (annotated_field_names.length) {
+                output.indent();
+                self.name.print(output);
+                output.print(".__annotations__ = {");
+                for (var ρσ_Index161 = 0; ρσ_Index161 < annotated_field_names.length; ρσ_Index161++) {
+                    i = ρσ_Index161;
+                    if (i > 0) {
+                        output.comma();
+                    }
+                    output.print(ρσ_list_add(JSON.stringify(annotated_field_names[(typeof i === "number" && i < 0) ? annotated_field_names.length + i : i]), ": null"));
+                }
+                output.print("}");
+                output.end_statement();
+            }
             if (self.parent) {
                 output.indent();
                 output.print("if (typeof ");
@@ -23361,33 +26295,11 @@ return this.__repr__();
                     return ρσ_anonfunc;
                 })());
             }
-            var ρσ_Iter156 = ρσ_Iterable(self.statements);
-            for (var ρσ_Index156 = 0; ρσ_Index156 < ρσ_Iter156.length; ρσ_Index156++) {
-                stmt = ρσ_Iter156[ρσ_Index156];
-                if (is_node_type(stmt, AST_Class)) {
-                    output.indent();
-                    stmt.print(output);
-                    output.newline();
-                    nested_name = stmt.name.name;
-                    output.indent();
-                    self.name.print(output);
-                    output.print(ρσ_list_add(ρσ_list_add(ρσ_list_add(".", nested_name), " = "), nested_name));
-                    output.end_statement();
-                    output.indent();
-                    self.name.print(output);
-                    output.print(ρσ_list_add(ρσ_list_add(ρσ_list_add(".prototype.", nested_name), " = "), nested_name));
-                    output.end_statement();
-                } else if (!is_node_type(stmt, AST_Method)) {
-                    output.indent();
-                    stmt.print(output);
-                    output.newline();
-                }
-            }
             if (decorators.length) {
                 output.indent();
                 output.assign(self.name);
-                for (var ρσ_Index157 = 0; ρσ_Index157 < decorators.length; ρσ_Index157++) {
-                    di = ρσ_Index157;
+                for (var ρσ_Index162 = 0; ρσ_Index162 < decorators.length; ρσ_Index162++) {
+                    di = ρσ_Index162;
                     self.name.print(output);
                     output.print(ρσ_list_add(ρσ_list_add(".ρσ_decorators[", ρσ_str.format("{}", di)), "]("));
                 }
@@ -23431,9 +26343,9 @@ return this.__repr__();
                             if (len_ > 0) {
                                 output.space();
                             }
-                            var ρσ_Iter158 = ρσ_Iterable(enumerate(a));
-                            for (var ρσ_Index158 = 0; ρσ_Index158 < ρσ_Iter158.length; ρσ_Index158++) {
-                                ρσ_unpack = ρσ_Iter158[ρσ_Index158];
+                            var ρσ_Iter163 = ρσ_Iterable(enumerate(a));
+                            for (var ρσ_Index163 = 0; ρσ_Index163 < ρσ_Iter163.length; ρσ_Index163++) {
+                                ρσ_unpack = ρσ_Iter163[ρσ_Index163];
                                 i = ρσ_unpack[0];
                                 exp = ρσ_unpack[1];
                                 if (i) {
@@ -23481,9 +26393,9 @@ return this.__repr__();
                                 output.spaced("var", "ρσ_d", "=", (self.is_jshash) ? "Object.create(null)" : "{}");
                             }
                             output.end_statement();
-                            var ρσ_Iter159 = ρσ_Iterable(enumerate(self.properties));
-                            for (var ρσ_Index159 = 0; ρσ_Index159 < ρσ_Iter159.length; ρσ_Index159++) {
-                                ρσ_unpack = ρσ_Iter159[ρσ_Index159];
+                            var ρσ_Iter164 = ρσ_Iterable(enumerate(self.properties));
+                            for (var ρσ_Index164 = 0; ρσ_Index164 < ρσ_Iter164.length; ρσ_Index164++) {
+                                ρσ_unpack = ρσ_Iter164[ρσ_Index164];
                                 i = ρσ_unpack[0];
                                 prop = ρσ_unpack[1];
                                 output.indent();
@@ -23587,9 +26499,9 @@ return this.__repr__();
         function print_set(self, output) {
             var has_spread, item;
             has_spread = false;
-            var ρσ_Iter160 = ρσ_Iterable(self.items);
-            for (var ρσ_Index160 = 0; ρσ_Index160 < ρσ_Iter160.length; ρσ_Index160++) {
-                item = ρσ_Iter160[ρσ_Index160];
+            var ρσ_Iter165 = ρσ_Iterable(self.items);
+            for (var ρσ_Index165 = 0; ρσ_Index165 < ρσ_Iter165.length; ρσ_Index165++) {
+                item = ρσ_Iter165[ρσ_Index165];
                 if (is_node_type(item, AST_Spread)) {
                     has_spread = true;
                     break;
@@ -23602,9 +26514,9 @@ return this.__repr__();
                         output.with_square((function() {
                             var ρσ_anonfunc = function () {
                                 var ρσ_unpack, i, item;
-                                var ρσ_Iter161 = ρσ_Iterable(enumerate(self.items));
-                                for (var ρσ_Index161 = 0; ρσ_Index161 < ρσ_Iter161.length; ρσ_Index161++) {
-                                    ρσ_unpack = ρσ_Iter161[ρσ_Index161];
+                                var ρσ_Iter166 = ρσ_Iterable(enumerate(self.items));
+                                for (var ρσ_Index166 = 0; ρσ_Index166 < ρσ_Iter166.length; ρσ_Index166++) {
+                                    ρσ_unpack = ρσ_Iter166[ρσ_Index166];
                                     i = ρσ_unpack[0];
                                     item = ρσ_unpack[1];
                                     if (i) {
@@ -23644,9 +26556,9 @@ return this.__repr__();
                             output.indent();
                             output.spaced.apply(output, "var s = ρσ_set()".split(" "));
                             output.end_statement();
-                            var ρσ_Iter162 = ρσ_Iterable(self.items);
-                            for (var ρσ_Index162 = 0; ρσ_Index162 < ρσ_Iter162.length; ρσ_Index162++) {
-                                item = ρσ_Iter162[ρσ_Index162];
+                            var ρσ_Iter167 = ρσ_Iterable(self.items);
+                            for (var ρσ_Index167 = 0; ρσ_Index167 < ρσ_Iter167.length; ρσ_Index167++) {
+                                item = ρσ_Iter167[ρσ_Index167];
                                 output.indent();
                                 output.print("s.jsset.add");
                                 output.with_parens((function() {
@@ -23713,9 +26625,9 @@ return this.__repr__();
 
         function output_comments(comments, output, nlb) {
             var comm;
-            var ρσ_Iter163 = ρσ_Iterable(comments);
-            for (var ρσ_Index163 = 0; ρσ_Index163 < ρσ_Iter163.length; ρσ_Index163++) {
-                comm = ρσ_Iter163[ρσ_Index163];
+            var ρσ_Iter168 = ρσ_Iterable(comments);
+            for (var ρσ_Index168 = 0; ρσ_Index168 < ρσ_Iter168.length; ρσ_Index168++) {
+                comm = ρσ_Iter168[ρσ_Index168];
                 if (comm.type === "comment1") {
                     output.print(ρσ_list_add(ρσ_list_add("//", comm.value), "\n"));
                     output.indent();
@@ -23812,9 +26724,9 @@ return this.__repr__();
         function write_imports(module, output) {
             var imports, import_id, nonlocalvars, name, module_, module_id;
             imports = ρσ_list_decorate([]);
-            var ρσ_Iter164 = ρσ_Iterable(Object.keys(module.imports));
-            for (var ρσ_Index164 = 0; ρσ_Index164 < ρσ_Iter164.length; ρσ_Index164++) {
-                import_id = ρσ_Iter164[ρσ_Index164];
+            var ρσ_Iter169 = ρσ_Iterable(Object.keys(module.imports));
+            for (var ρσ_Index169 = 0; ρσ_Index169 < ρσ_Iter169.length; ρσ_Index169++) {
+                import_id = ρσ_Iter169[ρσ_Index169];
                 imports.push((ρσ_expr_temp = module.imports)[(typeof import_id === "number" && import_id < 0) ? ρσ_expr_temp.length + import_id : import_id]);
             }
             imports.jssort((function() {
@@ -23837,12 +26749,12 @@ return this.__repr__();
                 output.newline();
             }
             nonlocalvars = Object.create(null);
-            var ρσ_Iter165 = ρσ_Iterable(imports);
-            for (var ρσ_Index165 = 0; ρσ_Index165 < ρσ_Iter165.length; ρσ_Index165++) {
-                module_ = ρσ_Iter165[ρσ_Index165];
-                var ρσ_Iter166 = ρσ_Iterable(module_.nonlocalvars);
-                for (var ρσ_Index166 = 0; ρσ_Index166 < ρσ_Iter166.length; ρσ_Index166++) {
-                    name = ρσ_Iter166[ρσ_Index166];
+            var ρσ_Iter170 = ρσ_Iterable(imports);
+            for (var ρσ_Index170 = 0; ρσ_Index170 < ρσ_Iter170.length; ρσ_Index170++) {
+                module_ = ρσ_Iter170[ρσ_Index170];
+                var ρσ_Iter171 = ρσ_Iterable(module_.nonlocalvars);
+                for (var ρσ_Index171 = 0; ρσ_Index171 < ρσ_Iter171.length; ρσ_Index171++) {
+                    name = ρσ_Iter171[ρσ_Index171];
                     nonlocalvars[(typeof name === "number" && name < 0) ? nonlocalvars.length + name : name] = true;
                 }
             }
@@ -23853,9 +26765,9 @@ return this.__repr__();
                 output.semicolon();
                 output.newline();
             }
-            var ρσ_Iter167 = ρσ_Iterable(imports);
-            for (var ρσ_Index167 = 0; ρσ_Index167 < ρσ_Iter167.length; ρσ_Index167++) {
-                module_ = ρσ_Iter167[ρσ_Index167];
+            var ρσ_Iter172 = ρσ_Iterable(imports);
+            for (var ρσ_Index172 = 0; ρσ_Index172 < ρσ_Iter172.length; ρσ_Index172++) {
+                module_ = ρσ_Iter172[ρσ_Index172];
                 module_id = module_.module_id;
                 if (module_id !== "__main__") {
                     output.indent();
@@ -23868,9 +26780,9 @@ return this.__repr__();
                     output.end_statement();
                 }
             }
-            var ρσ_Iter168 = ρσ_Iterable(imports);
-            for (var ρσ_Index168 = 0; ρσ_Index168 < ρσ_Iter168.length; ρσ_Index168++) {
-                module_ = ρσ_Iter168[ρσ_Index168];
+            var ρσ_Iter173 = ρσ_Iterable(imports);
+            for (var ρσ_Index173 = 0; ρσ_Index173 < ρσ_Iter173.length; ρσ_Index173++) {
+                module_ = ρσ_Iter173[ρσ_Index173];
                 if (module_.module_id !== "__main__") {
                     print_module(module_, output);
                 }
@@ -23920,9 +26832,9 @@ return this.__repr__();
                 output.end_statement();
             }
             output.newline();
-            var ρσ_Iter169 = ρσ_Iterable(exports);
-            for (var ρσ_Index169 = 0; ρσ_Index169 < ρσ_Iter169.length; ρσ_Index169++) {
-                symbol = ρσ_Iter169[ρσ_Index169];
+            var ρσ_Iter174 = ρσ_Iterable(exports);
+            for (var ρσ_Index174 = 0; ρσ_Index174 < ρσ_Iter174.length; ρσ_Index174++) {
+                symbol = ρσ_Iter174[ρσ_Index174];
                 if (!Object.prototype.hasOwnProperty.call(seen, symbol.name)) {
                     output.indent();
                     if (module_id.indexOf(".") === -1) {
@@ -24111,9 +27023,9 @@ return this.__repr__();
         function filter_body_for_tree_shaking(body, needed) {
             var result, name, stmt;
             result = ρσ_list_decorate([]);
-            var ρσ_Iter170 = ρσ_Iterable(body);
-            for (var ρσ_Index170 = 0; ρσ_Index170 < ρσ_Iter170.length; ρσ_Index170++) {
-                stmt = ρσ_Iter170[ρσ_Index170];
+            var ρσ_Iter175 = ρσ_Iterable(body);
+            for (var ρσ_Index175 = 0; ρσ_Index175 < ρσ_Iter175.length; ρσ_Index175++) {
+                stmt = ρσ_Iter175[ρσ_Index175];
                 name = get_top_level_name(stmt);
                 if (name === null || has_prop(needed, name)) {
                     result.push(stmt);
@@ -24129,9 +27041,9 @@ return this.__repr__();
         function filter_exports_for_tree_shaking(exports, needed) {
             var result, sym;
             result = ρσ_list_decorate([]);
-            var ρσ_Iter171 = ρσ_Iterable(exports);
-            for (var ρσ_Index171 = 0; ρσ_Index171 < ρσ_Iter171.length; ρσ_Index171++) {
-                sym = ρσ_Iter171[ρσ_Index171];
+            var ρσ_Iter176 = ρσ_Iterable(exports);
+            for (var ρσ_Index176 = 0; ρσ_Index176 < ρσ_Iter176.length; ρσ_Index176++) {
+                sym = ρσ_Iter176[ρσ_Index176];
                 if (has_prop(needed, sym.name)) {
                     result.push(sym);
                 }
@@ -24202,9 +27114,9 @@ return this.__repr__();
                                         ρσ_d["discard_asserts"] = !!output.options.discard_asserts;
                                         return ρσ_d;
                                     }).call(this);
-                                    var ρσ_Iter172 = ρσ_Iterable(Object.keys(self.classes));
-                                    for (var ρσ_Index172 = 0; ρσ_Index172 < ρσ_Iter172.length; ρσ_Index172++) {
-                                        cname = ρσ_Iter172[ρσ_Index172];
+                                    var ρσ_Iter177 = ρσ_Iterable(Object.keys(self.classes));
+                                    for (var ρσ_Index177 = 0; ρσ_Index177 < ρσ_Iter177.length; ρσ_Index177++) {
+                                        cname = ρσ_Iter177[ρσ_Index177];
                                         cobj = (ρσ_expr_temp = self.classes)[(typeof cname === "number" && cname < 0) ? ρσ_expr_temp.length + cname : cname];
                                         (ρσ_expr_temp = cached.classes)[(typeof cname === "number" && cname < 0) ? ρσ_expr_temp.length + cname : cname] = (function(){
                                             var ρσ_d = Object.create(null);
@@ -24219,24 +27131,24 @@ return this.__repr__();
                                             return ρσ_d;
                                         }).call(this);
                                     }
-                                    var ρσ_Iter173 = ρσ_Iterable(self.exports);
-                                    for (var ρσ_Index173 = 0; ρσ_Index173 < ρσ_Iter173.length; ρσ_Index173++) {
-                                        symdef = ρσ_Iter173[ρσ_Index173];
+                                    var ρσ_Iter178 = ρσ_Iterable(self.exports);
+                                    for (var ρσ_Index178 = 0; ρσ_Index178 < ρσ_Iter178.length; ρσ_Index178++) {
+                                        symdef = ρσ_Iter178[ρσ_Index178];
                                         cached.exports.push((function(){
                                             var ρσ_d = Object.create(null);
                                             ρσ_d["name"] = symdef.name;
                                             return ρσ_d;
                                         }).call(this));
                                     }
-                                    var ρσ_Iter174 = ρσ_Iterable(ρσ_list_decorate([ true, false ]));
-                                    for (var ρσ_Index174 = 0; ρσ_Index174 < ρσ_Iter174.length; ρσ_Index174++) {
-                                        beautify = ρσ_Iter174[ρσ_Index174];
-                                        var ρσ_Iter175 = ρσ_Iterable(ρσ_list_decorate([ true, false ]));
-                                        for (var ρσ_Index175 = 0; ρσ_Index175 < ρσ_Iter175.length; ρσ_Index175++) {
-                                            keep_docstrings = ρσ_Iter175[ρσ_Index175];
-                                            var ρσ_Iter176 = ρσ_Iterable(ρσ_list_decorate([ 5, 6 ]));
-                                            for (var ρσ_Index176 = 0; ρσ_Index176 < ρσ_Iter176.length; ρσ_Index176++) {
-                                                js_version = ρσ_Iter176[ρσ_Index176];
+                                    var ρσ_Iter179 = ρσ_Iterable(ρσ_list_decorate([ true, false ]));
+                                    for (var ρσ_Index179 = 0; ρσ_Index179 < ρσ_Iter179.length; ρσ_Index179++) {
+                                        beautify = ρσ_Iter179[ρσ_Index179];
+                                        var ρσ_Iter180 = ρσ_Iterable(ρσ_list_decorate([ true, false ]));
+                                        for (var ρσ_Index180 = 0; ρσ_Index180 < ρσ_Iter180.length; ρσ_Index180++) {
+                                            keep_docstrings = ρσ_Iter180[ρσ_Index180];
+                                            var ρσ_Iter181 = ρσ_Iterable(ρσ_list_decorate([ 5, 6 ]));
+                                            for (var ρσ_Index181 = 0; ρσ_Index181 < ρσ_Iter181.length; ρσ_Index181++) {
+                                                js_version = ρσ_Iter181[ρσ_Index181];
                                                 co = new OutputStream((function(){
                                                     var ρσ_d = Object.create(null);
                                                     ρσ_d["beautify"] = beautify;
@@ -24323,13 +27235,13 @@ return this.__repr__();
                 __module__ : {value: "output.modules"}
             });
 
-            var ρσ_Iter177 = ρσ_Iterable(container.imports);
-            for (var ρσ_Index177 = 0; ρσ_Index177 < ρσ_Iter177.length; ρσ_Index177++) {
-                self = ρσ_Iter177[ρσ_Index177];
+            var ρσ_Iter182 = ρσ_Iterable(container.imports);
+            for (var ρσ_Index182 = 0; ρσ_Index182 < ρσ_Iter182.length; ρσ_Index182++) {
+                self = ρσ_Iter182[ρσ_Index182];
                 if (self.argnames) {
-                    var ρσ_Iter178 = ρσ_Iterable(self.argnames);
-                    for (var ρσ_Index178 = 0; ρσ_Index178 < ρσ_Iter178.length; ρσ_Index178++) {
-                        argname = ρσ_Iter178[ρσ_Index178];
+                    var ρσ_Iter183 = ρσ_Iterable(self.argnames);
+                    for (var ρσ_Index183 = 0; ρσ_Index183 < ρσ_Iter183.length; ρσ_Index183++) {
+                        argname = ρσ_Iter183[ρσ_Index183];
                         akey = (argname.alias) ? argname.alias.name : argname.name;
                         add_aname(akey, self.key, argname.name);
                     }
@@ -24338,9 +27250,9 @@ return this.__repr__();
                         add_aname(self.alias.name, self.key, false);
                     } else {
                         parts = self.key.split(".");
-                        var ρσ_Iter179 = ρσ_Iterable(enumerate(parts));
-                        for (var ρσ_Index179 = 0; ρσ_Index179 < ρσ_Iter179.length; ρσ_Index179++) {
-                            ρσ_unpack = ρσ_Iter179[ρσ_Index179];
+                        var ρσ_Iter184 = ρσ_Iterable(enumerate(parts));
+                        for (var ρσ_Index184 = 0; ρσ_Index184 < ρσ_Iter184.length; ρσ_Index184++) {
+                            ρσ_unpack = ρσ_Iter184[ρσ_Index184];
                             i = ρσ_unpack[0];
                             part = ρσ_unpack[1];
                             if (i === 0) {
@@ -24446,15 +27358,15 @@ return this.__repr__();
             var lines, last_non_empty, i, result, line, is_first, is_last;
             lines = text.split("\n");
             last_non_empty = -1;
-            for (var ρσ_Index180 = 0; ρσ_Index180 < lines.length; ρσ_Index180++) {
-                i = ρσ_Index180;
+            for (var ρσ_Index185 = 0; ρσ_Index185 < lines.length; ρσ_Index185++) {
+                i = ρσ_Index185;
                 if (/[^ \t]/.test(lines[(typeof i === "number" && i < 0) ? lines.length + i : i])) {
                     last_non_empty = i;
                 }
             }
             result = "";
-            for (var ρσ_Index181 = 0; ρσ_Index181 < lines.length; ρσ_Index181++) {
-                i = ρσ_Index181;
+            for (var ρσ_Index186 = 0; ρσ_Index186 < lines.length; ρσ_Index186++) {
+                i = ρσ_Index186;
                 line = lines[(typeof i === "number" && i < 0) ? lines.length + i : i].replace(/\t/g, " ");
                 is_first = i === 0;
                 is_last = i === lines.length - 1;
@@ -24512,9 +27424,9 @@ return this.__repr__();
             }
             output.print("{");
             first = true;
-            var ρσ_Iter182 = ρσ_Iterable(props);
-            for (var ρσ_Index182 = 0; ρσ_Index182 < ρσ_Iter182.length; ρσ_Index182++) {
-                prop = ρσ_Iter182[ρσ_Index182];
+            var ρσ_Iter187 = ρσ_Iterable(props);
+            for (var ρσ_Index187 = 0; ρσ_Index187 < ρσ_Iter187.length; ρσ_Index187++) {
+                prop = ρσ_Iter187[ρσ_Index187];
                 if (!first) {
                     output.print(", ");
                 }
@@ -24549,9 +27461,9 @@ return this.__repr__();
 
         function _print_children(children, output) {
             var text, child;
-            var ρσ_Iter183 = ρσ_Iterable(children);
-            for (var ρσ_Index183 = 0; ρσ_Index183 < ρσ_Iter183.length; ρσ_Index183++) {
-                child = ρσ_Iter183[ρσ_Index183];
+            var ρσ_Iter188 = ρσ_Iterable(children);
+            for (var ρσ_Index188 = 0; ρσ_Index188 < ρσ_Iter188.length; ρσ_Index188++) {
+                child = ρσ_Iter188[ρσ_Index188];
                 if (is_node_type(child, AST_JSXText)) {
                     text = _process_jsx_text(child.value);
                     if (text) {
@@ -25157,9 +28069,9 @@ return this.__repr__();
                     output.with_block((function() {
                         var ρσ_anonfunc = function () {
                             var stmt;
-                            var ρσ_Iter184 = ρσ_Iterable(self.body.body);
-                            for (var ρσ_Index184 = 0; ρσ_Index184 < ρσ_Iter184.length; ρσ_Index184++) {
-                                stmt = ρσ_Iter184[ρσ_Index184];
+                            var ρσ_Iter189 = ρσ_Iterable(self.body.body);
+                            for (var ρσ_Index189 = 0; ρσ_Index189 < ρσ_Iter189.length; ρσ_Index189++) {
+                                stmt = ρσ_Iter189[ρσ_Index189];
                                 output.indent();
                                 stmt.print(output);
                                 output.newline();
@@ -25433,9 +28345,9 @@ return this.__repr__();
                     var ρσ_unpack, i, def_, p, in_for, avoid_semicolon;
                     output.print(kind);
                     output.space();
-                    var ρσ_Iter185 = ρσ_Iterable(enumerate(this.definitions));
-                    for (var ρσ_Index185 = 0; ρσ_Index185 < ρσ_Iter185.length; ρσ_Index185++) {
-                        ρσ_unpack = ρσ_Iter185[ρσ_Index185];
+                    var ρσ_Iter190 = ρσ_Iterable(enumerate(this.definitions));
+                    for (var ρσ_Index190 = 0; ρσ_Index190 < ρσ_Iter190.length; ρσ_Index190++) {
+                        ρσ_unpack = ρσ_Iter190[ρσ_Index190];
                         i = ρσ_unpack[0];
                         def_ = ρσ_unpack[1];
                         if (i) {
@@ -25778,17 +28690,17 @@ return this.__repr__();
             var nonlocal_set, nv, name_map, unnamed_stmts, name, stmt, top_level_set, needed, queue, always_refs, ref_name, current, refs;
             nonlocal_set = Object.create(null);
             if (nonlocalvars) {
-                var ρσ_Iter186 = ρσ_Iterable(nonlocalvars);
-                for (var ρσ_Index186 = 0; ρσ_Index186 < ρσ_Iter186.length; ρσ_Index186++) {
-                    nv = ρσ_Iter186[ρσ_Index186];
+                var ρσ_Iter191 = ρσ_Iterable(nonlocalvars);
+                for (var ρσ_Index191 = 0; ρσ_Index191 < ρσ_Iter191.length; ρσ_Index191++) {
+                    nv = ρσ_Iter191[ρσ_Index191];
                     nonlocal_set[(typeof nv === "number" && nv < 0) ? nonlocal_set.length + nv : nv] = true;
                 }
             }
             name_map = Object.create(null);
             unnamed_stmts = ρσ_list_decorate([]);
-            var ρσ_Iter187 = ρσ_Iterable(body);
-            for (var ρσ_Index187 = 0; ρσ_Index187 < ρσ_Iter187.length; ρσ_Index187++) {
-                stmt = ρσ_Iter187[ρσ_Index187];
+            var ρσ_Iter192 = ρσ_Iterable(body);
+            for (var ρσ_Index192 = 0; ρσ_Index192 < ρσ_Iter192.length; ρσ_Index192++) {
+                stmt = ρσ_Iter192[ρσ_Index192];
                 name = get_top_level_name(stmt);
                 if (name !== null) {
                     name_map[(typeof name === "number" && name < 0) ? name_map.length + name : name] = stmt;
@@ -25797,38 +28709,38 @@ return this.__repr__();
                 }
             }
             top_level_set = Object.create(null);
-            var ρσ_Iter188 = ρσ_Iterable(Object.keys(name_map));
-            for (var ρσ_Index188 = 0; ρσ_Index188 < ρσ_Iter188.length; ρσ_Index188++) {
-                name = ρσ_Iter188[ρσ_Index188];
+            var ρσ_Iter193 = ρσ_Iterable(Object.keys(name_map));
+            for (var ρσ_Index193 = 0; ρσ_Index193 < ρσ_Iter193.length; ρσ_Index193++) {
+                name = ρσ_Iter193[ρσ_Index193];
                 top_level_set[(typeof name === "number" && name < 0) ? top_level_set.length + name : name] = true;
             }
             needed = Object.create(null);
             queue = ρσ_list_decorate([]);
-            var ρσ_Iter189 = ρσ_Iterable(Object.keys(name_map));
-            for (var ρσ_Index189 = 0; ρσ_Index189 < ρσ_Iter189.length; ρσ_Index189++) {
-                name = ρσ_Iter189[ρσ_Index189];
+            var ρσ_Iter194 = ρσ_Iterable(Object.keys(name_map));
+            for (var ρσ_Index194 = 0; ρσ_Index194 < ρσ_Iter194.length; ρσ_Index194++) {
+                name = ρσ_Iter194[ρσ_Index194];
                 if (has_prop(nonlocal_set, name)) {
                     needed[(typeof name === "number" && name < 0) ? needed.length + name : name] = true;
                     queue.push(name);
                 }
             }
-            var ρσ_Iter190 = ρσ_Iterable(Object.keys(direct_names));
-            for (var ρσ_Index190 = 0; ρσ_Index190 < ρσ_Iter190.length; ρσ_Index190++) {
-                name = ρσ_Iter190[ρσ_Index190];
+            var ρσ_Iter195 = ρσ_Iterable(Object.keys(direct_names));
+            for (var ρσ_Index195 = 0; ρσ_Index195 < ρσ_Iter195.length; ρσ_Index195++) {
+                name = ρσ_Iter195[ρσ_Index195];
                 if (!has_prop(needed, name)) {
                     needed[(typeof name === "number" && name < 0) ? needed.length + name : name] = true;
                     queue.push(name);
                 }
             }
             always_refs = Object.create(null);
-            var ρσ_Iter191 = ρσ_Iterable(unnamed_stmts);
-            for (var ρσ_Index191 = 0; ρσ_Index191 < ρσ_Iter191.length; ρσ_Index191++) {
-                stmt = ρσ_Iter191[ρσ_Index191];
+            var ρσ_Iter196 = ρσ_Iterable(unnamed_stmts);
+            for (var ρσ_Index196 = 0; ρσ_Index196 < ρσ_Iter196.length; ρσ_Index196++) {
+                stmt = ρσ_Iter196[ρσ_Index196];
                 collect_refs_in_node(stmt, top_level_set, always_refs);
             }
-            var ρσ_Iter192 = ρσ_Iterable(Object.keys(always_refs));
-            for (var ρσ_Index192 = 0; ρσ_Index192 < ρσ_Iter192.length; ρσ_Index192++) {
-                ref_name = ρσ_Iter192[ρσ_Index192];
+            var ρσ_Iter197 = ρσ_Iterable(Object.keys(always_refs));
+            for (var ρσ_Index197 = 0; ρσ_Index197 < ρσ_Iter197.length; ρσ_Index197++) {
+                ref_name = ρσ_Iter197[ρσ_Index197];
                 if (!has_prop(needed, ref_name)) {
                     needed[(typeof ref_name === "number" && ref_name < 0) ? needed.length + ref_name : ref_name] = true;
                     queue.push(ref_name);
@@ -25841,9 +28753,9 @@ return this.__repr__();
                 }
                 refs = Object.create(null);
                 collect_refs_in_node(name_map[(typeof current === "number" && current < 0) ? name_map.length + current : current], top_level_set, refs);
-                var ρσ_Iter193 = ρσ_Iterable(Object.keys(refs));
-                for (var ρσ_Index193 = 0; ρσ_Index193 < ρσ_Iter193.length; ρσ_Index193++) {
-                    ref_name = ρσ_Iter193[ρσ_Index193];
+                var ρσ_Iter198 = ρσ_Iterable(Object.keys(refs));
+                for (var ρσ_Index198 = 0; ρσ_Index198 < ρσ_Iter198.length; ρσ_Index198++) {
+                    ref_name = ρσ_Iter198[ρσ_Index198];
                     if (!has_prop(needed, ref_name)) {
                         needed[(typeof ref_name === "number" && ref_name < 0) ? needed.length + ref_name : ref_name] = true;
                         queue.push(ref_name);
@@ -25880,9 +28792,9 @@ return this.__repr__();
                 __module__ : {value: "output.treeshake"}
             });
 
-            var ρσ_Iter194 = ρσ_Iterable(main_body);
-            for (var ρσ_Index194 = 0; ρσ_Index194 < ρσ_Iter194.length; ρσ_Index194++) {
-                stmt = ρσ_Iter194[ρσ_Index194];
+            var ρσ_Iter199 = ρσ_Iterable(main_body);
+            for (var ρσ_Index199 = 0; ρσ_Index199 < ρσ_Iter199.length; ρσ_Index199++) {
+                stmt = ρσ_Iter199[ρσ_Index199];
                 stmt.walk(new TreeWalker(visit_fn));
             }
         };
@@ -25897,9 +28809,9 @@ return this.__repr__();
             function visit_from_imports(node, descend) {
                 var key, argname, imp;
                 if (is_node_type(node, AST_Imports)) {
-                    var ρσ_Iter195 = ρσ_Iterable(node.imports);
-                    for (var ρσ_Index195 = 0; ρσ_Index195 < ρσ_Iter195.length; ρσ_Index195++) {
-                        imp = ρσ_Iter195[ρσ_Index195];
+                    var ρσ_Iter200 = ρσ_Iterable(node.imports);
+                    for (var ρσ_Index200 = 0; ρσ_Index200 < ρσ_Iter200.length; ρσ_Index200++) {
+                        imp = ρσ_Iter200[ρσ_Index200];
                         if (imp.argnames) {
                             key = imp.key;
                             if (!has_prop(result, key)) {
@@ -25910,9 +28822,9 @@ return this.__repr__();
                                     return ρσ_d;
                                 }).call(this);
                             }
-                            var ρσ_Iter196 = ρσ_Iterable(imp.argnames);
-                            for (var ρσ_Index196 = 0; ρσ_Index196 < ρσ_Iter196.length; ρσ_Index196++) {
-                                argname = ρσ_Iter196[ρσ_Index196];
+                            var ρσ_Iter201 = ρσ_Iterable(imp.argnames);
+                            for (var ρσ_Index201 = 0; ρσ_Index201 < ρσ_Iter201.length; ρσ_Index201++) {
+                                argname = ρσ_Iter201[ρσ_Index201];
                                 (ρσ_expr_temp = result[(typeof key === "number" && key < 0) ? result.length + key : key].direct_names)[ρσ_bound_index(argname.name, ρσ_expr_temp)] = true;
                             }
                         }
@@ -25924,20 +28836,20 @@ return this.__repr__();
                 __module__ : {value: "output.treeshake"}
             });
 
-            var ρσ_Iter197 = ρσ_Iterable(main_body);
-            for (var ρσ_Index197 = 0; ρσ_Index197 < ρσ_Iter197.length; ρσ_Index197++) {
-                stmt = ρσ_Iter197[ρσ_Index197];
+            var ρσ_Iter202 = ρσ_Iterable(main_body);
+            for (var ρσ_Index202 = 0; ρσ_Index202 < ρσ_Iter202.length; ρσ_Index202++) {
+                stmt = ρσ_Iter202[ρσ_Index202];
                 stmt.walk(new TreeWalker(visit_from_imports));
             }
-            var ρσ_Iter198 = ρσ_Iterable(main_body);
-            for (var ρσ_Index198 = 0; ρσ_Index198 < ρσ_Iter198.length; ρσ_Index198++) {
-                stmt = ρσ_Iter198[ρσ_Index198];
+            var ρσ_Iter203 = ρσ_Iterable(main_body);
+            for (var ρσ_Index203 = 0; ρσ_Index203 < ρσ_Iter203.length; ρσ_Index203++) {
+                stmt = ρσ_Iter203[ρσ_Index203];
                 if (!is_node_type(stmt, AST_Imports)) {
                     continue;
                 }
-                var ρσ_Iter199 = ρσ_Iterable(stmt.imports);
-                for (var ρσ_Index199 = 0; ρσ_Index199 < ρσ_Iter199.length; ρσ_Index199++) {
-                    imp = ρσ_Iter199[ρσ_Index199];
+                var ρσ_Iter204 = ρσ_Iterable(stmt.imports);
+                for (var ρσ_Index204 = 0; ρσ_Index204 < ρσ_Iter204.length; ρσ_Index204++) {
+                    imp = ρσ_Iter204[ρσ_Index204];
                     if (imp.argnames) {
                         continue;
                     }
@@ -25977,9 +28889,9 @@ return this.__repr__();
         function tree_shake(ast, context) {
             var import_infos, info, mod, parsed, needed, mod_key;
             import_infos = analyze_imports(ast.body);
-            var ρσ_Iter200 = ρσ_Iterable(Object.keys(import_infos));
-            for (var ρσ_Index200 = 0; ρσ_Index200 < ρσ_Iter200.length; ρσ_Index200++) {
-                mod_key = ρσ_Iter200[ρσ_Index200];
+            var ρσ_Iter205 = ρσ_Iterable(Object.keys(import_infos));
+            for (var ρσ_Index205 = 0; ρσ_Index205 < ρσ_Iter205.length; ρσ_Index205++) {
+                mod_key = ρσ_Iter205[ρσ_Index205];
                 info = import_infos[(typeof mod_key === "number" && mod_key < 0) ? import_infos.length + mod_key : mod_key];
                 if (!info.can_tree_shake) {
                     continue;
@@ -26066,9 +28978,9 @@ return this.__repr__();
             exports.tokenizer = tokenizer;
             exports.tree_shake = tree_shake;
             ast = ρσ_modules["ast"];
-            var ρσ_Iter201 = ρσ_Iterable(ast);
-            for (var ρσ_Index201 = 0; ρσ_Index201 < ρσ_Iter201.length; ρσ_Index201++) {
-                ast_node = ρσ_Iter201[ρσ_Index201];
+            var ρσ_Iter206 = ρσ_Iterable(ast);
+            for (var ρσ_Index206 = 0; ρσ_Index206 < ρσ_Iter206.length; ρσ_Index206++) {
+                ast_node = ρσ_Iter206[ρσ_Index206];
                 if (ast_node.substr(0, 4) === "AST_") {
                     exports[(typeof ast_node === "number" && ast_node < 0) ? exports.length + ast_node : ast_node] = ast[(typeof ast_node === "number" && ast_node < 0) ? ast.length + ast_node : ast_node];
                 }
