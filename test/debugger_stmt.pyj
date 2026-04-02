@@ -1,0 +1,41 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+
+ae = assrt.equal
+ok = assrt.ok
+
+# debugger statement is a no-op when no debugger is attached; verify it
+# compiles and executes without throwing
+
+before = 1
+debugger
+after = 2
+
+ae(before, 1)
+ae(after, 2)
+
+# inside a function
+def fn_with_debugger():
+    x = 10
+    debugger
+    return x
+
+ae(fn_with_debugger(), 10)
+
+# inside a loop
+total = 0
+for i in range(3):
+    debugger
+    total += i
+
+ae(total, 3)
+
+# inside a conditional
+def conditional_debugger(flag):
+    if flag:
+        debugger
+        return True
+    return False
+
+ae(conditional_debugger(True), True)
+ae(conditional_debugger(False), False)
