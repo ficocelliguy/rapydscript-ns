@@ -1,0 +1,227 @@
+###########################################################
+# RapydScript Standard Library
+# Author: RapydScript-NS Contributors
+# Copyright 2024 RapydScript-NS Contributors
+# License: Apache License    2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Python-compatible json module backed by the JS JSON global.
+#
+# RapydScript dicts/lists map directly to JS objects/arrays, so
+# JSON.stringify / JSON.parse round-trip without conversion.
+# This wrapper provides the familiar Python json.dumps / json.loads API.
+#
+# NOTE: `default` is a JS reserved word in RapydScript; the parameter is
+# exposed as `dflt` in function signatures but documented as `default`.
+
+
+class JSONDecodeError(ValueError):
+    def __init__(self, msg, doc, pos):
+        self.msg = msg
+        self.doc = doc
+        self.pos = pos
+        self.lineno = 1
+        self.colno  = pos + 1
+        ValueError.__init__(self, msg + ': line ' + str(self.lineno) + ' column ' + str(self.colno) + ' (char ' + str(pos) + ')')
+
+
+# ---------------------------------------------------------------------------
+# Internal JS helpers
+# ---------------------------------------------------------------------------
+
+v"""
+// Convert a value to a plain JS object recursively, honouring ρσ_dict.toJSON.
+function _json_to_plain(val) {
+    if (val === null || val === undefined) return val;
+    if (Array.isArray(val)) {
+        return val.map(_json_to_plain);
+    }
+    if (typeof val === 'object') {
+        if (typeof val.toJSON === 'function') {
+            // ρσ_dict.toJSON() converts the dict to a plain {k:v} object
+            val = val.toJSON();
+        }
+        var out = {};
+        var keys = Object.keys(val);
+        for (var i = 0; i < keys.length; i++) {
+            out[keys[i]] = _json_to_plain(val[keys[i]]);
+        }
+        return out;
+    }
+    return val;
+}
+
+// Sort keys recursively.
+function _json_sort_keys(val) {
+    if (val === null || val === undefined) return val;
+    if (Array.isArray(val)) {
+        return val.map(_json_sort_keys);
+    }
+    if (typeof val === 'object') {
+        var sorted = {};
+        Object.keys(val).sort().forEach(function(k) {
+            sorted[k] = _json_sort_keys(val[k]);
+        });
+        return sorted;
+    }
+    return val;
+}
+
+// Raise ValueError if any value in the tree is NaN or non-finite.
+function _json_check_nan(val, raise_fn) {
+    if (typeof val === 'number') {
+        if (isNaN(val) || !isFinite(val)) {
+            raise_fn();
+        }
+        return;
+    }
+    if (Array.isArray(val)) {
+        for (var i = 0; i < val.length; i++) _json_check_nan(val[i], raise_fn);
+        return;
+    }
+    if (val !== null && typeof val === 'object') {
+        var keys = Object.keys(val);
+        for (var j = 0; j < keys.length; j++) _json_check_nan(val[keys[j]], raise_fn);
+    }
+}
+
+// Walk a parsed JSON tree and apply object_hook / parse_float / parse_int.
+function _json_walk(val, parse_float, parse_int, object_hook, object_pairs_hook) {
+    if (Array.isArray(val)) {
+        for (var i = 0; i < val.length; i++) {
+            val[i] = _json_walk(val[i], parse_float, parse_int, object_hook, object_pairs_hook);
+        }
+        return val;
+    }
+    if (val !== null && typeof val === 'object') {
+        var keys = Object.keys(val);
+        for (var j = 0; j < keys.length; j++) {
+            val[keys[j]] = _json_walk(val[keys[j]], parse_float, parse_int, object_hook, object_pairs_hook);
+        }
+        if (object_pairs_hook) {
+            var pairs = keys.map(function(k) { return [k, val[k]]; });
+            return object_pairs_hook(pairs);
+        }
+        if (object_hook) {
+            return object_hook(val);
+        }
+        return val;
+    }
+    if (typeof val === 'number') {
+        if (parse_int && val === Math.floor(val)) {
+            return parse_int(String(val));
+        }
+        if (parse_float && val !== Math.floor(val)) {
+            return parse_float(String(val));
+        }
+    }
+    return val;
+}
+"""
+
+
+def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
+          allow_nan=False, sort_keys=False, indent=None, separators=None,
+          dflt=None):
+    """Serialize obj to a JSON-formatted string.
+
+    Parameters:
+      indent     -- int or str; if not None, pretty-print output
+      sort_keys  -- if True, sort dict keys in the output
+      dflt       -- callable for objects that are not serializable (Python: default);
+                    should return a JSON-serializable value or raise TypeError
+      separators -- (item_sep, key_sep) pair; (',', ':') gives compact output
+      allow_nan  -- if False (default), NaN/Infinity raise ValueError
+      skipkeys, ensure_ascii, check_circular -- accepted for API compatibility
+    """
+    # Convert to plain JS (handles ρσ_dict via toJSON)
+    work = _json_to_plain(obj)
+
+    if not allow_nan:
+        def _raise_nan():
+            raise ValueError('Out of range float values are not JSON compliant')
+        _json_check_nan(work, _raise_nan)
+
+    if sort_keys:
+        work = _json_sort_keys(work)
+
+    js_indent = None
+    if indent is not None:
+        if jstype(indent) is 'number':
+            js_indent = indent
+        else:
+            js_indent = str(indent)
+
+    replacer = None
+    if dflt is not None:
+        _dflt_fn = dflt
+        def replacer(key, value):
+            if value is not None and jstype(value) is 'object' and not Array.isArray(value):
+                try:
+                    return _json_to_plain(_dflt_fn(value))
+                except TypeError:
+                    pass
+            return value
+
+    result = JSON.stringify(work, replacer, js_indent)
+
+    if result is undefined:
+        raise TypeError('Object of type ' + jstype(obj) + ' is not JSON serializable')
+
+    # Apply custom separators when not pretty-printing.
+    # JS default uses ", " between items and ": " between key and value.
+    if indent is None and separators is not None:
+        item_sep = separators[0]
+        key_sep  = separators[1]
+        result = result.split(', ').join(item_sep).split(': ').join(key_sep)
+
+    return result
+
+
+def loads(s, cls=None, object_hook=None, parse_float=None,
+          parse_int=None, parse_constant=None, object_pairs_hook=None):
+    """Deserialize s (a str) to a Python object.
+
+    Returns plain JS objects (access with obj['key'] or obj.key).
+
+    Parameters:
+      object_hook       -- callable applied to every decoded JSON object
+      object_pairs_hook -- called with [(key, value), ...] for each object
+                           (takes precedence over object_hook)
+      parse_float       -- called with the string of each float literal
+      parse_int         -- called with the string of each integer literal
+      cls, parse_constant -- accepted for API compatibility, ignored
+    """
+    try:
+        result = v'JSON.parse'(str(s))
+    except Exception as _parse_err:
+        msg = _parse_err.message if _parse_err.message else str(_parse_err)
+        raise JSONDecodeError(msg, str(s), 0)
+
+    if result is undefined:
+        raise JSONDecodeError('No JSON object could be decoded', str(s), 0)
+
+    needs_walk = (parse_float is not None or parse_int is not None or
+                  object_hook is not None or object_pairs_hook is not None)
+    if needs_walk:
+        result = _json_walk(result, parse_float, parse_int, object_hook, object_pairs_hook)
+
+    return result
+
+
+def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
+         allow_nan=False, sort_keys=False, indent=None, separators=None,
+         dflt=None):
+    """Serialize obj as a JSON stream to fp (a file-like object with .write())."""
+    fp.write(dumps(obj, skipkeys=skipkeys, ensure_ascii=ensure_ascii,
+                   check_circular=check_circular, allow_nan=allow_nan,
+                   sort_keys=sort_keys, indent=indent, separators=separators,
+                   dflt=dflt))
+
+
+def load(fp):
+    """Deserialize fp (a file-like object with .read()) to a Python object."""
+    return loads(fp.read())

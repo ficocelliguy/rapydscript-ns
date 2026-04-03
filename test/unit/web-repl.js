@@ -1665,6 +1665,539 @@ var TESTS = [
         },
     },
 
+    // ── datetime stdlib ───────────────────────────────────────────────────────
+
+    {
+        name: "bundle_datetime_basic",
+        description: "datetime stdlib: date/time/datetime/timedelta construct and report attributes correctly",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from datetime import date, time, datetime, timedelta, MINYEAR, MAXYEAR",
+                "assrt.equal(MINYEAR, 1)",
+                "assrt.equal(MAXYEAR, 9999)",
+                // date
+                "d = date(2024, 6, 15)",
+                "assrt.equal(d.year,  2024)",
+                "assrt.equal(d.month,    6)",
+                "assrt.equal(d.day,     15)",
+                "assrt.equal(str(d),  '2024-06-15')",
+                // time
+                "t = time(14, 30, 5)",
+                "assrt.equal(t.hour,   14)",
+                "assrt.equal(t.minute, 30)",
+                "assrt.equal(str(t),   '14:30:05')",
+                // datetime
+                "dt = datetime(2024, 6, 15, 14, 30, 5)",
+                "assrt.equal(dt.year,   2024)",
+                "assrt.equal(dt.hour,   14)",
+                "assrt.equal(str(dt),   '2024-06-15 14:30:05')",
+                // timedelta
+                "td = timedelta(1)",
+                "assrt.equal(td.days, 1)",
+                "assrt.equal(td.total_seconds(), 86400)",
+                "assrt.equal(str(td), '1 day, 0:00:00')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_datetime_arithmetic",
+        description: "datetime stdlib: date/datetime arithmetic via overload_operators",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_operators",
+                "from datetime import date, datetime, timedelta",
+                // date + timedelta
+                "d1 = date(2024, 1, 31)",
+                "d2 = d1 + timedelta(1)",
+                "assrt.equal(d2.month, 2)",
+                "assrt.equal(d2.day,   1)",
+                // date - date
+                "delta = date(2024, 6, 15) - date(2024, 1, 1)",
+                "assrt.ok(delta.days > 0)",
+                // datetime + timedelta
+                "dt1 = datetime(2024, 1, 15, 23, 30, 0)",
+                "dt2 = dt1 + timedelta(0, 3600)",
+                "assrt.equal(dt2.day,    16)",
+                "assrt.equal(dt2.hour,    0)",
+                "assrt.equal(dt2.minute, 30)",
+                // datetime - datetime
+                "diff = datetime(2024, 1, 10, 0, 0) - datetime(2024, 1, 5, 0, 0)",
+                "assrt.equal(diff.days, 5)",
+                // timedelta + timedelta
+                "td = timedelta(1) + timedelta(0, 3600)",
+                "assrt.equal(td.days,    1)",
+                "assrt.equal(td.seconds, 3600)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_datetime_fromisoformat",
+        description: "datetime stdlib: fromisoformat parses ISO strings correctly",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from datetime import date, datetime",
+                "d = date.fromisoformat('2024-06-15')",
+                "assrt.equal(d.year,  2024)",
+                "assrt.equal(d.month,    6)",
+                "assrt.equal(d.day,     15)",
+                "dt = datetime.fromisoformat('2024-06-15T09:30:45.123456')",
+                "assrt.equal(dt.hour,        9)",
+                "assrt.equal(dt.minute,     30)",
+                "assrt.equal(dt.second,     45)",
+                "assrt.equal(dt.microsecond, 123456)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_datetime_strftime",
+        description: "datetime stdlib: strftime formats date and datetime correctly",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from datetime import date, datetime",
+                "d = date(2024, 1, 15)",
+                "assrt.equal(d.strftime('%Y-%m-%d'),  '2024-01-15')",
+                "assrt.equal(d.strftime('%B %d, %Y'), 'January 15, 2024')",
+                "assrt.equal(d.strftime('%a'),        'Mon')",
+                "assrt.equal(d.strftime('%%'),        '%')",
+                "dt = datetime(2024, 1, 15, 14, 5, 9)",
+                "assrt.equal(dt.strftime('%H:%M:%S'), '14:05:09')",
+                "assrt.equal(dt.strftime('%I:%M %p'), '02:05 PM')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── contextlib ────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_contextlib_suppress",
+        description: "contextlib.suppress silences listed exceptions in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from contextlib import suppress",
+                // matched exception is suppressed
+                "reached = False",
+                "with suppress(ValueError):",
+                "    raise ValueError('ignored')",
+                "reached = True",
+                "assrt.equal(reached, True)",
+                // non-matching exception propagates
+                "propagated = False",
+                "try:",
+                "    with suppress(KeyError):",
+                "        raise ValueError('not suppressed')",
+                "except ValueError:",
+                "    propagated = True",
+                "assrt.equal(propagated, True)",
+                // suppress multiple types
+                "hit = False",
+                "with suppress(TypeError, KeyError):",
+                "    raise KeyError('one of two')",
+                "hit = True",
+                "assrt.equal(hit, True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_contextlib_closing",
+        description: "contextlib.closing calls close() on exit in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from contextlib import closing",
+                "class _Obj:",
+                "    def __init__(self):",
+                "        self.closed = False",
+                "    def close(self):",
+                "        self.closed = True",
+                "obj = _Obj()",
+                "with closing(obj) as c:",
+                "    assrt.equal(c, obj)",
+                "    assrt.equal(c.closed, False)",
+                "assrt.equal(obj.closed, True)",
+                // close() is called even on exception
+                "obj2 = _Obj()",
+                "try:",
+                "    with closing(obj2):",
+                "        raise ValueError('test')",
+                "except ValueError:",
+                "    pass",
+                "assrt.equal(obj2.closed, True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── json stdlib ──────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_json_dumps_loads_basic",
+        description: "json stdlib: dumps/loads round-trip for basic types and collections",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from json import dumps, loads",
+                // basic scalars
+                "assrt.equal(dumps(None),    'null')",
+                "assrt.equal(dumps(True),    'true')",
+                "assrt.equal(dumps(False),   'false')",
+                "assrt.equal(dumps(42),      '42')",
+                "assrt.equal(dumps('hello'), '\"hello\"')",
+                // list round-trip
+                "assrt.deepEqual(loads(dumps([1, 2, 3])), [1, 2, 3])",
+                // object round-trip
+                "obj = loads(dumps({'a': 1, 'b': 2}))",
+                "assrt.equal(obj.a, 1)",
+                "assrt.equal(obj.b, 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_json_dumps_options",
+        description: "json stdlib: dumps respects sort_keys, indent, and separators",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from json import dumps",
+                // sort_keys
+                "assrt.equal(dumps({'b': 2, 'a': 1}, sort_keys=True), '{\"a\":1,\"b\":2}')",
+                // indent produces newlines
+                "pretty = dumps([1, 2], indent=2)",
+                "assrt.ok(pretty.indexOf('\\n') >= 0)",
+                // compact separators
+                "assrt.equal(dumps({'a': 1}, sort_keys=True, separators=(',', ':')), '{\"a\":1}')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_json_loads_hooks",
+        description: "json stdlib: loads supports object_hook and JSONDecodeError",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from json import loads, JSONDecodeError",
+                // object_hook
+                "hits = []",
+                "def hook(d):",
+                "    hits.push(1)",
+                "    return d",
+                "loads('{\"x\": 1}', object_hook=hook)",
+                "assrt.equal(hits.length, 1)",
+                // JSONDecodeError on bad JSON
+                "got_err = False",
+                "try:",
+                "    loads('{bad json}')",
+                "except JSONDecodeError:",
+                "    got_err = True",
+                "assrt.ok(got_err)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_json_dump_load_file",
+        description: "json stdlib: dump/load work with file-like objects",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from json import dump, load",
+                "class _SIO:",
+                "    def __init__(self): self._buf = ''",
+                "    def write(self, s): self._buf += s",
+                "    def read(self): return self._buf",
+                "sio = _SIO()",
+                "dump({'key': 'value', 'n': 7}, sio)",
+                "result = load(sio)",
+                "assrt.equal(result.key, 'value')",
+                "assrt.equal(result.n, 7)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_contextlib_nullcontext",
+        description: "contextlib.nullcontext works as a no-op context manager in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from contextlib import nullcontext",
+                "with nullcontext() as v:",
+                "    assrt.equal(v, None)",
+                "with nullcontext(42) as v:",
+                "    assrt.equal(v, 42)",
+                "with nullcontext('hi') as v:",
+                "    assrt.equal(v, 'hi')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_contextlib_contextmanager",
+        description: "contextlib.contextmanager creates generator-based context managers in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from contextlib import contextmanager",
+                "log = []",
+                "@contextmanager",
+                "def _cm(name):",
+                "    log.append('enter:' + name)",
+                "    try:",
+                "        yield name.upper()",
+                "    finally:",
+                "        log.append('exit:' + name)",
+                "with _cm('hello') as v:",
+                "    assrt.equal(v, 'HELLO')",
+                "    log.append('body')",
+                "assrt.deepEqual(log, ['enter:hello', 'body', 'exit:hello'])",
+                // exception propagates through finally
+                "log2 = []",
+                "@contextmanager",
+                "def _cm2():",
+                "    try:",
+                "        yield",
+                "    finally:",
+                "        log2.append('cleanup')",
+                "caught = False",
+                "try:",
+                "    with _cm2():",
+                "        raise ValueError('oops')",
+                "except ValueError:",
+                "    caught = True",
+                "assrt.equal(caught, True)",
+                "assrt.deepEqual(log2, ['cleanup'])",
+                // generator can suppress exceptions
+                "@contextmanager",
+                "def _cm3():",
+                "    try:",
+                "        yield",
+                "    except ValueError:",
+                "        pass",
+                "after = False",
+                "with _cm3():",
+                "    raise ValueError('suppressed')",
+                "after = True",
+                "assrt.equal(after, True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_contextlib_exitstack",
+        description: "contextlib.ExitStack enters/exits context managers in LIFO order in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from contextlib import ExitStack",
+                "exit_order = []",
+                "class _CM:",
+                "    def __init__(self, label):",
+                "        self.label = label",
+                "    def __enter__(self):",
+                "        return self.label",
+                "    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+                "        exit_order.append(self.label)",
+                "        return False",
+                "with ExitStack() as stack:",
+                "    a = stack.enter_context(_CM('a'))",
+                "    b = stack.enter_context(_CM('b'))",
+                "    c = stack.enter_context(_CM('c'))",
+                "    assrt.equal(a, 'a')",
+                "    assrt.equal(b, 'b')",
+                "    assrt.equal(c, 'c')",
+                "assrt.deepEqual(exit_order, ['c', 'b', 'a'])",
+                // callback
+                "cb_log = []",
+                "def _append_done():",
+                "    cb_log.append('done')",
+                "with ExitStack() as stack:",
+                "    stack.callback(_append_done)",
+                "assrt.deepEqual(cb_log, ['done'])",
+                // close() outside with
+                "close_log = []",
+                "class _CM2:",
+                "    def __enter__(self): return self",
+                "    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+                "        close_log.append('closed')",
+                "        return False",
+                "s2 = ExitStack()",
+                "s2.enter_context(_CM2())",
+                "s2.close()",
+                "assrt.deepEqual(close_log, ['closed'])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_io_stringio_basic",
+        description: "io.StringIO: write, seek, read, getvalue work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from io import StringIO",
+                // basic write + seek + read
+                "sio = StringIO()",
+                "sio.write('hello')",
+                "sio.write(' world')",
+                "sio.seek(0)",
+                "assrt.equal(sio.read(), 'hello world')",
+                // getvalue independent of position
+                "sio.seek(3)",
+                "assrt.equal(sio.getvalue(), 'hello world')",
+                // tell / seek with whence
+                "sio.seek(0)",
+                "assrt.equal(sio.tell(), 0)",
+                "sio.seek(0, 2)",
+                "assrt.equal(sio.tell(), 11)",
+                // readline
+                "ml = StringIO('line1\\nline2\\nline3')",
+                "assrt.equal(ml.readline(), 'line1\\n')",
+                "assrt.equal(ml.readline(), 'line2\\n')",
+                "assrt.equal(ml.readline(), 'line3')",
+                "assrt.equal(ml.readline(), '')",
+                // truncate
+                "tr = StringIO('hello world')",
+                "tr.truncate(5)",
+                "assrt.equal(tr.getvalue(), 'hello')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_io_stringio_context",
+        description: "io.StringIO: context manager and closed attribute work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from io import StringIO",
+                // context manager
+                "result = ''",
+                "cm = StringIO('context text')",
+                "with cm as f:",
+                "    result = f.read()",
+                "assrt.equal(result, 'context text')",
+                "assrt.equal(cm.closed, True)",
+                // ValueError on read after close
+                "got_err = False",
+                "try:",
+                "    cm.read()",
+                "except ValueError:",
+                "    got_err = True",
+                "assrt.ok(got_err)",
+                // readable / writable / seekable
+                "s2 = StringIO()",
+                "assrt.ok(s2.readable())",
+                "assrt.ok(s2.writable())",
+                "assrt.ok(s2.seekable())",
+                // init with value
+                "s3 = StringIO('preset')",
+                "assrt.equal(s3.read(), 'preset')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_io_bytesio_basic",
+        description: "io.BytesIO: write, seek, read, getvalue work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from io import BytesIO",
+                // basic write + seek + read
+                "bio = BytesIO()",
+                "bio.write(bytes([1, 2, 3]))",
+                "bio.write(bytes([4, 5]))",
+                "bio.seek(0)",
+                "data = bio.read()",
+                "assrt.equal(len(data), 5)",
+                "assrt.equal(data[0], 1)",
+                "assrt.equal(data[4], 5)",
+                // getvalue
+                "bio.seek(2)",
+                "assrt.equal(len(bio.getvalue()), 5)",
+                // partial read
+                "bio.seek(0)",
+                "chunk = bio.read(3)",
+                "assrt.equal(len(chunk), 3)",
+                "assrt.equal(chunk[2], 3)",
+                // init from bytes
+                "bio2 = BytesIO(bytes([10, 20, 30]))",
+                "bio2.seek(0)",
+                "assrt.equal(bio2.read()[1], 20)",
+                // seek whence=2
+                "bio2.seek(0)",
+                "bio2.seek(-1, 2)",
+                "assrt.equal(bio2.tell(), 2)",
+                // truncate
+                "bt = BytesIO(bytes([1, 2, 3, 4, 5]))",
+                "bt.truncate(3)",
+                "assrt.equal(len(bt.getvalue()), 3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_io_bytesio_context",
+        description: "io.BytesIO: context manager, readline, and writelines in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from io import BytesIO",
+                // context manager
+                "bcm = BytesIO(bytes([7, 8, 9]))",
+                "with bcm as bf:",
+                "    bf.seek(0)",
+                "    got = bf.read()",
+                "assrt.equal(got[0], 7)",
+                "assrt.equal(bcm.closed, True)",
+                // ValueError on closed
+                "berr = False",
+                "try:",
+                "    bcm.read()",
+                "except ValueError:",
+                "    berr = True",
+                "assrt.ok(berr)",
+                // writelines
+                "bwl = BytesIO()",
+                "bwl.writelines([bytes([1, 2]), bytes([3, 4])])",
+                "assrt.equal(len(bwl.getvalue()), 4)",
+                // readline
+                "brl = BytesIO(bytes([65, 66, 10, 67, 68]))",
+                "first = brl.readline()",
+                "assrt.equal(len(first), 3)",
+                "assrt.equal(first[2], 10)",
+                "second = brl.readline()",
+                "assrt.equal(len(second), 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",

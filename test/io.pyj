@@ -1,0 +1,316 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# io.pyj
+# Tests for the io standard library module (StringIO and BytesIO).
+
+from io import StringIO, BytesIO, UnsupportedOperation
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+throws = assrt.throws
+
+# ── 1. StringIO — construction ────────────────────────────────────────────────
+
+_sio = StringIO()
+ae(_sio.getvalue(), '')
+ae(_sio.tell(), 0)
+ok(not _sio.closed)
+
+_sio2 = StringIO('hello')
+ae(_sio2.getvalue(), 'hello')
+ae(_sio2.tell(), 0)
+
+# ── 2. StringIO — read ────────────────────────────────────────────────────────
+
+_s = StringIO('hello world')
+ae(_s.read(5), 'hello')
+ae(_s.read(1), ' ')
+ae(_s.read(),  'world')
+ae(_s.read(),  '')     # at end
+
+_s.seek(0)
+ae(_s.read(),  'hello world')
+
+# read with size=0
+_s.seek(0)
+ae(_s.read(0), '')
+ae(_s.tell(),  0)
+
+# ── 3. StringIO — readline ────────────────────────────────────────────────────
+
+_ml = StringIO('line1\nline2\nline3')
+ae(_ml.readline(),      'line1\n')
+ae(_ml.readline(),      'line2\n')
+ae(_ml.readline(),      'line3')
+ae(_ml.readline(),      '')     # past end
+
+# readline with size limit
+_ml2 = StringIO('abcdef\nghijkl')
+ae(_ml2.readline(3),    'abc')
+ae(_ml2.readline(100),  'def\n')
+
+# ── 4. StringIO — readlines ───────────────────────────────────────────────────
+
+_rls = StringIO('a\nb\nc\n')
+ade(_rls.readlines(), ['a\n', 'b\n', 'c\n'])
+
+_rls2 = StringIO('x\ny\nz')
+ade(_rls2.readlines(), ['x\n', 'y\n', 'z'])
+
+# hint stops early (total >= hint)
+_hint = StringIO('aa\nbb\ncc\n')
+_hlines = _hint.readlines(hint=4)
+ok(_hlines.length >= 1)
+ok(_hlines.length <= 3)
+
+# ── 5. StringIO — write ───────────────────────────────────────────────────────
+
+_w = StringIO()
+_w.write('hello')
+_w.write(' ')
+_w.write('world')
+ae(_w.getvalue(), 'hello world')
+ae(_w.tell(), 11)
+
+# write returns the number of chars written
+_w2 = StringIO()
+ae(_w2.write('abc'), 3)
+ae(_w2.write(''),    0)
+
+# overwrite in the middle
+_ow = StringIO('hello world')
+_ow.seek(6)
+_ow.write('Python')
+ae(_ow.getvalue(), 'hello Python')
+
+# ── 6. StringIO — writelines ──────────────────────────────────────────────────
+
+_wl = StringIO()
+_wl.writelines(['one', ' ', 'two'])
+ae(_wl.getvalue(), 'one two')
+
+# ── 7. StringIO — seek / tell ─────────────────────────────────────────────────
+
+_sk = StringIO('abcde')
+ae(_sk.seek(2), 2)
+ae(_sk.tell(), 2)
+ae(_sk.read(2), 'cd')
+
+# whence=1 (relative)
+_sk.seek(0)
+_sk.seek(2, 1)
+ae(_sk.tell(), 2)
+
+# whence=2 (from end)
+_sk.seek(-2, 2)
+ae(_sk.tell(), 3)
+ae(_sk.read(), 'de')
+
+# seek before start clamps to 0
+_sk.seek(-99)
+ae(_sk.tell(), 0)
+
+# ── 8. StringIO — truncate ────────────────────────────────────────────────────
+
+_tr = StringIO('hello world')
+_tr.seek(5)
+ae(_tr.truncate(), 5)
+ae(_tr.getvalue(), 'hello')
+
+_tr2 = StringIO('hello world')
+ae(_tr2.truncate(3), 3)
+ae(_tr2.getvalue(), 'hel')
+
+# ── 9. StringIO — closed / context manager ────────────────────────────────────
+
+_cm = StringIO('text')
+with _cm as _f:
+    ae(_f.read(), 'text')
+ok(_cm.closed)
+
+_err_raised = False
+try:
+    _cm.read()
+except ValueError:
+    _err_raised = True
+ok(_err_raised, 'read on closed StringIO should raise ValueError')
+
+# ── 10. StringIO — readable / writable / seekable ────────────────────────────
+
+_rws = StringIO()
+ok(_rws.readable())
+ok(_rws.writable())
+ok(_rws.seekable())
+
+# ── 11. StringIO — iteration ──────────────────────────────────────────────────
+
+_it = StringIO('line1\nline2\nline3\n')
+_lines = list(_it)
+ade(_lines, ['line1\n', 'line2\n', 'line3\n'])
+
+# ── 12. BytesIO — construction ────────────────────────────────────────────────
+
+_bio = BytesIO()
+ae(len(_bio.getvalue()), 0)
+ae(_bio.tell(), 0)
+ok(not _bio.closed)
+
+_bio2 = BytesIO(bytes([72, 101, 108, 108, 111]))
+ae(len(_bio2.getvalue()), 5)
+ae(_bio2.getvalue()[0], 72)
+ae(_bio2.getvalue()[4], 111)
+
+# init from bytearray
+_bio3 = BytesIO(bytearray([1, 2, 3]))
+ae(len(_bio3.getvalue()), 3)
+
+# ── 13. BytesIO — read ────────────────────────────────────────────────────────
+
+_br = BytesIO(bytes([10, 20, 30, 40, 50]))
+ae(_br.read(2)[0], 10)
+ae(_br.read(2)[0], 30)
+ae(len(_br.read()), 1)
+ae(len(_br.read()), 0)   # at end
+
+_br.seek(0)
+ae(len(_br.read()), 5)
+
+# ── 14. BytesIO — readline ────────────────────────────────────────────────────
+
+# b'line1\nline2' (0x0a is newline)
+_brl = BytesIO(bytes([108, 49, 10, 108, 50]))   # 'l1\nl2'
+_first = _brl.readline()
+ae(len(_first), 3)
+ae(_first[2], 10)   # includes the newline byte
+
+_second = _brl.readline()
+ae(len(_second), 2)
+
+ae(len(_brl.readline()), 0)   # at end
+
+# ── 15. BytesIO — write ───────────────────────────────────────────────────────
+
+_bw = BytesIO()
+ae(_bw.write(bytes([1, 2, 3])), 3)
+ae(_bw.write(bytes([4, 5])),    2)
+_bw.seek(0)
+ae(len(_bw.read()), 5)
+ae(_bw.getvalue()[0], 1)
+ae(_bw.getvalue()[4], 5)
+
+# write returns byte count
+_bw2 = BytesIO()
+ae(_bw2.write(bytes()), 0)
+
+# overwrite in the middle
+_bo = BytesIO(bytes([1, 2, 3, 4, 5]))
+_bo.seek(1)
+_bo.write(bytes([20, 30]))
+_bo.seek(0)
+_boval = _bo.read()
+ae(_boval[0], 1)
+ae(_boval[1], 20)
+ae(_boval[2], 30)
+ae(_boval[3], 4)
+ae(_boval[4], 5)
+
+# write past end extends with zeros
+_bext = BytesIO(bytes([1, 2]))
+_bext.seek(4)
+_bext.write(bytes([99]))
+_bextval = _bext.getvalue()
+ae(len(_bextval), 5)
+ae(_bextval[2], 0)
+ae(_bextval[3], 0)
+ae(_bextval[4], 99)
+
+# ── 16. BytesIO — writelines ─────────────────────────────────────────────────
+
+_bwl = BytesIO()
+_bwl.writelines([bytes([1, 2]), bytes([3, 4])])
+ae(len(_bwl.getvalue()), 4)
+
+# ── 17. BytesIO — seek / tell ─────────────────────────────────────────────────
+
+_bsk = BytesIO(bytes([10, 20, 30, 40, 50]))
+ae(_bsk.seek(3), 3)
+ae(_bsk.tell(), 3)
+ae(_bsk.read(1)[0], 40)
+
+# whence=1
+_bsk.seek(0)
+_bsk.seek(2, 1)
+ae(_bsk.tell(), 2)
+
+# whence=2
+_bsk.seek(-1, 2)
+ae(_bsk.tell(), 4)
+ae(_bsk.read(1)[0], 50)
+
+# clamp below 0
+_bsk.seek(-999)
+ae(_bsk.tell(), 0)
+
+# ── 18. BytesIO — truncate ────────────────────────────────────────────────────
+
+_btr = BytesIO(bytes([1, 2, 3, 4, 5]))
+_btr.seek(3)
+ae(_btr.truncate(), 3)
+ae(len(_btr.getvalue()), 3)
+
+_btr2 = BytesIO(bytes([10, 20, 30, 40]))
+ae(_btr2.truncate(2), 2)
+ae(len(_btr2.getvalue()), 2)
+ae(_btr2.getvalue()[1], 20)
+
+# ── 19. BytesIO — closed / context manager ───────────────────────────────────
+
+_bcm = BytesIO(bytes([7, 8, 9]))
+with _bcm as _bf:
+    _bf.seek(0)
+    ae(_bf.read()[0], 7)
+ok(_bcm.closed)
+
+_berr_raised = False
+try:
+    _bcm.read()
+except ValueError:
+    _berr_raised = True
+ok(_berr_raised, 'read on closed BytesIO should raise ValueError')
+
+# ── 20. BytesIO — readable / writable / seekable ─────────────────────────────
+
+_brws = BytesIO()
+ok(_brws.readable())
+ok(_brws.writable())
+ok(_brws.seekable())
+
+# ── 21. BytesIO — iteration ───────────────────────────────────────────────────
+
+_bit = BytesIO(bytes([65, 66, 10, 67, 68, 10]))  # 'AB\nCD\n'
+_bitlines = list(_bit)
+ae(_bitlines.length, 2)
+ae(_bitlines[0][0], 65)   # 'A'
+ae(_bitlines[0][2], 10)   # '\n'
+
+# ── 22. getvalue() does not depend on position ────────────────────────────────
+
+_gv = StringIO('hello')
+_gv.seek(3)
+ae(_gv.getvalue(), 'hello')   # full buffer regardless of pos
+
+_bgv = BytesIO(bytes([1, 2, 3]))
+_bgv.seek(2)
+ae(len(_bgv.getvalue()), 3)
+
+# ── 23. round-trip with json.dump / json.load ────────────────────────────────
+
+from json import dump, load
+_jsio = StringIO()
+dump({'key': 'value', 'n': 42}, _jsio)
+_jsio.seek(0)
+_result = load(_jsio)
+ae(_result.key,   'value')
+ae(_result.n,     42)

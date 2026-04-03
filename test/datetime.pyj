@@ -1,0 +1,500 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# datetime.pyj
+# Tests for the datetime standard library (from datetime import ...).
+
+from datetime import date, time, datetime, timedelta, MINYEAR, MAXYEAR
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+throws = assrt.throws
+
+# ── 1. Constants ──────────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(MINYEAR, 1)
+ae(MAXYEAR, 9999)
+
+# ── 2. timedelta construction and normalisation ────────────────────────────────
+# STATUS: ✓ WORKS
+
+# Basic positional args
+_td0 = timedelta(0)
+ae(_td0.days, 0)
+ae(_td0.seconds, 0)
+ae(_td0.microseconds, 0)
+
+_td1 = timedelta(1)
+ae(_td1.days, 1)
+ae(_td1.seconds, 0)
+
+# Keyword args
+_td_kw = timedelta(days=2, seconds=3661)
+ae(_td_kw.days, 2)
+ae(_td_kw.seconds, 3661)
+
+# Normalisation: seconds overflow into days
+_td_norm = timedelta(0, 90061)  # 25h 1m 1s
+ae(_td_norm.days, 1)
+ae(_td_norm.seconds, 3661)
+
+# Normalisation: milliseconds folded in
+_td_ms = timedelta(0, 0, 0, 1500)  # 1500 ms
+ae(_td_ms.seconds, 1)
+ae(_td_ms.microseconds, 500000)
+
+# Negative timedelta
+_td_neg = timedelta(-1)
+ae(_td_neg.days, -1)
+ae(_td_neg.seconds, 0)
+
+# Negative seconds normalised: days=-1, seconds=86399
+_td_neg_s = timedelta(0, -1)
+ae(_td_neg_s.days, -1)
+ae(_td_neg_s.seconds, 86399)
+
+# Float days folded into seconds
+_td_frac = timedelta(0, 0, 0, 0, 0, 0, 0)  # all zeros
+ae(_td_frac.days, 0)
+
+# ── 3. timedelta.total_seconds() ──────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(timedelta(1).total_seconds(), 86400)
+ae(timedelta(0, 3600).total_seconds(), 3600)
+ae(timedelta(0, 0, 500000).total_seconds(), 0.5)
+ae(timedelta(-1).total_seconds(), -86400)
+
+# ── 4. timedelta arithmetic (direct method calls) ─────────────────────────────
+# STATUS: ✓ WORKS
+
+_a = timedelta(1)
+_b = timedelta(0, 3600)
+_sum = _a.__add__(_b)
+ae(_sum.days, 1)
+ae(_sum.seconds, 3600)
+
+_diff = _a.__sub__(_b)
+ae(_diff.days, 0)
+ae(_diff.seconds, 82800)  # 86400 - 3600
+
+# __neg__
+_neg = _a.__neg__()
+ae(_neg.days, -1)
+ae(_neg.seconds, 0)
+
+# __mul__
+_mul = _a.__mul__(3)
+ae(_mul.days, 3)
+
+# ── 5. timedelta comparisons ──────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_td_a = timedelta(1)
+_td_b = timedelta(2)
+_td_c = timedelta(1)
+
+ok(_td_a.__eq__(_td_c))
+ok(not _td_a.__eq__(_td_b))
+ok(_td_a.__lt__(_td_b))
+ok(not _td_b.__lt__(_td_a))
+ok(_td_a.__le__(_td_c))
+ok(_td_b.__gt__(_td_a))
+ok(_td_b.__ge__(_td_b))
+
+# ── 6. timedelta str and repr ─────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(str(timedelta(0)),            '0:00:00')
+ae(str(timedelta(1)),            '1 day, 0:00:00')
+ae(str(timedelta(2)),            '2 days, 0:00:00')
+ae(str(timedelta(-1)),           '-1 day, 0:00:00')
+ae(str(timedelta(-2)),           '-2 days, 0:00:00')
+ae(str(timedelta(0, 3661)),      '1:01:01')
+ae(str(timedelta(0, 0, 100000)), '0:00:00.100000')
+
+ae(repr(timedelta(0)),              'datetime.timedelta(0)')
+ae(repr(timedelta(1)),              'datetime.timedelta(days=1)')
+ae(repr(timedelta(0, 3661)),        'datetime.timedelta(seconds=3661)')
+ae(repr(timedelta(0, 0, 1)),        'datetime.timedelta(microseconds=1)')
+ae(repr(timedelta(1, 3661, 1)),     'datetime.timedelta(days=1, seconds=3661, microseconds=1)')
+
+# ── 7. timedelta class attributes ─────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ok(isinstance(timedelta.min,        timedelta))
+ok(isinstance(timedelta.max,        timedelta))
+ok(isinstance(timedelta.resolution, timedelta))
+ae(timedelta.min.days, -999999999)
+ae(timedelta.max.days, 999999999)
+ae(timedelta.resolution.microseconds, 1)
+
+# ── 8. date construction ──────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_d1 = date(2024, 1, 15)
+ae(_d1.year,  2024)
+ae(_d1.month,    1)
+ae(_d1.day,     15)
+
+# Min/max class attributes
+ae(date.min.year,   MINYEAR)
+ae(date.min.month,  1)
+ae(date.min.day,    1)
+ae(date.max.year,   MAXYEAR)
+ae(date.max.month,  12)
+ae(date.max.day,    31)
+
+# ── 9. date.fromisoformat ────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_d_iso = date.fromisoformat('2024-01-15')
+ae(_d_iso.year,  2024)
+ae(_d_iso.month,    1)
+ae(_d_iso.day,     15)
+
+# ── 10. date.fromordinal / toordinal round-trip ───────────────────────────────
+# STATUS: ✓ WORKS
+
+_d_ref = date(2024, 6, 15)
+ae(date.fromordinal(_d_ref.toordinal()).__eq__(_d_ref), True)
+
+ae(date(1, 1, 1).toordinal(), 1)
+ae(date.fromordinal(1).year,  1)
+ae(date.fromordinal(1).month, 1)
+ae(date.fromordinal(1).day,   1)
+
+# ── 11. date.weekday / isoweekday ────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+# 2024-01-01 is Monday
+ae(date(2024, 1, 1).weekday(),    0)   # Monday
+ae(date(2024, 1, 1).isoweekday(), 1)
+ae(date(2024, 1, 7).weekday(),    6)   # Sunday
+ae(date(2024, 1, 7).isoweekday(), 7)
+
+# ── 12. date.isoformat / str / repr ──────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(str(date(2024, 1, 15)),        '2024-01-15')
+ae(date(2024, 1, 15).isoformat(), '2024-01-15')
+ae(repr(date(2024, 1, 15)),       'datetime.date(2024, 1, 15)')
+
+# ── 13. date arithmetic (direct method calls) ─────────────────────────────────
+# STATUS: ✓ WORKS
+
+_d_base = date(2024, 1, 15)
+_d_plus = _d_base.__add__(timedelta(10))
+ae(_d_plus.year,  2024)
+ae(_d_plus.month,    1)
+ae(_d_plus.day,     25)
+
+_d_minus = _d_base.__sub__(timedelta(15))
+ae(_d_minus.year,  2023)
+ae(_d_minus.month,   12)
+ae(_d_minus.day,     31)
+
+# date - date → timedelta
+_delta = date(2024, 1, 15).__sub__(date(2024, 1, 1))
+ae(_delta.days, 14)
+
+# Month boundary
+_d_end = date(2024, 1, 31).__add__(timedelta(1))
+ae(_d_end.month, 2)
+ae(_d_end.day,   1)
+
+# Leap year: 2024 is a leap year
+_d_leap = date(2024, 2, 28).__add__(timedelta(1))
+ae(_d_leap.month, 2)
+ae(_d_leap.day,  29)
+
+_d_leap2 = date(2024, 2, 29).__add__(timedelta(1))
+ae(_d_leap2.month, 3)
+ae(_d_leap2.day,   1)
+
+# ── 14. date comparisons ──────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_da = date(2024, 1,  1)
+_db = date(2024, 1, 15)
+_dc = date(2024, 1,  1)
+
+ok(_da.__eq__(_dc))
+ok(not _da.__eq__(_db))
+ok(_da.__lt__(_db))
+ok(not _db.__lt__(_da))
+ok(_da.__le__(_dc))
+ok(_db.__gt__(_da))
+ok(_da.__ge__(_dc))
+
+# ── 15. date.replace ─────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_d_orig = date(2024, 6, 15)
+_d_rep  = _d_orig.replace(year=2025)
+ae(_d_rep.year,  2025)
+ae(_d_rep.month,    6)
+ae(_d_rep.day,     15)
+
+_d_rep2 = _d_orig.replace(month=12, day=31)
+ae(_d_rep2.year,  2024)
+ae(_d_rep2.month,   12)
+ae(_d_rep2.day,     31)
+
+# ── 16. date.strftime ────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_ds = date(2024, 1, 5)
+ae(_ds.strftime('%Y-%m-%d'),  '2024-01-05')
+ae(_ds.strftime('%d/%m/%Y'),  '05/01/2024')
+ae(_ds.strftime('%B %d, %Y'), 'January 05, 2024')
+ae(_ds.strftime('%a %b %d'),  'Fri Jan 05')
+ae(_ds.strftime('%%'),        '%')
+ae(_ds.strftime('%j'),        '005')
+
+# ── 17. time construction ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_t0 = time(0)
+ae(_t0.hour, 0)
+ae(_t0.minute, 0)
+ae(_t0.second, 0)
+ae(_t0.microsecond, 0)
+
+_t1 = time(14, 30, 5, 123456)
+ae(_t1.hour,        14)
+ae(_t1.minute,      30)
+ae(_t1.second,       5)
+ae(_t1.microsecond, 123456)
+
+# Min / max
+ae(time.min.hour,         0)
+ae(time.max.hour,        23)
+ae(time.max.minute,      59)
+ae(time.max.second,      59)
+ae(time.max.microsecond, 999999)
+
+# ── 18. time.isoformat / str / repr ──────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(str(time(0)),                  '00:00:00')
+ae(str(time(14, 30, 5)),          '14:30:05')
+ae(str(time(14, 30, 5, 123456)),  '14:30:05.123456')
+ae(time(9).isoformat(),           '09:00:00')
+ae(repr(time(14, 30, 5)),         'datetime.time(14, 30, 5)')
+ae(repr(time(14, 30, 5, 123456)), 'datetime.time(14, 30, 5, 123456)')
+ae(repr(time(14)),                'datetime.time(14)')
+
+# ── 19. time comparisons ──────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_ta = time(9, 0)
+_tb = time(17, 30)
+_tc = time(9, 0)
+
+ok(_ta.__eq__(_tc))
+ok(not _ta.__eq__(_tb))
+ok(_ta.__lt__(_tb))
+ok(_tb.__gt__(_ta))
+ok(_ta.__le__(_tc))
+ok(_tb.__ge__(_tb))
+
+# ── 20. time.replace ─────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_t_orig = time(9, 30, 0)
+_t_rep  = _t_orig.replace(hour=17)
+ae(_t_rep.hour,   17)
+ae(_t_rep.minute, 30)
+ae(_t_rep.second,  0)
+
+# ── 21. time.strftime ────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_ts = time(14, 5, 9)
+ae(_ts.strftime('%H:%M:%S'), '14:05:09')
+ae(_ts.strftime('%I %p'),    '02 PM')
+
+# ── 22. datetime construction ─────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dt = datetime(2024, 1, 15, 9, 30, 45, 123456)
+ae(_dt.year,        2024)
+ae(_dt.month,          1)
+ae(_dt.day,           15)
+ae(_dt.hour,           9)
+ae(_dt.minute,        30)
+ae(_dt.second,        45)
+ae(_dt.microsecond, 123456)
+
+# Defaults for time components
+_dt2 = datetime(2024, 6, 1)
+ae(_dt2.hour,        0)
+ae(_dt2.minute,      0)
+ae(_dt2.second,      0)
+ae(_dt2.microsecond, 0)
+
+# ── 23. datetime.fromisoformat ───────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dti = datetime.fromisoformat('2024-01-15T09:30:45')
+ae(_dti.year,   2024)
+ae(_dti.hour,      9)
+ae(_dti.minute,   30)
+ae(_dti.second,   45)
+
+_dti2 = datetime.fromisoformat('2024-01-15 09:30:45.123456')
+ae(_dti2.microsecond, 123456)
+
+_dti3 = datetime.fromisoformat('2024-01-15')
+ae(_dti3.hour,   0)
+ae(_dti3.minute, 0)
+
+# ── 24. datetime.isoformat / str / repr ──────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dt3 = datetime(2024, 1, 15, 9, 30, 45)
+ae(_dt3.isoformat(),      '2024-01-15T09:30:45')
+ae(_dt3.isoformat(' '),   '2024-01-15 09:30:45')
+ae(str(_dt3),             '2024-01-15 09:30:45')
+ae(repr(_dt3),            'datetime.datetime(2024, 1, 15, 9, 30, 45)')
+
+_dt4 = datetime(2024, 1, 15, 9, 30, 45, 123456)
+ae(repr(_dt4), 'datetime.datetime(2024, 1, 15, 9, 30, 45, 123456)')
+
+# ── 25. datetime.combine ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dc = datetime.combine(date(2024, 1, 15), time(9, 30))
+ae(_dc.year,   2024)
+ae(_dc.month,     1)
+ae(_dc.day,      15)
+ae(_dc.hour,      9)
+ae(_dc.minute,   30)
+
+# ── 26. datetime.date() / datetime.time() ─────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dt5 = datetime(2024, 1, 15, 9, 30, 45)
+_dt5_date = _dt5.date()
+_dt5_time = _dt5.time()
+ok(isinstance(_dt5_date, date))
+ok(not isinstance(_dt5_date, datetime))
+ok(isinstance(_dt5_time, time))
+ae(_dt5_date.year,  2024)
+ae(_dt5_time.hour,     9)
+
+# ── 27. datetime arithmetic (direct method calls) ─────────────────────────────
+# STATUS: ✓ WORKS
+
+_dt_base = datetime(2024, 1, 15, 12, 0, 0)
+
+# + timedelta
+_dt_plus = _dt_base.__add__(timedelta(1))
+ae(_dt_plus.year,  2024)
+ae(_dt_plus.month,    1)
+ae(_dt_plus.day,     16)
+ae(_dt_plus.hour,    12)
+
+# - timedelta
+_dt_minus = _dt_base.__sub__(timedelta(0, 3600))  # subtract 1 hour
+ae(_dt_minus.day,    15)
+ae(_dt_minus.hour,   11)
+
+# - datetime → timedelta
+_dt_other = datetime(2024, 1, 10, 12, 0, 0)
+_dt_diff  = _dt_base.__sub__(_dt_other)
+ok(isinstance(_dt_diff, timedelta))
+ae(_dt_diff.days, 5)
+ae(_dt_diff.seconds, 0)
+
+# Cross-midnight arithmetic
+_dt_night = datetime(2024, 1, 15, 23, 30, 0)
+_dt_next  = _dt_night.__add__(timedelta(0, 3600))  # +1 hour → next day
+ae(_dt_next.day,    16)
+ae(_dt_next.hour,    0)
+ae(_dt_next.minute, 30)
+
+# Cross-month
+_dt_jan31 = datetime(2024, 1, 31, 23, 0, 0)
+_dt_feb1  = _dt_jan31.__add__(timedelta(0, 3600))
+ae(_dt_feb1.month, 2)
+ae(_dt_feb1.day,   1)
+ae(_dt_feb1.hour,  0)
+
+# ── 28. datetime comparisons ──────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dta = datetime(2024, 1, 1, 0, 0, 0)
+_dtb = datetime(2024, 1, 1, 0, 0, 1)
+_dtc = datetime(2024, 1, 1, 0, 0, 0)
+
+ok(_dta.__eq__(_dtc))
+ok(not _dta.__eq__(_dtb))
+ok(_dta.__lt__(_dtb))
+ok(_dtb.__gt__(_dta))
+ok(_dta.__le__(_dtc))
+ok(_dtb.__ge__(_dtb))
+
+# ── 29. datetime.replace ─────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dt_r  = datetime(2024, 1, 15, 9, 30, 0)
+_dt_r2 = _dt_r.replace(hour=17, minute=0)
+ae(_dt_r2.year,  2024)
+ae(_dt_r2.month,    1)
+ae(_dt_r2.day,     15)
+ae(_dt_r2.hour,    17)
+ae(_dt_r2.minute,   0)
+
+# ── 30. datetime.strftime ────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+_dtf = datetime(2024, 1, 15, 14, 5, 9)
+ae(_dtf.strftime('%Y-%m-%d %H:%M:%S'), '2024-01-15 14:05:09')
+ae(_dtf.strftime('%A, %B %d, %Y'),     'Monday, January 15, 2024')
+ae(_dtf.strftime('%I:%M %p'),          '02:05 PM')
+
+# ── 31. datetime class min/max/resolution ────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ok(isinstance(datetime.min, datetime))
+ok(isinstance(datetime.max, datetime))
+ae(datetime.min.year,  MINYEAR)
+ae(datetime.max.year,  MAXYEAR)
+ae(datetime.max.hour,  23)
+ae(datetime.max.microsecond, 999999)
+
+# ── 32. isinstance and subclass checks ───────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ok(isinstance(date(2024, 1, 1),          date))
+ok(isinstance(datetime(2024, 1, 1),      date))       # datetime IS-A date
+ok(isinstance(datetime(2024, 1, 1),      datetime))
+ok(not isinstance(date(2024, 1, 1),      datetime))   # date is NOT-A datetime
+ok(isinstance(time(12, 0),               time))
+ok(isinstance(timedelta(1),              timedelta))
+
+# ── 33. date.ctime ───────────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(date(2024, 1, 15).ctime(), 'Mon Jan 15 00:00:00 2024')
+
+# ── 34. datetime.ctime ───────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+
+ae(datetime(2024, 1, 15, 9, 5, 3).ctime(), 'Mon Jan 15 09:05:03 2024')
+
+# ── 35. Validation errors ────────────────────────────────────────────────────
+# STATUS: ✓ WORKS
+# assrt.throws(fn) returns undefined on success; call it directly (not ok-wrapped)
+
+throws(def(): date(0, 1, 1);)           # year < MINYEAR
+throws(def(): date(2024, 0, 1);)        # month < 1
+throws(def(): date(2024, 13, 1);)       # month > 12
+throws(def(): date(2023, 2, 29);)       # Feb 29 in non-leap year
+throws(def(): time(24, 0, 0);)          # hour > 23
+throws(def(): time(0, 60, 0);)          # minute > 59
+throws(def(): datetime(2024, 1, 1, 0, 0, 60);)  # second > 59

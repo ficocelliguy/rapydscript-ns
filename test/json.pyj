@@ -1,0 +1,196 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# json.pyj
+# Tests for the json standard library module.
+
+from json import dumps, loads, dump, load, JSONDecodeError
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+throws = assrt.throws
+
+# ── 1. dumps — basic types ────────────────────────────────────────────────────
+
+ae(dumps(None),        'null')
+ae(dumps(True),        'true')
+ae(dumps(False),       'false')
+ae(dumps(42),          '42')
+ae(dumps(3.14),        '3.14')
+ae(dumps('hello'),     '"hello"')
+ae(dumps('with "quotes"'), '"with \\"quotes\\""')
+
+# ── 2. dumps — collections ────────────────────────────────────────────────────
+
+ae(dumps([]),          '[]')
+ae(dumps([1, 2, 3]),   '[1,2,3]')
+ae(dumps({}),          '{}')
+
+# Object with single key (no ordering ambiguity)
+_d1 = dumps({'a': 1})
+ae(_d1, '{"a":1}')
+
+# ── 3. dumps — indent ─────────────────────────────────────────────────────────
+
+_pretty = dumps([1, 2], indent=2)
+ok(_pretty.indexOf('\n') >= 0, 'indented output should contain newlines')
+ok(_pretty.indexOf('  ') >= 0, 'indented output should contain spaces')
+
+# ── 4. dumps — sort_keys ──────────────────────────────────────────────────────
+
+_sk = dumps({'b': 2, 'a': 1}, sort_keys=True)
+ae(_sk, '{"a":1,"b":2}')
+
+# Nested sort_keys
+_sk2 = dumps({'z': {'y': 3, 'x': 4}, 'a': 1}, sort_keys=True)
+ae(_sk2, '{"a":1,"z":{"x":4,"y":3}}')
+
+# ── 5. dumps — separators ─────────────────────────────────────────────────────
+
+# Compact form used in Python: separators=(',', ':')
+_compact = dumps({'a': 1, 'b': 2}, sort_keys=True, separators=(',', ':'))
+ae(_compact, '{"a":1,"b":2}')
+
+# ── 6. dumps — default callback ───────────────────────────────────────────────
+
+class _Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+def _point_default(obj):
+    if isinstance(obj, _Point):
+        return {'x': obj.x, 'y': obj.y}
+    raise TypeError('not serializable')
+
+_pt_json = dumps(_Point(3, 4), dflt=_point_default)
+_pt_obj  = loads(_pt_json)
+ae(_pt_obj.x, 3)
+ae(_pt_obj.y, 4)
+
+# ── 7. dumps — allow_nan ──────────────────────────────────────────────────────
+
+_nan_raised = False
+try:
+    dumps(v'NaN')
+except ValueError:
+    _nan_raised = True
+ok(_nan_raised, 'dumps(NaN) should raise ValueError by default')
+
+_inf_raised = False
+try:
+    dumps(v'Infinity')
+except ValueError:
+    _inf_raised = True
+ok(_inf_raised, 'dumps(Infinity) should raise ValueError by default')
+
+# allow_nan=True should not raise
+_nan_str = dumps(v'NaN', allow_nan=True)
+ok(_nan_str.length > 0, 'allow_nan=True should return a string')
+
+# ── 8. loads — basic types ────────────────────────────────────────────────────
+
+ae(loads('null'),    None)
+ae(loads('true'),    True)
+ae(loads('false'),   False)
+ae(loads('42'),      42)
+ae(loads('3.14'),    3.14)
+ae(loads('"hello"'), 'hello')
+
+# ── 9. loads — collections ────────────────────────────────────────────────────
+
+_arr = loads('[1, 2, 3]')
+ade(_arr, [1, 2, 3])
+
+_obj = loads('{"a": 1, "b": 2}')
+ae(_obj.a, 1)
+ae(_obj.b, 2)
+
+# ── 10. loads — nested structures ─────────────────────────────────────────────
+
+_nested = loads('{"users": [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]}')
+ae(_nested.users.length, 2)
+ae(_nested.users[0].name, 'Alice')
+ae(_nested.users[1].age,  25)
+
+# ── 11. loads — object_hook ───────────────────────────────────────────────────
+
+class _NameAge:
+    def __init__(self, d):
+        self.name = d.name if d.name else ''
+        self.age  = d.age  if d.age  else 0
+
+def _obj_hook(d):
+    if d.name is not None:
+        return _NameAge(d)
+    return d
+
+_h = loads('{"name": "Alice", "age": 30}', object_hook=_obj_hook)
+ok(isinstance(_h, _NameAge), 'object_hook should produce a _NameAge instance')
+ae(_h.name, 'Alice')
+ae(_h.age,  30)
+
+# ── 12. loads — object_pairs_hook ─────────────────────────────────────────────
+
+_pairs_result = []
+def _pairs_hook(pairs):
+    _pairs_result.push(pairs.length)
+    return pairs
+
+loads('{"x": 1, "y": 2}', object_pairs_hook=_pairs_hook)
+ae(_pairs_result[0], 2, 'object_pairs_hook should receive 2 pairs')
+
+# ── 13. loads — parse_float / parse_int ───────────────────────────────────────
+
+_floats = []
+def _capture_float(s):
+    _floats.push(s)
+    return float(s)
+
+loads('3.14', parse_float=_capture_float)
+ae(_floats.length, 1)
+ae(_floats[0], '3.14')
+
+_ints = []
+def _capture_int(s):
+    _ints.push(s)
+    return int(s)
+
+loads('42', parse_int=_capture_int)
+ae(_ints.length, 1)
+ae(_ints[0], '42')
+
+# ── 14. loads — JSONDecodeError ───────────────────────────────────────────────
+
+_err_raised = False
+try:
+    loads('{invalid json}')
+except JSONDecodeError as e:
+    _err_raised = True
+    ok(isinstance(e, JSONDecodeError), 'should be JSONDecodeError')
+    ok(isinstance(e, ValueError), 'JSONDecodeError should be a ValueError')
+ok(_err_raised, 'invalid JSON should raise JSONDecodeError')
+
+# ── 15. round-trip ────────────────────────────────────────────────────────────
+
+_original = {'name': 'test', 'values': [1, 2, 3], 'nested': {'ok': True}}
+_rt = loads(dumps(_original))
+ae(_rt.name,          _original.name)
+ade(_rt.values,       _original.values)
+ae(_rt.nested.ok,     _original.nested.ok)
+
+# ── 16. dump / load via file-like object ──────────────────────────────────────
+
+class _StringIO:
+    def __init__(self):
+        self._buf = ''
+    def write(self, s):
+        self._buf += s
+    def read(self):
+        return self._buf
+
+_sio = _StringIO()
+dump({'key': 'value'}, _sio)
+_loaded = load(_sio)
+ae(_loaded.key, 'value')

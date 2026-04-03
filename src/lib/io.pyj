@@ -1,0 +1,500 @@
+###########################################################
+# RapydScript Standard Library
+# Author: RapydScript-NS Contributors
+# Copyright 2024 RapydScript-NS Contributors
+# License: Apache License 2.0
+###########################################################
+
+# Python-compatible io module.
+#
+# Provides StringIO and BytesIO — in-memory file-like objects that implement
+# the same read/write/seek interface as Python's io.StringIO and io.BytesIO.
+#
+# Usage:
+#   from io import StringIO, BytesIO, UnsupportedOperation
+#
+#   sio = StringIO('hello')
+#   sio.seek(0)
+#   print(sio.read())       # 'hello'
+#
+#   bio = BytesIO(bytes([72, 105]))
+#   bio.seek(0)
+#   print(bio.read())       # bytes([72, 105])
+#
+# Implementation notes:
+#   - StringIO is backed by a plain JS string with an integer position cursor.
+#   - BytesIO is backed by a plain JS array of integers (0-255), with read()
+#     returning a bytes() object.
+#   - write() at a position in the middle of the buffer overwrites bytes in
+#     place (matching Python semantics); write() past the end zero-pads.
+#   - The `closed` attribute is a plain instance variable (not a property),
+#     since RapydScript does not support @property descriptors.
+#   - `newline` parameter to StringIO is accepted for API compatibility but
+#     not processed (universal newline translation is not performed).
+
+
+# ---------------------------------------------------------------------------
+# Internal JS helper
+# ---------------------------------------------------------------------------
+
+v"""
+// Convert a bytes-like value to a plain JS array of integers.
+// Handles: ρσ_bytes / ρσ_bytearray (._data), Uint8Array, Int8Array,
+//          plain JS Array, and strings (latin-1 codepoints).
+function _io_bytes_to_array(b) {
+    if (b === null || b === undefined) return [];
+    // RapydScript bytes / bytearray carry their data in ._data
+    if (b._data !== undefined && b._data !== null) {
+        return b._data.slice();
+    }
+    if (b instanceof Uint8Array || b instanceof Int8Array) {
+        var r = [];
+        for (var i = 0; i < b.length; i++) r.push(b[i] & 0xFF);
+        return r;
+    }
+    if (Array.isArray(b)) {
+        return b.slice();
+    }
+    if (typeof b === 'string') {
+        var r2 = [];
+        for (var j = 0; j < b.length; j++) r2.push(b.charCodeAt(j) & 0xFF);
+        return r2;
+    }
+    // fallback: try length-indexed access
+    var r3 = [];
+    for (var k = 0; k < (b.length || 0); k++) r3.push((b[k] | 0) & 0xFF);
+    return r3;
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+class UnsupportedOperation(Exception):
+    """Raised when an unsupported IO operation is attempted."""
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Base class
+# ---------------------------------------------------------------------------
+
+class IOBase:
+    """Minimal base class shared by StringIO and BytesIO."""
+
+    def __init__(self):
+        self.closed = False
+
+    def _check_closed(self):
+        if self.closed:
+            raise ValueError('I/O operation on closed file.')
+
+    def close(self):
+        """Mark the stream as closed."""
+        self.closed = True
+
+    def readable(self):
+        """Return True — StringIO/BytesIO are always readable."""
+        return True
+
+    def writable(self):
+        """Return True — StringIO/BytesIO are always writable."""
+        return True
+
+    def seekable(self):
+        """Return True — StringIO/BytesIO are always seekable."""
+        return True
+
+    def __enter__(self):
+        self._check_closed()
+        return self
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        self.close()
+        return False
+
+
+# ---------------------------------------------------------------------------
+# StringIO
+# ---------------------------------------------------------------------------
+
+class StringIO(IOBase):
+    """
+    In-memory text stream backed by a string.
+
+    Mirrors the interface of Python's io.StringIO:
+      read([size])      — read up to *size* characters (-1 or None = all)
+      readline([size])  — read one line (up to *size* chars)
+      readlines([hint]) — read all lines; stop early when total ≥ hint
+      write(s)          — write string *s* at the current position
+      writelines(lines) — write each item in *lines*
+      getvalue()        — return the full buffer contents
+      seek(pos[, whence]) — reposition (0=absolute, 1=relative, 2=from end)
+      tell()            — return the current position
+      truncate([pos])   — truncate buffer at *pos* (default: current pos)
+      close()           — mark the stream as closed
+      closed            — True after close()
+
+    Example::
+
+        sio = StringIO()
+        sio.write('hello ')
+        sio.write('world')
+        sio.seek(0)
+        print(sio.read())   # 'hello world'
+
+    The stream also works as a context manager::
+
+        with StringIO('data') as f:
+            text = f.read()
+    """
+
+    def __init__(self, initial_value='', newline='\n'):
+        IOBase.__init__(self)
+        self._buf = str(initial_value) if initial_value is not None else ''
+        self._pos = 0
+
+    def getvalue(self):
+        """Return the entire contents of the buffer as a string."""
+        self._check_closed()
+        return self._buf
+
+    def read(self, size=-1):
+        """
+        Read up to *size* characters from the current position.
+
+        If *size* is -1 or None, read until end of stream.
+        Returns the data as a string.
+        """
+        self._check_closed()
+        buflen = len(self._buf)
+        if self._pos >= buflen:
+            return ''
+        if size is None or size < 0:
+            result = self._buf[self._pos:]
+            self._pos = buflen
+        else:
+            end = min(self._pos + size, buflen)
+            result = self._buf[self._pos:end]
+            self._pos = end
+        return result
+
+    def readline(self, size=-1):
+        """
+        Read until a newline or end of stream.
+
+        If *size* is given and non-negative, read at most *size* characters.
+        The trailing newline is included in the returned string.
+        """
+        self._check_closed()
+        buflen = len(self._buf)
+        if self._pos >= buflen:
+            return ''
+        nl = self._buf.indexOf('\n', self._pos)
+        if nl == -1:
+            end = buflen
+        else:
+            end = nl + 1
+        if size is not None and size >= 0:
+            limit = self._pos + size
+            if limit < end:
+                end = limit
+        result = self._buf[self._pos:end]
+        self._pos = end
+        return result
+
+    def readlines(self, hint=-1):
+        """
+        Read and return a list of lines from the stream.
+
+        *hint* is the approximate number of bytes/characters to read;
+        reading stops once the accumulated size reaches or exceeds *hint*.
+        """
+        self._check_closed()
+        lines = []
+        total = 0
+        while self._pos < len(self._buf):
+            line = self.readline()
+            lines.append(line)
+            total += len(line)
+            if hint is not None and hint >= 0 and total >= hint:
+                break
+        return lines
+
+    def write(self, s):
+        """
+        Write the string *s* to the stream at the current position.
+
+        The position is advanced by the number of characters written.
+        Returns the number of characters written.
+        """
+        self._check_closed()
+        s = str(s)
+        n = len(s)
+        if n == 0:
+            return 0
+        pos = self._pos
+        buflen = len(self._buf)
+        if pos >= buflen:
+            # Append (may need zero-padding for gaps)
+            if pos > buflen:
+                # Gap: fill with null characters like Python does
+                self._buf += v'"\x00".repeat(pos - buflen)'
+            self._buf += s
+        else:
+            # Overwrite in place (do not extend by skipping)
+            self._buf = self._buf[:pos] + s + self._buf[pos + n:]
+        self._pos = pos + n
+        return n
+
+    def writelines(self, lines):
+        """Write each item from *lines* to the stream. No newlines are added."""
+        self._check_closed()
+        for line in lines:
+            self.write(line)
+
+    def seek(self, pos, whence=0):
+        """
+        Change the stream position.
+
+        *whence* controls the reference point:
+          0 — absolute position (default)
+          1 — relative to the current position
+          2 — relative to the end of the stream
+        Returns the new absolute position.
+        """
+        self._check_closed()
+        if whence == 0:
+            new_pos = pos
+        elif whence == 1:
+            new_pos = self._pos + pos
+        elif whence == 2:
+            new_pos = len(self._buf) + pos
+        else:
+            raise ValueError('Invalid whence: ' + str(whence))
+        self._pos = max(0, new_pos)
+        return self._pos
+
+    def tell(self):
+        """Return the current stream position."""
+        self._check_closed()
+        return self._pos
+
+    def truncate(self, pos=None):
+        """
+        Truncate the file to at most *pos* characters.
+
+        If *pos* is omitted or None, truncate at the current position.
+        Returns the new size.  The stream position is not changed.
+        """
+        self._check_closed()
+        if pos is None:
+            pos = self._pos
+        if pos < 0:
+            raise ValueError('truncate size must be non-negative')
+        self._buf = self._buf[:pos]
+        return pos
+
+    def __iter__(self):
+        """Iterate over lines (starting from the current position)."""
+        self._check_closed()
+        return iter(self.readlines())
+
+    def __repr__(self):
+        return '<_io.StringIO object>'
+
+
+# ---------------------------------------------------------------------------
+# BytesIO
+# ---------------------------------------------------------------------------
+
+class BytesIO(IOBase):
+    """
+    In-memory binary stream backed by a bytes buffer.
+
+    Mirrors the interface of Python's io.BytesIO:
+      read([size])      — return up to *size* bytes (-1 or None = all)
+      readline([size])  — read one line of bytes
+      readlines([hint]) — read all lines as a list of bytes objects
+      write(b)          — write bytes-like object *b* at current position
+      writelines(lines) — write each item in *lines*
+      getvalue()        — return the full buffer as a bytes object
+      seek(pos[, whence]) — reposition (0=absolute, 1=relative, 2=from end)
+      tell()            — return the current position
+      truncate([pos])   — truncate buffer at *pos* (default: current pos)
+      close()           — mark the stream as closed
+      closed            — True after close()
+
+    The *initial_bytes* argument may be a ``bytes``, ``bytearray``,
+    ``Uint8Array``, or a plain list of integers.
+
+    Example::
+
+        bio = BytesIO()
+        bio.write(bytes([1, 2, 3]))
+        bio.seek(0)
+        data = bio.read()   # bytes([1, 2, 3])
+
+    The stream also works as a context manager::
+
+        with BytesIO(bytes([0x48, 0x69])) as f:
+            f.seek(0)
+            print(f.read())   # bytes([72, 105])
+    """
+
+    def __init__(self, initial_bytes=None):
+        IOBase.__init__(self)
+        self._pos = 0
+        if initial_bytes is None:
+            self._data = []
+        else:
+            self._data = v'_io_bytes_to_array(initial_bytes)'
+
+    def getvalue(self):
+        """Return the entire contents of the buffer as a bytes object."""
+        self._check_closed()
+        return bytes(self._data)
+
+    def read(self, size=-1):
+        """
+        Read up to *size* bytes from the current position.
+
+        If *size* is -1 or None, read until end of stream.
+        Returns a bytes object.
+        """
+        self._check_closed()
+        datalen = self._data.length
+        if self._pos >= datalen:
+            return bytes()
+        if size is None or size < 0:
+            result = self._data.slice(self._pos)
+            self._pos = datalen
+        else:
+            end = min(self._pos + size, datalen)
+            result = self._data.slice(self._pos, end)
+            self._pos = end
+        return bytes(result)
+
+    def readline(self, size=-1):
+        """
+        Read bytes until a b'\\n' byte or end of stream.
+
+        If *size* is given and non-negative, read at most *size* bytes.
+        The trailing newline byte (0x0a) is included in the result.
+        Returns a bytes object.
+        """
+        self._check_closed()
+        datalen = self._data.length
+        if self._pos >= datalen:
+            return bytes()
+        # search for newline (0x0a)
+        end = datalen
+        for v'var i = this._pos; i < datalen; i++':
+            if self._data[i] == 10:
+                end = i + 1
+                break
+        if size is not None and size >= 0:
+            limit = self._pos + size
+            if limit < end:
+                end = limit
+        result = self._data.slice(self._pos, end)
+        self._pos = end
+        return bytes(result)
+
+    def readlines(self, hint=-1):
+        """
+        Read and return a list of bytes objects, one per line.
+
+        Reading stops once the accumulated byte count reaches or exceeds *hint*
+        (if *hint* is positive).
+        """
+        self._check_closed()
+        lines = []
+        total = 0
+        while self._pos < self._data.length:
+            line = self.readline()
+            lines.append(line)
+            total += len(line)
+            if hint is not None and hint >= 0 and total >= hint:
+                break
+        return lines
+
+    def write(self, b):
+        """
+        Write bytes-like object *b* to the stream at the current position.
+
+        If the write goes past the end of the current buffer, the buffer is
+        zero-extended.  Returns the number of bytes written.
+        """
+        self._check_closed()
+        arr = v'_io_bytes_to_array(b)'
+        n = arr.length
+        if n == 0:
+            return 0
+        pos = self._pos
+        end_pos = pos + n
+        # Zero-extend if needed
+        while self._data.length < end_pos:
+            self._data.push(0)
+        for v'var i = 0; i < n; i++':
+            self._data[pos + i] = arr[i]
+        self._pos = end_pos
+        return n
+
+    def writelines(self, lines):
+        """Write each bytes-like item from *lines* to the stream."""
+        self._check_closed()
+        for line in lines:
+            self.write(line)
+
+    def seek(self, pos, whence=0):
+        """
+        Change the stream position.
+
+        *whence* controls the reference point:
+          0 — absolute position (default)
+          1 — relative to the current position
+          2 — relative to the end of the stream
+        Returns the new absolute position.
+        """
+        self._check_closed()
+        if whence == 0:
+            new_pos = pos
+        elif whence == 1:
+            new_pos = self._pos + pos
+        elif whence == 2:
+            new_pos = self._data.length + pos
+        else:
+            raise ValueError('Invalid whence: ' + str(whence))
+        self._pos = max(0, new_pos)
+        return self._pos
+
+    def tell(self):
+        """Return the current stream position."""
+        self._check_closed()
+        return self._pos
+
+    def truncate(self, pos=None):
+        """
+        Truncate the stream to at most *pos* bytes.
+
+        If *pos* is omitted or None, truncate at the current position.
+        Returns the new size.  The stream position is not changed.
+        """
+        self._check_closed()
+        if pos is None:
+            pos = self._pos
+        if pos < 0:
+            raise ValueError('truncate size must be non-negative')
+        self._data = self._data.slice(0, pos)
+        return pos
+
+    def __iter__(self):
+        """Iterate over lines (starting from the current position)."""
+        self._check_closed()
+        return iter(self.readlines())
+
+    def __repr__(self):
+        return '<_io.BytesIO object>'

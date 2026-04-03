@@ -1,0 +1,362 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# contextlib.pyj — tests for the contextlib standard library module.
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+from contextlib import (
+    AbstractContextManager, contextmanager, closing,
+    nullcontext, suppress, ExitStack
+)
+
+
+# ── 1. AbstractContextManager ─────────────────────────────────────────────────
+
+class _SimpleCM(AbstractContextManager):
+    def __init__(self):
+        self.exited = False
+        self.exc_type = None
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        self.exited = True
+        self.exc_type = exc_type
+        return False
+
+_cm = _SimpleCM()
+with _cm as val:
+    ae(val, _cm)           # __enter__ returns self
+
+ok(_cm.exited)
+ae(_cm.exc_type, None)     # no exception
+
+# AbstractContextManager with default __exit__ (no-op)
+class _DefaultExit(AbstractContextManager):
+    pass
+
+_de = _DefaultExit()
+with _de as v:
+    ae(v, _de)
+
+# ── 2. closing ────────────────────────────────────────────────────────────────
+
+class _Closeable:
+    def __init__(self):
+        self.closed = False
+    def close(self):
+        self.closed = True
+
+_obj = _Closeable()
+with closing(_obj) as c:
+    ae(c, _obj)
+    ok(not c.closed)
+ok(_obj.closed)            # close() called on exit
+
+# close() is called even when an exception occurs
+_obj2 = _Closeable()
+_raised = False
+try:
+    with closing(_obj2):
+        raise ValueError('oops')
+except ValueError:
+    _raised = True
+ok(_raised)
+ok(_obj2.closed)           # still closed despite exception
+
+# ── 3. nullcontext ────────────────────────────────────────────────────────────
+
+with nullcontext() as v:
+    ae(v, None)
+
+with nullcontext(42) as v:
+    ae(v, 42)
+
+with nullcontext('hello') as s:
+    ae(s, 'hello')
+
+# ── 4. suppress ───────────────────────────────────────────────────────────────
+
+# Suppress a matching exception — execution continues after the with block
+_reached = False
+with suppress(ValueError):
+    raise ValueError('ignored')
+_reached = True
+ok(_reached)
+
+# Suppress one of several listed types
+_reached2 = False
+with suppress(KeyError, ValueError):
+    raise KeyError('ignored')
+_reached2 = True
+ok(_reached2)
+
+# Non-matching exception propagates
+_non_match = False
+try:
+    with suppress(KeyError):
+        raise ValueError('not suppressed')
+except ValueError:
+    _non_match = True
+ok(_non_match)
+
+# No exception — block runs normally
+_no_exc = False
+with suppress(ValueError):
+    _no_exc = True
+ok(_no_exc)
+
+# suppress returns self from __enter__
+with suppress(TypeError) as ctx:
+    ok(ctx is not None)
+
+# ── 5. contextmanager ─────────────────────────────────────────────────────────
+
+# Basic: yield value becomes the `as` target
+@contextmanager
+def _cm_basic(val):
+    yield val
+
+with _cm_basic(99) as v:
+    ae(v, 99)
+
+# setup/teardown order
+_log = []
+
+@contextmanager
+def _cm_log(name):
+    _log.push('enter:' + name)
+    try:
+        yield name
+    finally:
+        _log.push('exit:' + name)
+
+with _cm_log('x') as v:
+    ae(v, 'x')
+    _log.push('body')
+
+ade(_log, ['enter:x', 'body', 'exit:x'])
+
+# exception in the body is thrown into the generator and re-raised if not caught
+_teardown_ran = False
+_body_exc_caught = False
+
+@contextmanager
+def _cm_reraise():
+    global _teardown_ran
+    try:
+        yield 'val'
+    finally:
+        _teardown_ran = True
+
+try:
+    with _cm_reraise():
+        raise ValueError('oops')
+except ValueError:
+    _body_exc_caught = True
+ok(_teardown_ran)
+ok(_body_exc_caught)
+
+# generator catches the exception and suppresses it (returns True from __exit__)
+_suppress_log = []
+
+@contextmanager
+def _cm_suppress_exc():
+    try:
+        yield
+    except ValueError:
+        _suppress_log.push('caught ValueError')
+
+_after_suppress = False
+with _cm_suppress_exc():
+    raise ValueError('caught by generator')
+_after_suppress = True
+ok(_after_suppress)
+ade(_suppress_log, ['caught ValueError'])
+
+# contextmanager with setup / cleanup and no yield value
+_setup_done = False
+_cleanup_done = False
+
+@contextmanager
+def _cm_setup_cleanup():
+    global _setup_done, _cleanup_done
+    _setup_done = True
+    yield
+    _cleanup_done = True
+
+with _cm_setup_cleanup():
+    ok(_setup_done)
+
+ok(_cleanup_done)
+
+# nested contextmanagers
+_nest_log = []
+
+@contextmanager
+def _cm_nest(label):
+    _nest_log.push('in:' + label)
+    yield label
+    _nest_log.push('out:' + label)
+
+with _cm_nest('a') as a:
+    with _cm_nest('b') as b:
+        ae(a, 'a')
+        ae(b, 'b')
+
+ade(_nest_log, ['in:a', 'in:b', 'out:b', 'out:a'])
+
+# ── 6. ExitStack ──────────────────────────────────────────────────────────────
+
+# Basic usage as a context manager
+_es_entered = False
+_es_exited = False
+
+class _TrackedCM:
+    def __init__(self, name):
+        self.name = name
+        self.entered = False
+        self.exited = False
+    def __enter__(self):
+        self.entered = True
+        return self.name
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        self.exited = True
+        return False
+
+_cm_a = _TrackedCM('a')
+_cm_b = _TrackedCM('b')
+
+with ExitStack() as stack:
+    va = stack.enter_context(_cm_a)
+    vb = stack.enter_context(_cm_b)
+    ae(va, 'a')
+    ae(vb, 'b')
+    ok(_cm_a.entered)
+    ok(_cm_b.entered)
+
+ok(_cm_a.exited)
+ok(_cm_b.exited)
+
+# LIFO exit order
+_exit_order = []
+
+class _OrderedCM:
+    def __init__(self, label):
+        self.label = label
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        _exit_order.push(self.label)
+        return False
+
+with ExitStack() as stack:
+    stack.enter_context(_OrderedCM('first'))
+    stack.enter_context(_OrderedCM('second'))
+    stack.enter_context(_OrderedCM('third'))
+
+ade(_exit_order, ['third', 'second', 'first'])
+
+# callback() is called on exit
+_cb_called = False
+_cb_arg = None
+
+def _my_callback(x):
+    global _cb_called, _cb_arg
+    _cb_called = True
+    _cb_arg = x
+
+with ExitStack() as stack:
+    stack.callback(_my_callback, 'hello')
+
+ok(_cb_called)
+ae(_cb_arg, 'hello')
+
+# push() with a raw callable
+_push_called = False
+
+def _raw_exit(exc_type=None, exc_val=None, exc_tb=None):
+    global _push_called
+    _push_called = True
+    return False
+
+with ExitStack() as stack:
+    stack.push(_raw_exit)
+
+ok(_push_called)
+
+# push() with a context manager object (does not call __enter__)
+_push_cm = _TrackedCM('pushed')
+with ExitStack() as stack:
+    stack.push(_push_cm)
+
+ok(not _push_cm.entered)    # __enter__ was NOT called by push()
+ok(_push_cm.exited)         # __exit__ WAS called
+
+# exception in the with block is passed to registered __exit__ methods
+_exc_saw_exc = False
+
+class _SeeExc:
+    def __enter__(self): return self
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        global _exc_saw_exc
+        if exc_type is not None:
+            _exc_saw_exc = True
+        return False          # don't suppress
+
+_exc_propagated = False
+try:
+    with ExitStack() as stack:
+        stack.enter_context(_SeeExc())
+        raise ValueError('test')
+except ValueError:
+    _exc_propagated = True
+
+ok(_exc_saw_exc)
+ok(_exc_propagated)
+
+# a cleanup that suppresses the exception
+_suppressed_by_stack = False
+
+class _SuppressCM:
+    def __enter__(self): return self
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        return True   # suppress whatever is active
+
+_after_stack_suppress = False
+with ExitStack() as stack:
+    stack.enter_context(_SuppressCM())
+    raise KeyError('suppressed by stack')
+_after_stack_suppress = True
+ok(_after_stack_suppress)
+
+# close() works outside of a `with` block
+_close_log = []
+
+class _CloseTracked:
+    def __enter__(self): return self
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        _close_log.push('closed')
+        return False
+
+stack2 = ExitStack()
+stack2.enter_context(_CloseTracked())
+stack2.close()
+ade(_close_log, ['closed'])
+
+# ── 7. Multiple context managers in one `with` statement ─────────────────────
+
+# This exercises the compiler's multi-clause `with` support alongside our CMs
+_multi_log = []
+
+@contextmanager
+def _cm_multi(label):
+    _multi_log.push('enter:' + label)
+    yield label
+    _multi_log.push('exit:' + label)
+
+with _cm_multi('p') as p, _cm_multi('q') as q:
+    ae(p, 'p')
+    ae(q, 'q')
+
+ade(_multi_log, ['enter:p', 'enter:q', 'exit:q', 'exit:p'])

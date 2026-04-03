@@ -3348,6 +3348,7 @@ One of Python's main strengths is the number of libraries available to the devel
 	itertools           # count, cycle, repeat, accumulate, chain, compress, dropwhile, filterfalse,
 	                    # groupby, islice, pairwise, starmap, takewhile, zip_longest,
 	                    # product, permutations, combinations, combinations_with_replacement
+	io                  # StringIO (in-memory text stream), BytesIO (in-memory binary stream)
 
 For the most part, the logic implemented in these libraries functions identically to the Python versions. I'd be happy to include more libraries, if other members of the community want them. However, unlike most other Python-to-JavaScript compilers, RapydScript doesn't need them to be complete since there are already tons of available JavaScript libraries that it can use natively.
 
@@ -4016,7 +4017,7 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 
 ---
 
-### Not Supported
+### Python Features That Are Not Supported
 
 | Feature                               | Notes                                                                                   |
 |---------------------------------------|-----------------------------------------------------------------------------------------|
@@ -4050,13 +4051,13 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `dataclasses` | ✅           | `@dataclass`, `field()`, `asdict()`, `astuple()`, `replace()`, `fields()`, `is_dataclass()`, `MISSING` in `src/lib/dataclasses.pyj`; `frozen=True`, `order=True`, inheritance supported; note: `field()` first positional arg is the default value (JS reserved word `default` cannot be used as a kwarg) |
 | `enum`        | ✅           | `Enum` base class in `src/lib/enum.pyj`; `.name`, `.value`, iteration, `isinstance` checks; `IntEnum`/`Flag` not available |
 | `abc`         | ✅           | `ABC`, `@abstractmethod`, `Protocol`, `@runtime_checkable`, `ABCMeta` (informational), `get_cache_token()` in `src/lib/abc.pyj`; abstract method enforcement via `__init__` guard; `ABC.register()` for virtual subclasses with isinstance support; `Symbol.hasInstance` enables structural isinstance for `@runtime_checkable` protocols; `ABCMeta` metaclass not usable (no metaclass support), use `ABC` base class instead |
-| `contextlib`  | ❌           | `contextmanager`, `suppress`, `ExitStack`, `asynccontextmanager` not available                |
+| `contextlib`  | ✅           | `AbstractContextManager`, `@contextmanager`, `closing`, `nullcontext`, `suppress`, `ExitStack` in `src/lib/contextlib.pyj`; generator-based context managers via `@contextmanager`; `asynccontextmanager` not available |
+| `datetime`    | ✅           | `date`, `time`, `datetime`, `timedelta`, `MINYEAR`, `MAXYEAR` in `src/lib/datetime.pyj`; construction, `isoformat()`, `fromisoformat()`, `today()`/`now()`, `combine()`, arithmetic (via `__add__`/`__sub__`; operators need `overload_operators`), comparisons, `replace()`, `strftime()` (%Y %m %d %H %M %S %f %A %a %B %b %j %p %I %%); no tzinfo/timezone support |
+| `json`        | ✅           | `dumps()`, `loads()`, `dump()`, `load()`, `JSONDecodeError` in `src/lib/json.pyj`; `indent`, `sort_keys`, `separators`, `dflt` (Python's `default`) callback, `object_hook`, `object_pairs_hook`, `parse_float`, `parse_int` supported; backed by the JS `JSON` global; note: `default` is a JS reserved word — use `dflt=` instead |
+| `io`          | ✅           | `StringIO`, `BytesIO`, `UnsupportedOperation` in `src/lib/io.pyj`; `read([size])`, `readline([size])`, `readlines([hint])`, `write()`, `writelines()`, `seek(pos[, whence])`, `tell()`, `truncate([pos])`, `getvalue()`, `close()`, `closed`; context manager support; `readable()`, `writable()`, `seekable()` return True; `newline` parameter accepted for API compatibility |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
-| `json`        | ❌           | No Python wrapper; JS `JSON.parse` / `JSON.stringify` work directly via verbatim JS           |
-| `datetime`    | ❌           | `date`, `time`, `datetime`, `timedelta` not available                                         |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `asyncio`     | ❌           | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await`    |
-| `io`          | ❌           | `StringIO`, `BytesIO` not available                                                           |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |
 | `hmac`        | ❌           | Keyed hashing not available                                                                   |

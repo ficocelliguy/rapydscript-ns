@@ -1,0 +1,379 @@
+# vim:fileencoding=utf-8
+# License: BSD
+# RapydScript implementation of Python's contextlib standard library.
+#
+# Supported:
+#   AbstractContextManager — base class with default __enter__ (returns self)
+#   @contextmanager        — turn a generator function into a context manager
+#   closing(thing)         — calls thing.close() on exit
+#   nullcontext(val)       — no-op context manager; __enter__ returns val
+#   suppress(*excs)        — silently swallow specified exception types
+#   ExitStack              — dynamic LIFO stack of context managers / callbacks
+#
+# Usage:
+#   from contextlib import contextmanager, suppress, closing, nullcontext, ExitStack
+#
+#   @contextmanager
+#   def managed(name):
+#       print('enter', name)
+#       try:
+#           yield name.upper()
+#       finally:
+#           print('exit', name)
+#
+#   with managed('hello') as val:
+#       print(val)          # HELLO
+#   # prints: enter hello / HELLO / exit hello
+#
+#   with suppress(ValueError):
+#       int('not-a-number')
+#   # no exception raised
+#
+#   stack = ExitStack()
+#   with stack:
+#       f = stack.enter_context(some_cm())
+#
+# Implementation notes:
+#   - contextmanager uses the JS generator protocol (.next() / .throw()).
+#     Since 'throw' is a reserved JS keyword it cannot appear as a bare
+#     identifier in RapydScript method-call syntax; the call is made via a
+#     verbatim v"""...""" block.
+#   - The with-statement machinery in RapydScript calls __exit__() (0 args)
+#     when no exception occurred and __exit__(exc_type, exc_val, exc_tb)
+#     (3 args) when one did.  All __exit__ implementations here use default
+#     parameters (=None) so both signatures work transparently.
+#   - ExitStack.__exit__ may raise a new exception that replaces the original;
+#     the with-statement machinery propagates whatever __exit__ throws.
+
+
+# RuntimeError is not defined in the RapydScript baselib; define it here so
+# that the contextmanager helpers can raise it for protocol violations.
+class RuntimeError(Exception):
+    pass
+
+
+class AbstractContextManager:
+    """
+    ABC for context managers that provides a default __enter__ returning self.
+
+    Subclasses must override __exit__.  A default no-op __exit__ is also
+    provided so that plain subclasses work without override if no cleanup is
+    needed.
+
+    Example::
+
+        class Timed(AbstractContextManager):
+            def __enter__(self):
+                self._start = Date.now()
+                return self
+            def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+                print('elapsed:', Date.now() - self._start, 'ms')
+                return False
+    """
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        return None
+
+
+class closing:
+    """
+    Context manager that calls thing.close() when the block exits.
+
+    Equivalent to Python's contextlib.closing.
+
+    Example::
+
+        from contextlib import closing
+
+        with closing(open_connection()) as conn:
+            conn.send(data)
+        # conn.close() is guaranteed to be called
+    """
+
+    def __init__(self, thing):
+        self.thing = thing
+
+    def __enter__(self):
+        return self.thing
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        self.thing.close()
+        return False
+
+
+class nullcontext:
+    """
+    No-op context manager.  __enter__ returns enter_result (default None).
+
+    Useful as a conditional stand-in when you optionally want a real context
+    manager::
+
+        cm = open_lock() if need_lock else nullcontext()
+        with cm:
+            do_work()
+
+    Also handy for parameterised tests::
+
+        with nullcontext(42) as val:
+            assert val == 42
+    """
+
+    def __init__(self, enter_result=None):
+        self.enter_result = enter_result
+
+    def __enter__(self):
+        return self.enter_result
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        return None
+
+
+class suppress:
+    """
+    Context manager that silently suppresses the listed exception types.
+
+    If a listed exception is raised inside the block the block is exited
+    and execution continues after the with statement.  Any other exception
+    type propagates normally.
+
+    Example::
+
+        from contextlib import suppress
+
+        with suppress(KeyError, ValueError):
+            d = {}
+            _ = d['missing']   # KeyError suppressed
+        # execution continues here
+    """
+
+    def __init__(self, *exceptions):
+        self._exceptions = exceptions
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        if exc_type is None:
+            return False
+        for exc_class in self._exceptions:
+            if isinstance(exc_val, exc_class):
+                return True
+        return False
+
+
+def contextmanager(func):
+    """
+    Decorator that turns a generator function into a context manager.
+
+    The decorated function must contain exactly one ``yield`` expression.
+    Everything before the yield is the __enter__ body; everything after is
+    the __exit__ body.  The yielded value is bound to the ``as`` target.
+
+    Exception handling works as in Python: if an exception is raised inside
+    the with block it is thrown into the generator at the yield point.  The
+    generator may catch and suppress it (by not re-raising) or let it
+    propagate.
+
+    Example::
+
+        from contextlib import contextmanager
+
+        @contextmanager
+        def temp_value(d, key, val):
+            old = d.get(key)
+            d[key] = val
+            try:
+                yield val
+            finally:
+                if old is None:
+                    del d[key]
+                else:
+                    d[key] = old
+
+        d = {}
+        with temp_value(d, 'x', 99) as v:
+            assert v == 99
+            assert d['x'] == 99
+        assert 'x' not in d
+    """
+
+    def _make_cm(*args, **kwargs):
+        gen = func(*args, **kwargs)
+
+        class _GeneratorContextManager:
+
+            def __enter__(self):
+                r = gen.next()
+                if r.done:
+                    raise RuntimeError('generator did not yield')
+                return r.value
+
+            def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+                if exc_type is None:
+                    # No-exception path: advance the generator to completion.
+                    r = gen.next()
+                    if not r.done:
+                        raise RuntimeError('generator did not stop after yield')
+                    return False
+                # Exception path: throw exc_val into the generator.
+                # 'throw' is a reserved JS keyword so we use verbatim JS.
+                v"""
+                var ρσ_cm_result;
+                try {
+                    ρσ_cm_result = gen.throw(exc_val);
+                } catch (ρσ_cm_err) {
+                    // Generator did not catch the exception (re-raised or threw a
+                    // different one).  If it's the same object, return false so
+                    // the with-machinery re-raises it.  Otherwise let the new
+                    // exception propagate from __exit__.
+                    if (ρσ_cm_err === exc_val) {
+                        return false;
+                    }
+                    throw ρσ_cm_err;
+                }
+                // Generator caught the exception and returned normally.
+                if (!ρσ_cm_result.done) {
+                    throw new RuntimeError('generator did not stop after throw()');
+                }
+                return true;
+                """
+
+        return _GeneratorContextManager()
+
+    return _make_cm
+
+
+class ExitStack:
+    """
+    Context manager for dynamic stacks of context managers and callbacks.
+
+    Maintains a LIFO stack of registered cleanup actions.  All registered
+    actions are guaranteed to run on exit, even if earlier ones raise.
+
+    Key methods:
+      enter_context(cm)          — enter *cm* and push its __exit__ for cleanup
+      push(exit_cb)              — push a raw (exc_type, exc_val, exc_tb) callback
+                                   or a context manager (its __exit__ is pushed)
+      callback(func, *a, **kw)   — push func(*a, **kw) as a no-exc callback
+      close()                    — trigger exit immediately (convenience)
+
+    Example::
+
+        from contextlib import ExitStack
+
+        with ExitStack() as stack:
+            files = [stack.enter_context(open_file(name)) for name in names]
+            # all files closed on exit, even if some raises
+
+        # Manually-built stack:
+        stack = ExitStack()
+        conn = stack.enter_context(get_connection())
+        stack.callback(log, 'connection cleaned up')
+        try:
+            use(conn)
+        finally:
+            stack.close()
+    """
+
+    def __init__(self):
+        self._exit_callbacks = []
+
+    def __enter__(self):
+        return self
+
+    def push(self, exit_or_cm):
+        """
+        Register an exit callback or a context manager.
+
+        If *exit_or_cm* has an ``__exit__`` attribute it is treated as a
+        context manager (its __exit__ is registered but __enter__ is NOT
+        called — use enter_context() if you need that).  Otherwise it must be
+        a callable with the ``(exc_type, exc_val, exc_tb)`` signature.
+
+        Returns *exit_or_cm* unchanged, so it can be used as a decorator.
+        """
+        if hasattr(exit_or_cm, '__exit__'):
+            _cm = exit_or_cm
+            def _cm_exit(exc_type=None, exc_val=None, exc_tb=None):
+                return _cm.__exit__(exc_type, exc_val, exc_tb)
+            self._exit_callbacks.append(_cm_exit)
+        else:
+            self._exit_callbacks.append(exit_or_cm)
+        return exit_or_cm
+
+    def enter_context(self, cm):
+        """
+        Enter a context manager and push its __exit__ for cleanup.
+
+        Returns the value returned by cm.__enter__().
+        """
+        result = cm.__enter__()
+        _cm2 = cm
+        def _cm2_exit(exc_type=None, exc_val=None, exc_tb=None):
+            return _cm2.__exit__(exc_type, exc_val, exc_tb)
+        self._exit_callbacks.append(_cm2_exit)
+        return result
+
+    def callback(self, func, *args, **kwargs):
+        """
+        Register a plain callback to run on exit, ignoring exception info.
+
+        The callback is called as func(*args, **kwargs) and its return value
+        is ignored.  Returns *func* unchanged.
+        """
+        stored_args = args
+        stored_kwargs = kwargs
+        def _plain_cb(exc_type=None, exc_val=None, exc_tb=None):
+            func(*stored_args, **stored_kwargs)
+            return False
+        self._exit_callbacks.append(_plain_cb)
+        return func
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        """
+        Run all registered cleanups in LIFO order.
+
+        Returns True if an active exception was suppressed by any cleanup.
+        If a cleanup raises, that exception becomes the active exception for
+        subsequent cleanups; if it is still active at the end it propagates
+        from __exit__ (replacing the original).
+        """
+        received_exc = exc_type is not None
+        suppressed = False
+
+        current_type = exc_type
+        current_val = exc_val
+        current_tb = exc_tb
+
+        new_exc = None
+        raised_new = False
+
+        while len(self._exit_callbacks) > 0:
+            cb = self._exit_callbacks.pop()
+            try:
+                result = cb(current_type, current_val, current_tb)
+                if result:
+                    suppressed = True
+                    current_type = None
+                    current_val = None
+                    current_tb = None
+            except Exception as e:
+                # Cleanup raised — this becomes the active exception.
+                new_exc = e
+                raised_new = True
+                current_type = e.__class__
+                current_val = e
+                current_tb = None
+                suppressed = False
+
+        if raised_new:
+            raise new_exc
+
+        return received_exc and suppressed
+
+    def close(self):
+        """Exit the stack without an active exception."""
+        self.__exit__(None, None, None)
