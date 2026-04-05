@@ -1,10 +1,12 @@
-version 0.9.1
+version 0.9.2
 =======================
   * Added the contextlib standard library
   * Added the datetime standard library
   * Added the io standard library
   * Added the json standard library
   * Added support for the `debugger` keyword 
+  * Added TypeScript definitions for compiler.js
+  * Simplified ExtraBuiltins interface
 
 version 0.9.0
 =======================
