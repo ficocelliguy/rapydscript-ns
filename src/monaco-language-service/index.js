@@ -112,7 +112,7 @@ class RapydScriptLanguageService {
         this._analyzer    = new SourceAnalyzer(compiler, options.pythonFlags);
 
         // Preserve extra builtin names so they survive addDts() rebuilds
-        this._extraBuiltinNames = options.extraBuiltins ? Object.keys(options.extraBuiltins) : [];
+        this._extraBuiltinNames = options.extraBuiltins || [];
         this._stdlibFiles = Object.assign({}, options.stdlibFiles || {});
 
         // DTS registry — load any files supplied at construction time
@@ -398,7 +398,7 @@ class RapydScriptLanguageService {
  * @param {object} [options.virtualFiles]    - map of module-name → source
  * @param {Array}  [options.dtsFiles]        - [{name, content}] d.ts files (Phase 6)
  * @param {number} [options.parseDelay=300]  - debounce ms
- * @param {object} [options.extraBuiltins]   - extra {name: true} globals to suppress undef warnings
+ * @param {string[]} [options.extraBuiltins] - extra global names to suppress undef warnings
  * @param {string} [options.pythonFlags]     - comma-separated python flags (e.g. "dict_literals,overload_getitem")
  * @returns {RapydScriptLanguageService}
  */

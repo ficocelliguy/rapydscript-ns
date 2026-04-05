@@ -609,7 +609,7 @@ function to_marker(msg, markerSeverity) {
 export class Diagnostics {
     /**
      * @param {object} compiler      - window.RapydScript (the compiled compiler)
-     * @param {object} [extraBuiltins] - additional symbol names to treat as defined
+     * @param {string[]} [extraBuiltins] - additional symbol names to treat as defined
      * @param {string} [pythonFlags]   - comma-separated python flags to enable globally
      *   (e.g. "dict_literals,overload_getitem").  Equivalent to a global
      *   `from __python__ import` at the top of every file.
@@ -630,7 +630,7 @@ export class Diagnostics {
 
         // Caller-supplied extra builtins (e.g. from d.ts globals)
         if (extraBuiltins) {
-            Object.keys(extraBuiltins).forEach(name => {
+            extraBuiltins.forEach(name => {
                 this._builtins[name] = true;
             });
         }

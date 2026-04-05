@@ -173,7 +173,7 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             name: "undef_suppressed_extra_builtins",
             description: "extraBuiltins option prevents a name from being flagged",
             run: function () {
-                var inst = new Diagnostics(RS, { MY_GLOBAL: true, ANOTHER: true });
+                var inst = new Diagnostics(RS, ['MY_GLOBAL', 'ANOTHER']);
                 var markers = inst.check("print(MY_GLOBAL)\nprint(ANOTHER)");
                 assert.deepStrictEqual(markers, []);
             },

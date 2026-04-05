@@ -5227,6 +5227,72 @@ assrt.equal(fib(15), 610)
         },
     },
 
+    // ── Strict-mode var declarations ─────────────────────────────────────
+
+    {
+        name: "comprehension_unpack_var_declared",
+        description: "list comprehension with tuple unpacking declares var ρσ_unpack",
+        src: [
+            "# globals: assrt",
+            "pairs = [('a', 1), ('b', 2), ('c', 3)]",
+            "result = [v for k, v in pairs if k != 'b']",
+            "assrt.deepEqual(result, [1, 3])",
+        ].join("\n"),
+        js_checks: [/var\s[^;]*ρσ_unpack/],
+    },
+
+    {
+        name: "comprehension_unpack_nested_clauses",
+        description: "nested comprehension with tuple unpacking in inner clause declares ρσ_unpack",
+        src: [
+            "# globals: assrt",
+            "groups = [[(1, 'a'), (2, 'b')], [(3, 'c')]]",
+            "result = [s for row in groups for n, s in row]",
+            "assrt.deepEqual(result, ['a', 'b', 'c'])",
+        ].join("\n"),
+        js_checks: [/var\s[^;]*ρσ_unpack/],
+    },
+
+    {
+        name: "with_statement_scope_declared",
+        description: "with statement ρσ_with_exception/ρσ_with_suppress are scope-declared (not implicit globals)",
+        src: [
+            "# globals: assrt",
+            "class CM:",
+            "    def __init__(self):",
+            "        self.entered = False",
+            "        self.exited = False",
+            "    def __enter__(self):",
+            "        self.entered = True",
+            "        return self",
+            "    def __exit__(self, exc_type, exc_val, exc_tb):",
+            "        self.exited = True",
+            "        return False",
+            "with CM() as c:",
+            "    assrt.ok(c.entered)",
+            "assrt.ok(c.exited)",
+        ].join("\n"),
+        js_checks: [/let\s[^;]*ρσ_with_exception/, /let\s[^;]*ρσ_with_suppress/],
+    },
+
+    {
+        name: "with_statement_suppresses_exception",
+        description: "with statement __exit__ returning True suppresses the exception",
+        src: [
+            "# globals: assrt",
+            "class Suppressor:",
+            "    def __enter__(self):",
+            "        return self",
+            "    def __exit__(self, exc_type, exc_val, exc_tb):",
+            "        return True",
+            "caught = False",
+            "with Suppressor():",
+            "    raise ValueError('boom')",
+            "    caught = True  # should not reach",
+            "assrt.ok(not caught, 'line after raise should not execute')",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

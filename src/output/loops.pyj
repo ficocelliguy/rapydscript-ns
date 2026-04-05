@@ -455,6 +455,15 @@ def print_list_comprehension(self, output):
                 body_out.assign("ρσ_Result")
                 body_out.print(result_obj)
             # Locally scope all loop variables (outer and inner clauses)
+            needs_unpack = is_node_type(self.init, AST_Array)
+            if not needs_unpack:
+                for clause in clauses:
+                    if is_node_type(clause.init, AST_Array):
+                        needs_unpack = True
+                        break
+            if needs_unpack:
+                body_out.comma()
+                body_out.print("ρσ_unpack")
             def decl_loop_vars(init_node):
                 # Recursively declare all leaf variable names from nested tuples/seqs
                 if is_node_type(init_node, AST_Array):

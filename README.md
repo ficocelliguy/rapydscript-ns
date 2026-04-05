@@ -3688,7 +3688,7 @@ when the editor is torn down.
 | `stdlibFiles` | `{name: source}` | `{}` | Like `virtualFiles` but treated as stdlib — always available and never produce bad-import warnings. |
 | `dtsFiles` | `[{name, content}]` | `[]` | TypeScript `.d.ts` files loaded at startup. |
 | `loadDts` | `(name) => Promise<string>` | — | Async callback for lazy-loading `.d.ts` content on demand. |
-| `extraBuiltins` | `{name: true}` | `{}` | Extra global names that suppress undefined-symbol warnings. |
+| `extraBuiltins` | `string[]` | `[]` | Extra global names that suppress undefined-symbol warnings. |
 | `pythonFlags` | string | — | Comma-separated Python flags to enable globally (e.g. `"dict_literals,overload_getitem"`). See [Python Flags](#python-flags) above. |
 
 ### Runtime API
