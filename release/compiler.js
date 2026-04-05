@@ -15126,7 +15126,7 @@ return this.__repr__();
         WHITESPACE_CHARS = make_predicate(characters("  \n\r\t\f\u000b​᠎           \u202f 　"));
         PUNC_BEFORE_EXPRESSION = make_predicate(characters("[{(,.;:"));
         PUNC_CHARS = make_predicate(characters("[]{}(),;:?"));
-        KEYWORDS = "as assert async await break class continue def del do elif else except finally for from global if import in is lambda new nonlocal pass raise return yield try while with or and not";
+        KEYWORDS = "as assert async await break class continue debugger def del do elif else except finally for from global if import in is lambda new nonlocal pass raise return yield try while with or and not";
         KEYWORDS_ATOM = "False None True";
         RESERVED_WORDS = "break case class catch const continue debugger default delete do else export extends finally for function if import in instanceof new return switch this throw try typeof var void while with yield implements static private package let public protected interface await null true false";
         KEYWORDS_BEFORE_EXPRESSION = "return yield new del raise elif else if";
@@ -16244,7 +16244,7 @@ return this.__repr__();
         var is_token = ρσ_modules.tokenizer.is_token;
         var RESERVED_WORDS = ρσ_modules.tokenizer.RESERVED_WORDS;
 
-        COMPILER_VERSION = "fd346949151ce69268600b19489d22e404377c38";
+        COMPILER_VERSION = "146ab479438eea3efe2870440ee9a4ef2bdd4319";
         PYTHON_FLAGS = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["dict_literals"] = true;

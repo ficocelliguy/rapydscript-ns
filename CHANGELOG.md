@@ -1,3 +1,11 @@
+version 0.9.1
+=======================
+  * Added the contextlib standard library
+  * Added the datetime standard library
+  * Added the io standard library
+  * Added the json standard library
+  * Added support for the `debugger` keyword 
+
 version 0.9.0
 =======================
   * All optional Python compatibility features are now enabled by default. See Python Feature Coverage from the README
