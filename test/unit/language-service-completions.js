@@ -87,6 +87,10 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
         require('path').join(__dirname, '../../src/lib/collections.pyj'), 'utf-8'
     );
 
+    var RE_SRC = require('fs').readFileSync(
+        require('path').join(__dirname, '../../src/lib/re.pyj'), 'utf-8'
+    );
+
     var TESTS = [
 
         // ── detect_context ────────────────────────────────────────────────
@@ -1251,6 +1255,121 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 var list = engine.getCompletions(scopeMap, pos(2, 14), "get_config().", MockKind);
                 assert_has(list, 'keys', 'dict.keys via inferred cross-file return type');
                 assert_has(list, 'values', 'dict.values via inferred cross-file return type');
+            },
+        },
+
+        // ── Bare import dot completions (import X; X.attr) ──────────────
+
+        {
+            name: "bare_import_virtual_dot_completions",
+            description: "import mymod; mymod. shows module-level symbols from virtual file",
+            run: function () {
+                var vf = {
+                    mymod: [
+                        "def foo():",
+                        "    return 1",
+                        "def bar():",
+                        "    return 2",
+                        "BAZ = 42",
+                    ].join("\n"),
+                };
+                var engine = make_engine(vf);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("import mymod\npass", { virtualFiles: vf });
+                var list = engine.getCompletions(scopeMap, pos(2, 7), "mymod.", MockKind);
+                assert_has(list, 'foo', 'foo from virtual module');
+                assert_has(list, 'bar', 'bar from virtual module');
+                assert_has(list, 'BAZ', 'BAZ from virtual module');
+            },
+        },
+
+        {
+            name: "bare_import_virtual_dot_prefix",
+            description: "import mymod; mymod.f filters completions by prefix",
+            run: function () {
+                var vf = {
+                    mymod: "def foo():\n    return 1\ndef bar():\n    return 2",
+                };
+                var engine = make_engine(vf);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("import mymod\npass", { virtualFiles: vf });
+                var list = engine.getCompletions(scopeMap, pos(2, 8), "mymod.f", MockKind);
+                assert_has(list,    'foo', 'foo matches prefix f');
+                assert_missing(list,'bar', 'bar does not match prefix f');
+            },
+        },
+
+        {
+            name: "bare_import_re_dot_completions",
+            description: "import re; re. shows re module exports via stdlibFiles",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { re: RE_SRC });
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("import re\npass", { virtualFiles: { re: RE_SRC } });
+                var list = engine.getCompletions(scopeMap, pos(2, 4), "re.", MockKind);
+                assert_has(list, 'match',   'match from re module');
+                assert_has(list, 'search',  'search from re module');
+                assert_has(list, 'compile', 'compile from re module');
+                assert_has(list, 'sub',     'sub from re module');
+                assert_has(list, 'findall', 'findall from re module');
+                assert_has(list, 'split',   'split from re module');
+            },
+        },
+
+        {
+            name: "bare_import_re_dot_prefix",
+            description: "import re; re.ma filters to matching names like match",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { re: RE_SRC });
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("import re\npass", { virtualFiles: { re: RE_SRC } });
+                var list = engine.getCompletions(scopeMap, pos(2, 6), "re.ma", MockKind);
+                assert_has(list,    'match',   'match matches prefix ma');
+                assert_missing(list,'compile', 'compile does not match prefix ma');
+            },
+        },
+
+        {
+            name: "bare_import_alias_dot_completions",
+            description: "import mymod as mm; mm. shows module-level symbols",
+            run: function () {
+                var vf = {
+                    mymod: "def foo():\n    return 1\nVAL = 10",
+                };
+                var engine = make_engine(vf);
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("import mymod as mm\npass", { virtualFiles: vf });
+                var list = engine.getCompletions(scopeMap, pos(2, 4), "mm.", MockKind);
+                assert_has(list, 'foo', 'foo from aliased module');
+                assert_has(list, 'VAL', 'VAL from aliased module');
+            },
+        },
+
+        {
+            name: "bare_import_unknown_module_empty",
+            description: "import unknown; unknown. returns empty when module source unavailable",
+            run: function () {
+                var engine = make_engine({});
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("import unknown\npass", {});
+                var list = engine.getCompletions(scopeMap, pos(2, 9), "unknown.", MockKind);
+                assert.strictEqual(list.suggestions.length, 0, 'unknown module → no dot suggestions');
+            },
+        },
+
+        {
+            name: "bare_import_collections_dot_completions",
+            description: "import collections; collections. shows namedtuple, deque, Counter, etc.",
+            run: function () {
+                var engine = make_engine({}, ['print', 'len', 'range'], null, null, { collections: COLLECTIONS_SRC });
+                var analyzer = new SourceAnalyzer(RS);
+                var scopeMap = analyzer.analyze("import collections\npass", { virtualFiles: { collections: COLLECTIONS_SRC } });
+                var list = engine.getCompletions(scopeMap, pos(2, 13), "collections.", MockKind);
+                assert_has(list, 'namedtuple',  'namedtuple from collections');
+                assert_has(list, 'deque',       'deque from collections');
+                assert_has(list, 'Counter',     'Counter from collections');
+                assert_has(list, 'OrderedDict', 'OrderedDict from collections');
+                assert_has(list, 'defaultdict', 'defaultdict from collections');
             },
         },
 

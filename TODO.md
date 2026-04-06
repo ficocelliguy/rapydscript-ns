@@ -1,6 +1,18 @@
 
 ### libraries
 
+- type hints for `re` after `import re` don't work
+- enable tree shaking
+- false infinite loop warning
+
+call stack exceeded:
+```
+import re
+
+async def main(ns):
+  ns.tprint(re.match(r"^.?$|^(..+?)\1+$", "1"*10458240))
+```
+
 
 - remove repl_mode and make repl make a new context for each "run" press
 - `.replace(str, str)` replaces only the first occurrence.

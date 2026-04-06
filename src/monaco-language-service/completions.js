@@ -523,6 +523,32 @@ export class CompletionEngine {
             }
         }
 
+        // 1.1. Module member completions — `import X; X.attr`
+        //      When the symbol is a bare import, parse the module source and
+        //      expose its top-level symbols as dot-completions.
+        if (!scope_matched && obj_sym && obj_sym.is_bare_import && obj_sym.source_module) {
+            const mod_src = this._virtualFiles[obj_sym.source_module]
+                         || this._stdlibFiles[obj_sym.source_module];
+            if (mod_src) {
+                let mod_map;
+                try { mod_map = this._analyzer.analyze(mod_src, {}); } catch (_e) { /* ignore */ }
+                if (mod_map) {
+                    const mod_frame = mod_map.frames.find(f => f.kind === 'module');
+                    if (mod_frame) {
+                        scope_matched = true;
+                        for (const [name, sym] of mod_frame.symbols) {
+                            if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                                if (!seen.has(name)) {
+                                    seen.add(name);
+                                    items.push(symbol_to_item(sym, range, monacoKind, '0'));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 1.5. Built-in type members — list, str, dict, number.
         //      Used when inferred_class names a built-in type, not a user class.
         if (!scope_matched && this._builtins && obj_sym && obj_sym.inferred_class) {

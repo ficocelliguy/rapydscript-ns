@@ -236,6 +236,7 @@ class ScopeBuilder {
             return_type:    opts.return_type    || null,
             source_module:  opts.source_module  || null,
             original_name:  opts.original_name  || null,
+            is_bare_import: opts.is_bare_import || false,
         });
         scope.addSymbol(sym);
         return sym;
@@ -362,8 +363,10 @@ class ScopeBuilder {
             if (name) {
                 this._add_symbol({
                     name,
-                    kind:       'import',
-                    defined_at: pos_from_token(node.start),
+                    kind:           'import',
+                    defined_at:     pos_from_token(node.start),
+                    source_module:  node.key || null,
+                    is_bare_import: true,
                 });
             }
 

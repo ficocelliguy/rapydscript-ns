@@ -33,6 +33,7 @@ export class SymbolInfo {
         this.return_type    = opts.return_type   || null;  // annotated return type, e.g. 'list', 'str', 'MyClass'
         this.source_module  = opts.source_module || null;  // module name when kind='import' (from X import Y)
         this.original_name  = opts.original_name || null;  // pre-alias name for imports (from X import Y as Z → 'Y')
+        this.is_bare_import = opts.is_bare_import || false; // true for `import X` (vs `from X import Y`)
     }
 }
 
