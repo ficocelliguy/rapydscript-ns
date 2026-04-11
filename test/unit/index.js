@@ -1831,13 +1831,13 @@ assrt.equal(fib(15), 610)
 
     {
         name: "print_compiles_to_console_log",
-        description: "print(x) compiles directly to console.log(x)",
+        description: "print(x) compiles to console.log(ρσ_str(x)) for Python-style string conversion",
         src: [
             "# globals: assrt",
             "print('hello')",
             "print(1, 2, 3)",
         ].join("\n"),
-        js_checks: ["console.log(\"hello\")", "console.log(1, 2, 3)"],
+        js_checks: ["console.log(ρσ_str(\"hello\"))", "console.log(ρσ_str(1), ρσ_str(2), ρσ_str(3))"],
     },
 
     {
@@ -1883,7 +1883,7 @@ assrt.equal(fib(15), 610)
             "print('test')",
         ].join("\n"),
         // The compiled JS must NOT contain 'var print = ' (which would overwrite window.print)
-        js_checks: [/console\.log\("test"\)/],
+        js_checks: [/console\.log\(ρσ_str\("test"\)\)/],
     },
 
     {
