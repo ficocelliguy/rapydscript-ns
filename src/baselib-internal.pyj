@@ -282,6 +282,8 @@ def ρσ_arith_type_name(v):
     t = jstype(v)
     if t is 'boolean':
         return 'bool'
+    if t is 'bigint':
+        return 'long'
     if t is 'number':
         return 'int' if Number.isInteger(v) else 'float'
     if t is 'string' or v'v instanceof String':
@@ -303,6 +305,7 @@ def ρσ_op_add(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a + b'
+    if ta is 'bigint' and tb is 'bigint': return v'a + b'
     if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a + b'
     raise TypeError("unsupported operand type(s) for +: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
@@ -312,6 +315,7 @@ def ρσ_op_sub(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a - b
+    if ta is 'bigint' and tb is 'bigint': return v'a - b'
     raise TypeError("unsupported operand type(s) for -: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_mul(a, b):
@@ -332,6 +336,7 @@ def ρσ_op_mul(a, b):
             result = result.concat(b)  # noqa:undef
         return ρσ_list_constructor(result)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a * b
+    if ta is 'bigint' and tb is 'bigint': return v'a * b'
     raise TypeError("unsupported operand type(s) for *: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_truediv(a, b):
@@ -340,6 +345,8 @@ def ρσ_op_truediv(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a / b
+    if ta is 'bigint' and tb is 'bigint':
+        raise TypeError("unsupported operand type(s) for /: 'long' and 'long' — use // for integer division of long values")
     raise TypeError("unsupported operand type(s) for /: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_floordiv(a, b):
@@ -348,6 +355,8 @@ def ρσ_op_floordiv(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return Math.floor(a / b)
+    if ta is 'bigint' and tb is 'bigint':
+        v'var ρσ_bq = a / b, ρσ_br = a % b; if (ρσ_br !== 0n && (ρσ_br < 0n) !== (b < 0n)) { return ρσ_bq - 1n; } return ρσ_bq;'
     raise TypeError("unsupported operand type(s) for //: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_mod(a, b):
@@ -356,6 +365,8 @@ def ρσ_op_mod(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a % b
+    if ta is 'bigint' and tb is 'bigint':
+        v'var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;'
     raise TypeError("unsupported operand type(s) for %: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_pow(a, b):
@@ -364,32 +375,46 @@ def ρσ_op_pow(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return Math.pow(a, b)
+    if ta is 'bigint' and tb is 'bigint':
+        if v'b < 0n':
+            raise ValueError("negative exponent not supported for long values")
+        return v'a ** b'
     raise TypeError("unsupported operand type(s) for **: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_and(a, b):
     if a is not None and jstype(a.__and__) is 'function': return a.__and__(b)
     if b is not None and jstype(b.__rand__) is 'function': return b.__rand__(a)
-    return a & b
+    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
+        raise TypeError("unsupported operand type(s) for &: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+    return v'a & b'
 
 def ρσ_op_or(a, b):
     if a is not None and jstype(a.__or__) is 'function': return a.__or__(b)
     if b is not None and jstype(b.__ror__) is 'function': return b.__ror__(a)
-    return a | b
+    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
+        raise TypeError("unsupported operand type(s) for |: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+    return v'a | b'
 
 def ρσ_op_xor(a, b):
     if a is not None and jstype(a.__xor__) is 'function': return a.__xor__(b)
     if b is not None and jstype(b.__rxor__) is 'function': return b.__rxor__(a)
-    return a ^ b
+    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
+        raise TypeError("unsupported operand type(s) for ^: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+    return v'a ^ b'
 
 def ρσ_op_lshift(a, b):
     if a is not None and jstype(a.__lshift__) is 'function': return a.__lshift__(b)
     if b is not None and jstype(b.__rlshift__) is 'function': return b.__rlshift__(a)
-    return a << b
+    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
+        raise TypeError("unsupported operand type(s) for <<: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+    return v'a << b'
 
 def ρσ_op_rshift(a, b):
     if a is not None and jstype(a.__rshift__) is 'function': return a.__rshift__(b)
     if b is not None and jstype(b.__rrshift__) is 'function': return b.__rrshift__(a)
-    return a >> b
+    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
+        raise TypeError("unsupported operand type(s) for >>: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
+    return v'a >> b'
 
 # Ordered-comparison operator overloading helpers.
 # ρσ_op_lt dispatches __lt__ (forward) then __gt__ (reflected), handles lists
@@ -409,6 +434,7 @@ def ρσ_op_lt(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a < b'
+    if ta is 'bigint' and tb is 'bigint': return v'a < b'
     if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a < b'
     raise TypeError("'<' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
@@ -426,6 +452,7 @@ def ρσ_op_le(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a <= b'
+    if ta is 'bigint' and tb is 'bigint': return v'a <= b'
     if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a <= b'
     raise TypeError("'<=' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
@@ -436,6 +463,7 @@ def ρσ_op_gt(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a > b'
+    if ta is 'bigint' and tb is 'bigint': return v'a > b'
     if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a > b'
     raise TypeError("'>' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
@@ -446,6 +474,7 @@ def ρσ_op_ge(a, b):
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a >= b'
+    if ta is 'bigint' and tb is 'bigint': return v'a >= b'
     if (ta is 'string' or v'a instanceof String') and (tb is 'string' or v'b instanceof String'): return v'a >= b'
     raise TypeError("'>=' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
@@ -575,16 +604,21 @@ def ρσ_op_truediv_ns(a, b):
 def ρσ_op_floordiv_ns(a, b):
     if a is not None and jstype(a.__floordiv__) is 'function': return a.__floordiv__(b)
     if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
+    if jstype(a) is 'bigint' and jstype(b) is 'bigint':
+        v'var ρσ_bq = a / b, ρσ_br = a % b; if (ρσ_br !== 0n && (ρσ_br < 0n) !== (b < 0n)) { return ρσ_bq - 1n; } return ρσ_bq;'
     return Math.floor(v'a / b')
 
 def ρσ_op_mod_ns(a, b):
     if a is not None and jstype(a.__mod__) is 'function': return a.__mod__(b)
     if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
+    if jstype(a) is 'bigint' and jstype(b) is 'bigint':
+        v'var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;'
     return v'a % b'
 
 def ρσ_op_pow_ns(a, b):
     if a is not None and jstype(a.__pow__) is 'function': return a.__pow__(b)
     if b is not None and jstype(b.__rpow__) is 'function': return b.__rpow__(a)
+    if jstype(a) is 'bigint' and jstype(b) is 'bigint': return v'a ** b'
     return Math.pow(a, b)
 
 def ρσ_op_lt_ns(a, b):
@@ -670,6 +704,8 @@ def ρσ_instanceof():
         if q is ρσ_int and (jstype(obj) is 'number' and Number.isInteger(obj)):
             return True
         if q is ρσ_float and (jstype(obj) is 'number' and not Number.isInteger(obj)):
+            return True
+        if q is ρσ_long and jstype(obj) is 'bigint':
             return True
         if bases.length > 1:
             for v'var c = 1; c < bases.length; c++':

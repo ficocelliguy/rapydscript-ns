@@ -48,6 +48,39 @@ def ρσ_float(val):
     return ans
 ρσ_float.__name__ = 'float'
 
+def ρσ_long(val, base):
+    t = jstype(val)
+    if t is 'bigint':
+        return val
+    if t is 'boolean':
+        return v'BigInt(val ? 1 : 0)'
+    if t is 'number':
+        if not Number.isInteger(val):
+            raise TypeError("long() can't convert non-integer float to long")
+        v'try { return BigInt(val); } catch(e) { throw new ValueError("long() argument out of range: " + val); }'
+    if t is 'string':
+        b = base if (base is not None and base is not undefined) else 10
+        v'var ρσ_ls = val.trim()'
+        try:
+            if b is 16:
+                if v'ρσ_ls.slice(0, 2).toLowerCase()' is not '0x':
+                    v'ρσ_ls = "0x" + ρσ_ls'
+                return v'BigInt(ρσ_ls)'
+            elif b is 2:
+                if v'ρσ_ls.slice(0, 2).toLowerCase()' is not '0b':
+                    v'ρσ_ls = "0b" + ρσ_ls'
+                return v'BigInt(ρσ_ls)'
+            elif b is 8:
+                if v'ρσ_ls.slice(0, 2).toLowerCase()' is not '0o':
+                    v'ρσ_ls = "0o" + ρσ_ls'
+                return v'BigInt(ρσ_ls)'
+            else:
+                return v'BigInt(ρσ_ls)'
+        except:
+            raise ValueError('Invalid literal for long() with base ' + b + ': ' + val)
+    raise TypeError("long() argument must be a string, a number, or a boolean, not '" + t + "'")
+ρσ_long.__name__ = 'long'
+
 def ρσ_arraylike_creator():
     names = 'Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array'.split(' ')
     if jstype(HTMLCollection) is 'function':
@@ -308,8 +341,21 @@ def ρσ_pow(x, y, z):
         ans %= z
     return ans
 
+ρσ_NoneType = v'{"__name__": "NoneType"}'
+ρσ_NoneType.toString = def(): return "<class 'NoneType'>";
+ρσ_js_builtin_names = v'{"Number": "float", "String": "str", "Boolean": "bool", "Array": "list", "Object": "object", "Function": "function", "RegExp": "RegExp", "Date": "datetime", "Map": "dict", "Set": "set", "Uint8Array": "bytes"}'
+
 def ρσ_type(x):
-    return x.constructor
+    if x is None or x is undefined:
+        return ρσ_NoneType
+    c = x.constructor
+    if not c:
+        return ρσ_NoneType
+    if not v'Object.prototype.hasOwnProperty.call(c, "__ρσ_ts")':
+        n = c.__name__ or ρσ_js_builtin_names[c.name] or c.name or 'object'
+        c.toString = def(): return "<class '" + n + "'>";
+        c.__ρσ_ts = True
+    return c
 
 
 def ρσ_issubclass(cls, base):
@@ -793,7 +839,7 @@ class ρσ_complex:
 ρσ_complex.__name__ = 'complex'
 
 v'var abs = ρσ_abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
-v'var float = ρσ_float, int = ρσ_int, complex = ρσ_complex, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
+v'var float = ρσ_float, int = ρσ_int, long = ρσ_long, complex = ρσ_complex, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
 v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__'
 v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round'
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'

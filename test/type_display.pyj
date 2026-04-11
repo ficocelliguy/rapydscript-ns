@@ -1,0 +1,48 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+
+ae  = assrt.equal
+ok  = assrt.ok
+
+# ── type() display: <class 'name'> formatting ─────────────────────────────────
+
+# Built-in Python-mapped types
+ae(str(type([])),       "<class 'list'>")
+ae(str(type('hello')),  "<class 'str'>")
+ae(str(type(42)),       "<class 'float'>")
+ae(str(type(True)),     "<class 'bool'>")
+ae(str(type(None)),     "<class 'NoneType'>")
+
+# Explicit dict/set
+ae(str(type(dict())),   "<class 'dict'>")
+ae(str(type(set())),    "<class 'set'>")
+
+# User-defined classes
+class Dog:
+    def __init__(self, name):
+        self.name = name
+
+d = Dog('Rex')
+ae(str(type(d)), "<class 'Dog'>")
+
+class Cat(Dog):
+    pass
+
+c = Cat('Mittens')
+ae(str(type(c)), "<class 'Cat'>")
+
+# type() identity is preserved (type(x) is Cls still works)
+ok(type(d) is Dog)
+ok(type(c) is Cat)
+ok(type(c) is not Dog)
+ok(type([]) is list)
+ok(type(None) is type(None))
+
+# __name__ attribute is accessible on the returned type
+ae(type([]) .__name__, 'list')
+ae(type(d)  .__name__, 'Dog')
+ae(type(None).__name__, 'NoneType')
+
+# Same type called twice returns same constructor (no double-patching issue)
+ok(type([]) is type([]))
+ok(type('a') is type('b'))

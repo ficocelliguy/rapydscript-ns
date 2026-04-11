@@ -511,6 +511,7 @@ def ρσ_set_wrap(x):
     ans.jsset = x
     return ans
 
+ρσ_set.__name__ = 'set'
 v'var set = ρσ_set, set_wrap = ρσ_set_wrap'
 # }}}
 
@@ -902,6 +903,7 @@ def ρσ_dict_wrap(x):
     ans.jsmap = x
     return ans
 
+ρσ_dict.__name__ = 'dict'
 v'var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap'
 
 v'''

@@ -78,6 +78,8 @@ def ρσ_str(x):
         return 'None'
     if x is undefined:
         return 'undefined'
+    if v'typeof x === "bigint"':
+        return v'String(x)'
     ans = x
     if v'typeof x.__str__ === "function"':
         ans = x.__str__()

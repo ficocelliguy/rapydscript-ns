@@ -443,12 +443,15 @@ def print_function_call(self, output):
             )
         elif is_node_type(self.expression, AST_SymbolRef) and self.expression.name is 'print':
             # Bare print(...) → console.log(...) to avoid clobbering window.print
+            # Wrap each arg in ρσ_str() so type() and other objects display like Python
             output.print('console.log')
             output.with_parens(def():
                 for i, a in enumerate(self.args):
                     if i:
                         output.comma()
+                    output.print('ρσ_str(')
                     a.print(output)
+                    output.print(')')
             )
         elif (is_node_type(self.expression, AST_SymbolRef) and
               self.expression.name is 'vars' and self.args.length is 0):

@@ -1,0 +1,130 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+from __python__ import overload_operators
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+throws = assrt.throws
+
+# ── construction ──────────────────────────────────────────────────────────────
+
+# from int
+ok(jstype(long(0)) is 'bigint')
+ok(jstype(long(42)) is 'bigint')
+ok(jstype(long(-99)) is 'bigint')
+
+# from string (base 10)
+ok(jstype(long('12345678901234567890')) is 'bigint')
+ae(str(long('42')), '42')
+ae(str(long('-7')), '-7')
+
+# from string with explicit base 10
+ae(str(long('255', 10)), '255')
+
+# from string base 16
+ae(str(long('ff', 16)), '255')
+ae(str(long('FF', 16)), '255')
+ae(str(long('0xff', 16)), '255')
+ae(str(long('0xFF', 16)), '255')
+
+# from string base 2
+ae(str(long('1010', 2)), '10')
+ae(str(long('0b1010', 2)), '10')
+
+# from string base 8
+ae(str(long('17', 8)), '15')
+ae(str(long('0o17', 8)), '15')
+
+# from bool
+ae(str(long(True)), '1')
+ae(str(long(False)), '0')
+
+# identity: long of long
+x = long(7)
+ae(str(long(x)), '7')
+
+# very large integer (beyond JS Number precision)
+big = long('99999999999999999999999999999999')
+ae(str(big), '99999999999999999999999999999999')
+
+# ── error cases ───────────────────────────────────────────────────────────────
+
+throws(def(): long('abc');, ValueError)
+throws(def(): long('xyz', 16);, ValueError)
+throws(def(): long(3.14);, TypeError)
+throws(def(): long(None);, TypeError)
+
+# ── arithmetic ────────────────────────────────────────────────────────────────
+
+a = long(10)
+b = long(3)
+
+ae(str(a + b), '13')
+ae(str(a - b), '7')
+ae(str(a * b), '30')
+
+# floor division — Python semantics (floor toward -inf)
+ae(str(a // b), '3')
+ae(str(long(-7) // long(2)), '-4')   # Python: -4, JS truncate: -3
+ae(str(long(7) // long(-2)), '-4')   # Python: -4, JS truncate: -3
+ae(str(long(-7) // long(-2)), '3')   # both negative
+
+# modulo — Python semantics (result has same sign as divisor)
+ae(str(long(7) % long(3)), '1')
+ae(str(long(-7) % long(3)), '2')     # Python: 2, JS BigInt: -1
+ae(str(long(7) % long(-3)), '-2')    # Python: -2, JS BigInt: 1
+ae(str(long(-7) % long(-3)), '-1')   # both negative
+
+# power
+ae(str(long(2) ** long(10)), '1024')
+ae(str(long(3) ** long(0)), '1')
+
+# negative exponent raises ValueError
+throws(def(): long(2) ** long(-1);, ValueError)
+
+# truediv raises TypeError (use // instead)
+throws(def(): long(10) / long(3);, TypeError)
+
+# ── bitwise ───────────────────────────────────────────────────────────────────
+
+ae(str(long(0b1010) & long(0b1100)), '8')   # 0b1000 = 8
+ae(str(long(0b1010) | long(0b1100)), '14')  # 0b1110 = 14
+ae(str(long(0b1010) ^ long(0b1100)), '6')   # 0b0110 = 6
+ae(str(long(1) << long(4)), '16')
+ae(str(long(16) >> long(2)), '4')
+
+# mixed long + int raises TypeError
+throws(def(): long(1) + 1;, TypeError)
+throws(def(): long(1) & 1;, TypeError)
+
+# ── comparisons ───────────────────────────────────────────────────────────────
+
+ok(long(1) < long(2))
+ok(long(2) > long(1))
+ok(long(3) <= long(3))
+ok(long(3) >= long(3))
+ok(long(1) == long(1))
+ok(long(1) != long(2))
+
+# ── isinstance / type ─────────────────────────────────────────────────────────
+
+ok(isinstance(long(5), long))
+ok(isinstance(long(0), long))
+ok(isinstance(long(-1), long))
+ok(not isinstance(5, long))
+ok(not isinstance('5', long))
+
+# ── str() conversion ──────────────────────────────────────────────────────────
+
+ae(str(long(0)), '0')
+ae(str(long(12345)), '12345')
+ae(str(long(-42)), '-42')
+ae(str(long('99999999999999999999')), '99999999999999999999')
+
+# ── identity with large numbers ───────────────────────────────────────────────
+
+# Verify precision is maintained (JS Number loses this)
+n = long('9007199254740993')  # 2^53 + 1, not representable as JS Number
+ae(str(n), '9007199254740993')
+ae(str(n + long(1)), '9007199254740994')

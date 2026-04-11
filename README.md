@@ -1343,6 +1343,49 @@ ba.clear()                    # remove all bytes
 ba += bytearray([7, 8])       # in-place concatenation
 ```
 
+### `long` — arbitrary-precision integers
+
+RapydScript provides a `long` builtin backed by JavaScript's native `BigInt`,
+giving you arbitrary-precision integers beyond the safe range of JS `Number`.
+
+```python
+a = long(10)
+b = long(3)
+
+a + b           # long(13)
+a - b           # long(7)
+a * b           # long(30)
+a // b          # long(3)   — floor division (Python semantics, not JS truncation)
+a % b           # long(1)   — Python-style modulo (result has same sign as divisor)
+a ** b          # long(1000)
+long(-7) // long(2)   # long(-4)  — floors toward −∞ (JS BigInt would give −3)
+long(-7) % long(3)    # long(2)   — result matches sign of divisor
+```
+
+#### Precision beyond JS Number
+
+The main motivation for `long` is numbers outside the safe integer range of
+JavaScript `Number` (`2^53 − 1 = 9007199254740991`):
+
+```python
+n = long('9007199254740993')  # 2^53 + 1 — cannot be represented as a JS Number
+str(n)                        # '9007199254740993'  (exact)
+str(n + long(1))              # '9007199254740994'  (still exact)
+```
+
+#### Operator overloading
+
+`//`, `%`, and `**` require `overload_operators` (on by default) to emit the
+BigInt-aware helpers rather than the raw JS operators.  If you have explicitly
+disabled operator overloading with `from __python__ import no_overload_operators`,
+`//` will call `Math.floor(a / b)` which throws a `TypeError` at runtime for
+`long` values.
+
+#### Browser / environment support
+
+`BigInt` is supported in all modern browsers (Chrome 67+, Firefox 68+, Safari
+14+, Node.js 10.3+).  Code using `long` will not run in Internet Explorer.
+
 ### `issubclass`
 
 `issubclass(cls, classinfo)` checks whether a class is a subclass of another
@@ -3958,6 +4001,7 @@ Python Feature Coverage
 | `float.is_integer()`                                                                                                                                                                                                                                          | Returns `True` if the float has no fractional part (i.e. is a whole number), `False` otherwise. `float('inf').is_integer()` and `float('nan').is_integer()` both return `False`, matching Python semantics. Added to `Number.prototype` in the baselib so it works on any numeric literal or variable. |
 | `int.bit_length()`                                                                                                                                                                                                                                            | Returns the number of bits needed to represent the integer in binary, excluding the sign and leading zeros. `(0).bit_length()` → `0`; `(255).bit_length()` → `8`; `(256).bit_length()` → `9`; sign is ignored (`(-5).bit_length()` → `3`). Added to `Number.prototype` in the baselib. |
 | Arithmetic type coercion — `TypeError` on incompatible operands                                                                                                                                                                                               | `1 + '1'` raises `TypeError: unsupported operand type(s) for +: 'int' and 'str'`; all arithmetic operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`) enforce compatible types in their `ρσ_op_*` helpers. `bool` is treated as numeric (like Python's `int` subclass). Activated by `overload_operators` (on by default). String `+` string and numeric `+` numeric are allowed; mixed types raise `TypeError` with a Python-style message. |
+| `long(val[, base])` — arbitrary-precision integers                                                                                                                                                                                                            | Backed by JS `BigInt`. `long(42)`, `long('ff', 16)`, `long('1010', 2)`, `long(True)`. Arithmetic: `+`, `-`, `*`, `//`, `%`, `**` — `//` and `%` follow Python floor-division semantics (floor toward −∞), not JS BigInt truncation. `/` raises `TypeError` (use `//`). Bitwise: `&`, `\|`, `^`, `<<`, `>>`. Comparisons: `<`, `<=`, `>`, `>=`, `==`, `!=`. `isinstance(x, long)` works. Mixing `long` with `int` or `float` raises `TypeError`. Requires `BigInt` (Chrome 67+, Firefox 68+, Safari 14+, Node 10.3+). |
 | `complex(real=0, imag=0)` and complex literals `3+4j`                                                                                                                                                                                                         | Full complex number type via `ρσ_complex` class. `complex(real, imag)`, `complex(string)` (parses `'3+4j'`), and `j`/`J` imaginary literal suffix (e.g. `4j`, `3.5J`). Attributes: `.real`, `.imag`. Methods: `conjugate()`, `__abs__()`, `__bool__()`, `__repr__()`, `__str__()`. Arithmetic: `+`, `-`, `*`, `/`, `**` via dunder methods (or operator overloading with `overload_operators`). `abs(z)` dispatches `__abs__`. `isinstance(z, complex)` works. String representation matches Python: `(3+4j)`, `4j`, `(3-0j)`. |
 | `eval(expr[, globals[, locals]])`                                                                                                                                                                                                                             | String literals are compiled as **RapydScript source** at compile time (the compiler parses and transpiles the string, just like Python's `eval` takes Python source). `eval(expr)` maps to native JS direct `eval` for scope access. `eval(expr, globals)` / `eval(expr, globals, locals)` use `Function` constructor with explicit bindings; `locals` override `globals`. Runtime `ρσ_` helpers referenced in the compiled string are automatically injected into the Function scope. Only string *literals* are transformed at compile time; dynamic strings are passed through unchanged. |
 | `exec(code[, globals[, locals]])`                                                                                                                                                                                                                             | String literals are compiled as **RapydScript source** at compile time. Executes the compiled code string; always returns `None`. Without `globals`/`locals` uses native `eval` (scope access). With `globals`/`locals` uses `Function` constructor — mutable objects (lists, dicts) passed in `globals` are accessible by reference, so side-effects are visible after the call. `ρσ_dict` instances (created when `dict_literals` flag is active) are correctly unwrapped via their `jsmap` backing store. |
