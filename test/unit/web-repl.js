@@ -2198,6 +2198,54 @@ var TESTS = [
         },
     },
 
+    // ── float() special string values ────────────────────────────────────────
+
+    {
+        name: "bundle_float_special_inf_nan",
+        description: "float() accepts 'inf', '-inf', 'infinity', 'nan' (and variants) in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                // positive infinity
+                "assrt.equal(float('inf'),       Infinity)",
+                "assrt.equal(float('+inf'),      Infinity)",
+                "assrt.equal(float('INF'),       Infinity)",
+                "assrt.equal(float('infinity'),  Infinity)",
+                "assrt.equal(float('+infinity'), Infinity)",
+                "assrt.equal(float('Infinity'),  Infinity)",
+                "assrt.equal(float('INFINITY'),  Infinity)",
+                // negative infinity
+                "assrt.equal(float('-inf'),      -Infinity)",
+                "assrt.equal(float('-infinity'), -Infinity)",
+                "assrt.equal(float('-Infinity'), -Infinity)",
+                // nan
+                "assrt.ok(isNaN(float('nan')))",
+                "assrt.ok(isNaN(float('NaN')))",
+                "assrt.ok(isNaN(float('NAN')))",
+                "assrt.ok(isNaN(float('+nan')))",
+                "assrt.ok(isNaN(float('-nan')))",
+                // whitespace stripped
+                "assrt.equal(float('  inf  '),  Infinity)",
+                "assrt.equal(float('  -inf '),  -Infinity)",
+                "assrt.ok(isNaN(float('  nan  ')))",
+                // numeric strings still work
+                "assrt.equal(float('3.14'), 3.14)",
+                "assrt.equal(float('-2.5'), -2.5)",
+                // real Infinity passes through
+                "assrt.equal(float(Infinity),  Infinity)",
+                "assrt.equal(float(-Infinity), -Infinity)",
+                // ValueError still raised for bad strings
+                "_err = False",
+                "try:",
+                "    float('bad')",
+                "except ValueError:",
+                "    _err = True",
+                "assrt.ok(_err)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",

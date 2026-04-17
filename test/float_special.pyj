@@ -1,0 +1,64 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+
+ae  = assrt.equal
+ok  = assrt.ok
+
+# ── float() — special string values ───────────────────────────────────────────
+
+# 'inf' / '+inf'
+ae(float('inf'),  v'Infinity')
+ae(float('+inf'), v'Infinity')
+ae(float('INF'),  v'Infinity')
+ae(float('Inf'),  v'Infinity')
+
+# '-inf'
+ae(float('-inf'),  v'-Infinity')
+ae(float('-INF'),  v'-Infinity')
+ae(float('-Inf'),  v'-Infinity')
+
+# 'infinity' variants
+ae(float('infinity'),   v'Infinity')
+ae(float('+infinity'),  v'Infinity')
+ae(float('-infinity'),  v'-Infinity')
+ae(float('Infinity'),   v'Infinity')
+ae(float('+Infinity'),  v'Infinity')
+ae(float('-Infinity'),  v'-Infinity')
+ae(float('INFINITY'),   v'Infinity')
+ae(float('-INFINITY'),  v'-Infinity')
+
+# 'nan' variants
+ok(isNaN(float('nan')))
+ok(isNaN(float('NaN')))
+ok(isNaN(float('NAN')))
+ok(isNaN(float('+nan')))
+ok(isNaN(float('-nan')))
+
+# leading/trailing whitespace is accepted (matches Python)
+ae(float('  inf  '),  v'Infinity')
+ae(float('  -inf '),  v'-Infinity')
+ok(isNaN(float('  nan  ')))
+
+# numeric strings still work
+ae(float('3.14'), 3.14)
+ae(float('1e10'), 1e10)
+ae(float('-2.5'), -2.5)
+
+# passing a real Infinity/NaN JS value through float() still works
+ae(float(v'Infinity'),  v'Infinity')
+ae(float(v'-Infinity'), v'-Infinity')
+
+# ValueError is still raised for unrecognised strings
+_err = False
+try:
+    float('not_a_number')
+except ValueError:
+    _err = True
+ok(_err)
+
+_err2 = False
+try:
+    float('')
+except ValueError:
+    _err2 = True
+ok(_err2)

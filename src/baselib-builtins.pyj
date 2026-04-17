@@ -44,6 +44,14 @@ def ρσ_float(val):
     else:
         ans = parseFloat(val)
     if isNaN(ans):
+        if jstype(val) is 'string':
+            s = val.trim().toLowerCase()
+            if s is 'inf' or s is '+inf' or s is 'infinity' or s is '+infinity':
+                return v'Infinity'
+            if s is '-inf' or s is '-infinity':
+                return v'-Infinity'
+            if s is 'nan' or s is '+nan' or s is '-nan':
+                return v'NaN'
         raise ValueError('Could not convert string to float: ' + arguments[0])
     return ans
 ρσ_float.__name__ = 'float'
