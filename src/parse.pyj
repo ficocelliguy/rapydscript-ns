@@ -1396,6 +1396,9 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     argnames.push(aname)
                     if is_('punc', ','):
                         next()
+                        if bracketed and is_('punc', ')'):
+                            next()
+                            break
                     else:
                         if bracketed:
                             if is_('punc', ')'):

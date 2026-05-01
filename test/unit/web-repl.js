@@ -2379,6 +2379,42 @@ var TESTS = [
     },
 
     {
+        name: "bundle_multiline_paren_import",
+        description: "multi-line parenthesized import with trailing comma works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from math import (",
+                "    floor,",
+                "    ceil,",
+                "    sqrt,",
+                ")",
+                "assrt.equal(floor(3.9), 3)",
+                "assrt.equal(ceil(3.1), 4)",
+                "assrt.equal(sqrt(9), 3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_multiline_paren_import_alias",
+        description: "multi-line parenthesized import with aliases and trailing comma works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from math import (",
+                "    floor as fl,",
+                "    ceil as cl,",
+                ")",
+                "assrt.equal(fl(2.9), 2)",
+                "assrt.equal(cl(2.1), 3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",
         run: function () {

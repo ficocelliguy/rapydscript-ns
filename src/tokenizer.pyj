@@ -706,7 +706,7 @@ def tokenizer(raw_text, filename):
             if (peek() is "'" or peek() is '"') and is_string_modifier(tok.value):
                 mods = tok.value.toLowerCase()
                 start_pos_for_string = S.tokpos
-                stok = read_string(mods.indexOf('r') is not -1, mods.indexOf('v') is not -1)
+                stok = read_string(mods.indexOf('r') is not -1 or mods.indexOf('v') is not -1, mods.indexOf('v') is not -1)
                 tok.endpos = stok.endpos
                 if stok.type is not 'js' and mods.indexOf('f') is not -1:
                     tok.col += start_pos_for_string - tok.pos

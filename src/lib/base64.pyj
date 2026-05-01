@@ -342,7 +342,7 @@ def decodebytes(s):
     """Decode Base64 data from *s*, ignoring newline characters."""
     s_str = v'_b64_to_str(s)'
     # Strip newlines via split/join (avoids backslash-in-regex issues)
-    s_str = v's_str.split("\\n").join("").split("\\r").join("")'
+    s_str = v's_str.split("\n").join("").split("\r").join("")'
     arr = v'_b64_decode_impl(s_str, _B64_STD_TABLE, false, Error)'
     return bytes(arr)
 

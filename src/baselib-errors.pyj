@@ -4,12 +4,13 @@
 # globals: ρσ_str
 
 v'var NameError = ReferenceError'
+v'var _ρσ_NativeError = Error'
 
 class Exception(Error):
 
     def __init__(self, message):
         self.message = message
-        self.stack = Error().stack
+        self.stack = v'_ρσ_NativeError'().stack
         self.name = self.constructor.name
 
     def __repr__(self):

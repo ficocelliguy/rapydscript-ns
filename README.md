@@ -3102,6 +3102,16 @@ You can import things from modules, just like you would in python:
 from mypackage.mymodule import something, something_else
 ```
 
+Multi-line parenthesized imports (Python 3.10+ style) are fully supported, including trailing commas:
+
+```py
+from mypackage.mymodule import (
+    something,
+    something_else as alias,
+    another_thing,
+)
+```
+
 When you import modules, the RapydScript compiler automatically generates a
 single large JavaScript file containing all the imported packages/modules and
 their dependencies, recursively. This makes it very easy to integrate the
@@ -3995,6 +4005,7 @@ Python Feature Coverage
 | `dict \| dict` and `dict \|= dict` (Python 3.9+)                                                                                                                                                                                                              | Dict merge via `\|` creates a new merged dict (right-side values win); `\|=` updates in-place. Active via `overload_operators` + `dict_literals` (both on by default). |
 | `__format__` dunder                                                                                                                                                                                                                                           | `format()`, `str.format()`, and f-strings all dispatch to `__format__`; default `__format__` auto-generated for classes (returns `__str__()` for empty spec, raises `TypeError` for non-empty spec); `!r`/`!s`/`!a` transformers bypass `__format__` correctly |
 | `slice(start, stop[, step])`                                                                                                                                                                                                                                  | Full Python `slice` class: 1-, 2-, and 3-argument forms; `.start`, `.stop`, `.step` attributes; `.indices(length)` → `(start, stop, step)`; `str()` / `repr()`; `isinstance(s, slice)`; equality `==`; use as subscript `lst[s]` (read, write, `del`) all work. |
+| Multi-line parenthesized `from … import (…)` with optional trailing comma                                                                                                                                                                                     | Each imported name (with optional `as` alias) may appear on its own line; a trailing comma before `)` is accepted — identical to Python syntax |
 | `__import__(name[, globals, locals, fromlist, level])`                                                                                                                                                                                                        | Runtime lookup in the compiled module registry (`ρσ_modules`). Without `fromlist` (or empty `fromlist`) returns the top-level package, matching Python's semantics. `ImportError` / `ModuleNotFoundError` raised for unknown modules. **Constraint**: the module must have been statically imported elsewhere in the source so it is present in `ρσ_modules`. |
 | `ImportError`, `ModuleNotFoundError`                                                                                                                                                                                                                          | Both defined as runtime exception classes; `ModuleNotFoundError` is a subclass of `ImportError` (same as Python 3.6+). |
 | `bytes(source[, encoding[, errors]])` and `bytearray(source[, encoding[, errors]])`                                                                                                                                                                           | Full Python semantics: construction from integer (n zero bytes), list/iterable of ints (0–255), string + encoding (`utf-8`, `latin-1`, `ascii`), `Uint8Array`, or another `bytes`/`bytearray`. Key methods: `hex([sep[, bytes_per_sep]])`, `decode(encoding)`, `fromhex(s)` (static), `count`, `find`, `rfind`, `index`, `rindex`, `startswith`, `endswith`, `join`, `split`, `replace`, `strip`, `lstrip`, `rstrip`, `upper`, `lower`, `copy`. `bytearray` adds: `append`, `extend`, `insert`, `pop`, `remove`, `reverse`, `clear`, `__setitem__` (single and slice). Slicing returns a new `bytes`/`bytearray`. `+` concatenates; `*` repeats; `==` compares element-wise; `in` tests integer or subsequence membership; `isinstance(x, bytes)` / `isinstance(x, bytearray)` work; `bytearray` is a subclass of `bytes`. `repr()` returns `b'...'` notation. `Uint8Array` values may be passed anywhere a `bytes`-like object is accepted. |

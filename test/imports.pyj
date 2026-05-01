@@ -3,6 +3,13 @@ from _import_one import toplevel_var, toplevel_func as tf, TopLevel, true_var, f
 from _import_two import (toplevel_var2,
                  toplevel_func2, TopLevel2 as TL2)
 
+# Python-style multi-line parenthesized import with trailing comma
+from _import_one import (
+    toplevel_var,
+    toplevel_func as tf,
+    TopLevel,
+)
+
 def AClass(x):
     return this
 

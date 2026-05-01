@@ -13,7 +13,7 @@ def namedtuple(typename, field_names):
     """Return a new class with named fields, like Python's collections.namedtuple."""
     if isinstance(field_names, str):
         # Use explicit JS regex split for cross-environment safety
-        fields = v"field_names.replace(/,/g, ' ').trim().split(/\\s+/).filter(function(s){return s.length>0;})"
+        fields = v"field_names.replace(/,/g, ' ').trim().split(/\s+/).filter(function(s){return s.length>0;})"
     else:
         fields = list(field_names)
     n = fields.length
