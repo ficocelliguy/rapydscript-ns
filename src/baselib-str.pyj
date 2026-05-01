@@ -663,11 +663,9 @@ define_str_func('rpartition', def(sep):
 
 define_str_func('replace', def(old, repl, count):
     string = this
-    if count is 1:
-        return ρσ_orig_replace(string, old, repl)
-    if count < 1:
+    if count is 0:
         return string
-    count = count or Number.MAX_VALUE
+    count = count if count > 0 else Number.MAX_VALUE
     pos = 0
     while count > 0:
         count -= 1

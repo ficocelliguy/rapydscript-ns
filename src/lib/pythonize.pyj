@@ -9,7 +9,7 @@ def strings():
         ' partition rpartition replace split rsplit splitlines zfill expandtabs').split(' '))
 
     if not arguments.length:
-        exclude = {'split', 'replace'}
+        exclude = {'split'}
     elif arguments[0]:
         exclude = Array.prototype.slice.call(arguments)
     else:

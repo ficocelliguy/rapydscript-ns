@@ -1,0 +1,202 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# base64.pyj
+# Tests for the base64 standard library module.
+
+from base64 import b64encode, b64decode, standard_b64encode, standard_b64decode
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from base64 import b32encode, b32decode
+from base64 import b16encode, b16decode
+from base64 import encodebytes, decodebytes
+from base64 import Error
+
+ae    = assrt.equal
+ade   = assrt.deepEqual
+ok    = assrt.ok
+throws = assrt.throws
+
+# Helper: convert bytes to ASCII string for easy comparison
+def _str(b):
+    return b.decode('ascii')
+
+
+# ── 1. b64encode — basic round-trips ─────────────────────────────────────────
+
+ae(_str(b64encode(bytes([]))),          '')
+ae(_str(b64encode(bytes([0]))),         'AA==')
+ae(_str(b64encode(bytes([0, 0]))),      'AAA=')
+ae(_str(b64encode(bytes([0, 0, 0]))),   'AAAA')
+ae(_str(b64encode(bytes([77, 97, 110]))), 'TWFu')  # 'Man'
+
+# Known Python vectors
+ae(_str(b64encode(bytes([104, 101, 108, 108, 111]))), 'aGVsbG8=')  # 'hello'
+ae(_str(b64encode(bytes([104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100]))), 'aGVsbG8gd29ybGQ=')  # 'hello world'
+
+
+# ── 2. b64decode ──────────────────────────────────────────────────────────────
+
+_dec1 = b64decode('TWFu')
+ade(list(_dec1), [77, 97, 110])
+
+_dec2 = b64decode('aGVsbG8=')
+ade(list(_dec2), [104, 101, 108, 108, 111])
+
+# Empty string
+ade(list(b64decode('')), [])
+
+# Missing padding — Python strips whitespace and pads internally
+_dec3 = b64decode('aGVsbG8')
+ade(list(_dec3), [104, 101, 108, 108, 111])
+
+# With embedded whitespace (stripped by default)
+_dec4 = b64decode('aGVs bG8=')
+ade(list(_dec4), [104, 101, 108, 108, 111])
+
+# Accepts bytes input
+_dec5 = b64decode(bytes([84, 87, 70, 117]))  # b'TWFu'
+ade(list(_dec5), [77, 97, 110])
+
+
+# ── 3. b64encode / b64decode with altchars ────────────────────────────────────
+
+# altchars b'-_': replaces + and /
+_enc_alt = b64encode(bytes([251, 239, 190]), altchars=bytes([45, 95]))  # b'-_'
+_enc_std = b64encode(bytes([251, 239, 190]))
+ok(_str(_enc_alt).indexOf('-') >= 0 or _str(_enc_alt).indexOf('_') >= 0
+   or (_str(_enc_alt) == _str(_enc_std)),
+   'altchars encoding should differ or be identical if no + or / present')
+
+# Round-trip with altchars
+_data_alt = bytes([200, 100, 50, 25])
+_enc2 = b64encode(_data_alt, altchars=bytes([45, 95]))
+_dec6 = b64decode(_enc2, altchars=bytes([45, 95]))
+ade(list(_dec6), list(_data_alt))
+
+
+# ── 4. standard_b64encode / standard_b64decode ────────────────────────────────
+
+_s_enc = standard_b64encode(bytes([104, 101, 108, 108, 111]))
+ae(_str(_s_enc), 'aGVsbG8=')
+
+_s_dec = standard_b64decode('aGVsbG8=')
+ade(list(_s_dec), [104, 101, 108, 108, 111])
+
+
+# ── 5. urlsafe_b64encode / urlsafe_b64decode ──────────────────────────────────
+
+# bytes([251, 239, 190]) encodes to '----' in URL-safe (all 6-bit groups are 62)
+_us_enc = urlsafe_b64encode(bytes([251, 239, 190]))
+ok(_str(_us_enc).indexOf('+') < 0,  'URL-safe should not contain +')
+ok(_str(_us_enc).indexOf('/') < 0,  'URL-safe should not contain /')
+ae(_str(_us_enc), '----')
+
+# Round-trip with data that produces + and / in standard encoding
+_us_data = bytes([251, 254, 254])   # encodes to '-_7-' in URL-safe
+_us_enc2 = urlsafe_b64encode(_us_data)
+ae(_str(_us_enc2), '-_7-')
+
+# URL-safe decode
+_us_dec = urlsafe_b64decode('-_7-')
+ade(list(_us_dec), [251, 254, 254])
+
+# Round-trip with general data
+_us_rt_data = bytes([0, 1, 2, 127, 128, 255])
+_us_rt = urlsafe_b64decode(urlsafe_b64encode(_us_rt_data))
+ade(list(_us_rt), list(_us_rt_data))
+
+
+# ── 6. b32encode / b32decode ─────────────────────────────────────────────────
+
+ae(_str(b32encode(bytes([]))),       '')
+ae(_str(b32encode(bytes([102]))),    'MY======')       # b'f'  → 'MY======'
+ae(_str(b32encode(bytes([102, 111]))), 'MZXQ====')    # b'fo' → 'MZXQ===='
+ae(_str(b32encode(bytes([102, 111, 111]))), 'MZXW6===') # b'foo'
+ae(_str(b32encode(bytes([102, 111, 111, 98]))), 'MZXW6YQ=') # b'foob'
+ae(_str(b32encode(bytes([102, 111, 111, 98, 97]))), 'MZXW6YTB') # b'fooba'
+
+# Round-trip several lengths
+for _rt_data in [bytes([]), bytes([42]), bytes([1, 2, 3]), bytes([255, 0, 128, 64])]:
+    ade(list(b32decode(b32encode(_rt_data))), list(_rt_data))
+
+# casefold
+_b32_lc = b32decode('mzxw6ytb', casefold=True)
+ade(list(_b32_lc), list(bytes([102, 111, 111, 98, 97])))
+
+
+# ── 7. b16encode / b16decode ──────────────────────────────────────────────────
+
+ae(_str(b16encode(bytes([]))),          '')
+ae(_str(b16encode(bytes([0]))),         '00')
+ae(_str(b16encode(bytes([255]))),       'FF')
+ae(_str(b16encode(bytes([0, 1, 254, 255]))), '0001FEFF')
+ae(_str(b16encode(bytes([171]))),       'AB')
+
+# Round-trip
+ade(list(b16decode(b16encode(bytes([10, 20, 30, 40, 250])))), [10, 20, 30, 40, 250])
+
+# casefold
+ade(list(b16decode('0001feff', casefold=True)), [0, 1, 254, 255])
+
+# Error on invalid hex
+_b16_err = False
+try:
+    b16decode('ZZ')
+except Error:
+    _b16_err = True
+ok(_b16_err, 'b16decode of non-hex should raise Error')
+
+# Error on odd-length string
+_b16_odd = False
+try:
+    b16decode('A')
+except Error:
+    _b16_odd = True
+ok(_b16_odd, 'b16decode of odd-length string should raise Error')
+
+
+# ── 8. encodebytes / decodebytes ──────────────────────────────────────────────
+
+# encodebytes wraps at 76 chars per line
+_long_data = bytes(list(range(57)))   # 57 bytes → exactly 76 base64 chars (one line)
+_enc_lines = encodebytes(_long_data)
+_enc_lines_str = _str(_enc_lines)
+# Each line ends with \n
+ok(_enc_lines_str[-1:] == '\n', 'encodebytes output should end with newline')
+
+# Decode should recover original
+_dec_lines = decodebytes(_enc_lines)
+ade(list(_dec_lines), list(_long_data))
+
+# More than 57 bytes → multiple lines
+_long2 = bytes(list(range(100)))
+_enc2b = encodebytes(_long2)
+ok(_str(_enc2b).split('\n').length > 2, 'long encodebytes should have multiple lines')
+ade(list(decodebytes(_enc2b)), list(_long2))
+
+# Empty bytes
+ade(list(decodebytes(encodebytes(bytes([])))), [])
+
+
+# ── 9. b64decode validate=True ────────────────────────────────────────────────
+
+# Valid input should not raise
+_valid = b64decode('aGVsbG8=', validate=True)
+ade(list(_valid), [104, 101, 108, 108, 111])
+
+# Invalid character raises Error when validate=True
+_bad_raised = False
+try:
+    b64decode('aGVs!G8=', validate=True)
+except Error:
+    _bad_raised = True
+ok(_bad_raised, 'validate=True should raise Error on non-base64 character')
+
+
+# ── 10. b64encode returns bytes ───────────────────────────────────────────────
+
+_enc_type = b64encode(bytes([1, 2, 3]))
+ok(isinstance(_enc_type, bytes), 'b64encode should return bytes')
+
+_dec_type = b64decode('AQID')
+ok(isinstance(_dec_type, bytes), 'b64decode should return bytes')

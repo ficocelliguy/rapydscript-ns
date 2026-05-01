@@ -3392,6 +3392,7 @@ One of Python's main strengths is the number of libraries available to the devel
 	                    # groupby, islice, pairwise, starmap, takewhile, zip_longest,
 	                    # product, permutations, combinations, combinations_with_replacement
 	io                  # StringIO (in-memory text stream), BytesIO (in-memory binary stream)
+	base64              # b64encode/decode, urlsafe_b64encode/decode, b32encode/decode, b16encode/decode, encodebytes/decodebytes
 
 For the most part, the logic implemented in these libraries functions identically to the Python versions. I'd be happy to include more libraries, if other members of the community want them. However, unlike most other Python-to-JavaScript compilers, RapydScript doesn't need them to be complete since there are already tons of available JavaScript libraries that it can use natively.
 
@@ -4085,7 +4086,7 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `math`        | ✅           | Full implementation in `src/lib/math.pyj`                                                     |
 | `random`      | ✅           | RC4-seeded PRNG in `src/lib/random.pyj`                                                       |
 | `re`          | ✅           | Regex wrapper in `src/lib/re.pyj`; uses the JS engine — full PCRE-level support on modern runtimes: positive/negative lookbehind (ES2018+, including variable-width), unicode via automatic `u` flag (ES2015+), `re.fullmatch()`, `re.S`/`re.NOFLAG` aliases. `MatchObject.start()`/`.end()` return exact positions on runtimes with the ES2022 `d` flag (Node 18+); heuristic fallback on older runtimes. Conditional groups `(?(id)yes\|no)` are not supported (JS limitation) and raise `re.error`. |
-| `encodings`   | ✅           | Base64 and encoding helpers; partial `base64` coverage                                        |
+| `encodings`   | ✅           | UTF-8 encode/decode helpers and low-level base64 utilities; for the standard Python API use the `base64` module instead |
 | `collections` | ✅           | `defaultdict`, `Counter`, `OrderedDict`, `deque`                                              |
 | `functools`   | ✅           | `reduce`, `partial`, `wraps`, `lru_cache`                                                     |
 | `itertools`   | ✅           | Common iteration tools                                                                        |
@@ -4099,13 +4100,14 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `datetime`    | ✅           | `date`, `time`, `datetime`, `timedelta`, `MINYEAR`, `MAXYEAR` in `src/lib/datetime.pyj`; construction, `isoformat()`, `fromisoformat()`, `today()`/`now()`, `combine()`, arithmetic (via `__add__`/`__sub__`; operators need `overload_operators`), comparisons, `replace()`, `strftime()` (%Y %m %d %H %M %S %f %A %a %B %b %j %p %I %%); no tzinfo/timezone support |
 | `json`        | ✅           | `dumps()`, `loads()`, `dump()`, `load()`, `JSONDecodeError` in `src/lib/json.pyj`; `indent`, `sort_keys`, `separators`, `dflt` (Python's `default`) callback, `object_hook`, `object_pairs_hook`, `parse_float`, `parse_int` supported; backed by the JS `JSON` global; note: `default` is a JS reserved word — use `dflt=` instead |
 | `io`          | ✅           | `StringIO`, `BytesIO`, `UnsupportedOperation` in `src/lib/io.pyj`; `read([size])`, `readline([size])`, `readlines([hint])`, `write()`, `writelines()`, `seek(pos[, whence])`, `tell()`, `truncate([pos])`, `getvalue()`, `close()`, `closed`; context manager support; `readable()`, `writable()`, `seekable()` return True; `newline` parameter accepted for API compatibility |
+| `base64`      | ✅           | `b64encode(s[, altchars])`, `b64decode(s[, altchars][, validate])`, `standard_b64encode`, `standard_b64decode`, `urlsafe_b64encode`, `urlsafe_b64decode`, `b32encode`, `b32decode([casefold][, map01])`, `b16encode`, `b16decode([casefold])`, `encodebytes`, `decodebytes`, `Error` in `src/lib/base64.pyj`; pure-JS implementation, works in browser and Node; all encode functions return `bytes` |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `asyncio`     | ❌           | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await`    |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |
 | `hmac`        | ❌           | Keyed hashing not available                                                                   |
-| `base64`      | ❌ (partial) | Partial coverage via `encodings` module; no full `base64` module                              |
+| `base64`      | ✅           | Full module in `src/lib/base64.pyj`; see Standard Library Modules table above                 |
 | `urllib`      | ❌           | URL parsing/encoding (`urllib.parse`) not available; use JS `URL` API                         |
 | `html`        | ❌           | `escape`, `unescape` not available; use JS DOM APIs                                           |
 | `csv`         | ❌           | CSV parsing not available                                                                     |

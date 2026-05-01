@@ -2246,6 +2246,138 @@ var TESTS = [
         },
     },
 
+    // ── base64 stdlib ────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_base64_encode_decode",
+        description: "base64 stdlib: b64encode/b64decode round-trips in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from base64 import b64encode, b64decode",
+                // basic encode
+                "enc = b64encode(bytes([77, 97, 110]))",
+                "assrt.equal(enc.decode('ascii'), 'TWFu')",
+                // empty
+                "assrt.equal(len(b64encode(bytes([]))), 0)",
+                // padding variants
+                "assrt.equal(b64encode(bytes([0])).decode('ascii'), 'AA==')",
+                "assrt.equal(b64encode(bytes([0, 0])).decode('ascii'), 'AAA=')",
+                "assrt.equal(b64encode(bytes([0, 0, 0])).decode('ascii'), 'AAAA')",
+                // decode round-trip
+                "msg = bytes([104, 101, 108, 108, 111])",  // hello
+                "assrt.deepEqual(list(b64decode(b64encode(msg))), list(msg))",
+                // decode accepts string input
+                "d = b64decode('TWFu')",
+                "assrt.equal(d[0], 77)",
+                "assrt.equal(d[1], 97)",
+                "assrt.equal(d[2], 110)",
+                // decode strips whitespace
+                "assrt.deepEqual(list(b64decode('aGVs bG8=')), list(msg))",
+                // missing padding accepted
+                "assrt.deepEqual(list(b64decode('aGVsbG8')), list(msg))",
+                // isinstance check
+                "assrt.ok(isinstance(b64encode(bytes([1,2,3])), bytes))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_base64_urlsafe",
+        description: "base64 stdlib: URL-safe encoding and altchars in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from base64 import urlsafe_b64encode, urlsafe_b64decode, b64encode, b64decode",
+                // URL-safe produces no + or /
+                "enc = urlsafe_b64encode(bytes([251, 239, 190]))",
+                "s = enc.decode('ascii')",
+                "assrt.ok(s.indexOf('+') < 0, 'no + in URL-safe')",
+                "assrt.ok(s.indexOf('/') < 0, 'no / in URL-safe')",
+                // -_7- decodes to [251, 254, 254]
+                "dec = urlsafe_b64decode('-_7-')",
+                "assrt.equal(dec[0], 251)",
+                "assrt.equal(dec[1], 254)",
+                "assrt.equal(dec[2], 254)",
+                // round-trip
+                "data = bytes([0, 127, 128, 255])",
+                "assrt.deepEqual(list(urlsafe_b64decode(urlsafe_b64encode(data))), list(data))",
+                // altchars
+                "enc_alt = b64encode(bytes([251, 254, 254]), altchars=bytes([45, 95]))",
+                "assrt.equal(enc_alt.decode('ascii'), '-_7-')",
+                "dec_alt = b64decode('-_7-', altchars=bytes([45, 95]))",
+                "assrt.deepEqual(list(dec_alt), [251, 254, 254])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_base64_b32_b16",
+        description: "base64 stdlib: b32encode/b32decode and b16encode/b16decode in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from base64 import b32encode, b32decode, b16encode, b16decode",
+                // b32 round-trips
+                "b32_msg = bytes([102, 111, 111])",  // 'foo'
+                "b32_enc = b32encode(b32_msg)",
+                "assrt.equal(b32_enc.decode('ascii'), 'MZXW6===')",
+                "assrt.deepEqual(list(b32decode(b32_enc)), list(b32_msg))",
+                // casefold
+                "assrt.deepEqual(list(b32decode('mzxw6===', casefold=True)), list(b32_msg))",
+                // b16 (hex) encoding
+                "b16_msg = bytes([0, 1, 254, 255])",
+                "b16_enc = b16encode(b16_msg)",
+                "assrt.equal(b16_enc.decode('ascii'), '0001FEFF')",
+                "assrt.deepEqual(list(b16decode(b16_enc)), list(b16_msg))",
+                // b16 casefold
+                "assrt.deepEqual(list(b16decode('0001feff', casefold=True)), list(b16_msg))",
+                // b16 Error on bad input
+                "b16_err = False",
+                "try:",
+                "    b16decode('ZZ')",
+                "except ValueError:",
+                "    b16_err = True",
+                "assrt.ok(b16_err, 'b16decode of non-hex raises ValueError')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_base64_encodebytes",
+        description: "base64 stdlib: encodebytes/decodebytes and validate= flag in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from base64 import encodebytes, decodebytes, b64decode",
+                // Note: catch ValueError (base64.Error subclasses ValueError).
+                // Importing 'Error' from base64 in the web-repl context would
+                // shadow the native JS Error constructor, causing issues.
+                // encodebytes wraps at 76 chars per line
+                "data = bytes(list(range(57)))",
+                "enc = encodebytes(data)",
+                "s = enc.decode('ascii')",
+                "assrt.equal(s.charCodeAt(s.length - 1), 10, 'encodebytes ends with newline')",
+                // decodebytes round-trip
+                "assrt.deepEqual(list(decodebytes(enc)), list(data))",
+                // validate=True raises on bad input (caught as ValueError)
+                "b64_err = False",
+                "try:",
+                "    b64decode('aGVs!G8=', validate=True)",
+                "except ValueError:",
+                "    b64_err = True",
+                "assrt.ok(b64_err, 'validate=True should raise ValueError on non-base64 char')",
+                // validate=True passes on good input
+                "good = b64decode('aGVsbG8=', validate=True)",
+                "assrt.equal(good[0], 104)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",

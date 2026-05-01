@@ -235,7 +235,7 @@ strings()
 ae('  hello  '.strip(), 'hello')
 ae('hello world'.upper(), 'HELLO WORLD')
 
-# ── 15. strings() leaves replace() as JS version; split() defaults to ' ' ─────
+# ── 15. strings() patches replace(); split() defaults to ' ' ──────────────────
 # (strings() is active from section 14 above)
 # Python str.split() with no args: splits on any whitespace, strips leading/trailing.
 # RapydScript .split() with no args: transpiles to .split(" ") — splits on single space.
@@ -248,11 +248,9 @@ ade(str.split('a  b c'), ['a', 'b', 'c'])
 ade('a  b'.split(), ['a', '', 'b'])   # double space → empty token between
 ade('a b'.split(' '), ['a', 'b'])     # explicit ' ' separator still works
 
-# Python str.replace() vs JS String.prototype.replace():
-# Python replaces ALL occurrences by default.
-# JS .replace() with a string pattern only replaces the FIRST occurrence.
+# str.replace() and String.prototype.replace() both use Python semantics (replace all).
 ae(str.replace('aaa', 'a', 'b'), 'bbb')     # Python: replaces all
-ae('aaa'.replace('a', 'b'), 'baa')           # JS: replaces only first
+ae('aaa'.replace('a', 'b'), 'bbb')           # also replaces all (pythonized)
 
 # ── 16. Method binding — not automatic ──────────────────────────────────────
 # Python: bound methods carry a reference to self.
