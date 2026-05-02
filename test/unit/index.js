@@ -5376,12 +5376,20 @@ function run_tests(filter) {
                     "  –  " + test.description);
     });
 
+    var passed = tests.length - failures.length;
     console.log("");
     if (failures.length) {
-        console.log(colored(failures.length + " test(s) failed.", "red"));
-    } else {
-        console.log(colored("All " + tests.length + " unit tests passed!", "green"));
+        console.log(colored("Failed tests:", "red"));
+        failures.forEach(function (name) {
+            console.log(colored("  ✗ " + name, "red"));
+        });
+        console.log("");
     }
+    var summary = "unit tests — " +
+        colored("passed: " + passed, "green") + "  " +
+        (failures.length ? colored("failed: " + failures.length, "red") : colored("failed: 0", "green")) +
+        "  total: " + tests.length;
+    console.log(summary);
     process.exit(failures.length ? 1 : 0);
 }
 

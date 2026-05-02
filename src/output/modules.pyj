@@ -94,7 +94,7 @@ def declare_exports(module_id, exports, output, docstrings):
 def _inject_pythonize_strings(output):
     str_funcs = ('capitalize strip lstrip rstrip islower isupper isspace lower upper swapcase title'
         ' center count endswith startswith find rfind index rindex format join ljust rjust'
-        ' partition rpartition splitlines zfill').split(' ')
+        ' partition rpartition replace splitlines zfill').split(' ')
     output.newline()
     output.indent()
     output.print('(function(){var _f=' + JSON.stringify(str_funcs) + ';for(var _i=0;_i<_f.length;_i++)String.prototype[_f[_i]]=\u03c1\u03c3_str.prototype[_f[_i]];})()')

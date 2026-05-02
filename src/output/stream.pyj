@@ -54,7 +54,6 @@ output_stream_defaults = {
     'module_cache_dir': '',
     'js_version':5,
     'write_name': True,
-    'omit_function_metadata': False,
     'pythonize_strings': False,
     'repl_mode': False,
 }

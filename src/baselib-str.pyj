@@ -663,6 +663,8 @@ define_str_func('rpartition', def(sep):
 
 define_str_func('replace', def(old, repl, count):
     string = this
+    if v'old instanceof RegExp':
+        return ρσ_orig_replace(string, old, repl)
     if count is 0:
         return string
     count = count if count > 0 else Number.MAX_VALUE

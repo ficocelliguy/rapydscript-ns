@@ -103,7 +103,6 @@ assert.deepEqual = function (a, b, message) {
 // Compile RapydScript using the web-repl's own compile() path (same as browser)
 function bundle_compile(repl, src) {
     return repl.compile(src, {
-        omit_function_metadata: false,
         tree_shake: false,
         keep_baselib: true,
     });
@@ -2461,12 +2460,20 @@ function run_tests(filter) {
         }
     });
 
+    var passed = tests.length - failures.length;
     console.log("");
     if (failures.length) {
-        console.log(colored(failures.length + " test(s) failed.", "red"));
-    } else {
-        console.log(colored("All " + tests.length + " web-repl tests passed!", "green"));
+        console.log(colored("Failed tests:", "red"));
+        failures.forEach(function (name) {
+            console.log(colored("  ✗ " + name, "red"));
+        });
+        console.log("");
     }
+    var summary = "web-repl tests — " +
+        colored("passed: " + passed, "green") + "  " +
+        (failures.length ? colored("failed: " + failures.length, "red") : colored("failed: 0", "green")) +
+        "  total: " + tests.length;
+    console.log(summary);
     process.exit(failures.length ? 1 : 0);
 }
 

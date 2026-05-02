@@ -19,10 +19,13 @@ class Exception(Error):
 class AttributeError(Exception):
     pass
 
-class IndexError(Exception):
+class LookupError(Exception):
     pass
 
-class KeyError(Exception):
+class IndexError(LookupError):
+    pass
+
+class KeyError(LookupError):
     pass
 
 class ValueError(Exception):

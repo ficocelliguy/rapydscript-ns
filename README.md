@@ -3892,7 +3892,6 @@ original `.py` file with working breakpoints and correct error stack frames.
 | `python_flags` | string | — | Comma-separated Python flags to enable for this compilation (e.g. `"dict_literals,overload_operators"`). See [Python Flags](#python-flags) above. Flags set here override any inherited from a previous `compile()` call on a streaming compiler. |
 | `virtual_files` | `{name: source}` | — | Map of module-name → RapydScript source for modules importable via `import`. Only used when the underlying streaming compiler was created with a virtual-file context (as `web_repl()` does). |
 | `discard_asserts` | bool | `false` | Strip all `assert` statements from the output. |
-| `omit_function_metadata` | bool | `false` | Omit per-function metadata (e.g. argument names) from the output for smaller bundles. |
 | `write_name` | bool | `false` | Emit a `var __name__ = "…"` assignment at the top of the output. |
 | `tree_shake` | bool | `false` | Remove unused imported names from the output (requires stdlib imports). |
 | `filename` | string | `'<input>'` | Source filename embedded in the source map and used in error messages. |
@@ -4112,13 +4111,13 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `json`        | ✅           | `dumps()`, `loads()`, `dump()`, `load()`, `JSONDecodeError` in `src/lib/json.pyj`; `indent`, `sort_keys`, `separators`, `dflt` (Python's `default`) callback, `object_hook`, `object_pairs_hook`, `parse_float`, `parse_int` supported; backed by the JS `JSON` global; note: `default` is a JS reserved word — use `dflt=` instead |
 | `io`          | ✅           | `StringIO`, `BytesIO`, `UnsupportedOperation` in `src/lib/io.pyj`; `read([size])`, `readline([size])`, `readlines([hint])`, `write()`, `writelines()`, `seek(pos[, whence])`, `tell()`, `truncate([pos])`, `getvalue()`, `close()`, `closed`; context manager support; `readable()`, `writable()`, `seekable()` return True; `newline` parameter accepted for API compatibility |
 | `base64`      | ✅           | `b64encode(s[, altchars])`, `b64decode(s[, altchars][, validate])`, `standard_b64encode`, `standard_b64decode`, `urlsafe_b64encode`, `urlsafe_b64decode`, `b32encode`, `b32decode([casefold][, map01])`, `b16encode`, `b16decode([casefold])`, `encodebytes`, `decodebytes`, `Error` in `src/lib/base64.pyj`; pure-JS implementation, works in browser and Node; all encode functions return `bytes` |
+| `base64`      | ✅           | Full module in `src/lib/base64.pyj`; see Standard Library Modules table above                 |
 | `string`      | ❌           | Character constants, `Template`, `Formatter` not available                                    |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `asyncio`     | ❌           | Event loop, `gather`, `sleep`, `Queue`, `Task` wrappers not available; use `async`/`await`    |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |
 | `hmac`        | ❌           | Keyed hashing not available                                                                   |
-| `base64`      | ✅           | Full module in `src/lib/base64.pyj`; see Standard Library Modules table above                 |
 | `urllib`      | ❌           | URL parsing/encoding (`urllib.parse`) not available; use JS `URL` API                         |
 | `html`        | ❌           | `escape`, `unescape` not available; use JS DOM APIs                                           |
 | `csv`         | ❌           | CSV parsing not available                                                                     |
