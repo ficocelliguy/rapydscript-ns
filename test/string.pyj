@@ -1,0 +1,245 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# string.pyj
+# Tests for the string standard library module.
+
+from string import (
+    ascii_lowercase, ascii_uppercase, ascii_letters,
+    digits, hexdigits, octdigits,
+    punctuation, whitespace, printable,
+    Template, Formatter,
+)
+
+ae     = assrt.equal
+ade    = assrt.deepEqual
+ok     = assrt.ok
+throws = assrt.throws
+
+
+# ── 1. Character constants ────────────────────────────────────────────────────
+
+ae(len(ascii_lowercase), 26)
+ae(ascii_lowercase[0],  'a')
+ae(ascii_lowercase[25], 'z')
+
+ae(len(ascii_uppercase), 26)
+ae(ascii_uppercase[0],  'A')
+ae(ascii_uppercase[25], 'Z')
+
+ae(ascii_letters, ascii_lowercase + ascii_uppercase)
+ae(len(ascii_letters), 52)
+
+ae(digits, '0123456789')
+ae(len(digits), 10)
+
+ae(hexdigits, '0123456789abcdefABCDEF')
+ae(len(hexdigits), 22)
+
+ae(octdigits, '01234567')
+ae(len(octdigits), 8)
+
+# punctuation: 32 chars, contains known members
+ae(len(punctuation), 32)
+ok(punctuation.indexOf('!') >= 0)
+ok(punctuation.indexOf('~') >= 0)
+ok(punctuation.indexOf('\\') >= 0)   # backslash present
+ok(punctuation.indexOf('`') >= 0)    # backtick present
+ok(punctuation.indexOf("'") >= 0)    # single-quote present
+
+# whitespace: space, tab, newline, carriage-return, vertical-tab, form-feed
+ae(len(whitespace), 6)
+ok(whitespace.indexOf(' ') >= 0)
+ok(whitespace.indexOf('\t') >= 0)
+ok(whitespace.indexOf('\n') >= 0)
+
+# printable is a concatenation of the four sets
+ae(len(printable), len(digits) + len(ascii_letters) + len(punctuation) + len(whitespace))
+ok(printable.indexOf('A') >= 0)
+ok(printable.indexOf('0') >= 0)
+ok(printable.indexOf('!') >= 0)
+ok(printable.indexOf(' ') >= 0)
+
+
+# ── 2. Template — basic substitution ─────────────────────────────────────────
+
+t1 = Template('Hello $name!')
+ae(t1.substitute({'name': 'World'}), 'Hello World!')
+
+# $$ → literal $
+t2 = Template('Price: $$5.00')
+ae(t2.substitute({}), 'Price: $5.00')
+
+# ${identifier} brace form
+t3 = Template('${foo}bar')
+ae(t3.substitute({'foo': 'baz'}), 'bazbar')
+
+# template attribute
+ae(t1.template, 'Hello $name!')
+
+# multiple substitutions in one string
+t4 = Template('$a + $b = $c')
+ae(t4.substitute({'a': '1', 'b': '2', 'c': '3'}), '1 + 2 = 3')
+
+# numeric values coerced to string
+t5 = Template('$x items')
+ae(t5.substitute({'x': 42}), '42 items')
+
+# None → 'None'
+t6 = Template('val=$v')
+ae(t6.substitute({'v': None}), 'val=None')
+
+
+# ── 3. Template — missing key errors ─────────────────────────────────────────
+
+err_missing = False
+try:
+    Template('Hello $missing').substitute({})
+except KeyError:
+    err_missing = True
+ok(err_missing)
+
+# safe_substitute leaves unknown placeholder intact
+ae(Template('Hello $missing').safe_substitute({}), 'Hello $missing')
+ae(Template('${missing} world').safe_substitute({}), '${missing} world')
+
+# safe_substitute replaces known, leaves unknown
+t7 = Template('$a and $b')
+ae(t7.safe_substitute({'a': 'yes'}), 'yes and $b')
+
+
+# ── 4. Template — edge cases ─────────────────────────────────────────────────
+
+# leading/trailing dollar
+ae(Template('$$').substitute({}), '$')
+ae(Template('$$$$').substitute({}), '$$')
+
+# empty template
+ae(Template('').substitute({}), '')
+ae(Template('').safe_substitute({}), '')
+
+# no placeholders
+ae(Template('plain text').substitute({}), 'plain text')
+
+# trailing $ — safe_substitute leaves it, substitute raises ValueError
+ae(Template('end$').safe_substitute({}), 'end$')
+
+err_dollar = False
+try:
+    Template('end$').substitute({})
+except ValueError:
+    err_dollar = True
+ok(err_dollar)
+
+# class attributes
+ae(Template.delimiter, '$')
+
+
+# ── 5. Formatter — positional args ───────────────────────────────────────────
+
+f = Formatter()
+
+ae(f.format('Hello {}!', 'World'), 'Hello World!')
+ae(f.format('{0} {1}', 'a', 'b'), 'a b')
+ae(f.format('{1} {0}', 'a', 'b'), 'b a')
+ae(f.format('no fields'), 'no fields')
+ae(f.format('{0}{0}{0}', 'x'), 'xxx')
+
+
+# ── 6. Formatter — format specs ──────────────────────────────────────────────
+
+ae(f.format('{:.2f}', 3.14159), '3.14')
+ae(f.format('{:d}', 42), '42')
+ae(f.format('{:05d}', 7), '00007')
+ae(f.format('{:>10}', 'hi'), '        hi')
+ae(f.format('{:<10}', 'hi'), 'hi        ')
+ae(f.format('{:^5}', 'x'), '  x  ')
+ae(f.format('{:x}', 255), 'ff')
+ae(f.format('{:X}', 255), 'FF')
+ae(f.format('{:b}', 10), '1010')
+ae(f.format('{:o}', 8), '10')
+ae(f.format('{:e}', 100000.0), '1.000000e+5')
+
+# {{ }} escaping
+ae(f.format('{{ }}'), '{ }')
+ae(f.format('{{{0}}}', 'inner'), '{inner}')
+
+
+# ── 7. Formatter — conversion flags ──────────────────────────────────────────
+
+ae(f.format('{0!s}', 42), '42')
+
+# repr adds quotes around strings
+_repr_result = f.format('{0!r}', 'hi')
+ok(_repr_result.indexOf('hi') >= 0)
+
+
+# ── 8. Formatter — vformat with named kwargs ─────────────────────────────────
+
+ae(f.vformat('{name}', [], {'name': 'Alice'}), 'Alice')
+ae(f.vformat('{x} + {y}', [], {'x': '1', 'y': '2'}), '1 + 2')
+ae(f.vformat('{0} {name}', ['hi'], {'name': 'Bob'}), 'hi Bob')
+
+
+# ── 9. Formatter — parse() ───────────────────────────────────────────────────
+
+_parsed = f.parse('literal {0} more {name!r:.5}')
+ae(len(_parsed), 3)
+# first item: literal before first field
+ae(_parsed[0][0], 'literal ')
+ae(_parsed[0][1], '0')
+ae(_parsed[0][2], '')
+ae(_parsed[0][3], None)
+# second item
+ae(_parsed[1][0], ' more ')
+ae(_parsed[1][1], 'name')
+ae(_parsed[1][2], '.5')
+ae(_parsed[1][3], 'r')
+# trailing literal
+ae(_parsed[2][0], '')
+ae(_parsed[2][1], None)
+
+# parse with only a trailing literal
+_p2 = f.parse('no fields here')
+ae(len(_p2), 1)
+ae(_p2[0][0], 'no fields here')
+ae(_p2[0][1], None)
+
+
+# ── 10. Formatter — subclassing ──────────────────────────────────────────────
+
+class UpperFormatter(Formatter):
+    def format_field(self, value, format_spec):
+        result = Formatter.format_field(self, value, format_spec)
+        return v'result.toUpperCase()'
+
+uf = UpperFormatter()
+ae(uf.format('Hello {0}!', 'world'), 'Hello WORLD!')
+ae(uf.format('{0}', 'lower'), 'LOWER')
+
+
+# ── 11. Formatter — get_value / get_field ────────────────────────────────────
+
+ae(f.get_value(0, ['a', 'b'], {}), 'a')
+ae(f.get_value(1, ['a', 'b'], {}), 'b')
+ae(f.get_value('x', [], {'x': 99}), 99)
+
+# get_field with dotted access
+_obj = {'name': 'Alice'}
+_gf = f.get_field('0', [_obj], {})
+ae(_gf[1], '0')  # first key used
+
+
+# ── 12. Formatter — convert_field ────────────────────────────────────────────
+
+ae(f.convert_field(42, 's'), '42')
+ok(f.convert_field(42, 'r').indexOf('42') >= 0)
+ae(f.convert_field('x', None), 'x')
+ae(f.convert_field('x', undefined), 'x')
+
+_bad_conv = False
+try:
+    f.convert_field(1, 'z')
+except ValueError:
+    _bad_conv = True
+ok(_bad_conv)

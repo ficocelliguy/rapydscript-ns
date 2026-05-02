@@ -2413,6 +2413,122 @@ var TESTS = [
         },
     },
 
+    // ── string stdlib ────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_string_constants",
+        description: "string stdlib: character constants in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from string import (",
+                "    ascii_lowercase, ascii_uppercase, ascii_letters,",
+                "    digits, hexdigits, octdigits,",
+                "    punctuation, whitespace, printable,",
+                ")",
+                // lengths
+                "assrt.equal(len(ascii_lowercase), 26)",
+                "assrt.equal(len(ascii_uppercase), 26)",
+                "assrt.equal(len(ascii_letters),   52)",
+                "assrt.equal(len(digits),    10)",
+                "assrt.equal(len(hexdigits), 22)",
+                "assrt.equal(len(octdigits),  8)",
+                "assrt.equal(len(punctuation), 32)",
+                "assrt.equal(len(whitespace),   6)",
+                "assrt.equal(len(printable), len(digits) + len(ascii_letters) + len(punctuation) + len(whitespace))",
+                // spot-checks
+                "assrt.equal(ascii_letters, ascii_lowercase + ascii_uppercase)",
+                "assrt.ok(digits.indexOf('5') >= 0)",
+                "assrt.ok(hexdigits.indexOf('f') >= 0)",
+                "assrt.ok(punctuation.indexOf('!') >= 0)",
+                "assrt.ok(whitespace.indexOf(' ') >= 0)",
+                "assrt.ok(printable.indexOf('A') >= 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_string_template",
+        description: "string stdlib: Template class in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from string import Template",
+                // basic substitution
+                "t1 = Template('Hello $name!')",
+                "assrt.equal(t1.substitute({'name': 'World'}), 'Hello World!')",
+                // $$ → $
+                "assrt.equal(Template('Price: $$5').substitute({}), 'Price: $5')",
+                // brace form
+                "assrt.equal(Template('${x}bar').substitute({'x': 'foo'}), 'foobar')",
+                // multiple fields
+                "assrt.equal(Template('$a and $b').substitute({'a': '1', 'b': '2'}), '1 and 2')",
+                // numeric value
+                "assrt.equal(Template('n=$n').substitute({'n': 42}), 'n=42')",
+                // safe_substitute leaves missing intact
+                "assrt.equal(Template('$x $y').safe_substitute({'x': 'hi'}), 'hi $y')",
+                // safe_substitute with all keys
+                "assrt.equal(Template('$a').safe_substitute({'a': 'z'}), 'z')",
+                // substitute raises KeyError for missing key
+                "_t_err = False",
+                "try:",
+                "    Template('Hello $missing').substitute({})",
+                "except KeyError:",
+                "    _t_err = True",
+                "assrt.ok(_t_err)",
+                // template attribute
+                "assrt.equal(Template('hello $x').template, 'hello $x')",
+                // class attribute
+                "assrt.equal(Template.delimiter, '$')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_string_formatter",
+        description: "string stdlib: Formatter class in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from string import Formatter",
+                "f = Formatter()",
+                // positional args
+                "assrt.equal(f.format('Hello {}!', 'World'), 'Hello World!')",
+                "assrt.equal(f.format('{0} {1}', 'a', 'b'), 'a b')",
+                "assrt.equal(f.format('{1} {0}', 'a', 'b'), 'b a')",
+                "assrt.equal(f.format('no fields'), 'no fields')",
+                // format specs
+                "assrt.equal(f.format('{:.2f}', 3.14159), '3.14')",
+                "assrt.equal(f.format('{:d}', 42), '42')",
+                "assrt.equal(f.format('{:x}', 255), 'ff')",
+                // {{ }} escaping
+                "assrt.equal(f.format('{{ }}'), '{ }')",
+                // vformat with named kwargs
+                "assrt.equal(f.vformat('{name}', [], {'name': 'Alice'}), 'Alice')",
+                "assrt.equal(f.vformat('{0} {name}', ['hi'], {'name': 'Bob'}), 'hi Bob')",
+                // convert_field
+                "assrt.equal(f.convert_field(42, 's'), '42')",
+                "assrt.equal(f.convert_field('x', None), 'x')",
+                // format_field
+                "assrt.equal(f.format_field(3.14159, '.2f'), '3.14')",
+                "assrt.equal(f.format_field('hi', ''), 'hi')",
+                // get_value
+                "assrt.equal(f.get_value(0, ['a', 'b'], {}), 'a')",
+                "assrt.equal(f.get_value('x', [], {'x': 99}), 99)",
+                // parse
+                "_p = f.parse('lit {0:.2f} end')",
+                "assrt.equal(_p[0][0], 'lit ')",
+                "assrt.equal(_p[0][1], '0')",
+                "assrt.equal(_p[0][2], '.2f')",
+                "assrt.equal(_p[1][0], ' end')",
+                "assrt.equal(_p[1][1], None)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",
