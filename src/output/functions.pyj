@@ -169,8 +169,6 @@ def has_annotations(self):
     return False
 
 def function_annotation(self, output, strip_first, name):
-    if output.options.omit_function_metadata:
-        return
     fname = name or (self.name.name if self.name else anonfunc)
     props = Object.create(None)
 

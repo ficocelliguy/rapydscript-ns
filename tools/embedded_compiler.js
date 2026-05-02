@@ -28,8 +28,8 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
     runjs(print_ast(compiler.parse(''), true));
     runjs('var __name__ = "' + (name || '__embedded__') + '";');
 
-    function print_ast(ast, keep_baselib, keep_docstrings, js_version, private_scope, write_name, omit_function_metadata, pythonize_strings) {
-        var output_options = {omit_baselib:!keep_baselib, write_name:!!write_name, private_scope:!!private_scope, beautify:true, js_version: (js_version || 6), keep_docstrings:keep_docstrings, omit_function_metadata:!!omit_function_metadata, pythonize_strings:!!pythonize_strings};
+    function print_ast(ast, keep_baselib, keep_docstrings, js_version, private_scope, write_name, pythonize_strings) {
+        var output_options = {omit_baselib:!keep_baselib, write_name:!!write_name, private_scope:!!private_scope, beautify:true, js_version: (js_version || 6), keep_docstrings:keep_docstrings, pythonize_strings:!!pythonize_strings};
         if (keep_baselib) output_options.baselib_plain = baselib;
         var output = new compiler.OutputStream(output_options);
         ast.print(output);
@@ -105,8 +105,8 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
         });
     }
 
-    function print_ast_with_sourcemap(ast, keep_baselib, keep_docstrings, js_version, private_scope, write_name, omit_function_metadata, pythonize_strings, source_name, source_content) {
-        var output_options = {omit_baselib:!keep_baselib, write_name:!!write_name, private_scope:!!private_scope, beautify:true, js_version:(js_version||6), keep_docstrings:keep_docstrings, omit_function_metadata:!!omit_function_metadata, pythonize_strings:!!pythonize_strings};
+    function print_ast_with_sourcemap(ast, keep_baselib, keep_docstrings, js_version, private_scope, write_name, pythonize_strings, source_name, source_content) {
+        var output_options = {omit_baselib:!keep_baselib, write_name:!!write_name, private_scope:!!private_scope, beautify:true, js_version:(js_version||6), keep_docstrings:keep_docstrings, pythonize_strings:!!pythonize_strings};
         if (keep_baselib) output_options.baselib_plain = baselib;
         var raw_mappings = [];
         var output = new compiler.OutputStream(output_options);
@@ -171,7 +171,7 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
                 });
             }
             var pythonize_strings = (opts.legacy_rapydscript !== true) ? true : !!opts.pythonize_strings;
-            var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, opts.omit_function_metadata, pythonize_strings);
+            var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, pythonize_strings);
             if (opts.export_main) {
                 ans = ans.replace(/^(function\smain)/gm, 'export $1')
                     .replace(/^(async\sfunction\smain)/gm, 'export $1');
@@ -233,7 +233,7 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
             var result = print_ast_with_sourcemap(
                 this.toplevel,
                 opts.keep_baselib, opts.keep_docstrings, opts.js_version,
-                opts.private_scope, opts.write_name, opts.omit_function_metadata,
+                opts.private_scope, opts.write_name,
                 pythonize_strings_sm,
                 opts.filename || '<input>',
                 code

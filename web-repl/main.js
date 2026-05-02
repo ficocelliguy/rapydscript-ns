@@ -18,7 +18,7 @@
     };
 
     function compile(code) {
-        return web_repl.compile(code, {omit_function_metadata: false, tree_shake: false, export_main: true, virtual_files: VIRTUAL_FILES, legacy_rapydscript: false});
+        return web_repl.compile(code, {tree_shake: false, export_main: true, virtual_files: VIRTUAL_FILES, legacy_rapydscript: false});
     }
 
     function runjs(code) {
