@@ -1,0 +1,86 @@
+###########################################################
+# RapydScript Standard Library
+# urllib.request — HTTP requests via the Fetch API
+###########################################################
+#
+# Provides:
+#   urlopen(url[, data[, timeout]])  — open a URL; returns a Promise
+#
+# Usage (inside an async function):
+#   from urllib.request import urlopen
+#
+#   async def fetch_json(url):
+#       resp = await urlopen(url)
+#       data = await resp.json()
+#       return data
+#
+# The response object exposes:
+#   .status   -- HTTP status code (int)
+#   .reason   -- HTTP status text (str)
+#   .url      -- final URL after any redirects (str)
+#   .headers  -- plain dict of lowercase header names → values
+#   .read()   -- Promise → response body as a string
+#   .json()   -- Promise → parsed JSON response body
+#   .close()  -- no-op (for API compatibility)
+#
+# Raises urllib.error.HTTPError for non-2xx responses.
+# Raises urllib.error.URLError for network/timeout failures.
+#
+# Note: urlopen() wraps the browser/Node Fetch API and therefore returns a
+# Promise.  It must be awaited inside an async function.  There is no
+# synchronous version because JavaScript has no synchronous HTTP.
+
+from urllib.error import URLError, HTTPError
+
+
+def urlopen(url, data=None, timeout=None):
+    """Open url, returning a Promise that resolves to a response object.
+
+    url     -- the URL to open (string)
+    data    -- if given, the request uses POST and sends data as the body
+    timeout -- seconds before an AbortController cancels the request (float)
+
+    On success the Promise resolves to an object with .status, .reason, .url,
+    .headers, .read(), .json(), and .close() (see module docstring).
+    On HTTP error (non-2xx status) the Promise rejects with HTTPError.
+    On network failure the Promise rejects with URLError.
+    """
+    v"""
+    var _opts = { method: data != null ? 'POST' : 'GET' };
+    if (data != null) {
+        _opts.body = data;
+        _opts.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    }
+    var _abort = null;
+    if (timeout != null && typeof AbortController !== 'undefined') {
+        var _ctrl = new AbortController();
+        _opts.signal = _ctrl.signal;
+        _abort = setTimeout(function() { _ctrl.abort(); }, timeout * 1000);
+    }
+    return Promise.resolve()
+        .then(function() { return fetch(url, _opts); })
+        .then(function(resp) {
+            if (_abort) { clearTimeout(_abort); _abort = null; }
+            var hdrs = {};
+            if (resp.headers && typeof resp.headers.forEach === 'function') {
+                resp.headers.forEach(function(v, k) { hdrs[k] = v; });
+            }
+            if (!resp.ok) {
+                throw new HTTPError(resp.url, resp.status, resp.statusText, hdrs, null);
+            }
+            return {
+                status:  resp.status,
+                reason:  resp.statusText,
+                url:     resp.url,
+                headers: hdrs,
+                read:    function() { return resp.text(); },
+                json:    function() { return resp.json(); },
+                close:   function() {}
+            };
+        })
+        .catch(function(e) {
+            if (_abort) { clearTimeout(_abort); _abort = null; }
+            if (e instanceof HTTPError) throw e;
+            throw new URLError(String(e));
+        });
+    """

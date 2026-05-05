@@ -61,12 +61,27 @@ var LIB_DIR = path.join(__dirname, "../../src/lib");
 
 /**
  * Return the module names of all .pyj files currently in src/lib/.
+ * Also includes sub-package directory names that contain an __init__.pyj.
  * Excludes cache files (.pyj-cached) and any non-.pyj entries.
  */
 function get_lib_module_names() {
-    return fs.readdirSync(LIB_DIR)
-        .filter(function (f) { return f.endsWith(".pyj") && !f.endsWith(".pyj-cached"); })
-        .map(function (f) { return f.replace(/\.pyj$/, ""); });
+    var names = [];
+    fs.readdirSync(LIB_DIR).forEach(function (f) {
+        if (f.endsWith(".pyj-cached")) return;
+        if (f.endsWith(".pyj")) {
+            names.push(f.replace(/\.pyj$/, ""));
+        } else {
+            // Directory with __init__.pyj counts as a package module.
+            var full = path.join(LIB_DIR, f);
+            try {
+                var stat = fs.statSync(full);
+                if (stat.isDirectory() && fs.existsSync(path.join(full, "__init__.pyj"))) {
+                    names.push(f);
+                }
+            } catch (e) {}
+        }
+    });
+    return names;
 }
 
 function make_tests(Diagnostics, RS, STDLIB_MODULES) {

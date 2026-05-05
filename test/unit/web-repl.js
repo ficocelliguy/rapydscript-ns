@@ -2919,6 +2919,155 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_urllib_parse_quote",
+        description: "urllib.parse stdlib: quote, unquote, quote_plus, unquote_plus in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from urllib.parse import quote, unquote, quote_plus, unquote_plus",
+                // quote: basic
+                "assrt.equal(quote('hello world'), 'hello%20world')",
+                "assrt.equal(quote('a/b/c'), 'a/b/c')",          // '/' safe by default
+                "assrt.equal(quote('a/b/c', safe=''), 'a%2Fb%2Fc')",
+                "assrt.equal(quote('abc123-_.~'), 'abc123-_.~')", // RFC 3986 unreserved
+                "assrt.equal(quote('a+b'), 'a%2Bb')",
+                "assrt.equal(quote('!*'), '%21%2A')",             // sub-delimiters encoded
+                // unquote
+                "assrt.equal(unquote('hello%20world'), 'hello world')",
+                "assrt.equal(unquote('a%2Fb'), 'a/b')",
+                "assrt.equal(unquote('a%2Bb'), 'a+b')",           // '+' not decoded by unquote
+                // quote_plus / unquote_plus
+                "assrt.equal(quote_plus('hello world'), 'hello+world')",
+                "assrt.equal(quote_plus('a+b'), 'a%2Bb')",
+                "assrt.equal(unquote_plus('hello+world'), 'hello world')",
+                "assrt.equal(unquote_plus('a%2Bb'), 'a+b')",
+                // round-trips
+                "s = 'a/b c+d=e&f'",
+                "assrt.equal(unquote(quote(s, safe='')), s)",
+                "assrt.equal(unquote_plus(quote_plus(s, safe='')), s)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_urllib_parse_urlencode",
+        description: "urllib.parse stdlib: urlencode, parse_qs, parse_qsl in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from urllib.parse import urlencode, parse_qs, parse_qsl",
+                // urlencode with list of pairs
+                "assrt.equal(urlencode([['a', '1'], ['b', '2']]), 'a=1&b=2')",
+                "assrt.equal(urlencode([['q', 'hello world']]), 'q=hello%20world')",
+                "assrt.equal(urlencode([]), '')",
+                // doseq
+                "assrt.equal(urlencode([['a', ['x', 'y']]], doseq=True), 'a=x&a=y')",
+                // parse_qsl
+                "pairs = parse_qsl('a=1&b=2&a=3')",
+                "assrt.equal(pairs.length, 3)",
+                "assrt.equal(pairs[0][0], 'a')",
+                "assrt.equal(pairs[0][1], '1')",
+                "assrt.equal(pairs[2][0], 'a')",
+                "assrt.equal(pairs[2][1], '3')",
+                "assrt.equal(parse_qsl('a=hello+world')[0][1], 'hello world')",
+                "assrt.equal(parse_qsl('q=a%20b')[0][1], 'a b')",
+                // parse_qs
+                "d = parse_qs('a=1&b=2&a=3')",
+                "assrt.equal(d['a'].length, 2)",
+                "assrt.equal(d['a'][0], '1')",
+                "assrt.equal(d['a'][1], '3')",
+                "assrt.equal(d['b'][0], '2')",
+                "assrt.equal(parse_qs('q=hello+world')['q'][0], 'hello world')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_urllib_parse_urlparse",
+        description: "urllib.parse stdlib: urlsplit, urlparse, urljoin, urlunsplit in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from urllib.parse import urlsplit, urlunsplit, urlparse, urlunparse, urljoin",
+                // urlsplit
+                "r = urlsplit('http://example.com/path?q=1#frag')",
+                "assrt.equal(r.scheme,   'http')",
+                "assrt.equal(r.netloc,   'example.com')",
+                "assrt.equal(r.path,     '/path')",
+                "assrt.equal(r.query,    'q=1')",
+                "assrt.equal(r.fragment, 'frag')",
+                "assrt.equal(r.hostname, 'example.com')",
+                "assrt.equal(r.port,     None)",
+                // authority with user:pass@host:port
+                "r2 = urlsplit('https://user:pw@host:8080/p?x=1')",
+                "assrt.equal(r2.hostname, 'host')",
+                "assrt.equal(r2.port,     8080)",
+                "assrt.equal(r2.username, 'user')",
+                "assrt.equal(r2.password, 'pw')",
+                // urlparse splits params
+                "r3 = urlparse('http://example.com/path;params?q=1#frag')",
+                "assrt.equal(r3.path,   '/path')",
+                "assrt.equal(r3.params, 'params')",
+                // urlunsplit round-trip
+                "assrt.equal(urlunsplit(('http', 'example.com', '/path', 'q=1', 'frag')), 'http://example.com/path?q=1#frag')",
+                "assrt.equal(urlunsplit(('http', 'example.com', '/path', '', '')),         'http://example.com/path')",
+                // urlunparse with params
+                "assrt.equal(urlunparse(('http', 'example.com', '/path', 'par', 'q=1', 'frag')), 'http://example.com/path;par?q=1#frag')",
+                // geturl round-trip
+                "r4 = urlsplit('http://example.com/path?q=1#frag')",
+                "assrt.equal(r4.geturl(), 'http://example.com/path?q=1#frag')",
+                // urljoin
+                "assrt.equal(urljoin('http://example.com/foo',  'bar'),               'http://example.com/bar')",
+                "assrt.equal(urljoin('http://example.com/foo/', 'bar'),               'http://example.com/foo/bar')",
+                "assrt.equal(urljoin('http://example.com/',     '/other'),            'http://example.com/other')",
+                "assrt.equal(urljoin('http://example.com/foo',  'http://other.com/'), 'http://other.com/')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_urllib_error",
+        description: "urllib.error stdlib: URLError and HTTPError exception classes in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from urllib.error import URLError, HTTPError",
+                // URLError
+                "caught_url = False",
+                "try:",
+                "    raise URLError('network failure')",
+                "except URLError as e:",
+                "    caught_url = True",
+                "    assrt.ok('network failure' in str(e.reason))",
+                "assrt.ok(caught_url)",
+                // HTTPError
+                "caught_http = False",
+                "try:",
+                "    raise HTTPError('http://example.com', 404, 'Not Found', {}, None)",
+                "except HTTPError as e:",
+                "    caught_http = True",
+                "    assrt.equal(e.code, 404)",
+                "    assrt.equal(e.msg, 'Not Found')",
+                "    assrt.equal(e.getcode(), 404)",
+                "    assrt.equal(e.geturl(), 'http://example.com')",
+                "assrt.ok(caught_http)",
+                // HTTPError is caught by URLError handler
+                "caught_as_url = False",
+                "try:",
+                "    raise HTTPError('http://x.com', 500, 'Server Error', {}, None)",
+                "except URLError as e:",
+                "    caught_as_url = True",
+                "    assrt.equal(e.code, 500)",
+                "assrt.ok(caught_as_url)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

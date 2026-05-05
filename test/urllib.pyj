@@ -1,0 +1,193 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# urllib.pyj
+# Tests for the urllib standard library module.
+#
+# Covers urllib.parse (pure-JS, no network) and urllib.error exception classes.
+# urllib.request requires a live network (Fetch API) so it is exercised only
+# in the web-repl bundle tests via a mocked Promise chain.
+
+from urllib.parse import (
+    quote, unquote, quote_plus, unquote_plus,
+    urlencode, urlsplit, urlunsplit, urlparse, urlunparse,
+    urljoin, parse_qs, parse_qsl,
+    SplitResult, ParseResult
+)
+from urllib.error import URLError, HTTPError
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. quote — basic percent-encoding ────────────────────────────────────────
+
+ae(quote('hello world'), 'hello%20world')
+ae(quote('a/b/c'),        'a/b/c')          # '/' is safe by default
+ae(quote('a/b/c', safe=''), 'a%2Fb%2Fc')
+ae(quote('abc123-_.~'), 'abc123-_.~')        # unreserved chars pass through
+ae(quote('a+b'),          'a%2Bb')
+ae(quote('a=1&b=2', safe=''), 'a%3D1%26b%3D2')
+ae(quote('!*\'()'),       '%21%2A%27%28%29') # sub-delimiters encoded
+
+# ── 2. unquote ────────────────────────────────────────────────────────────────
+
+ae(unquote('hello%20world'), 'hello world')
+ae(unquote('a%2Fb'),         'a/b')
+ae(unquote('abc'),           'abc')
+ae(unquote('a%2Bb'),         'a+b')          # '+' is not decoded by unquote
+
+# ── 3. quote_plus / unquote_plus ─────────────────────────────────────────────
+
+ae(quote_plus('hello world'), 'hello+world')
+ae(quote_plus('a+b'),         'a%2Bb')
+ae(quote_plus('a/b', safe=''), 'a%2Fb')
+ae(unquote_plus('hello+world'), 'hello world')
+ae(unquote_plus('a%2Bb'),       'a+b')
+ae(unquote_plus('hello%20world'), 'hello world')
+
+# ── 4. urlencode — list of pairs ─────────────────────────────────────────────
+
+ae(urlencode([['a', '1'], ['b', '2']]), 'a=1&b=2')
+ae(urlencode([['q', 'hello world']]),   'q=hello%20world')
+ae(urlencode([['k', 'a+b']]),           'k=a%2Bb')
+ae(urlencode([]),                        '')
+
+# ── 5. urlencode — doseq ─────────────────────────────────────────────────────
+
+ae(urlencode([['a', ['x', 'y']]], doseq=True), 'a=x&a=y')
+ae(urlencode([['a', ['x', 'y']], ['b', '1']], doseq=True), 'a=x&a=y&b=1')
+
+# ── 6. urlsplit — absolute URL ────────────────────────────────────────────────
+
+r = urlsplit('http://example.com/path?q=1#frag')
+ae(r.scheme,   'http')
+ae(r.netloc,   'example.com')
+ae(r.path,     '/path')
+ae(r.query,    'q=1')
+ae(r.fragment, 'frag')
+ae(r.hostname, 'example.com')
+ae(r.port,     None)
+ae(r.username, None)
+ae(r.password, None)
+
+# ── 7. urlsplit — authority with user:pass@host:port ─────────────────────────
+
+r2 = urlsplit('https://user:pw@host:8080/p?x=1')
+ae(r2.scheme,   'https')
+ae(r2.netloc,   'user:pw@host:8080')
+ae(r2.path,     '/p')
+ae(r2.query,    'x=1')
+ae(r2.hostname, 'host')
+ae(r2.port,     8080)
+ae(r2.username, 'user')
+ae(r2.password, 'pw')
+
+# ── 8. urlsplit — no fragment ─────────────────────────────────────────────────
+
+r3 = urlsplit('http://example.com/path?q=1', allow_fragments=False)
+ae(r3.fragment, '')
+ae(r3.query,    'q=1')
+
+# ── 9. urlsplit — relative URL ────────────────────────────────────────────────
+
+r4 = urlsplit('/path?q=1#frag')
+ae(r4.scheme,   '')
+ae(r4.netloc,   '')
+ae(r4.path,     '/path')
+ae(r4.query,    'q=1')
+ae(r4.fragment, 'frag')
+
+# ── 10. urlparse — params split from path ─────────────────────────────────────
+
+r5 = urlparse('http://example.com/path;params?q=1#frag')
+ae(r5.scheme,   'http')
+ae(r5.path,     '/path')
+ae(r5.params,   'params')
+ae(r5.query,    'q=1')
+ae(r5.fragment, 'frag')
+
+r6 = urlparse('http://example.com/path?q=1')
+ae(r6.params, '')
+
+# ── 11. urlunsplit / urlunparse ───────────────────────────────────────────────
+
+ae(urlunsplit(('http', 'example.com', '/path', 'q=1', 'frag')),
+   'http://example.com/path?q=1#frag')
+ae(urlunsplit(('http', 'example.com', '/path', '', '')),
+   'http://example.com/path')
+ae(urlunsplit(('', '', '/path', 'q=1', '')),
+   '/path?q=1')
+ae(urlunparse(('http', 'example.com', '/path', 'par', 'q=1', 'frag')),
+   'http://example.com/path;par?q=1#frag')
+ae(urlunparse(('http', 'example.com', '/path', '', 'q=1', '')),
+   'http://example.com/path?q=1')
+
+# ── 12. geturl round-trip ─────────────────────────────────────────────────────
+
+r7 = urlsplit('http://example.com/path?q=1#frag')
+ae(r7.geturl(), 'http://example.com/path?q=1#frag')
+
+r8 = urlparse('http://example.com/path?q=1#frag')
+ae(r8.geturl(), 'http://example.com/path?q=1#frag')
+
+# ── 13. urljoin ───────────────────────────────────────────────────────────────
+
+ae(urljoin('http://example.com/foo',  'bar'),               'http://example.com/bar')
+ae(urljoin('http://example.com/foo/', 'bar'),               'http://example.com/foo/bar')
+ae(urljoin('http://example.com/',     '/other'),            'http://example.com/other')
+ae(urljoin('http://example.com/foo',  'http://other.com/'), 'http://other.com/')
+ae(urljoin('http://example.com/foo',  '?q=1'),              'http://example.com/foo?q=1')
+
+# ── 14. parse_qsl ─────────────────────────────────────────────────────────────
+
+pairs = parse_qsl('a=1&b=2&a=3')
+ade(pairs[0], ['a', '1'])
+ade(pairs[1], ['b', '2'])
+ade(pairs[2], ['a', '3'])
+ae(len(pairs), 3)
+
+pairs2 = parse_qsl('a=hello+world')
+ae(len(pairs2), 1)
+ae(pairs2[0][1], 'hello world')
+
+pairs3 = parse_qsl('q=a%20b')
+ae(pairs3[0][1], 'a b')
+
+ae(len(parse_qsl('')), 0)
+
+# ── 15. parse_qs ─────────────────────────────────────────────────────────────
+
+d = parse_qs('a=1&b=2&a=3')
+ade(d['a'], ['1', '3'])
+ade(d['b'], ['2'])
+
+d2 = parse_qs('q=hello+world')
+ae(d2['q'][0], 'hello world')
+
+ae(len(parse_qs('')), 0)
+
+# ── 16. URLError / HTTPError ──────────────────────────────────────────────────
+
+try:
+    raise URLError('network error')
+    ok(False)
+except URLError as e:
+    ok('network error' in str(e.reason))
+
+try:
+    raise HTTPError('http://example.com', 404, 'Not Found', {}, None)
+    ok(False)
+except HTTPError as e:
+    ae(e.code, 404)
+    ae(e.msg, 'Not Found')
+    ae(e.getcode(), 404)
+    ae(e.geturl(), 'http://example.com')
+    ok(isinstance(e, URLError))
+
+try:
+    raise HTTPError('http://example.com', 500, 'Internal Server Error', {}, None)
+    ok(False)
+except URLError as e:
+    # HTTPError is caught by URLError handler (inheritance)
+    ae(e.code, 500)

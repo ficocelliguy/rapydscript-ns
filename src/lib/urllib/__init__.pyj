@@ -1,0 +1,14 @@
+###########################################################
+# RapydScript Standard Library
+# urllib — URL handling utilities
+###########################################################
+#
+# Sub-modules:
+#   urllib.parse   — URL parsing and encoding (urlparse, quote, urlencode, …)
+#   urllib.request — HTTP requests via fetch (urlopen)
+#   urllib.error   — URLError, HTTPError exception classes
+#
+# Usage:
+#   from urllib.parse   import urlparse, quote, unquote, urlencode, urljoin
+#   from urllib.request import urlopen
+#   from urllib.error   import URLError, HTTPError

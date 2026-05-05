@@ -1,0 +1,66 @@
+###########################################################
+# RapydScript Standard Library
+# urllib.error — Exception classes for urllib
+###########################################################
+#
+# Provides:
+#   URLError  -- base exception for URL-related errors
+#   HTTPError -- raised for HTTP error responses (extends URLError)
+#
+# Usage:
+#   from urllib.error import URLError, HTTPError
+#
+#   try:
+#       resp = await urlopen('https://example.com/missing')
+#   except HTTPError as e:
+#       print(e.code, e.msg)
+#   except URLError as e:
+#       print('Network error:', e.reason)
+
+
+class URLError(Exception):
+    """Exception raised when urlopen() cannot fulfil a request.
+
+    Attributes:
+        reason   -- the error reason (string or exception)
+        filename -- the URL that triggered the error, if available
+    """
+
+    def __init__(self, reason, filename=None):
+        self.reason = reason
+        self.filename = filename
+        Exception.__init__(self, str(reason))
+
+    def __str__(self):
+        return '<urlopen error ' + str(self.reason) + '>'
+
+
+class HTTPError(URLError):
+    """Exception raised for HTTP error responses.
+
+    Attributes:
+        url   -- the URL that triggered the error
+        code  -- HTTP status code (e.g. 404)
+        msg   -- HTTP status text (e.g. 'Not Found')
+        hdrs  -- dict of response headers
+        fp    -- file-like object for the response body (may be None)
+    """
+
+    def __init__(self, url, code, msg, hdrs, fp):
+        self.url  = url
+        self.code = code
+        self.msg  = msg
+        self.hdrs = hdrs
+        self.fp   = fp
+        URLError.__init__(self, msg)
+
+    def getcode(self):
+        """Return the HTTP status code."""
+        return self.code
+
+    def geturl(self):
+        """Return the URL that triggered the error."""
+        return self.url
+
+    def __str__(self):
+        return 'HTTP Error ' + str(self.code) + ': ' + str(self.msg)

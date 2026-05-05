@@ -1,0 +1,475 @@
+###########################################################
+# RapydScript Standard Library
+# urllib.parse — URL parsing and encoding utilities
+###########################################################
+#
+# Provides:
+#   quote(s[, safe[, encoding[, errors]]])         → percent-encode a string
+#   unquote(s[, encoding[, errors]])               → decode %xx sequences
+#   quote_plus(s[, safe[, encoding[, errors]]])    → like quote, spaces → '+'
+#   unquote_plus(s[, encoding[, errors]])          → like unquote, '+' → space
+#   urlencode(query[, doseq])                      → encode dict/pairs as query
+#   urlsplit(url[, scheme[, allow_fragments]])      → SplitResult
+#   urlunsplit(components)                         → string
+#   urlparse(url[, scheme[, allow_fragments]])      → ParseResult
+#   urlunparse(components)                         → string
+#   urljoin(base, url[, allow_fragments])          → string
+#   parse_qs(qs[, keep_blank_values, ...])         → dict of lists
+#   parse_qsl(qs[, keep_blank_values, ...])        → list of [key, value] pairs
+#   ParseResult, SplitResult                       — result classes
+
+
+# ---------------------------------------------------------------------------
+# Internal JS helpers
+# ---------------------------------------------------------------------------
+
+v"""
+// -- quote helpers -----------------------------------------------------------
+
+// RFC 3986 unreserved characters: A-Z a-z 0-9 - _ . ~
+var _uparse_unreserved = /^[A-Za-z0-9\-_.~]$/;
+
+// Characters encodeURIComponent leaves unencoded that Python's quote() encodes.
+// ! * ' ( ) are sub-delimiters; only ~ is truly unreserved and left alone.
+var _uparse_extra = {'!': '%21', "'": '%27', '(': '%28', ')': '%29', '*': '%2A'};
+
+// Percent-encode a string.  Chars in `safe` and RFC 3986 unreserved chars
+// are left intact; all others are encoded as UTF-8 percent-sequences.
+// Uses Array.from to iterate code points so surrogate pairs encode correctly.
+function _uparse_quote(s, safe) {
+    if (safe === null || safe === undefined) safe = '/';
+    s = String(s);
+    var chars = typeof Array.from === 'function' ? Array.from(s) : s.split('');
+    var out = '';
+    for (var i = 0; i < chars.length; i++) {
+        var c = chars[i];
+        if (safe.indexOf(c) >= 0 || _uparse_unreserved.test(c)) {
+            out += c;
+        } else if (_uparse_extra[c] !== undefined) {
+            out += _uparse_extra[c];
+        } else {
+            out += encodeURIComponent(c);
+        }
+    }
+    return out;
+}
+
+// Decode %xx sequences in a URL component.  Tolerates malformed sequences.
+function _uparse_unquote(s) {
+    s = String(s);
+    return s.replace(/%([0-9A-Fa-f]{2})/g, function(m) {
+        try { return decodeURIComponent(m); } catch(e) { return m; }
+    });
+}
+
+// -- urlencode ---------------------------------------------------------------
+
+function _uparse_urlencode(query, doseq) {
+    var pairs = [];
+    var items;
+    if (Array.isArray(query)) {
+        items = query;
+    } else if (query && query.jsmap instanceof Map) {
+        // ρσ_dict (dict_literals mode)
+        items = [];
+        query.jsmap.forEach(function(v, k) { items.push([k, v]); });
+    } else {
+        items = Object.keys(query).map(function(k) { return [k, query[k]]; });
+    }
+    for (var i = 0; i < items.length; i++) {
+        var k = _uparse_quote(String(items[i][0]), '');
+        var v = items[i][1];
+        if (doseq && Array.isArray(v)) {
+            for (var j = 0; j < v.length; j++) {
+                pairs.push(k + '=' + _uparse_quote(String(v[j]), ''));
+            }
+        } else {
+            pairs.push(k + '=' + _uparse_quote(String(v), ''));
+        }
+    }
+    return pairs.join('&');
+}
+
+// -- URL parsing -------------------------------------------------------------
+
+// RFC 3986 URI-reference regex (Appendix B):
+//   ^(scheme:)?   (//netloc)?   (path)   (?query)?   (#fragment)?
+var _uparse_URI_RE = /^(?:([a-zA-Z][a-zA-Z0-9+\-.]*):)?(?:\/\/([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?$/;
+
+// Parse a URL string into its five RFC 3986 components.
+function _uparse_split(urlstring, scheme) {
+    if (!urlstring) return {scheme: '', netloc: '', path: '', query: '', fragment: ''};
+    var m = _uparse_URI_RE.exec(urlstring);
+    if (!m) return {scheme: '', netloc: '', path: urlstring, query: '', fragment: ''};
+    return {
+        scheme:   m[1] || scheme || '',
+        netloc:   m[2] !== undefined ? m[2] : '',
+        path:     m[3] || '',
+        query:    m[4] !== undefined ? m[4] : '',
+        fragment: m[5] !== undefined ? m[5] : ''
+    };
+}
+
+// -- netloc decomposition ---------------------------------------------------
+
+// Parse a netloc string into {hostname, port, username, password}.
+// Uses native JS toLowerCase() to avoid relying on String.prototype.lower
+// (which may not be installed in restricted vm contexts).
+function _uparse_netloc_parts(netloc) {
+    if (!netloc) return {hostname: null, port: null, username: null, password: null};
+    var username = null, password = null;
+    var host = netloc;
+    var at = netloc.indexOf('@');
+    if (at >= 0) {
+        var ui = netloc.slice(0, at);
+        host = netloc.slice(at + 1);
+        var uc = ui.indexOf(':');
+        username = uc >= 0 ? ui.slice(0, uc) : ui;
+        password = uc >= 0 ? ui.slice(uc + 1) : null;
+    }
+    var hostname = null, port = null;
+    if (host.charAt(0) === '[') {
+        // IPv6 bracketed address: [::1] or [::1]:8080
+        var eb = host.indexOf(']');
+        hostname = eb >= 0 ? host.slice(0, eb + 1).toLowerCase() : host.toLowerCase();
+        var after = eb >= 0 ? host.slice(eb + 1) : '';
+        if (after.charAt(0) === ':') {
+            port = parseInt(after.slice(1), 10);
+            if (isNaN(port)) port = null;
+        }
+    } else {
+        var lc = host.lastIndexOf(':');
+        if (lc >= 0) {
+            var maybe_port = parseInt(host.slice(lc + 1), 10);
+            if (!isNaN(maybe_port)) {
+                hostname = host.slice(0, lc).toLowerCase() || null;
+                port = maybe_port;
+            } else {
+                hostname = host.toLowerCase() || null;
+            }
+        } else {
+            hostname = host ? host.toLowerCase() : null;
+        }
+    }
+    return {hostname: hostname, port: port, username: username, password: password};
+}
+
+// -- parse_qsl ---------------------------------------------------------------
+
+function _uparse_parse_qsl(qs, keep_blank) {
+    var result = [];
+    if (!qs) return result;
+    if (qs.charAt(0) === '?') qs = qs.slice(1);
+    var parts = qs.split('&');
+    for (var i = 0; i < parts.length; i++) {
+        var pair = parts[i];
+        if (!pair) continue;
+        var idx = pair.indexOf('=');
+        var key, val;
+        if (idx < 0) {
+            key = pair; val = '';
+        } else {
+            key = pair.slice(0, idx);
+            val = pair.slice(idx + 1);
+        }
+        key = _uparse_unquote(key.split('+').join(' '));
+        val = _uparse_unquote(val.split('+').join(' '));
+        if (val || keep_blank) result.push([key, val]);
+    }
+    return result;
+}
+
+// -- urljoin -----------------------------------------------------------------
+
+// Remove RFC 3986 dot segments from a path (Section 5.2.4).
+function _uparse_remove_dots(path) {
+    var inp = path, segs = [];
+    while (inp.length) {
+        if (inp.slice(0, 3) === '../' || inp.slice(0, 2) === './') {
+            inp = inp.replace(/^\.\.?\//,'');
+        } else if (inp === '/.' || inp.slice(0, 3) === '/./') {
+            inp = '/' + inp.slice(inp.charAt(2) === '/' ? 3 : 2);
+        } else if (inp === '/..' || inp.slice(0, 4) === '/../') {
+            inp = '/' + inp.slice(inp.slice(0, 4) === '/../' ? 4 : 3);
+            segs.pop();
+        } else if (inp === '.' || inp === '..') {
+            inp = '';
+        } else {
+            var end = inp.indexOf('/', inp.charAt(0) === '/' ? 1 : 0);
+            if (end < 0) end = inp.length;
+            segs.push(inp.slice(0, end));
+            inp = inp.slice(end);
+        }
+    }
+    return segs.join('');
+}
+
+// Resolve a relative URL against a base URL (RFC 3986 Section 5.2.2).
+// Uses the browser/Node URL constructor when available for correctness,
+// and falls back to the RFC 3986 algorithm in restricted vm contexts.
+var _uparse_URLcls = (function() {
+    if (typeof URL !== 'undefined') return URL;
+    if (typeof require !== 'undefined') { try { return require('url').URL; } catch(e) {} }
+    return null;
+})();
+
+function _uparse_urljoin(base, url, allow_fragments) {
+    if (_uparse_URLcls) {
+        try {
+            var u = new _uparse_URLcls(url, base);
+            if (!allow_fragments) u.hash = '';
+            return u.href;
+        } catch(e) {}
+    }
+    // RFC 3986 Section 5.2.2 reference resolution
+    var R = _uparse_split(url, '');
+    var B = _uparse_split(base, '');
+    var Ts, Tn, Tp, Tq, Tf;
+    if (R.scheme) {
+        Ts = R.scheme; Tn = R.netloc;
+        Tp = _uparse_remove_dots(R.path); Tq = R.query;
+    } else {
+        if (R.netloc !== '') {
+            Tn = R.netloc;
+            Tp = _uparse_remove_dots(R.path); Tq = R.query;
+        } else {
+            if (!R.path) {
+                Tp = B.path;
+                Tq = R.query !== '' ? R.query : B.query;
+            } else {
+                if (R.path.charAt(0) === '/') {
+                    Tp = _uparse_remove_dots(R.path);
+                } else {
+                    var bdir = (B.netloc && !B.path)
+                        ? '/'
+                        : B.path.slice(0, B.path.lastIndexOf('/') + 1);
+                    Tp = _uparse_remove_dots(bdir + R.path);
+                }
+                Tq = R.query;
+            }
+            Tn = B.netloc;
+        }
+        Ts = B.scheme;
+    }
+    Tf = allow_fragments ? R.fragment : '';
+    var out = Ts ? Ts + ':' : '';
+    if (Tn !== '') out += '//' + Tn;
+    out += Tp;
+    if (Tq !== '') out += '?' + Tq;
+    if (Tf !== '') out += '#' + Tf;
+    return out;
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Result classes
+# ---------------------------------------------------------------------------
+
+class SplitResult:
+    """Result of urlsplit(): scheme, netloc, path, query, fragment."""
+
+    def __init__(self, scheme, netloc, path, query, fragment):
+        self.scheme   = scheme
+        self.netloc   = netloc
+        self.path     = path
+        self.query    = query
+        self.fragment = fragment
+        # Derived auth/host attributes computed via JS helper (avoids
+        # relying on String.prototype.lower in restricted vm contexts).
+        _auth = _uparse_netloc_parts(netloc)
+        self.hostname = _auth['hostname']
+        self.port     = _auth['port']
+        self.username = _auth['username']
+        self.password = _auth['password']
+
+    def geturl(self):
+        """Reconstruct the original URL from its components."""
+        return urlunsplit((self.scheme, self.netloc, self.path, self.query, self.fragment))
+
+    def __repr__(self):
+        return ('SplitResult(scheme=' + repr(self.scheme) +
+                ', netloc=' + repr(self.netloc) +
+                ', path=' + repr(self.path) +
+                ', query=' + repr(self.query) +
+                ', fragment=' + repr(self.fragment) + ')')
+
+
+class ParseResult:
+    """Result of urlparse(): scheme, netloc, path, params, query, fragment."""
+
+    def __init__(self, scheme, netloc, path, params, query, fragment):
+        self.scheme   = scheme
+        self.netloc   = netloc
+        self.path     = path
+        self.params   = params
+        self.query    = query
+        self.fragment = fragment
+        # Derived auth/host attributes computed via JS helper (avoids
+        # relying on String.prototype.lower in restricted vm contexts).
+        _auth = _uparse_netloc_parts(netloc)
+        self.hostname = _auth['hostname']
+        self.port     = _auth['port']
+        self.username = _auth['username']
+        self.password = _auth['password']
+
+    def geturl(self):
+        """Reconstruct the original URL from its components."""
+        return urlunparse((self.scheme, self.netloc, self.path, self.params, self.query, self.fragment))
+
+    def __repr__(self):
+        return ('ParseResult(scheme=' + repr(self.scheme) +
+                ', netloc=' + repr(self.netloc) +
+                ', path=' + repr(self.path) +
+                ', params=' + repr(self.params) +
+                ', query=' + repr(self.query) +
+                ', fragment=' + repr(self.fragment) + ')')
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def quote(string, safe='/', encoding=None, errors=None):
+    """Percent-encode a string for safe inclusion in a URL.
+
+    Characters listed in safe (default '/') and RFC 3986 unreserved characters
+    (A-Z, a-z, 0-9, -, _, ., ~) are never encoded.  All other characters are
+    encoded as UTF-8 percent-sequences.
+    """
+    return _uparse_quote(string, safe)
+
+
+def unquote(string, encoding='utf-8', errors='replace'):
+    """Decode percent-encoded sequences (%xx) in a URL component.
+
+    '+' signs are NOT decoded as spaces; use unquote_plus() for that.
+    """
+    return _uparse_unquote(string)
+
+
+def quote_plus(string, safe='', encoding=None, errors=None):
+    """Like quote(), but spaces are encoded as '+' instead of '%20'."""
+    v"""return _uparse_quote(string, safe).split('%20').join('+');"""
+
+
+def unquote_plus(string, encoding='utf-8', errors='replace'):
+    """Like unquote(), but '+' signs are decoded as spaces first."""
+    v"""return _uparse_unquote(string.split('+').join(' '));"""
+
+
+def urlencode(query, doseq=False):
+    """Encode a mapping or sequence of pairs as a URL query string.
+
+    query may be a dict or a list of [key, value] pairs.
+    When doseq=True, values that are sequences are expanded into separate pairs.
+    """
+    return _uparse_urlencode(query, doseq)
+
+
+def urlsplit(urlstring, scheme='', allow_fragments=True):
+    """Parse a URL into (scheme, netloc, path, query, fragment).
+
+    Returns a SplitResult.  Unlike urlparse(), the path component is not
+    split on ';' — params remain part of path.
+    """
+    parts = _uparse_split(urlstring, scheme)
+    _scheme = parts['scheme']
+    _netloc = parts['netloc']
+    _path   = parts['path']
+    _query  = parts['query']
+    _frag   = parts['fragment']
+    if not allow_fragments and _frag:
+        _query = _query + '#' + _frag
+        _frag  = ''
+    return SplitResult(_scheme, _netloc, _path, _query, _frag)
+
+
+def urlunsplit(components):
+    """Combine the elements of a SplitResult (or 5-tuple) back into a URL string.
+
+    components = (scheme, netloc, path, query, fragment)
+    """
+    scheme   = components[0]
+    netloc   = components[1]
+    path     = components[2]
+    query    = components[3]
+    fragment = components[4]
+    url = path
+    if netloc:
+        if url and v'url.charAt(0) !== "/"':
+            url = '/' + url
+        url = '//' + netloc + url
+    if scheme:
+        url = scheme + ':' + url
+    if query:
+        url = url + '?' + query
+    if fragment:
+        url = url + '#' + fragment
+    return url
+
+
+def urlparse(urlstring, scheme='', allow_fragments=True):
+    """Parse a URL into (scheme, netloc, path, params, query, fragment).
+
+    Returns a ParseResult.  params is the text after the first ';' in the
+    path (used in FTP-style URLs such as ftp://host/path;type=a).
+    """
+    sr = urlsplit(urlstring, scheme, allow_fragments)
+    path   = sr.path
+    params = ''
+    semi   = v'path.indexOf(";")'
+    if semi >= 0:
+        params = v'path.slice(semi + 1)'
+        path   = v'path.slice(0, semi)'
+    return ParseResult(sr.scheme, sr.netloc, path, params, sr.query, sr.fragment)
+
+
+def urlunparse(components):
+    """Combine the elements of a ParseResult (or 6-tuple) back into a URL string.
+
+    components = (scheme, netloc, path, params, query, fragment)
+    """
+    scheme   = components[0]
+    netloc   = components[1]
+    path     = components[2]
+    params   = components[3]
+    query    = components[4]
+    fragment = components[5]
+    if params:
+        path = path + ';' + params
+    return urlunsplit((scheme, netloc, path, query, fragment))
+
+
+def urljoin(base, url, allow_fragments=True):
+    """Resolve a possibly relative URL against a base URL.
+
+    Returns the absolute URL that results from joining base and url.
+    """
+    return _uparse_urljoin(base, url, allow_fragments)
+
+
+def parse_qsl(qs, keep_blank_values=False, strict_parsing=False,
+              encoding='utf-8', errors='replace', max_num_fields=None):
+    """Parse a query string into a list of (name, value) pairs.
+
+    keep_blank_values controls whether entries with empty values are returned.
+    """
+    return _uparse_parse_qsl(qs, keep_blank_values)
+
+
+def parse_qs(qs, keep_blank_values=False, strict_parsing=False,
+             encoding='utf-8', errors='replace', max_num_fields=None):
+    """Parse a query string into a dict mapping names to lists of values.
+
+    Values in the returned dict are always lists (even for single occurrences).
+    """
+    d = {}
+    for pair in _uparse_parse_qsl(qs, keep_blank_values):
+        k = pair[0]
+        v = pair[1]
+        if k in d:
+            d[k].append(v)
+        else:
+            d[k] = [v]
+    return d
