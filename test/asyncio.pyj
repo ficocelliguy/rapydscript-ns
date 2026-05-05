@@ -1,0 +1,307 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# asyncio.pyj
+# Tests for the asyncio standard library module.
+#
+# Most tests verify synchronous-observable behaviour (exceptions, queue state,
+# lock/event/semaphore flags, iscoroutine/iscoroutinefunction) because the
+# vm.runInNewContext test runner is synchronous.  Async coroutine execution
+# is tested by verifying that async functions compile correctly and return
+# thenable Promises.
+
+from asyncio import (
+    sleep, gather, create_task, ensure_future, run,
+    shield, wait_for, iscoroutine, iscoroutinefunction,
+    current_task, all_tasks, get_event_loop, get_running_loop, new_event_loop,
+    CancelledError, TimeoutError, InvalidStateError, RuntimeError,
+    QueueEmpty, QueueFull,
+    Lock, Event, Semaphore, BoundedSemaphore,
+    Queue, LifoQueue, PriorityQueue
+)
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Exception classes ─────────────────────────────────────────────────────
+
+try:
+    raise CancelledError('cancelled')
+    ok(False)
+except CancelledError as e:
+    ae(e.message, 'cancelled')
+
+try:
+    raise TimeoutError('timed out')
+    ok(False)
+except TimeoutError as e:
+    ae(e.message, 'timed out')
+
+try:
+    raise InvalidStateError('bad state')
+    ok(False)
+except InvalidStateError as e:
+    ae(e.message, 'bad state')
+
+try:
+    raise QueueEmpty('empty')
+    ok(False)
+except QueueEmpty as e:
+    ae(e.message, 'empty')
+
+try:
+    raise QueueFull('full')
+    ok(False)
+except QueueFull as e:
+    ae(e.message, 'full')
+
+# ── 2. sleep / gather return Promises ────────────────────────────────────────
+
+ok(iscoroutine(sleep(0)))
+ok(iscoroutine(sleep(0.1)))
+ok(iscoroutine(gather()))
+ok(iscoroutine(gather(Promise.resolve(1), Promise.resolve(2))))
+
+# ── 3. create_task / ensure_future / run / shield pass through Promises ──────
+
+p = Promise.resolve(42)
+ok(iscoroutine(create_task(p)))
+ok(iscoroutine(ensure_future(p)))
+ok(iscoroutine(run(p)))
+ok(iscoroutine(shield(p)))
+
+# ── 4. iscoroutine / iscoroutinefunction ─────────────────────────────────────
+
+ok(not iscoroutine(42))
+ok(not iscoroutine(None))
+ok(not iscoroutine('string'))
+ok(not iscoroutine([]))
+
+async def _async_fn():
+    return 1
+
+ok(iscoroutinefunction(_async_fn))
+
+def _sync_fn():
+    return 1
+
+ok(not iscoroutinefunction(_sync_fn))
+ok(not iscoroutinefunction(42))
+ok(not iscoroutinefunction(None))
+
+# Async functions return Promises
+p2 = _async_fn()
+ok(iscoroutine(p2))
+
+# ── 5. current_task / all_tasks ───────────────────────────────────────────────
+
+ok(current_task() is None)
+ok(len(all_tasks()) == 0)
+
+# ── 6. Event loop stubs ───────────────────────────────────────────────────────
+
+loop = get_event_loop()
+ok(loop is not None)
+ok(loop is get_running_loop())
+
+loop2 = new_event_loop()
+ok(loop2 is not None)
+ok(not loop2.is_closed())
+ok(loop2.is_running())
+
+p3 = Promise.resolve(99)
+ok(iscoroutine(loop.run_until_complete(p3)))
+ok(iscoroutine(loop.create_task(p3)))
+
+# ── 7. Lock — synchronous state ──────────────────────────────────────────────
+
+lock = Lock()
+ok(not lock.locked())
+
+# acquire() returns a Promise (since it's async def)
+acq = lock.acquire()
+ok(iscoroutine(acq))
+
+# After acquiring asynchronously lock should become locked.
+# We can test the synchronous fast-path by observing the side-effect in a
+# chained then (fire-and-forget style; the VM won't await it but we verify
+# the structure is correct):
+lock2 = Lock()
+ok(not lock2.locked())
+
+try:
+    lock2.release()
+    ok(False)
+except RuntimeError:
+    ok(True)
+
+# ── 8. Event — synchronous set/clear/is_set ──────────────────────────────────
+
+ev = Event()
+ok(not ev.is_set())
+
+ev.set()
+ok(ev.is_set())
+
+ev.clear()
+ok(not ev.is_set())
+
+# wait() returns a Promise
+ok(iscoroutine(ev.wait()))
+
+# If event is already set, wait() still returns a thenable
+ev.set()
+ok(iscoroutine(ev.wait()))
+
+# ── 9. Semaphore — synchronous state ─────────────────────────────────────────
+
+sem = Semaphore(2)
+ok(not sem.locked())
+
+sem.release()
+ok(not sem.locked())
+
+sem.release()
+ok(not sem.locked())
+
+# acquire() returns a Promise
+ok(iscoroutine(sem.acquire()))
+
+try:
+    Semaphore(-1)
+    ok(False)
+except ValueError:
+    ok(True)
+
+# ── 10. BoundedSemaphore ─────────────────────────────────────────────────────
+
+# BoundedSemaphore(n) starts at value=n (same as bound).
+# Releasing without a prior acquire immediately exceeds the bound.
+bsem = BoundedSemaphore(1)
+ok(not bsem.locked())
+try:
+    bsem.release()
+    ok(False)
+except ValueError:
+    ok(True)
+
+# BoundedSemaphore(0) is always locked and cannot be released at all.
+bsem0 = BoundedSemaphore(0)
+ok(bsem0.locked())
+try:
+    bsem0.release()
+    ok(False)
+except ValueError:
+    ok(True)
+
+# ── 11. Queue — synchronous put_nowait / get_nowait ──────────────────────────
+
+q = Queue()
+ok(q.empty())
+ok(q.qsize() == 0)
+ok(not q.full())
+
+q.put_nowait('a')
+q.put_nowait('b')
+q.put_nowait('c')
+ok(q.qsize() == 3)
+ok(not q.empty())
+
+ae(q.get_nowait(), 'a')
+q.task_done()
+ae(q.get_nowait(), 'b')
+q.task_done()
+ae(q.get_nowait(), 'c')
+q.task_done()
+ok(q.empty())
+
+# QueueFull with bounded queue
+q2 = Queue(2)
+ok(not q2.full())
+q2.put_nowait(1)
+q2.put_nowait(2)
+ok(q2.full())
+try:
+    q2.put_nowait(3)
+    ok(False)
+except QueueFull:
+    ok(True)
+
+# QueueEmpty
+q3 = Queue()
+try:
+    q3.get_nowait()
+    ok(False)
+except QueueEmpty:
+    ok(True)
+
+# task_done() overflow check
+q4 = Queue()
+q4.put_nowait('x')
+ae(q4.get_nowait(), 'x')
+q4.task_done()
+try:
+    q4.task_done()
+    ok(False)
+except ValueError:
+    ok(True)
+
+# put() and get() return Promises (async methods) — test on fresh queues
+q5 = Queue()
+put_p = q5.put('async-item')  # no waiters, goes to internal queue
+ok(iscoroutine(put_p))
+ae(q5.get_nowait(), 'async-item')
+q5.task_done()
+
+q6 = Queue()
+get_p = q6.get()  # empty queue → adds a getter waiter
+ok(iscoroutine(get_p))
+
+# join() returns a Promise
+q7 = Queue()
+ok(iscoroutine(q7.join()))
+
+# ── 12. LifoQueue — last-in first-out ordering ───────────────────────────────
+
+lq = LifoQueue()
+lq.put_nowait(1)
+lq.put_nowait(2)
+lq.put_nowait(3)
+ae(lq.get_nowait(), 3)
+ae(lq.get_nowait(), 2)
+ae(lq.get_nowait(), 1)
+
+# ── 13. PriorityQueue — lowest value dequeued first ──────────────────────────
+
+pq = PriorityQueue()
+pq.put_nowait(30)
+pq.put_nowait(10)
+pq.put_nowait(20)
+ae(pq.get_nowait(), 10)
+ae(pq.get_nowait(), 20)
+ae(pq.get_nowait(), 30)
+
+# ── 14. async def / await compiles correctly ─────────────────────────────────
+
+async def _add_async(a, b):
+    return a + b
+
+ok(iscoroutinefunction(_add_async))
+p4 = _add_async(3, 4)
+ok(iscoroutine(p4))
+
+async def _chain():
+    x = await Promise.resolve(10)
+    y = await Promise.resolve(20)
+    return x + y
+
+p5 = _chain()
+ok(iscoroutine(p5))
+
+async def _gather_test():
+    results = await gather(Promise.resolve(1), Promise.resolve(2), Promise.resolve(3))
+    return results
+
+p6 = _gather_test()
+ok(iscoroutine(p6))

@@ -27,7 +27,7 @@ const MESSAGES = {
 // with the compiler from src/lib/).  These should never produce 'Unknown module'
 // errors regardless of what virtualFiles or stdlibFiles are configured.
 export const STDLIB_MODULES = [
-    'abc', 'aes', 'base64', 'collections', 'contextlib', 'copy', 'dataclasses', 'datetime', 'elementmaker', 'encodings', 'enum',
+    'abc', 'aes', 'asyncio', 'base64', 'collections', 'contextlib', 'copy', 'dataclasses', 'datetime', 'elementmaker', 'encodings', 'enum',
     'functools', 'gettext', 'html', 'io', 'itertools', 'json', 'math', 'numpy', 'operator',
     'pythonize', 'random', 're', 'react', 'string', 'traceback', 'typing', 'uuid',
     // Pseudo-modules for language feature flags (from __python__ import ...)

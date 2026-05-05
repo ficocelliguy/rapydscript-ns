@@ -1,0 +1,534 @@
+###########################################################
+# RapydScript Standard Library
+# asyncio — Python-compatible async I/O module
+###########################################################
+#
+# Maps Python asyncio APIs to JavaScript's native Promise/async-await model.
+#
+#   async def / await syntax compiles directly to JS:
+#       async def main(): → async function main() {
+#       result = await coro()  → let result = await coro()
+#
+#   asyncio.run(coro) returns the Promise; it cannot block (JS single-threaded).
+#   async with / async for are not supported in the compiler; use
+#   .acquire()/.release() / .get()/.put() explicitly instead.
+#   No real event-loop management: JS always has exactly one event loop.
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+FIRST_COMPLETED = 'FIRST_COMPLETED'
+FIRST_EXCEPTION = 'FIRST_EXCEPTION'
+ALL_COMPLETED = 'ALL_COMPLETED'
+
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+class CancelledError(Exception):
+    pass
+
+
+class TimeoutError(Exception):
+    pass
+
+
+class InvalidStateError(Exception):
+    pass
+
+
+class QueueEmpty(Exception):
+    pass
+
+
+class QueueFull(Exception):
+    pass
+
+
+class RuntimeError(Exception):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Core coroutine functions
+# ---------------------------------------------------------------------------
+
+def sleep(seconds):
+    """Return a Promise that resolves after `seconds` seconds.
+
+    Equivalent to Python's asyncio.sleep().  Accepts fractional seconds.
+    A value of 0 yields control to the event loop once (next microtask tick
+    in practice, since setTimeout(0) is used).
+    """
+    v"""return new Promise(function(resolve) { setTimeout(resolve, (seconds || 0) * 1000); });"""
+
+
+def gather(*coros, **kwargs):
+    """Wait for multiple coroutines/Promises to complete.
+
+    Returns a Promise that resolves with a list of all results (in order).
+    If any coroutine raises, the returned Promise rejects (unless
+    return_exceptions=True is passed, in which case exceptions are returned
+    as values in the result list rather than propagating).
+
+    Equivalent to Python's asyncio.gather().
+    """
+    v"""
+    var _re = kwargs && kwargs.return_exceptions;
+    if (_re) {
+        return Promise.allSettled(coros).then(function(results) {
+            return results.map(function(r) {
+                return r.status === 'fulfilled' ? r.value : r.reason;
+            });
+        });
+    }
+    return Promise.all(coros);
+    """
+
+
+def create_task(coro):
+    """Schedule a coroutine to run and return it.
+
+    In JS, Promises start executing immediately when created, so this is a
+    no-op that just returns the Promise.  Equivalent to asyncio.create_task().
+    """
+    return coro
+
+
+def ensure_future(coro):
+    """Wrap a coroutine in a Task.  Alias for create_task()."""
+    return coro
+
+
+def run(coro):
+    """Run a top-level coroutine (returns the underlying Promise).
+
+    In Python this blocks until the coroutine finishes.  In JS there is no
+    blocking, so this simply returns the Promise.  The JS event loop handles
+    it automatically.
+    """
+    return coro
+
+
+def shield(coro):
+    """Protect a coroutine from external cancellation.
+
+    Returns a new Promise that resolves/rejects exactly when `coro` does, but
+    is otherwise independent (cancelling the wrapper does not cancel `coro`).
+    """
+    v"""
+    return new Promise(function(resolve, reject) {
+        Promise.resolve(coro).then(resolve, reject);
+    });
+    """
+
+
+def wait_for(coro, timeout):
+    """Wait for a coroutine to complete with a timeout.
+
+    Rejects with TimeoutError if the coroutine does not complete within
+    `timeout` seconds.  Equivalent to Python's asyncio.wait_for().
+    """
+    _TimeoutError = TimeoutError
+    v"""
+    return new Promise(function(resolve, reject) {
+        var done = false;
+        var timer = setTimeout(function() {
+            if (!done) {
+                done = true;
+                reject(new _TimeoutError('wait_for timed out after ' + timeout + 's'));
+            }
+        }, (timeout || 0) * 1000);
+        Promise.resolve(coro).then(
+            function(v) { if (!done) { done = true; clearTimeout(timer); resolve(v); } },
+            function(e) { if (!done) { done = true; clearTimeout(timer); reject(e); } }
+        );
+    });
+    """
+
+
+def wait(aws, return_when=ALL_COMPLETED):
+    """Wait for the Promises in `aws` to complete.
+
+    Returns a Promise that resolves with {done, pending} sets.
+    `return_when` controls when the function returns:
+      ALL_COMPLETED   — wait for all (default)
+      FIRST_COMPLETED — return as soon as one completes
+      FIRST_EXCEPTION — return as soon as one raises (not yet fully supported)
+    """
+    _first = FIRST_COMPLETED
+    v"""
+    var promises = Array.isArray(aws) ? aws.slice() : Array.from(aws);
+    if (return_when === _first) {
+        return Promise.race(promises).then(function(v) {
+            return { done: [v], pending: [] };
+        });
+    }
+    return Promise.allSettled(promises).then(function(results) {
+        var done = [], pending = [];
+        results.forEach(function(r) {
+            done.push(r.status === 'fulfilled' ? r.value : r.reason);
+        });
+        return { done: done, pending: pending };
+    });
+    """
+
+
+# ---------------------------------------------------------------------------
+# Introspection helpers
+# ---------------------------------------------------------------------------
+
+def iscoroutine(obj):
+    """Return True if obj is a coroutine/Promise (has a .then method)."""
+    v"""return obj !== null && obj !== undefined && typeof obj === 'object' && typeof obj.then === 'function';"""
+
+
+def iscoroutinefunction(fn):
+    """Return True if fn is an async function."""
+    v"""return typeof fn === 'function' && fn.constructor && fn.constructor.name === 'AsyncFunction';"""
+
+
+def current_task():
+    """Return the currently running Task, or None.
+
+    Always returns None in the JS implementation (no task tracking).
+    """
+    return None
+
+
+def all_tasks():
+    """Return all running Tasks.
+
+    Always returns an empty set in the JS implementation.
+    """
+    return set()
+
+
+# ---------------------------------------------------------------------------
+# Event loop stubs (API-compatibility shims)
+# ---------------------------------------------------------------------------
+
+class AbstractEventLoop:
+    """Minimal event-loop shim for API compatibility.
+
+    In JS there is always exactly one event loop; these methods are either
+    no-ops or thin wrappers around the equivalent JS mechanisms.
+    """
+    def run_until_complete(self, coro):
+        """Start executing `coro` and return it (cannot block in JS)."""
+        return coro
+
+    def run_forever(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def close(self):
+        pass
+
+    def is_closed(self):
+        return False
+
+    def is_running(self):
+        return True
+
+    def create_task(self, coro):
+        return coro
+
+    def call_soon(self, callback, *args):
+        v"""setTimeout(function() { callback.apply(null, args); }, 0);"""
+
+    def call_later(self, delay, callback, *args):
+        v"""setTimeout(function() { callback.apply(null, args); }, (delay || 0) * 1000);"""
+
+    def call_soon_threadsafe(self, callback, *args):
+        v"""setTimeout(function() { callback.apply(null, args); }, 0);"""
+
+
+class _EventLoop(AbstractEventLoop):
+    pass
+
+
+_the_loop = _EventLoop()
+
+
+def get_event_loop():
+    """Return the running event loop."""
+    return _the_loop
+
+
+def get_running_loop():
+    """Return the running event loop (same as get_event_loop() in JS)."""
+    return _the_loop
+
+
+def new_event_loop():
+    """Create and return a new event loop object."""
+    return _EventLoop()
+
+
+# ---------------------------------------------------------------------------
+# Synchronization primitives
+# ---------------------------------------------------------------------------
+
+class Lock:
+    """Mutual-exclusion lock.
+
+    Usage (since async with is not supported):
+        lock = asyncio.Lock()
+        await lock.acquire()
+        try:
+            ...critical section...
+        finally:
+            lock.release()
+    """
+    def __init__(self):
+        self._locked = False
+        self._waiters = []
+
+    async def acquire(self):
+        """Acquire the lock, waiting if necessary."""
+        if not self._locked:
+            self._locked = True
+            return True
+        _self = self
+        v"""await new Promise(function(resolve) { _self._waiters.push(resolve); });"""
+        return True
+
+    def release(self):
+        """Release the lock."""
+        if not self._locked:
+            raise RuntimeError("Lock is not acquired")
+        if self._waiters.length > 0:
+            waiter = self._waiters.shift()
+            waiter()
+        else:
+            self._locked = False
+
+    def locked(self):
+        """Return True if the lock is currently held."""
+        return self._locked
+
+
+class Event:
+    """Async event flag that coroutines can wait on.
+
+    Usage:
+        event = asyncio.Event()
+        # In one coroutine:
+        await event.wait()
+        # In another:
+        event.set()
+    """
+    def __init__(self):
+        self._is_set = False
+        self._waiters = []
+
+    def set(self):
+        """Set the event, releasing all waiting coroutines."""
+        self._is_set = True
+        for waiter in self._waiters:
+            waiter()
+        self._waiters = []
+
+    def clear(self):
+        """Reset the event to unset."""
+        self._is_set = False
+
+    def is_set(self):
+        """Return True if the event is set."""
+        return self._is_set
+
+    async def wait(self):
+        """Wait until the event is set, then return True."""
+        if self._is_set:
+            return True
+        _self = self
+        v"""await new Promise(function(resolve) { _self._waiters.push(resolve); });"""
+        return True
+
+
+class Semaphore:
+    """Counting semaphore for limiting concurrent access.
+
+    Usage:
+        sem = asyncio.Semaphore(3)
+        await sem.acquire()
+        try:
+            ...
+        finally:
+            sem.release()
+    """
+    def __init__(self, value=1):
+        if value < 0:
+            raise ValueError("Semaphore initial value must be >= 0")
+        self._value = value
+        self._waiters = []
+
+    async def acquire(self):
+        """Acquire one permit, waiting if the count is zero."""
+        if self._value > 0:
+            self._value -= 1
+            return True
+        _self = self
+        v"""await new Promise(function(resolve) { _self._waiters.push(resolve); });"""
+        return True
+
+    def release(self):
+        """Release one permit, waking a waiting coroutine if any."""
+        if self._waiters.length > 0:
+            waiter = self._waiters.shift()
+            waiter()
+        else:
+            self._value += 1
+
+    def locked(self):
+        """Return True if the semaphore cannot be acquired without waiting."""
+        return self._value == 0
+
+
+class BoundedSemaphore(Semaphore):
+    """Semaphore that raises ValueError if released more times than acquired."""
+    def __init__(self, value=1):
+        Semaphore.__init__(self, value)
+        self._bound_value = value
+
+    def release(self):
+        if self._waiters.length == 0 and self._value >= self._bound_value:
+            raise ValueError("BoundedSemaphore released too many times")
+        Semaphore.release(self)
+
+
+# ---------------------------------------------------------------------------
+# Async queues
+# ---------------------------------------------------------------------------
+
+class Queue:
+    """First-in, first-out async queue.
+
+    Usage:
+        q = asyncio.Queue()
+        await q.put(item)
+        item = await q.get()
+        q.task_done()
+        await q.join()  # wait until all items are processed
+    """
+    def __init__(self, maxsize=0):
+        self._maxsize = maxsize
+        self._queue = []
+        self._getters = []
+        self._putters = []
+        self._unfinished_tasks = 0
+        self._join_waiters = []
+
+    def qsize(self):
+        """Return the number of items currently in the queue."""
+        return self._queue.length
+
+    def empty(self):
+        """Return True if the queue has no items."""
+        return self._queue.length == 0
+
+    def full(self):
+        """Return True if the queue is at maxsize (always False if maxsize=0)."""
+        if self._maxsize <= 0:
+            return False
+        return self._queue.length >= self._maxsize
+
+    async def put(self, item):
+        """Put an item into the queue, waiting if the queue is full."""
+        if self.full():
+            _self = self
+            _item = item
+            v"""await new Promise(function(resolve) { _self._putters.push({resolve: resolve, item: _item}); });"""
+        else:
+            self._put_nowait_internal(item)
+        self._unfinished_tasks += 1
+
+    def put_nowait(self, item):
+        """Put an item without waiting; raise QueueFull if the queue is full."""
+        if self.full():
+            raise QueueFull("Queue is full")
+        self._put_nowait_internal(item)
+        self._unfinished_tasks += 1
+
+    def _put_nowait_internal(self, item):
+        if self._getters.length > 0:
+            getter = self._getters.shift()
+            getter(item)
+        else:
+            self._queue.push(item)
+
+    async def get(self):
+        """Remove and return an item, waiting if the queue is empty."""
+        if self._queue.length > 0:
+            return self._get_nowait_internal()
+        _self = self
+        v"""return await new Promise(function(resolve) { _self._getters.push(resolve); });"""
+
+    def get_nowait(self):
+        """Remove and return an item; raise QueueEmpty if the queue is empty."""
+        if self.empty():
+            raise QueueEmpty("Queue is empty")
+        return self._get_nowait_internal()
+
+    def _get_nowait_internal(self):
+        item = self._queue.shift()
+        if self._putters.length > 0:
+            putter = self._putters.shift()
+            self._queue.push(putter.item)
+            putter.resolve()
+        return item
+
+    def task_done(self):
+        """Mark a formerly enqueued item as processed.
+
+        Raises ValueError if called more times than there have been puts.
+        """
+        if self._unfinished_tasks <= 0:
+            raise ValueError("task_done() called too many times")
+        self._unfinished_tasks -= 1
+        if self._unfinished_tasks == 0:
+            for waiter in self._join_waiters:
+                waiter()
+            self._join_waiters = []
+
+    async def join(self):
+        """Block until all items which have been put into the queue are processed."""
+        if self._unfinished_tasks > 0:
+            _self = self
+            v"""await new Promise(function(resolve) { _self._join_waiters.push(resolve); });"""
+
+
+class LifoQueue(Queue):
+    """Last-in, first-out variant of Queue."""
+    def _get_nowait_internal(self):
+        item = self._queue.pop()
+        if self._putters.length > 0:
+            putter = self._putters.shift()
+            self._queue.push(putter.item)
+            putter.resolve()
+        return item
+
+
+class PriorityQueue(Queue):
+    """Priority queue where the smallest item is retrieved first."""
+    def _put_nowait_internal(self, item):
+        if self._getters.length > 0:
+            getter = self._getters.shift()
+            getter(item)
+        else:
+            self._queue.push(item)
+            self._queue.sort()
+
+    def _get_nowait_internal(self):
+        item = self._queue.shift()
+        if self._putters.length > 0:
+            putter = self._putters.shift()
+            self._queue.push(putter.item)
+            self._queue.sort()
+            putter.resolve()
+        return item

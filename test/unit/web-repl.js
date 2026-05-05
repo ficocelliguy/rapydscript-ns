@@ -2733,6 +2733,192 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_asyncio_exceptions_and_primitives",
+        description: "asyncio stdlib: exception classes, Queue/Lock/Event/Semaphore synchronous state in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from asyncio import (",
+                "    CancelledError, TimeoutError, InvalidStateError, RuntimeError,",
+                "    QueueEmpty, QueueFull,",
+                "    Lock, Event, Semaphore, BoundedSemaphore, Queue",
+                ")",
+                // Exception classes
+                "try:",
+                "    raise CancelledError('c')",
+                "except CancelledError as e:",
+                "    assrt.equal(e.message, 'c')",
+                "try:",
+                "    raise TimeoutError('t')",
+                "except TimeoutError as e:",
+                "    assrt.equal(e.message, 't')",
+                "try:",
+                "    raise QueueEmpty('empty')",
+                "except QueueEmpty as e:",
+                "    assrt.equal(e.message, 'empty')",
+                "try:",
+                "    raise QueueFull('full')",
+                "except QueueFull as e:",
+                "    assrt.equal(e.message, 'full')",
+                // Lock
+                "lock = Lock()",
+                "assrt.equal(lock.locked(), False)",
+                "try:",
+                "    lock.release()",
+                "    assrt.ok(False)",
+                "except RuntimeError:",
+                "    assrt.ok(True)",
+                // Event
+                "ev = Event()",
+                "assrt.equal(ev.is_set(), False)",
+                "ev.set()",
+                "assrt.equal(ev.is_set(), True)",
+                "ev.clear()",
+                "assrt.equal(ev.is_set(), False)",
+                // Semaphore
+                "sem = Semaphore(2)",
+                "assrt.equal(sem.locked(), False)",
+                "sem.release()",
+                "assrt.equal(sem.locked(), False)",
+                // BoundedSemaphore
+                "bsem = BoundedSemaphore(1)",
+                "try:",
+                "    bsem.release()",
+                "    assrt.ok(False)",
+                "except ValueError:",
+                "    assrt.ok(True)",
+                // Queue synchronous ops
+                "q = Queue()",
+                "assrt.equal(q.empty(), True)",
+                "q.put_nowait('a')",
+                "q.put_nowait('b')",
+                "assrt.equal(q.qsize(), 2)",
+                "assrt.equal(q.get_nowait(), 'a')",
+                "q.task_done()",
+                "assrt.equal(q.get_nowait(), 'b')",
+                "q.task_done()",
+                "assrt.equal(q.empty(), True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_asyncio_coroutine_helpers",
+        description: "asyncio stdlib: iscoroutine, iscoroutinefunction, sleep/gather/run return Promises in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from asyncio import iscoroutine, iscoroutinefunction, sleep, gather, create_task, run, shield",
+                // sleep returns a thenable
+                "p = sleep(0)",
+                "assrt.ok(iscoroutine(p))",
+                // gather returns a thenable
+                "p2 = gather(Promise.resolve(1), Promise.resolve(2))",
+                "assrt.ok(iscoroutine(p2))",
+                // create_task / run pass through
+                "p3 = Promise.resolve(99)",
+                "assrt.ok(iscoroutine(create_task(p3)))",
+                "assrt.ok(iscoroutine(run(p3)))",
+                "assrt.ok(iscoroutine(shield(p3)))",
+                // iscoroutine
+                "assrt.ok(not iscoroutine(42))",
+                "assrt.ok(not iscoroutine(None))",
+                "assrt.ok(iscoroutine(sleep(0)))",
+                // iscoroutinefunction
+                "async def _af():",
+                "    return 1",
+                "assrt.ok(iscoroutinefunction(_af))",
+                "def _sf():",
+                "    return 1",
+                "assrt.ok(not iscoroutinefunction(_sf))",
+                // async functions return Promises
+                "assrt.ok(iscoroutine(_af()))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_asyncio_queue_variants",
+        description: "asyncio stdlib: LifoQueue and PriorityQueue ordering in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from asyncio import Queue, LifoQueue, PriorityQueue, QueueFull, QueueEmpty",
+                // Bounded Queue — QueueFull
+                "q2 = Queue(2)",
+                "q2.put_nowait(1)",
+                "q2.put_nowait(2)",
+                "assrt.equal(q2.full(), True)",
+                "try:",
+                "    q2.put_nowait(3)",
+                "    assrt.ok(False)",
+                "except QueueFull:",
+                "    assrt.ok(True)",
+                // LifoQueue ordering
+                "lq = LifoQueue()",
+                "lq.put_nowait(1)",
+                "lq.put_nowait(2)",
+                "lq.put_nowait(3)",
+                "assrt.equal(lq.get_nowait(), 3)",
+                "assrt.equal(lq.get_nowait(), 2)",
+                "assrt.equal(lq.get_nowait(), 1)",
+                // PriorityQueue ordering (lowest value first)
+                "pq = PriorityQueue()",
+                "pq.put_nowait(30)",
+                "pq.put_nowait(10)",
+                "pq.put_nowait(20)",
+                "assrt.equal(pq.get_nowait(), 10)",
+                "assrt.equal(pq.get_nowait(), 20)",
+                "assrt.equal(pq.get_nowait(), 30)",
+                // QueueEmpty
+                "q3 = Queue()",
+                "try:",
+                "    q3.get_nowait()",
+                "    assrt.ok(False)",
+                "except QueueEmpty:",
+                "    assrt.ok(True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_asyncio_async_await",
+        description: "asyncio stdlib: async def / await compiles and returns Promise in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from asyncio import sleep, gather, iscoroutine, iscoroutinefunction, get_event_loop",
+                // async functions compile and return Promises
+                "async def _add(a, b):",
+                "    return a + b",
+                "assrt.ok(iscoroutinefunction(_add))",
+                "p = _add(2, 3)",
+                "assrt.ok(iscoroutine(p))",
+                // chained awaits produce a Promise
+                "async def _chain():",
+                "    x = await Promise.resolve(10)",
+                "    y = await Promise.resolve(20)",
+                "    return x + y",
+                "assrt.ok(iscoroutine(_chain()))",
+                // gather of resolved Promises
+                "async def _g():",
+                "    results = await gather(Promise.resolve(1), Promise.resolve(2))",
+                "    return results",
+                "assrt.ok(iscoroutine(_g()))",
+                // event loop stub
+                "loop = get_event_loop()",
+                "assrt.ok(loop is not None)",
+                "assrt.ok(not loop.is_closed())",
+                "assrt.ok(loop.is_running())",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------
