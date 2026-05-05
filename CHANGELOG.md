@@ -1,3 +1,11 @@
+version 0.9.3
+=======================
+* Added the `base64` standard library module
+* Added the `string` standard library module (character constants, `Template`, `Formatter`)
+* Added support for `float("inf")` and `float("-inf")`
+* Added `long()` type and improved pretty-printing of `type()` return values
+* Language service: bare imports now correctly provide type hints
+
 version 0.9.2
 =======================
   * Added the contextlib standard library

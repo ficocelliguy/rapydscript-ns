@@ -1,4 +1,4 @@
-let ρσ_len;
+let ρσ_len, ρσ_NoneType, ρσ_js_builtin_names;
 function ρσ_bool(val) {
     if (val === null || val === undefined) return false;
     var ρσ_bool_t = typeof val;
@@ -65,13 +65,25 @@ if (!ρσ_int.__argnames__) Object.defineProperties(ρσ_int, {
 
 ρσ_int.__name__ = "int";
 function ρσ_float(val) {
-    var ans;
+    var ans, s;
     if (typeof val === "number") {
         ans = val;
     } else {
         ans = parseFloat(val);
     }
     if (isNaN(ans)) {
+        if (typeof val === "string") {
+            s = val.trim().toLowerCase();
+            if (s === "inf" || s === "+inf" || s === "infinity" || s === "+infinity") {
+                return Infinity;
+            }
+            if (s === "-inf" || s === "-infinity") {
+                return -Infinity;
+            }
+            if (s === "nan" || s === "+nan" || s === "-nan") {
+                return NaN;
+            }
+        }
         throw new ValueError(ρσ_list_add("Could not convert string to float: ", arguments[0]));
     }
     return ans;
@@ -82,6 +94,58 @@ if (!ρσ_float.__argnames__) Object.defineProperties(ρσ_float, {
 });
 
 ρσ_float.__name__ = "float";
+function ρσ_long(val, base) {
+    var t, b;
+    t = typeof val;
+    if (t === "bigint") {
+        return val;
+    }
+    if (t === "boolean") {
+        return BigInt(val ? 1 : 0);
+    }
+    if (t === "number") {
+        if (!Number.isInteger(val)) {
+            throw new TypeError("long() can't convert non-integer float to long");
+        }
+        try { return BigInt(val); } catch(e) { throw new ValueError("long() argument out of range: " + val); };
+    }
+    if (t === "string") {
+        b = (base !== null && base !== undefined) ? base : 10;
+        var ρσ_ls = val.trim();
+        try {
+            if (b === 16) {
+                if (ρσ_ls.slice(0, 2).toLowerCase() !== "0x") {
+                    ρσ_ls = "0x" + ρσ_ls;
+                }
+                return BigInt(ρσ_ls);
+            } else if (b === 2) {
+                if (ρσ_ls.slice(0, 2).toLowerCase() !== "0b") {
+                    ρσ_ls = "0b" + ρσ_ls;
+                }
+                return BigInt(ρσ_ls);
+            } else if (b === 8) {
+                if (ρσ_ls.slice(0, 2).toLowerCase() !== "0o") {
+                    ρσ_ls = "0o" + ρσ_ls;
+                }
+                return BigInt(ρσ_ls);
+            } else {
+                return BigInt(ρσ_ls);
+            }
+        } catch (ρσ_Exception) {
+            ρσ_last_exception = ρσ_Exception;
+            {
+                throw new ValueError(ρσ_list_add(ρσ_list_add(ρσ_list_add("Invalid literal for long() with base ", b), ": "), val));
+            } 
+        }
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("long() argument must be a string, a number, or a boolean, not '", t), "'"));
+};
+if (!ρσ_long.__argnames__) Object.defineProperties(ρσ_long, {
+    __argnames__ : {value: ["val", "base"]},
+    __module__ : {value: "__main__"}
+});
+
+ρσ_long.__name__ = "long";
 function ρσ_arraylike_creator() {
     var names;
     names = "Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".split(" ");
@@ -679,8 +743,40 @@ if (!ρσ_pow.__argnames__) Object.defineProperties(ρσ_pow, {
     __module__ : {value: "__main__"}
 });
 
+ρσ_NoneType = {"__name__": "NoneType"};
+ρσ_NoneType.toString = (function() {
+    var ρσ_anonfunc = function () {
+        return "<class 'NoneType'>";
+    };
+    if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+        __module__ : {value: "__main__"}
+    });
+    return ρσ_anonfunc;
+})();
+ρσ_js_builtin_names = {"Number": "float", "String": "str", "Boolean": "bool", "Array": "list", "Object": "object", "Function": "function", "RegExp": "RegExp", "Date": "datetime", "Map": "dict", "Set": "set", "Uint8Array": "bytes"};
 function ρσ_type(x) {
-    return x.constructor;
+    var c, n;
+    if (x === null || x === undefined) {
+        return ρσ_NoneType;
+    }
+    c = x.constructor;
+    if (!c) {
+        return ρσ_NoneType;
+    }
+    if (!Object.prototype.hasOwnProperty.call(c, "__ρσ_ts")) {
+        n = c.__name__ || ρσ_js_builtin_names[ρσ_bound_index(c.name, ρσ_js_builtin_names)] || c.name || "object";
+        c.toString = (function() {
+            var ρσ_anonfunc = function () {
+                return ρσ_list_add(ρσ_list_add("<class '", n), "'>");
+            };
+            if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
+                __module__ : {value: "__main__"}
+            });
+            return ρσ_anonfunc;
+        })();
+        c.__ρσ_ts = true;
+    }
+    return c;
 };
 if (!ρσ_type.__argnames__) Object.defineProperties(ρσ_type, {
     __argnames__ : {value: ["x"]},
@@ -729,14 +825,14 @@ function ρσ_hash(obj) {
         }
         return ρσ_h;
     };
-    if (obj.__hash__ === null) throw new TypeError("unhashable type: '" + (obj.constructor && obj.constructor.name ? obj.constructor.name : "object") + "'");
+    if (obj.__hash__ === null) throw new TypeError("unhashable type: \'" + (obj.constructor && obj.constructor.name ? obj.constructor.name : "object") + "\'");
     if (typeof obj.__hash__ === "function") return obj.__hash__();
-    if (Array.isArray(obj)) throw new TypeError("unhashable type: 'list'");
-    if (typeof ρσ_set === "function" && obj instanceof ρσ_set) throw new TypeError("unhashable type: 'set'");
-    if (typeof Set === "function" && obj instanceof Set) throw new TypeError("unhashable type: 'set'");
-    if (typeof ρσ_dict === "function" && obj instanceof ρσ_dict) throw new TypeError("unhashable type: 'dict'");
-    if (typeof Map === "function" && obj instanceof Map) throw new TypeError("unhashable type: 'dict'");
-    if (!obj.constructor || obj.constructor === Object) throw new TypeError("unhashable type: 'dict'");
+    if (Array.isArray(obj)) throw new TypeError("unhashable type: \'list\'");
+    if (typeof ρσ_set === "function" && obj instanceof ρσ_set) throw new TypeError("unhashable type: \'set\'");
+    if (typeof Set === "function" && obj instanceof Set) throw new TypeError("unhashable type: \'set\'");
+    if (typeof ρσ_dict === "function" && obj instanceof ρσ_dict) throw new TypeError("unhashable type: \'dict\'");
+    if (typeof Map === "function" && obj instanceof Map) throw new TypeError("unhashable type: \'dict\'");
+    if (!obj.constructor || obj.constructor === Object) throw new TypeError("unhashable type: \'dict\'");
     if (obj.ρσ_object_id === undefined) obj.ρσ_object_id = ++ρσ_hash_id_counter;
     return obj.ρσ_object_id;
 };
@@ -1480,7 +1576,7 @@ Object.defineProperty(ρσ_complex.prototype, "__class__", {get: function() { re
 
 ρσ_complex.__name__ = "complex";
 var abs = ρσ_abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type;
-var float = ρσ_float, int = ρσ_int, complex = ρσ_complex, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike;
+var float = ρσ_float, int = ρσ_int, long = ρσ_long, complex = ρσ_complex, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike;
 var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__;
 var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round;
 var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len;
@@ -3640,6 +3736,7 @@ if (!ρσ_set_wrap.__argnames__) Object.defineProperties(ρσ_set_wrap, {
     __module__ : {value: "__main__"}
 });
 
+ρσ_set.__name__ = "set";
 var set = ρσ_set, set_wrap = ρσ_set_wrap;
 function ρσ_frozenset(iterable) {
     var ans, s, iterator, result, keys;
@@ -4565,6 +4662,7 @@ if (!ρσ_dict_wrap.__argnames__) Object.defineProperties(ρσ_dict_wrap, {
     __module__ : {value: "__main__"}
 });
 
+ρσ_dict.__name__ = "dict";
 var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap;
 
 function ρσ_kwargs_to_dict(kw) {
@@ -4629,6 +4727,7 @@ var ρσ_json_parse = function(text, reviver) {
     return JSON.parse(text, dict_reviver);
 };;// }}}
 var NameError = ReferenceError;
+var _ρσ_NativeError = Error;
 function Exception() {
     if (!(this instanceof Exception)) return new Exception(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
@@ -4638,7 +4737,7 @@ function Exception() {
 Exception.prototype.__init__ = function __init__(message) {
     var self = this;
     self.message = message;
-    self.stack = (new Error).stack;
+    self.stack = _ρσ_NativeError().stack;
     self.name = self.constructor.name;
 };
 if (!Exception.prototype.__init__.__argnames__) Object.defineProperties(Exception.prototype.__init__, {
@@ -4700,65 +4799,95 @@ Object.defineProperty(AttributeError.prototype, "__class__", {get: function() { 
 
 if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(AttributeError);
 
+function LookupError() {
+    if (!(this instanceof LookupError)) return new LookupError(...arguments);
+    if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
+    LookupError.prototype.__init__.apply(this, arguments);
+}
+ρσ_extends(LookupError, Exception);
+LookupError.prototype.__init__ = function __init__ () {
+    Exception.prototype.__init__ && Exception.prototype.__init__.apply(this, arguments);
+};
+LookupError.prototype.__repr__ = function __repr__ () {
+    if(Exception.prototype.__repr__) return Exception.prototype.__repr__.call(this);
+    return "<" + __name__ + "." + this.constructor.name + " #" + this.ρσ_object_id + ">";
+};
+LookupError.prototype.__str__ = function __str__ () {
+    if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
+return this.__repr__();
+};
+LookupError.prototype.__format__ = function __format__ () {
+    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if (!arguments[0]) return this.__str__();
+    throw new TypeError("unsupported format specification");
+};
+Object.defineProperty(LookupError.prototype, "__bases__", {value: [Exception]});
+LookupError.__name__ = "LookupError";
+LookupError.__qualname__ = "LookupError";
+LookupError.__module__ = "__main__";
+Object.defineProperty(LookupError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
+
+if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(LookupError);
+
 function IndexError() {
     if (!(this instanceof IndexError)) return new IndexError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     IndexError.prototype.__init__.apply(this, arguments);
 }
-ρσ_extends(IndexError, Exception);
+ρσ_extends(IndexError, LookupError);
 IndexError.prototype.__init__ = function __init__ () {
-    Exception.prototype.__init__ && Exception.prototype.__init__.apply(this, arguments);
+    LookupError.prototype.__init__ && LookupError.prototype.__init__.apply(this, arguments);
 };
 IndexError.prototype.__repr__ = function __repr__ () {
-    if(Exception.prototype.__repr__) return Exception.prototype.__repr__.call(this);
+    if(LookupError.prototype.__repr__) return LookupError.prototype.__repr__.call(this);
     return "<" + __name__ + "." + this.constructor.name + " #" + this.ρσ_object_id + ">";
 };
 IndexError.prototype.__str__ = function __str__ () {
-    if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
+    if(LookupError.prototype.__str__) return LookupError.prototype.__str__.call(this);
 return this.__repr__();
 };
 IndexError.prototype.__format__ = function __format__ () {
-    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if(LookupError.prototype.__format__) return LookupError.prototype.__format__.call(this, arguments[0]);
     if (!arguments[0]) return this.__str__();
     throw new TypeError("unsupported format specification");
 };
-Object.defineProperty(IndexError.prototype, "__bases__", {value: [Exception]});
+Object.defineProperty(IndexError.prototype, "__bases__", {value: [LookupError]});
 IndexError.__name__ = "IndexError";
 IndexError.__qualname__ = "IndexError";
 IndexError.__module__ = "__main__";
 Object.defineProperty(IndexError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
 
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(IndexError);
+if (typeof LookupError.__init_subclass__ === "function") LookupError.__init_subclass__.call(IndexError);
 
 function KeyError() {
     if (!(this instanceof KeyError)) return new KeyError(...arguments);
     if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
     KeyError.prototype.__init__.apply(this, arguments);
 }
-ρσ_extends(KeyError, Exception);
+ρσ_extends(KeyError, LookupError);
 KeyError.prototype.__init__ = function __init__ () {
-    Exception.prototype.__init__ && Exception.prototype.__init__.apply(this, arguments);
+    LookupError.prototype.__init__ && LookupError.prototype.__init__.apply(this, arguments);
 };
 KeyError.prototype.__repr__ = function __repr__ () {
-    if(Exception.prototype.__repr__) return Exception.prototype.__repr__.call(this);
+    if(LookupError.prototype.__repr__) return LookupError.prototype.__repr__.call(this);
     return "<" + __name__ + "." + this.constructor.name + " #" + this.ρσ_object_id + ">";
 };
 KeyError.prototype.__str__ = function __str__ () {
-    if(Exception.prototype.__str__) return Exception.prototype.__str__.call(this);
+    if(LookupError.prototype.__str__) return LookupError.prototype.__str__.call(this);
 return this.__repr__();
 };
 KeyError.prototype.__format__ = function __format__ () {
-    if(Exception.prototype.__format__) return Exception.prototype.__format__.call(this, arguments[0]);
+    if(LookupError.prototype.__format__) return LookupError.prototype.__format__.call(this, arguments[0]);
     if (!arguments[0]) return this.__str__();
     throw new TypeError("unsupported format specification");
 };
-Object.defineProperty(KeyError.prototype, "__bases__", {value: [Exception]});
+Object.defineProperty(KeyError.prototype, "__bases__", {value: [LookupError]});
 KeyError.__name__ = "KeyError";
 KeyError.__qualname__ = "KeyError";
 KeyError.__module__ = "__main__";
 Object.defineProperty(KeyError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
 
-if (typeof Exception.__init_subclass__ === "function") Exception.__init_subclass__.call(KeyError);
+if (typeof LookupError.__init_subclass__ === "function") LookupError.__init_subclass__.call(KeyError);
 
 function ValueError() {
     if (!(this instanceof ValueError)) return new ValueError(...arguments);
@@ -5652,6 +5781,9 @@ function ρσ_arith_type_name(v) {
     if (t === "boolean") {
         return "bool";
     }
+    if (t === "bigint") {
+        return "long";
+    }
     if (t === "number") {
         return (Number.isInteger(v)) ? "int" : "float";
     }
@@ -5687,6 +5819,9 @@ function ρσ_op_add(a, b) {
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return a + b;
     }
+    if (ta === "bigint" && tb === "bigint") {
+        return a + b;
+    }
     if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
         return a + b;
     }
@@ -5708,6 +5843,9 @@ function ρσ_op_sub(a, b) {
     ta = typeof a;
     tb = typeof b;
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a - b;
+    }
+    if (ta === "bigint" && tb === "bigint") {
         return a - b;
     }
     throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for -: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
@@ -5750,6 +5888,9 @@ function ρσ_op_mul(a, b) {
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return a * b;
     }
+    if (ta === "bigint" && tb === "bigint") {
+        return a * b;
+    }
     throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for *: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_mul.__argnames__) Object.defineProperties(ρσ_op_mul, {
@@ -5769,6 +5910,9 @@ function ρσ_op_truediv(a, b) {
     tb = typeof b;
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return a / b;
+    }
+    if (ta === "bigint" && tb === "bigint") {
+        throw new TypeError("unsupported operand type(s) for /: 'long' and 'long' — use // for integer division of long values");
     }
     throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for /: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
@@ -5790,6 +5934,9 @@ function ρσ_op_floordiv(a, b) {
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return Math.floor(a / b);
     }
+    if (ta === "bigint" && tb === "bigint") {
+        var ρσ_bq = a / b, ρσ_br = a % b; if (ρσ_br !== 0n && (ρσ_br < 0n) !== (b < 0n)) { return ρσ_bq - 1n; } return ρσ_bq;;
+    }
     throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for //: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_floordiv.__argnames__) Object.defineProperties(ρσ_op_floordiv, {
@@ -5809,6 +5956,9 @@ function ρσ_op_mod(a, b) {
     tb = typeof b;
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return a % b;
+    }
+    if (ta === "bigint" && tb === "bigint") {
+        var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;;
     }
     throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for %: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
@@ -5830,6 +5980,12 @@ function ρσ_op_pow(a, b) {
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return Math.pow(a, b);
     }
+    if (ta === "bigint" && tb === "bigint") {
+        if (b < 0n) {
+            throw new ValueError("negative exponent not supported for long values");
+        }
+        return a ** b;
+    }
     throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for **: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_pow.__argnames__) Object.defineProperties(ρσ_op_pow, {
@@ -5843,6 +5999,9 @@ function ρσ_op_and(a, b) {
     }
     if (b !== null && typeof b.__rand__ === "function") {
         return b.__rand__(a);
+    }
+    if (typeof a === "bigint" !== (typeof b === "bigint")) {
+        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for &: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
     }
     return a & b;
 };
@@ -5858,6 +6017,9 @@ function ρσ_op_or(a, b) {
     if (b !== null && typeof b.__ror__ === "function") {
         return b.__ror__(a);
     }
+    if (typeof a === "bigint" !== (typeof b === "bigint")) {
+        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for |: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+    }
     return a | b;
 };
 if (!ρσ_op_or.__argnames__) Object.defineProperties(ρσ_op_or, {
@@ -5871,6 +6033,9 @@ function ρσ_op_xor(a, b) {
     }
     if (b !== null && typeof b.__rxor__ === "function") {
         return b.__rxor__(a);
+    }
+    if (typeof a === "bigint" !== (typeof b === "bigint")) {
+        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for ^: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
     }
     return a ^ b;
 };
@@ -5886,6 +6051,9 @@ function ρσ_op_lshift(a, b) {
     if (b !== null && typeof b.__rlshift__ === "function") {
         return b.__rlshift__(a);
     }
+    if (typeof a === "bigint" !== (typeof b === "bigint")) {
+        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for <<: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+    }
     return a << b;
 };
 if (!ρσ_op_lshift.__argnames__) Object.defineProperties(ρσ_op_lshift, {
@@ -5899,6 +6067,9 @@ function ρσ_op_rshift(a, b) {
     }
     if (b !== null && typeof b.__rrshift__ === "function") {
         return b.__rrshift__(a);
+    }
+    if (typeof a === "bigint" !== (typeof b === "bigint")) {
+        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for >>: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
     }
     return a >> b;
 };
@@ -5932,6 +6103,9 @@ function ρσ_op_lt(a, b) {
     ta = typeof a;
     tb = typeof b;
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a < b;
+    }
+    if (ta === "bigint" && tb === "bigint") {
         return a < b;
     }
     if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
@@ -5971,6 +6145,9 @@ function ρσ_op_le(a, b) {
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return a <= b;
     }
+    if (ta === "bigint" && tb === "bigint") {
+        return a <= b;
+    }
     if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
         return a <= b;
     }
@@ -5997,6 +6174,9 @@ function ρσ_op_gt(a, b) {
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
         return a > b;
     }
+    if (ta === "bigint" && tb === "bigint") {
+        return a > b;
+    }
     if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
         return a > b;
     }
@@ -6021,6 +6201,9 @@ function ρσ_op_ge(a, b) {
     ta = typeof a;
     tb = typeof b;
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a >= b;
+    }
+    if (ta === "bigint" && tb === "bigint") {
         return a >= b;
     }
     if ((ta === "string" || a instanceof String) && (tb === "string" || b instanceof String)) {
@@ -6322,6 +6505,9 @@ function ρσ_op_floordiv_ns(a, b) {
     if (b !== null && typeof b.__rfloordiv__ === "function") {
         return b.__rfloordiv__(a);
     }
+    if (typeof a === "bigint" && typeof b === "bigint") {
+        var ρσ_bq = a / b, ρσ_br = a % b; if (ρσ_br !== 0n && (ρσ_br < 0n) !== (b < 0n)) { return ρσ_bq - 1n; } return ρσ_bq;;
+    }
     return Math.floor(a / b);
 };
 if (!ρσ_op_floordiv_ns.__argnames__) Object.defineProperties(ρσ_op_floordiv_ns, {
@@ -6336,6 +6522,9 @@ function ρσ_op_mod_ns(a, b) {
     if (b !== null && typeof b.__rmod__ === "function") {
         return b.__rmod__(a);
     }
+    if (typeof a === "bigint" && typeof b === "bigint") {
+        var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;;
+    }
     return a % b;
 };
 if (!ρσ_op_mod_ns.__argnames__) Object.defineProperties(ρσ_op_mod_ns, {
@@ -6349,6 +6538,9 @@ function ρσ_op_pow_ns(a, b) {
     }
     if (b !== null && typeof b.__rpow__ === "function") {
         return b.__rpow__(a);
+    }
+    if (typeof a === "bigint" && typeof b === "bigint") {
+        return a ** b;
     }
     return Math.pow(a, b);
 };
@@ -6548,6 +6740,9 @@ function ρσ_instanceof() {
             return true;
         }
         if (q === ρσ_float && typeof obj === "number" && !Number.isInteger(obj)) {
+            return true;
+        }
+        if (q === ρσ_long && typeof obj === "bigint") {
             return true;
         }
         if (bases.length > 1) {
@@ -7007,6 +7202,9 @@ function ρσ_str(x) {
     }
     if (x === undefined) {
         return "undefined";
+    }
+    if (typeof x === "bigint") {
+        return String(x);
     }
     ans = x;
     if (typeof x.__str__ === "function") {
@@ -7970,13 +8168,13 @@ define_str_func("replace", (function() {
     var ρσ_anonfunc = function (old, repl, count) {
         var string, pos, idx;
         string = this;
-        if (count === 1) {
+        if (old instanceof RegExp) {
             return ρσ_orig_replace(string, old, repl);
         }
-        if (count < 1) {
+        if (count === 0) {
             return string;
         }
-        count = count || Number.MAX_VALUE;
+        count = (count > 0) ? count : Number.MAX_VALUE;
         pos = 0;
         while (count > 0) {
             count -= 1;

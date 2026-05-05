@@ -1467,6 +1467,76 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── Infinite-loop detection ───────────────────────────────────────
+
+        {
+            name: "infinite_loop_while_true",
+            description: "while True: with no await inside is flagged as a warning",
+            run: function () {
+                var markers = d().check([
+                    "while True:",
+                    "    x = 1",
+                ].join("\n"));
+                var warnings = markers.filter(function (m) {
+                    return m.severity === SEV_WARNING &&
+                           m.message.indexOf("while loop") !== -1;
+                });
+                assert.ok(warnings.length >= 1,
+                    "Expected an infinite-loop warning but got: " + JSON.stringify(markers));
+            },
+        },
+
+        {
+            name: "infinite_loop_while_1",
+            description: "while 1: with no await inside is flagged as a warning",
+            run: function () {
+                var markers = d().check([
+                    "while 1:",
+                    "    pass",
+                ].join("\n"));
+                var warnings = markers.filter(function (m) {
+                    return m.severity === SEV_WARNING &&
+                           m.message.indexOf("while loop") !== -1;
+                });
+                assert.ok(warnings.length >= 1,
+                    "Expected an infinite-loop warning for while 1: but got: " + JSON.stringify(markers));
+            },
+        },
+
+        {
+            name: "infinite_loop_suppressed_by_await",
+            description: "while True: containing an await does NOT produce a warning",
+            run: function () {
+                var markers = d().check([
+                    "async def run():",
+                    "    while True:",
+                    "        await some_task()",
+                ].join("\n"));
+                var inf = markers.filter(function (m) {
+                    return m.message.indexOf("while loop") !== -1;
+                });
+                assert.deepStrictEqual(inf, [],
+                    "Expected no infinite-loop warning when await is present but got: " + JSON.stringify(inf));
+            },
+        },
+
+        {
+            name: "infinite_loop_no_false_positive_for_condition",
+            description: "while x > 0: (non-constant condition) does not produce a warning",
+            run: function () {
+                var markers = d().check([
+                    "x = 10",
+                    "while x > 0:",
+                    "    x -= 1",
+                ].join("\n"));
+                var inf = markers.filter(function (m) {
+                    return m.message.indexOf("while loop") !== -1;
+                });
+                assert.deepStrictEqual(inf, [],
+                    "Expected no infinite-loop warning for non-constant condition but got: " + JSON.stringify(inf));
+            },
+        },
+
     ];
 
     return TESTS;

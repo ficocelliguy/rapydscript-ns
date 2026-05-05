@@ -20,6 +20,7 @@ const MESSAGES = {
     'def-after-use':  'The symbol "{name}" is defined (at line {line}) after it is used',
     'dup-key':        'Duplicate key "{name}" in object literal',
     'dup-method':     'The method "{name}" was defined previously at line: {line}',
+    'infinite-loop':  'This while loop may never exit (condition is always true and there is no await in the body)',
 };
 
 // Built-in stdlib modules that are always available in RapydScript (bundled
@@ -497,6 +498,42 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
         if (node.alias) this.add_binding(node.alias.name);
     };
 
+    this.handle_while = function() {
+        const node = this.current_node;
+        const cond = node.condition;
+        const RS   = this.RS;
+
+        const is_trivially_true = (
+            (cond instanceof RS.AST_True) ||
+            (cond instanceof RS.AST_Number && cond.value !== 0)
+        );
+        if (!is_trivially_true) return;
+
+        let has_await = false;
+        const await_finder = {
+            _visit: function(n, cont) {
+                if (n instanceof RS.AST_Await) { has_await = true; return; }
+                if (cont) cont();
+            }
+        };
+        if (node.body) node.body._walk(await_finder);
+
+        if (!has_await) {
+            const sline = node.start ? node.start.line : 1;
+            const scol  = node.start ? node.start.col  : 0;
+            const eline = (node.condition && node.condition.end) ? node.condition.end.line : sline;
+            const ecol  = (node.condition && node.condition.end) ? node.condition.end.col  : scol;
+            this.messages.push({
+                start_line: sline, start_col: scol,
+                end_line:   eline, end_col:   ecol,
+                ident:   'infinite-loop',
+                message: MESSAGES['infinite-loop'],
+                level:   WARN,
+                name:    '',
+            });
+        }
+    };
+
     // The visitor function called by toplevel.walk()
     this._visit = function(node, cont) {
         if (node.lint_visited) return;
@@ -530,6 +567,7 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
         else if (node instanceof RS.AST_EmptyStatement)  this.handle_empty_statement();
         else if (node instanceof RS.AST_WithClause)      this.handle_with_clause();
         else if (node instanceof RS.AST_Object)          this.handle_object_literal();
+        else if (node instanceof RS.AST_While)           this.handle_while();
 
         if (node instanceof RS.AST_Scope) this.handle_scope();
 
