@@ -321,6 +321,13 @@ def print_binary_op(self, output):
         self.right.print(output)
         output.print(')')
         return
+    if self.operator is '%' and self.python_mod:
+        output.print('ρσ_op_mod_ns(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
+        return
     if function_ops[self.operator]:
         output.print(function_ops[self.operator])
         output.with_parens(def():
@@ -484,6 +491,14 @@ def print_assign(self, output):
             output.space()
             self.right.print(output)
         )
+        return
+    if self.operator is '%=' and self.python_mod:
+        output.assign(self.left)
+        output.print('ρσ_op_mod_ns(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
         return
     if self.operator is '**=':
         output.assign(self.left)

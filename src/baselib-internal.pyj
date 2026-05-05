@@ -364,7 +364,8 @@ def ρσ_op_mod(a, b):
     if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
     ta = jstype(a)
     tb = jstype(b)
-    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a % b
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
+        v'var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;'
     if ta is 'bigint' and tb is 'bigint':
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;'
     raise TypeError("unsupported operand type(s) for %: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
@@ -611,7 +612,11 @@ def ρσ_op_floordiv_ns(a, b):
 def ρσ_op_mod_ns(a, b):
     if a is not None and jstype(a.__mod__) is 'function': return a.__mod__(b)
     if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
-    if jstype(a) is 'bigint' and jstype(b) is 'bigint':
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
+        v'var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;'
+    if ta is 'bigint' and tb is 'bigint':
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;'
     return v'a % b'
 

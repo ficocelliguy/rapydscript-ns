@@ -1,0 +1,21 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# python_modulo_off.pyj
+# Tests for opting out of Python-style modulo via no_python_modulo.
+# With the flag off, `%` emits raw JS modulo (sign of dividend).
+
+from __python__ import no_python_modulo
+
+ae = assrt.equal
+
+# JS modulo: result takes the sign of the dividend.
+ae(-7 % 3, -1)   # Python would give 2
+ae(7 % -3, 1)    # Python would give -2
+ae(-7 % -3, -1)  # same as Python here
+ae(7 % 3, 1)     # positive case identical
+
+# Augmented `%=` follows the same flag.
+x = -7
+x %= 3
+ae(x, -1)        # Python would give 2

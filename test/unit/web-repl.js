@@ -2692,6 +2692,28 @@ var TESTS = [
     },
 
     {
+        name: "bundle_python_modulo",
+        description: "% operator gives Python-style modulo (sign of divisor) in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.equal(-7 % 3, 2)",
+                "assrt.equal(7 % -3, -2)",
+                "assrt.equal(-7 % -3, -1)",
+                "assrt.equal(7 % 3, 1)",
+                "assrt.equal(0 % 5, 0)",
+                "assrt.equal(-6 % 3, 0)",
+                "assrt.equal(-7.5 % 2, 0.5)",
+                "assrt.equal(7.5 % -2, -0.5)",
+                "x = -7",
+                "x %= 3",
+                "assrt.equal(x, 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",
         run: function () {

@@ -31,7 +31,7 @@ TreeWalker
 from tokenizer import tokenizer, is_token, RESERVED_WORDS
 
 COMPILER_VERSION = '__COMPILER_VERSION__'
-PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True, 'jsx':True, 'strict_arithmetic':True}
+PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True, 'jsx':True, 'strict_arithmetic':True, 'python_modulo':True}
 
 
 def get_compiler_version():
@@ -3245,6 +3245,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 'end': right.end,
                 'overloaded': S.scoped_flags.get('overload_operators', False),
                 'strict_arith': S.scoped_flags.get('overload_operators', False) and S.scoped_flags.get('strict_arithmetic', True),
+                'python_mod': (op is '%') and S.scoped_flags.get('python_modulo', True),
                 'python_truthiness': S.scoped_flags.get('truthiness', False) and (op is '&&' or op is '||')
             })
             return expr_op(ret, min_prec, no_in)
@@ -3327,6 +3328,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             if S.scoped_flags.get('overload_operators', False) and val is not '=':
                 asgn.overloaded = True
                 asgn.strict_arith = S.scoped_flags.get('strict_arithmetic', True)
+            if val is '%=':
+                asgn.python_mod = S.scoped_flags.get('python_modulo', True)
             return asgn
         return left
 
