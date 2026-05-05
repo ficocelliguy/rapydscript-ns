@@ -1,0 +1,236 @@
+###########################################################
+# RapydScript Standard Library
+# http.cookies — HTTP cookie parsing and generation
+###########################################################
+#
+# Provides:
+#   CookieError          — raised when a cookie value cannot be parsed
+#   Morsel               — represents a single cookie with its attributes
+#   SimpleCookie         — dict-like container of Morsel objects
+#
+# Usage:
+#   from http.cookies import SimpleCookie, CookieError
+#
+#   # Parse cookies from a Cookie request header
+#   c = SimpleCookie()
+#   c.load('session=abc123; user=alice')
+#   for name, morsel in c.items():
+#       print(name, morsel.value)
+#
+#   # Build a Set-Cookie response header
+#   c2 = SimpleCookie()
+#   c2['token'] = 'xyz'
+#   c2['token']['path']    = '/'
+#   c2['token']['max-age'] = 3600
+#   print(c2.output())   # Set-Cookie: token=xyz; Max-Age=3600; Path=/
+
+
+class CookieError(Exception):
+    """Raised when a cookie header cannot be parsed."""
+    pass
+
+
+# Attribute keys for Morsel (lowercase, matching the Set-Cookie directive names)
+_MORSEL_ATTRS = ['expires', 'path', 'comment', 'domain', 'max-age',
+                 'secure', 'httponly', 'version', 'samesite']
+
+
+class Morsel:
+    """A single cookie name/value pair plus its Set-Cookie attributes.
+
+    Attributes
+    ----------
+    key          : str  — cookie name
+    value        : str  — decoded cookie value
+    coded_value  : str  — value as it appears in the header (same as value here)
+
+    Cookie attributes (set via morsel['path'] = '/', etc.):
+    'expires', 'path', 'comment', 'domain', 'max-age',
+    'secure', 'httponly', 'version', 'samesite'
+    """
+
+    def __init__(self):
+        self.key         = None
+        self.value       = None
+        self.coded_value = None
+        self._attrs      = {}
+
+    def set(self, key, val, coded_val):
+        self.key         = key
+        self.value       = val
+        self.coded_value = coded_val
+
+    def __getitem__(self, k):
+        v"""
+        var lk = k.toLowerCase();
+        return Object.prototype.hasOwnProperty.call(this._attrs, lk)
+            ? this._attrs[lk]
+            : '';
+        """
+
+    def __setitem__(self, k, v):
+        v"""
+        var lk = k.toLowerCase();
+        this._attrs[lk] = v;
+        """
+
+    def isReservedKey(self, k):
+        v"""
+        var lk = k.toLowerCase();
+        for (var i = 0; i < _MORSEL_ATTRS.length; i++) {
+            if (_MORSEL_ATTRS[i] === lk) return true;
+        }
+        return false;
+        """
+
+    def OutputString(self):
+        """Return the cookie string (without the 'Set-Cookie:' prefix)."""
+        v"""
+        var parts = [this.key + '=' + this.coded_value];
+        var a     = this._attrs;
+        if (a['expires'])  { parts.push('expires='  + a['expires']); }
+        if (a['path'])     { parts.push('Path='     + a['path']); }
+        if (a['comment'])  { parts.push('Comment='  + a['comment']); }
+        if (a['domain'])   { parts.push('Domain='   + a['domain']); }
+        if (a['max-age'] !== undefined && a['max-age'] !== '') {
+            parts.push('Max-Age=' + a['max-age']);
+        }
+        if (a['version'])  { parts.push('Version='  + a['version']); }
+        if (a['samesite']) { parts.push('SameSite=' + a['samesite']); }
+        if (a['secure'])   { parts.push('Secure'); }
+        if (a['httponly']) { parts.push('HttpOnly'); }
+        return parts.join('; ');
+        """
+
+    def output(self, header='Set-Cookie'):
+        return header + ': ' + self.OutputString()
+
+    def __str__(self):
+        return self.OutputString()
+
+    def __repr__(self):
+        return '<Morsel: ' + str(self.key) + '=' + str(self.coded_value) + '>'
+
+
+def _parse_cookie_str(rawdata):
+    """Parse a Cookie or Set-Cookie header string into a dict of name→Morsel."""
+    result = {}
+    v"""
+    // Split on ';' to get individual name=value pairs.
+    // We only parse the name=value portion here (not Set-Cookie attributes);
+    // for SimpleCookie we treat each ';'-separated segment as a cookie if it
+    // contains '=', otherwise we skip it (it's a directive like 'HttpOnly').
+    var parts = String(rawdata).split(';');
+    for (var i = 0; i < parts.length; i++) {
+        var part = parts[i].replace(/^\s+|\s+$/g, '');
+        if (part.length === 0) continue;
+        var eq = part.indexOf('=');
+        if (eq < 0) continue;
+        var name = part.slice(0, eq).replace(/^\s+|\s+$/g, '');
+        var val  = part.slice(eq + 1).replace(/^\s+|\s+$/g, '');
+        // Strip surrounding quotes if present
+        if (val.length >= 2 && val.charAt(0) === '"' && val.charAt(val.length - 1) === '"') {
+            val = val.slice(1, val.length - 1);
+        }
+        if (name.length === 0) continue;
+        var m = new Morsel();
+        m.set(name, val, val);
+        result[name] = m;
+    }
+    """
+    return result
+
+
+class SimpleCookie:
+    """A dict-like container of Morsel objects parsed from cookie headers.
+
+    cookie['name'] = 'value'    — set a cookie (creates/replaces a Morsel)
+    cookie['name']              — get the Morsel for 'name'
+    cookie['name']['path'] = '/'— set a cookie attribute
+
+    load(rawdata)               — parse cookie string into this container
+    output(header, sep)         — format all cookies as Set-Cookie lines
+    items()                     — [(name, morsel), ...]
+    keys()                      — [name, ...]
+    values()                    — [morsel, ...]
+    """
+
+    def __init__(self, input=None):
+        self._cookies = {}
+        if input is not None:
+            self.load(input)
+
+    def load(self, rawdata):
+        """Parse *rawdata* (a cookie header string) and merge into this cookie."""
+        parsed = _parse_cookie_str(rawdata)
+        v"""
+        Object.keys(parsed).forEach(function(k) {
+            this._cookies[k] = parsed[k];
+        }.bind(this));
+        """
+
+    def __getitem__(self, key):
+        v"""
+        if (!Object.prototype.hasOwnProperty.call(this._cookies, key)) {
+            throw new KeyError(key);
+        }
+        return this._cookies[key];
+        """
+
+    def __setitem__(self, key, val):
+        v"""
+        if (!Object.prototype.hasOwnProperty.call(this._cookies, key)) {
+            var m = new Morsel();
+            m.set(key, String(val), String(val));
+            this._cookies[key] = m;
+        } else {
+            this._cookies[key].value       = String(val);
+            this._cookies[key].coded_value = String(val);
+        }
+        """
+
+    def __contains__(self, key):
+        v"""return Object.prototype.hasOwnProperty.call(this._cookies, key);"""
+
+    def keys(self):
+        v"""return Object.keys(this._cookies);"""
+
+    def values(self):
+        v"""
+        var out = [];
+        Object.keys(this._cookies).forEach(function(k) { out.push(this._cookies[k]); }.bind(this));
+        return out;
+        """
+
+    def items(self):
+        v"""
+        var out = [];
+        Object.keys(this._cookies).forEach(function(k) {
+            out.push([k, this._cookies[k]]);
+        }.bind(this));
+        return out;
+        """
+
+    def output(self, header='Set-Cookie:', sep='\r\n'):
+        """Return all cookies formatted as Set-Cookie header lines."""
+        v"""
+        var lines = [];
+        var ck = this._cookies;
+        Object.keys(ck).forEach(function(k) {
+            lines.push(ck[k].output(header.replace(/:$/, '')));
+        });
+        return lines.join(sep);
+        """
+
+    def __str__(self):
+        return self.output()
+
+    def __repr__(self):
+        v"""
+        var parts = [];
+        var ck = this._cookies;
+        Object.keys(ck).forEach(function(k) {
+            parts.push(JSON.stringify(k) + ': ' + JSON.stringify(ck[k].coded_value));
+        });
+        return '<SimpleCookie: ' + parts.join(', ') + '>';
+        """

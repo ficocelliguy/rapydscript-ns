@@ -1,0 +1,259 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# http.pyj
+# Tests for the http standard library module.
+#
+# Covers http (HTTPStatus), http.client (pure-JS synchronous parts), and
+# http.cookies.  Network-dependent tests (getresponse) are exercised only in
+# the web-repl bundle tests via a mocked fetch environment.
+
+from __python__ import overload_getitem
+
+from http         import HTTPStatus
+from http.client  import (HTTPConnection, HTTPSConnection,
+                          HTTPException, NotConnected, InvalidURL,
+                          RemoteDisconnected, HTTP_PORT, HTTPS_PORT,
+                          HTTPResponse)
+from http.cookies import SimpleCookie, Morsel, CookieError
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. HTTPStatus constants ───────────────────────────────────────────────────
+
+ae(HTTPStatus.OK,                  200)
+ae(HTTPStatus.CREATED,             201)
+ae(HTTPStatus.NO_CONTENT,          204)
+ae(HTTPStatus.MOVED_PERMANENTLY,   301)
+ae(HTTPStatus.NOT_MODIFIED,        304)
+ae(HTTPStatus.BAD_REQUEST,         400)
+ae(HTTPStatus.UNAUTHORIZED,        401)
+ae(HTTPStatus.FORBIDDEN,           403)
+ae(HTTPStatus.NOT_FOUND,           404)
+ae(HTTPStatus.METHOD_NOT_ALLOWED,  405)
+ae(HTTPStatus.INTERNAL_SERVER_ERROR, 500)
+ae(HTTPStatus.SERVICE_UNAVAILABLE, 503)
+ae(HTTPStatus.IM_A_TEAPOT,         418)
+
+# ── 2. Port constants ─────────────────────────────────────────────────────────
+
+ae(HTTP_PORT,  80)
+ae(HTTPS_PORT, 443)
+
+# ── 3. HTTPException hierarchy ────────────────────────────────────────────────
+
+try:
+    raise HTTPException('base error')
+    ok(False)
+except HTTPException as e:
+    ok('base error' in str(e))
+
+try:
+    raise NotConnected('not connected')
+    ok(False)
+except HTTPException as e:
+    ok(isinstance(e, NotConnected))
+
+try:
+    raise InvalidURL('bad url')
+    ok(False)
+except HTTPException as e:
+    ok(isinstance(e, InvalidURL))
+
+try:
+    raise RemoteDisconnected('gone')
+    ok(False)
+except HTTPException as e:
+    ok(isinstance(e, RemoteDisconnected))
+
+# ── 4. HTTPConnection — _build_url ────────────────────────────────────────────
+
+conn = HTTPConnection('example.com')
+ae(conn._build_url('/path'),    'http://example.com/path')
+ae(conn._build_url('/'),        'http://example.com/')
+
+conn2 = HTTPConnection('example.com', 8080)
+ae(conn2._build_url('/api'),    'http://example.com:8080/api')
+
+# Default port 80 should be omitted
+conn3 = HTTPConnection('example.com', 80)
+ae(conn3._build_url('/'),       'http://example.com/')
+
+# Full URL passes through unchanged
+ae(conn._build_url('https://other.com/x'), 'https://other.com/x')
+ae(conn._build_url('http://other.com/x'),  'http://other.com/x')
+
+# ── 5. HTTPSConnection — _build_url ──────────────────────────────────────────
+
+sconn = HTTPSConnection('secure.example.com')
+ae(sconn._build_url('/data'),   'https://secure.example.com/data')
+
+sconn2 = HTTPSConnection('secure.example.com', 8443)
+ae(sconn2._build_url('/data'),  'https://secure.example.com:8443/data')
+
+# Default port 443 should be omitted
+sconn3 = HTTPSConnection('secure.example.com', 443)
+ae(sconn3._build_url('/data'),  'https://secure.example.com/data')
+
+# ── 6. HTTPConnection.request stores state ───────────────────────────────────
+
+conn4 = HTTPConnection('api.example.com')
+conn4.request('POST', '/items', body='a=1', headers={'Content-Type': 'text/plain'})
+ae(conn4._method,  'POST')
+ae(conn4._path,    '/items')
+ae(conn4._body,    'a=1')
+ae(conn4._headers['content-type'], 'text/plain')
+
+# ── 7. putrequest / putheader / endheaders ───────────────────────────────────
+
+conn5 = HTTPConnection('example.com')
+conn5.putrequest('GET', '/search')
+conn5.putheader('Accept', 'application/json')
+conn5.putheader('X-Custom', 'hello')
+conn5.endheaders()
+ae(conn5._method, 'GET')
+ae(conn5._path,   '/search')
+ae(conn5._headers['accept'],   'application/json')
+ae(conn5._headers['x-custom'], 'hello')
+ae(conn5._body, None)
+
+conn5b = HTTPConnection('example.com')
+conn5b.putrequest('POST', '/upload')
+conn5b.endheaders('payload')
+ae(conn5b._body, 'payload')
+
+# ── 8. HTTPConnection.close resets state ─────────────────────────────────────
+
+conn6 = HTTPConnection('example.com')
+conn6.request('DELETE', '/items/1')
+conn6.close()
+ae(conn6._method, None)
+ae(conn6._path,   None)
+ae(conn6._body,   None)
+
+# ── 9. HTTPResponse — sync accessors ─────────────────────────────────────────
+
+hdrs = {'content-type': 'application/json', 'x-rate-limit': '100'}
+resp = HTTPResponse(200, 'OK', hdrs, '{"ok":true}', 'https://example.com/api')
+ae(resp.status,  200)
+ae(resp.reason,  'OK')
+ae(resp.url,     'https://example.com/api')
+ae(resp.getheader('content-type'),          'application/json')
+ae(resp.getheader('Content-Type'),          'application/json')
+ae(resp.getheader('missing'),               None)
+ae(resp.getheader('missing', 'default'),    'default')
+ok(not resp.closed)
+resp.close()
+ok(resp.closed)
+
+# ── 10. HTTPResponse.getheaders ───────────────────────────────────────────────
+
+pairs = resp.getheaders()
+ae(len(pairs), 2)
+found = False
+for pair in pairs:
+    if pair[0] is 'content-type' and pair[1] is 'application/json':
+        found = True
+ok(found)
+
+# ── 11. HTTPResponse.read / .json return Promises ────────────────────────────
+
+resp2 = HTTPResponse(200, 'OK', {}, '{"n":42}', 'https://x.com/')
+read_p  = resp2.read()
+json_p  = resp2.json()
+ok(read_p is not None)
+ok(json_p is not None)
+ok(jstype(read_p.then) is 'function')
+ok(jstype(json_p.then) is 'function')
+
+# ── 12. SimpleCookie — basic parsing ─────────────────────────────────────────
+
+c = SimpleCookie()
+c.load('session=abc123; user=alice')
+ok('session' in c.keys())
+ok('user' in c.keys())
+ae(c['session'].value, 'abc123')
+ae(c['user'].value,    'alice')
+
+# ── 13. SimpleCookie — set a cookie ──────────────────────────────────────────
+
+c2 = SimpleCookie()
+c2['token'] = 'xyz789'
+ok('token' in c2.keys())
+ae(c2['token'].value,       'xyz789')
+ae(c2['token'].coded_value, 'xyz789')
+
+# ── 14. SimpleCookie — cookie attributes ─────────────────────────────────────
+
+c3 = SimpleCookie()
+c3['id'] = '1'
+c3['id']['path']    = '/'
+c3['id']['max-age'] = 3600
+c3['id']['secure']  = True
+ae(c3['id']['path'],    '/')
+ae(c3['id']['max-age'], 3600)
+ok(c3['id']['secure'])
+
+# ── 15. Morsel.OutputString ───────────────────────────────────────────────────
+
+m = Morsel()
+m.set('token', 'abc', 'abc')
+m._attrs['path']    = '/'
+m._attrs['max-age'] = '3600'
+s = m.OutputString()
+ok('token=abc' in s)
+ok('Path=/' in s)
+ok('Max-Age=3600' in s)
+
+# ── 16. Morsel.output includes header ────────────────────────────────────────
+
+out = m.output()
+ok('Set-Cookie: token=abc' in out)
+
+out2 = m.output('Set-Cookie')
+ok('Set-Cookie: token=abc' in out2)
+
+# ── 17. SimpleCookie.output ───────────────────────────────────────────────────
+
+c4 = SimpleCookie()
+c4['a'] = '1'
+c4['b'] = '2'
+full = c4.output()
+ok('Set-Cookie: a=1' in full)
+ok('Set-Cookie: b=2' in full)
+
+# ── 18. SimpleCookie constructor with initial data ────────────────────────────
+
+c5 = SimpleCookie('x=10; y=20')
+ae(c5['x'].value, '10')
+ae(c5['y'].value, '20')
+
+# ── 19. SimpleCookie.keys / values / items ───────────────────────────────────
+
+c6 = SimpleCookie()
+c6['p'] = 'hello'
+c6['q'] = 'world'
+ks = c6.keys()
+ok('p' in ks)   # ks is a list — 'in' checks array membership
+ok('q' in ks)
+vs = c6.values()
+ae(len(vs), 2)
+itms = c6.items()
+ae(len(itms), 2)
+
+# ── 20. CookieError is an Exception ──────────────────────────────────────────
+
+try:
+    raise CookieError('bad cookie')
+    ok(False)
+except CookieError as e:
+    ok('bad cookie' in str(e))
+
+# ── 21. set_debuglevel / connect no-op ───────────────────────────────────────
+
+conn7 = HTTPConnection('example.com')
+conn7.set_debuglevel(1)
+conn7.connect()
+ok(True)

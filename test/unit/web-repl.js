@@ -3183,6 +3183,150 @@ var TESTS = [
         },
     },
 
+    // ── http stdlib ──────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_http_status",
+        description: "http stdlib: HTTPStatus constants in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from http import HTTPStatus",
+                "assrt.equal(HTTPStatus.OK,                  200)",
+                "assrt.equal(HTTPStatus.CREATED,             201)",
+                "assrt.equal(HTTPStatus.NO_CONTENT,          204)",
+                "assrt.equal(HTTPStatus.NOT_FOUND,           404)",
+                "assrt.equal(HTTPStatus.INTERNAL_SERVER_ERROR, 500)",
+                "assrt.equal(HTTPStatus.IM_A_TEAPOT,         418)",
+                "assrt.equal(HTTPStatus.MOVED_PERMANENTLY,   301)",
+                "assrt.equal(HTTPStatus.UNAUTHORIZED,        401)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_http_client_basics",
+        description: "http.client stdlib: HTTPConnection, HTTPSConnection, HTTPResponse, exceptions in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from http.client import (HTTPConnection, HTTPSConnection, HTTPResponse,",
+                "                         HTTPException, NotConnected, InvalidURL,",
+                "                         RemoteDisconnected, HTTP_PORT, HTTPS_PORT)",
+                "assrt.equal(HTTP_PORT,  80)",
+                "assrt.equal(HTTPS_PORT, 443)",
+                // URL building
+                "conn = HTTPConnection('example.com')",
+                "assrt.equal(conn._build_url('/path'), 'http://example.com/path')",
+                "conn2 = HTTPConnection('example.com', 8080)",
+                "assrt.equal(conn2._build_url('/api'), 'http://example.com:8080/api')",
+                "sconn = HTTPSConnection('secure.example.com')",
+                "assrt.equal(sconn._build_url('/data'), 'https://secure.example.com/data')",
+                // request() stores state
+                "conn3 = HTTPConnection('api.example.com')",
+                "conn3.request('POST', '/items', 'a=1', {'Content-Type': 'text/plain'})",
+                "assrt.equal(conn3._method, 'POST')",
+                "assrt.equal(conn3._path,   '/items')",
+                "assrt.equal(conn3._body,   'a=1')",
+                "assrt.equal(conn3._headers['content-type'], 'text/plain')",
+                // HTTPResponse accessors
+                "hdrs = {'content-type': 'application/json'}",
+                "resp = HTTPResponse(200, 'OK', hdrs, '{\"n\":42}', 'https://x.com/')",
+                "assrt.equal(resp.status, 200)",
+                "assrt.equal(resp.reason, 'OK')",
+                "assrt.equal(resp.getheader('content-type'), 'application/json')",
+                "assrt.equal(resp.getheader('Content-Type'), 'application/json')",
+                "assrt.equal(resp.getheader('missing', 'def'), 'def')",
+                "assrt.ok(resp.read() is not None)",
+                "assrt.ok(resp.json() is not None)",
+                // exception hierarchy
+                "caught = False",
+                "try:",
+                "    raise NotConnected('nc')",
+                "except HTTPException as e:",
+                "    caught = True",
+                "assrt.ok(caught)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_http_cookies_basic",
+        description: "http.cookies stdlib: SimpleCookie parsing and Morsel access in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_getitem",
+                "from http.cookies import SimpleCookie, Morsel, CookieError",
+                // basic parse
+                "c = SimpleCookie()",
+                "c.load('session=abc123; user=alice')",
+                "assrt.ok('session' in c.keys())",
+                "assrt.ok('user' in c.keys())",
+                "assrt.equal(c['session'].value, 'abc123')",
+                "assrt.equal(c['user'].value,    'alice')",
+                // set a cookie
+                "c2 = SimpleCookie()",
+                "c2['token'] = 'xyz'",
+                "assrt.ok('token' in c2.keys())",
+                "assrt.equal(c2['token'].value, 'xyz')",
+                // cookie attributes
+                "c3 = SimpleCookie()",
+                "c3['id'] = '1'",
+                "c3['id']['path']    = '/'",
+                "c3['id']['max-age'] = 3600",
+                "assrt.equal(c3['id']['path'], '/')",
+                "assrt.equal(c3['id']['max-age'], 3600)",
+                // constructor with initial data
+                "c4 = SimpleCookie('x=10; y=20')",
+                "assrt.equal(c4['x'].value, '10')",
+                "assrt.equal(c4['y'].value, '20')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_http_cookies_output",
+        description: "http.cookies stdlib: SimpleCookie.output, Morsel.OutputString in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_getitem",
+                "from http.cookies import SimpleCookie, Morsel, CookieError",
+                // Morsel.OutputString
+                "m = Morsel()",
+                "m.set('token', 'abc', 'abc')",
+                "m._attrs['path']    = '/'",
+                "m._attrs['max-age'] = '3600'",
+                "s = m.OutputString()",
+                "assrt.ok('token=abc' in s)",
+                "assrt.ok('Path=/' in s)",
+                "assrt.ok('Max-Age=3600' in s)",
+                // Morsel.output with header
+                "out = m.output()",
+                "assrt.ok('Set-Cookie: token=abc' in out)",
+                // SimpleCookie.output
+                "c = SimpleCookie()",
+                "c['a'] = '1'",
+                "c['b'] = '2'",
+                "full = c.output()",
+                "assrt.ok('Set-Cookie: a=1' in full)",
+                "assrt.ok('Set-Cookie: b=2' in full)",
+                // CookieError
+                "caught = False",
+                "try:",
+                "    raise CookieError('bad')",
+                "except CookieError as e:",
+                "    caught = True",
+                "assrt.ok(caught)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

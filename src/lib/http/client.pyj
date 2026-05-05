@@ -1,0 +1,304 @@
+###########################################################
+# RapydScript Standard Library
+# http.client — HTTP/HTTPS connections via the Fetch API
+###########################################################
+#
+# Provides:
+#   HTTPConnection(host[, port[, timeout]])  — plain HTTP connection
+#   HTTPSConnection(host[, port[, timeout]]) — TLS/HTTPS connection
+#   HTTPResponse                             — response returned by getresponse()
+#   HTTPException                            — base exception
+#   NotConnected                             — no request has been sent yet
+#   InvalidURL                              — malformed URL or host
+#   RemoteDisconnected                       — server closed connection unexpectedly
+#   HTTP_PORT   = 80
+#   HTTPS_PORT  = 443
+#
+# Usage (inside an async function):
+#   from http.client import HTTPConnection, HTTPSConnection
+#
+#   async def fetch_page():
+#       conn = HTTPConnection('example.com')
+#       conn.request('GET', '/path', headers={'Accept': 'text/html'})
+#       resp = await conn.getresponse()
+#       print(resp.status, resp.reason)
+#       body = await resp.read()
+#       conn.close()
+#       return body
+#
+# For HTTPS use HTTPSConnection or pass a full https:// URL to HTTPConnection.
+#
+# Note: getresponse() wraps the browser/Node Fetch API and returns a Promise.
+# It must be awaited inside an async function.  There is no synchronous version
+# because JavaScript has no synchronous HTTP.
+#
+# Unlike Python's http.client, non-2xx responses do NOT raise an exception —
+# check resp.status yourself (matching the lower-level CPython behaviour).
+
+HTTP_PORT  = 80
+HTTPS_PORT = 443
+
+
+class HTTPException(Exception):
+    """Base class for http.client exceptions."""
+    pass
+
+
+class NotConnected(HTTPException):
+    """No request has been issued on this connection yet."""
+    pass
+
+
+class InvalidURL(HTTPException):
+    """The URL or host string is malformed."""
+    pass
+
+
+class RemoteDisconnected(HTTPException):
+    """The remote end closed the connection unexpectedly."""
+    pass
+
+
+class HTTPResponse:
+    """HTTP response object returned by HTTPConnection.getresponse().
+
+    Attributes
+    ----------
+    status  : int   — HTTP status code (e.g. 200)
+    reason  : str   — HTTP reason phrase (e.g. 'OK')
+    headers : dict  — lowercase header name → value mapping
+    url     : str   — final URL after any redirects
+    msg     : dict  — alias for headers (CPython compat)
+
+    Methods
+    -------
+    read([amt])         — Promise → full response body as str (amt ignored)
+    json()              — Promise → body parsed as JSON
+    getheader(name[, default]) — return header value or default
+    getheaders()        — list of [name, value] pairs
+    close()             — mark response as closed (no-op in JS)
+    """
+
+    def __init__(self, status, reason, headers, body_text, url):
+        self.status = status
+        self.reason = reason
+        self.url    = url
+        self._body  = body_text
+        self._closed = False
+        v"""
+        // Normalise headers to a plain null-prototype object so getheader()
+        // works with both plain dicts and ρσ_dict (web-repl / dict_literals).
+        var _hdrs = Object.create(null);
+        if (headers) {
+            if (headers.jsmap && typeof headers.jsmap.forEach === 'function') {
+                headers.jsmap.forEach(function(v, k) {
+                    _hdrs[String(k).toLowerCase()] = String(v);
+                });
+            } else if (typeof headers === 'object') {
+                Object.keys(headers).forEach(function(k) {
+                    if (k !== 'jsmap' && k !== '__class__') {
+                        _hdrs[k.toLowerCase()] = String(headers[k]);
+                    }
+                });
+            }
+        }
+        this.headers = _hdrs;
+        this.msg     = _hdrs;
+        """
+
+    def read(self, amt=None):
+        """Return the response body as a string (as a resolved Promise)."""
+        body = self._body
+        return v'Promise.resolve(body)'
+
+    def json(self):
+        """Parse the response body as JSON (as a resolved Promise)."""
+        body = self._body
+        return v'Promise.resolve(JSON.parse(body))'
+
+    def getheader(self, name, dflt=None):
+        """Return the value of header *name* (case-insensitive), or *dflt*."""
+        v"""
+        var key = name.toLowerCase();
+        return Object.prototype.hasOwnProperty.call(this.headers, key)
+            ? this.headers[key]
+            : dflt;
+        """
+
+    def getheaders(self):
+        """Return a list of [name, value] pairs for all response headers."""
+        result = []
+        v"""
+        var hdrs = this.headers;
+        Object.keys(hdrs).forEach(function(k) { result.push([k, hdrs[k]]); });
+        """
+        return result
+
+    def close(self):
+        self._closed = True
+
+    @property
+    def closed(self):
+        return self._closed
+
+
+class HTTPConnection:
+    """An HTTP connection to *host*.
+
+    Parameters
+    ----------
+    host    : str   — hostname (may include port as 'host:port')
+    port    : int   — port number; overrides any port in *host*
+    timeout : float — seconds before the request is aborted
+
+    Call request() to set up a request, then await getresponse() to execute it
+    and obtain an HTTPResponse.
+    """
+
+    _scheme = 'http'
+
+    def __init__(self, host, port=None, timeout=None, source_address=None):
+        self.host    = host
+        self.port    = port
+        self.timeout = timeout
+        self._method  = None
+        self._path    = None
+        self._body    = None
+        v"""this._headers = Object.create(null);"""
+
+    def _build_url(self, path):
+        """Construct the full URL from the stored scheme, host, port, and path."""
+        v"""
+        var scheme = this._scheme;
+        var host   = this.host;
+        var port   = this.port;
+        // If path is already absolute, return it directly
+        if (path.slice(0, 7) === 'http://' || path.slice(0, 8) === 'https://') {
+            return path;
+        }
+        // Append port unless it is the default for the scheme
+        if (port != null) {
+            var default_port = scheme === 'https' ? 443 : 80;
+            if (port !== default_port) {
+                host = host + ':' + port;
+            }
+        }
+        return scheme + '://' + host + path;
+        """
+
+    def set_debuglevel(self, level):
+        """Set debug level (no-op in JS)."""
+        pass
+
+    def connect(self):
+        """Establish the connection (no-op in JS; fetch handles this)."""
+        pass
+
+    def close(self):
+        """Discard any pending request state."""
+        self._method  = None
+        self._path    = None
+        self._body    = None
+        v"""this._headers = Object.create(null);"""
+
+    def putrequest(self, method, url, skip_host=False, skip_accept_encoding=False):
+        """Begin a request; use putheader() + endheaders() to add headers."""
+        self._method  = method
+        self._path    = url
+        self._body    = None
+        v"""this._headers = Object.create(null);"""
+
+    def putheader(self, header, argument):
+        """Add a single header to the pending request."""
+        v"""this._headers[header.toLowerCase()] = String(argument);"""
+
+    def endheaders(self, body=None):
+        """Finalise the request headers and optionally set the body."""
+        if body is not None:
+            self._body = body
+
+    def request(self, method, url, body=None, headers={}):
+        """Set up a request; call await getresponse() to execute it.
+
+        Parameters
+        ----------
+        method  : str  — HTTP verb ('GET', 'POST', etc.)
+        url     : str  — path (e.g. '/api/items') or full URL
+        body    : str  — request body; also switches method hint to POST
+        headers : dict — extra request headers
+        """
+        self._method  = method
+        self._path    = url
+        self._body    = body
+        v"""
+        this._headers = Object.create(null);
+        var h = headers;
+        if (h) {
+            // ρσ_dict (web-repl / dict_literals mode) stores keys in h.jsmap (a Map)
+            if (h.jsmap && typeof h.jsmap.forEach === 'function') {
+                h.jsmap.forEach(function(v, k) {
+                    this._headers[String(k).toLowerCase()] = String(v);
+                }.bind(this));
+            } else if (typeof h === 'object') {
+                Object.keys(h).forEach(function(k) {
+                    if (k !== 'jsmap' && k !== '__class__') {
+                        this._headers[k.toLowerCase()] = String(h[k]);
+                    }
+                }.bind(this));
+            }
+        }
+        """
+
+    def getresponse(self):
+        """Execute the pending request and return a Promise → HTTPResponse.
+
+        Raises HTTPException on network errors.
+        Non-2xx responses are returned normally (check resp.status yourself).
+        """
+        method  = self._method or 'GET'
+        path    = self._path or '/'
+        body    = self._body
+        headers = self._headers
+        timeout = self.timeout
+        v"""
+        var url   = this._build_url(path);
+        var _opts = { method: method, headers: headers };
+        if (body != null) { _opts.body = body; }
+        var _abort = null;
+        if (timeout != null && typeof AbortController !== 'undefined') {
+            var _ctrl = new AbortController();
+            _opts.signal = _ctrl.signal;
+            _abort = setTimeout(function() { _ctrl.abort(); }, timeout * 1000);
+        }
+        return Promise.resolve()
+            .then(function() { return fetch(url, _opts); })
+            .then(function(resp) {
+                if (_abort) { clearTimeout(_abort); _abort = null; }
+                var hdrs = {};
+                if (resp.headers && typeof resp.headers.forEach === 'function') {
+                    resp.headers.forEach(function(v, k) { hdrs[k] = v; });
+                }
+                return resp.text().then(function(body_text) {
+                    return new HTTPResponse(resp.status, resp.statusText, hdrs, body_text, resp.url);
+                });
+            })
+            .catch(function(e) {
+                if (_abort) { clearTimeout(_abort); _abort = null; }
+                if (e instanceof HTTPException) throw e;
+                throw new HTTPException(String(e));
+            });
+        """
+
+
+class HTTPSConnection(HTTPConnection):
+    """An HTTPS connection to *host* (TLS).
+
+    Identical to HTTPConnection but uses https:// as the default scheme.
+    Parameters are the same as HTTPConnection.
+    """
+
+    _scheme = 'https'
+
+    def __init__(self, host, port=None, timeout=None, source_address=None,
+                 context=None, check_hostname=None):
+        HTTPConnection.__init__(self, host, port, timeout, source_address)
