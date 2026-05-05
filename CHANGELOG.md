@@ -1,9 +1,11 @@
 version 0.9.3
 =======================
+* Added the `bisect` standard library module (`bisect_left`, `bisect_right`, `bisect`, `insort_left`, `insort_right`, `insort`, optional `key` parameter)
 * Added the `base64` standard library module
 * Added the `string` standard library module (character constants, `Template`, `Formatter`)
 * Added the `html` standard library module (`escape`, `unescape`, `HTMLParser`, etc.)
 * Added the `asyncio` standard library module (`sleep()`, `gather()`, `create_task()`, etc.)
+* Added the `urllib` standard library module
 * Added support for `float("inf")` and `float("-inf")`
 * Added `long()` type and improved pretty-printing of `type()` return values
 * Language service: bare imports now correctly provide type hints; infinite loop warning

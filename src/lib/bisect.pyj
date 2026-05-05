@@ -1,0 +1,73 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Implementation of Python's 'bisect' module.
+# Binary search and sorted list insertion for maintaining sorted lists.
+#
+# key parameter (Python 3.10+): applied to each array element but NOT to x;
+# pass the desired comparison value as x directly when using key.
+
+
+def bisect_left(a, x, lo=0, hi=None, key=None):
+    if lo < 0:
+        raise ValueError('lo must be non-negative')
+    if hi is None:
+        hi = a.length
+    if key is None:
+        while lo < hi:
+            mid = Math.floor((lo + hi) / 2)
+            if a[mid] < x:
+                lo = mid + 1
+            else:
+                hi = mid
+    else:
+        while lo < hi:
+            mid = Math.floor((lo + hi) / 2)
+            if key(a[mid]) < x:
+                lo = mid + 1
+            else:
+                hi = mid
+    return lo
+
+
+def bisect_right(a, x, lo=0, hi=None, key=None):
+    if lo < 0:
+        raise ValueError('lo must be non-negative')
+    if hi is None:
+        hi = a.length
+    if key is None:
+        while lo < hi:
+            mid = Math.floor((lo + hi) / 2)
+            if x < a[mid]:
+                hi = mid
+            else:
+                lo = mid + 1
+    else:
+        while lo < hi:
+            mid = Math.floor((lo + hi) / 2)
+            if x < key(a[mid]):
+                hi = mid
+            else:
+                lo = mid + 1
+    return lo
+
+
+bisect = bisect_right
+
+
+def insort_left(a, x, lo=0, hi=None, key=None):
+    idx = bisect_left(a, x, lo, hi, key)
+    a.splice(idx, 0, x)
+
+
+def insort_right(a, x, lo=0, hi=None, key=None):
+    idx = bisect_right(a, x, lo, hi, key)
+    a.splice(idx, 0, x)
+
+
+insort = insort_right

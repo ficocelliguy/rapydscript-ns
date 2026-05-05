@@ -1,0 +1,178 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# bisect.pyj
+# Tests for the bisect standard library module.
+
+from bisect import bisect_left, bisect_right, bisect, insort_left, insort_right, insort
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. bisect_left — basic ────────────────────────────────────────────────────
+
+_a = [1, 3, 5, 7, 9]
+
+ae(bisect_left(_a, 0), 0)   # before all
+ae(bisect_left(_a, 1), 0)   # at first element (left of existing)
+ae(bisect_left(_a, 2), 1)   # between 1 and 3
+ae(bisect_left(_a, 3), 1)   # at existing element (left)
+ae(bisect_left(_a, 5), 2)
+ae(bisect_left(_a, 6), 3)   # between 5 and 7
+ae(bisect_left(_a, 9), 4)   # at last element (left)
+ae(bisect_left(_a, 10), 5)  # after all
+
+# ── 2. bisect_right — basic ───────────────────────────────────────────────────
+
+ae(bisect_right(_a, 0), 0)   # before all
+ae(bisect_right(_a, 1), 1)   # at first element (right of existing)
+ae(bisect_right(_a, 2), 1)   # between 1 and 3
+ae(bisect_right(_a, 3), 2)   # at existing element (right)
+ae(bisect_right(_a, 5), 3)
+ae(bisect_right(_a, 6), 3)   # between 5 and 7
+ae(bisect_right(_a, 9), 5)   # at last element (right)
+ae(bisect_right(_a, 10), 5)  # after all
+
+# ── 3. bisect alias ───────────────────────────────────────────────────────────
+
+ae(bisect(_a, 3), bisect_right(_a, 3))
+ae(bisect(_a, 5), bisect_right(_a, 5))
+
+# ── 4. Empty list ─────────────────────────────────────────────────────────────
+
+ae(bisect_left([], 5), 0)
+ae(bisect_right([], 5), 0)
+
+# ── 5. All elements equal ─────────────────────────────────────────────────────
+
+_eq = [3, 3, 3, 3, 3]
+ae(bisect_left(_eq, 3), 0)
+ae(bisect_right(_eq, 3), 5)
+ae(bisect_left(_eq, 2), 0)
+ae(bisect_right(_eq, 2), 0)
+ae(bisect_left(_eq, 4), 5)
+ae(bisect_right(_eq, 4), 5)
+
+# ── 6. Single-element list ────────────────────────────────────────────────────
+
+_one = [5]
+ae(bisect_left(_one, 5), 0)
+ae(bisect_right(_one, 5), 1)
+ae(bisect_left(_one, 4), 0)
+ae(bisect_right(_one, 6), 1)
+
+# ── 7. lo and hi bounds ───────────────────────────────────────────────────────
+
+_b = [1, 3, 5, 7, 9]
+# search only in [3, 5, 7] (indices 1..3)
+ae(bisect_left(_b, 3, 1, 4), 1)
+ae(bisect_right(_b, 3, 1, 4), 2)
+ae(bisect_left(_b, 6, 1, 4), 3)
+
+# lo == hi: insertion point is lo regardless of x
+ae(bisect_left(_b, 5, 2, 2), 2)
+ae(bisect_right(_b, 5, 2, 2), 2)
+
+# ── 8. ValueError for negative lo ────────────────────────────────────────────
+
+_neg_lo_raised = False
+try:
+    bisect_left([1, 2], 1, -1)
+except ValueError:
+    _neg_lo_raised = True
+ok(_neg_lo_raised, 'bisect_left with negative lo should raise ValueError')
+
+_neg_lo_raised2 = False
+try:
+    bisect_right([1, 2], 1, -1)
+except ValueError:
+    _neg_lo_raised2 = True
+ok(_neg_lo_raised2, 'bisect_right with negative lo should raise ValueError')
+
+# ── 9. insort_left — basic ────────────────────────────────────────────────────
+
+_il = [1, 3, 5, 7]
+insort_left(_il, 4)
+ade(_il, [1, 3, 4, 5, 7])
+
+insort_left(_il, 3)    # insert at left of equal elements
+ae(_il[1], 3)
+ae(_il[2], 3)
+ae(_il.length, 6)
+
+# ── 10. insort_right — basic ──────────────────────────────────────────────────
+
+_ir = [1, 3, 5, 7]
+insort_right(_ir, 4)
+ade(_ir, [1, 3, 4, 5, 7])
+
+insort_right(_ir, 3)   # insert at right of equal elements — new 3 goes at index 2
+ade(_ir, [1, 3, 3, 4, 5, 7])
+ae(_ir.length, 6)
+
+# ── 11. insort alias ──────────────────────────────────────────────────────────
+
+_ins = [2, 4, 6]
+insort(_ins, 5)
+ade(_ins, [2, 4, 5, 6])
+
+# ── 12. insort builds a sorted list from scratch ──────────────────────────────
+
+_scratch = []
+for _v in [5, 1, 3, 2, 4]:
+    insort(_scratch, _v)
+ade(_scratch, [1, 2, 3, 4, 5])
+
+# ── 13. Strings (lexicographic) ───────────────────────────────────────────────
+
+_s = ['bar', 'baz', 'foo', 'qux']
+ae(bisect_left(_s, 'baz'), 1)
+ae(bisect_right(_s, 'baz'), 2)
+ae(bisect_left(_s, 'car'), 2)    # 'car' > 'baz' and < 'foo'
+ae(bisect_right(_s, 'car'), 2)
+
+# ── 14. key function — bisect_left / bisect_right ────────────────────────────
+
+# list of pairs sorted by first element; search by first element
+_pairs = [[1, 'a'], [3, 'b'], [5, 'c'], [7, 'd']]
+_kfn = def(item): return item[0];
+
+ae(bisect_left(_pairs, 3, 0, None, _kfn), 1)
+ae(bisect_right(_pairs, 3, 0, None, _kfn), 2)
+ae(bisect_left(_pairs, 4, 0, None, _kfn), 2)
+ae(bisect_right(_pairs, 4, 0, None, _kfn), 2)
+ae(bisect_left(_pairs, 0, 0, None, _kfn), 0)
+ae(bisect_right(_pairs, 8, 0, None, _kfn), 4)
+
+# ── 15. insort with lo/hi bounds ─────────────────────────────────────────────
+# Only the sub-slice [10, 20, 30] (indices 3..5) is searched;
+# 15 is inserted at index 4, between 10 and 20.
+
+_bounded = [1, 2, 3, 10, 20, 30]
+insort_right(_bounded, 15, 3, 6)
+ade(_bounded, [1, 2, 3, 10, 15, 20, 30])
+
+_bounded2 = [1, 2, 3, 10, 20, 30]
+insort_left(_bounded2, 20, 3, 6)   # left of existing 20
+ae(_bounded2[4], 20)
+ae(_bounded2[5], 20)
+ae(_bounded2.length, 7)
+
+# ── 16. Duplicate-value stability ────────────────────────────────────────────
+
+_dup = [1, 2, 2, 2, 3]
+ae(bisect_left(_dup, 2), 1)
+ae(bisect_right(_dup, 2), 4)
+
+_dl = [1, 2, 2, 3]
+insort_left(_dl, 2)
+# new 2 inserted at index 1 (leftmost)
+ae(_dl[1], 2)
+ae(_dl.length, 5)
+
+_dr = [1, 2, 2, 3]
+insort_right(_dr, 2)
+# new 2 inserted at index 3 (rightmost)
+ae(_dr[3], 2)
+ae(_dr.length, 5)

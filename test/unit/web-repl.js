@@ -3068,6 +3068,121 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_bisect_basic",
+        description: "bisect stdlib: bisect_left, bisect_right, bisect in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from bisect import bisect_left, bisect_right, bisect",
+                "a = [1, 3, 5, 7, 9]",
+                // bisect_left
+                "assrt.equal(bisect_left(a, 0), 0)",
+                "assrt.equal(bisect_left(a, 1), 0)",
+                "assrt.equal(bisect_left(a, 5), 2)",
+                "assrt.equal(bisect_left(a, 9), 4)",
+                "assrt.equal(bisect_left(a, 10), 5)",
+                // bisect_right
+                "assrt.equal(bisect_right(a, 1), 1)",
+                "assrt.equal(bisect_right(a, 5), 3)",
+                "assrt.equal(bisect_right(a, 9), 5)",
+                "assrt.equal(bisect_right(a, 10), 5)",
+                // bisect alias == bisect_right
+                "assrt.equal(bisect(a, 5), bisect_right(a, 5))",
+                // empty list
+                "assrt.equal(bisect_left([], 5), 0)",
+                "assrt.equal(bisect_right([], 5), 0)",
+                // all equal
+                "eq = [3, 3, 3]",
+                "assrt.equal(bisect_left(eq, 3), 0)",
+                "assrt.equal(bisect_right(eq, 3), 3)",
+                // lo/hi bounds
+                "assrt.equal(bisect_left(a, 6, 1, 4), 3)",
+                "assrt.equal(bisect_right(a, 3, 1, 4), 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bisect_insort",
+        description: "bisect stdlib: insort_left, insort_right, insort in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from bisect import insort_left, insort_right, insort",
+                // insort_right basic
+                "r = [1, 3, 5, 7]",
+                "insort_right(r, 4)",
+                "assrt.deepEqual(r, [1, 3, 4, 5, 7])",
+                // insort_left: new value goes to the LEFT of equal elements
+                "l = [1, 3, 3, 5]",
+                "insort_left(l, 3)",
+                "assrt.equal(l[1], 3)",   // new 3 at index 1
+                "assrt.equal(l.length, 5)",
+                // insort alias == insort_right
+                "s = [2, 4, 6]",
+                "insort(s, 5)",
+                "assrt.deepEqual(s, [2, 4, 5, 6])",
+                // build sorted list from scratch
+                "built = []",
+                "for v in [5, 1, 3, 2, 4]:",
+                "    insort(built, v)",
+                "assrt.deepEqual(built, [1, 2, 3, 4, 5])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bisect_key",
+        description: "bisect stdlib: key function parameter in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from bisect import bisect_left, bisect_right",
+                // key extracts first element of each pair; x is the key value
+                "pairs = [[1, 'a'], [3, 'b'], [5, 'c'], [7, 'd']]",
+                "kfn = def(item): return item[0];",
+                "assrt.equal(bisect_left(pairs, 3, 0, None, kfn), 1)",
+                "assrt.equal(bisect_right(pairs, 3, 0, None, kfn), 2)",
+                "assrt.equal(bisect_left(pairs, 4, 0, None, kfn), 2)",
+                "assrt.equal(bisect_right(pairs, 4, 0, None, kfn), 2)",
+                "assrt.equal(bisect_left(pairs, 0, 0, None, kfn), 0)",
+                "assrt.equal(bisect_right(pairs, 8, 0, None, kfn), 4)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_bisect_errors",
+        description: "bisect stdlib: ValueError for negative lo in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from bisect import bisect_left, bisect_right",
+                "caught_left = False",
+                "try:",
+                "    bisect_left([1, 2, 3], 2, -1)",
+                "except ValueError:",
+                "    caught_left = True",
+                "assrt.ok(caught_left)",
+                "caught_right = False",
+                "try:",
+                "    bisect_right([1, 2, 3], 2, -1)",
+                "except ValueError:",
+                "    caught_right = True",
+                "assrt.ok(caught_right)",
+                // strings also work
+                "words = ['bar', 'baz', 'foo', 'qux']",
+                "assrt.equal(bisect_left(words, 'car'), 2)",
+                "assrt.equal(bisect_right(words, 'car'), 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

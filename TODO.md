@@ -8,7 +8,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python urllib library ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [python bisect library ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 ### asyncio example
 
@@ -62,4 +62,31 @@ async def main():
         print('Network error:', e.reason)
 
 asyncio.run(main())
+```
+
+### bisect example
+
+```python
+from bisect import bisect_left, bisect_right, insort
+
+# Grade boundaries
+breakpoints = [60, 70, 80, 90]
+grades = 'FDCBA'
+
+def grade(score):
+    return grades[bisect_right(breakpoints, score)]
+
+print([grade(s) for s in [55, 62, 74, 83, 91, 100]])
+# ['F', 'D', 'C', 'B', 'A', 'A']
+
+# Maintain a sorted log of timestamps as they arrive out of order
+log = []
+for ts in [1715, 1700, 1730, 1710, 1725]:
+    insort(log, ts)
+print(log)  # [1700, 1710, 1715, 1725, 1730]
+
+# Find insertion window using lo/hi to search only a slice
+data = [1, 3, 5, 10, 20, 30]
+pos = bisect_left(data, 15, 3, 6)  # search only indices 3..5
+print(pos)  # 4 (between 10 and 20)
 ```
