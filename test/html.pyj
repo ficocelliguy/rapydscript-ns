@@ -1,0 +1,212 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# html.pyj
+# Tests for the html standard library module.
+
+from html import escape, unescape, HTMLParser
+
+ae     = assrt.equal
+ade    = assrt.deepEqual
+ok     = assrt.ok
+
+# ── 1. escape – individual special characters ─────────────────────────────
+ae(escape('<'), '&lt;')
+ae(escape('>'), '&gt;')
+ae(escape('&'), '&amp;')
+ae(escape('"'), '&quot;')
+ae(escape("'"), '&#x27;')
+
+# ── 2. escape – combined string ───────────────────────────────────────────
+ae(escape('<script>alert("xss")</script>'),
+   '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;')
+
+# ── 3. escape – quote=False leaves quotes unchanged ───────────────────────
+ae(escape('A & B', quote=False), 'A &amp; B')
+ae(escape('"quoted"', quote=False), '"quoted"')
+ae(escape("it's", quote=False), "it's")
+
+# ── 4. escape – plain text unchanged ──────────────────────────────────────
+ae(escape('hello world'), 'hello world')
+ae(escape(''), '')
+
+# ── 5. unescape – named entities ──────────────────────────────────────────
+ae(unescape('&amp;'), '&')
+ae(unescape('&lt;'), '<')
+ae(unescape('&gt;'), '>')
+ae(unescape('&quot;'), '"')
+ae(unescape('&apos;'), "'")
+ae(unescape('&copy;'), '©')
+ae(unescape('&euro;'), '€')
+ae(unescape('&ndash;'), '–')
+ae(unescape('&mdash;'), '—')
+ae(unescape('&trade;'), '™')
+
+# ── 6. unescape – numeric references ──────────────────────────────────────
+ae(unescape('&#65;'),  'A')       # decimal
+ae(unescape('&#x41;'), 'A')       # hex lowercase
+ae(unescape('&#X41;'), 'A')       # hex uppercase
+ae(unescape('&#169;'), '©')  # © by decimal
+ae(unescape('&#x20ac;'), '€') # € by hex
+
+# ── 7. unescape – high code point (emoji via numeric ref) ─────────────────
+ae(unescape('&#128512;'), chr(128512))  # grinning face emoji
+
+# ── 8. unescape – unknown entity left intact ──────────────────────────────
+ae(unescape('&nosuchentity;'), '&nosuchentity;')
+
+# ── 9. unescape – mixed string ────────────────────────────────────────────
+ae(unescape('Hello &amp; World &lt;3'), 'Hello & World <3')
+
+# ── 10. round-trip ───────────────────────────────────────────────────────
+s = '<a href="http://example.com">Hello & World</a>'
+ae(unescape(escape(s)), s)
+
+# ── 11. HTMLParser – start/end/data ──────────────────────────────────────
+class _P1(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.events = []
+    def handle_starttag(self, tag, attrs):
+        self.events.push(['start', tag, attrs])
+    def handle_endtag(self, tag):
+        self.events.push(['end', tag])
+    def handle_data(self, data):
+        self.events.push(['data', data])
+
+p1 = _P1()
+p1.feed('<p class="greeting">Hello, World!</p>')
+ae(p1.events[0][0], 'start')
+ae(p1.events[0][1], 'p')
+ae(p1.events[0][2][0][0], 'class')
+ae(p1.events[0][2][0][1], 'greeting')
+ae(p1.events[1][0], 'data')
+ae(p1.events[1][1], 'Hello, World!')
+ae(p1.events[2][0], 'end')
+ae(p1.events[2][1], 'p')
+
+# ── 12. HTMLParser – entity auto-conversion in data ───────────────────────
+class _P2(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.chunks = []
+    def handle_data(self, data):
+        self.chunks.push(data)
+
+p2 = _P2()
+p2.feed('<p>Hello &amp; World &lt;3</p>')
+ae(p2.chunks[0], 'Hello & World <3')
+
+# ── 13. HTMLParser – comment ──────────────────────────────────────────────
+class _P3(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.comments = []
+    def handle_comment(self, data):
+        self.comments.push(data)
+
+p3 = _P3()
+p3.feed('<!-- this is a comment -->')
+ae(p3.comments.length, 1)
+ae(p3.comments[0], ' this is a comment ')
+
+# ── 14. HTMLParser – multiple attributes ─────────────────────────────────
+class _P4(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.attrs = None
+    def handle_starttag(self, tag, attrs):
+        self.attrs = attrs
+
+p4 = _P4()
+p4.feed('<a href="http://example.com" target="_blank" rel="noopener">')
+ae(p4.attrs.length, 3)
+ae(p4.attrs[0][0], 'href')
+ae(p4.attrs[0][1], 'http://example.com')
+ae(p4.attrs[1][0], 'target')
+ae(p4.attrs[1][1], '_blank')
+ae(p4.attrs[2][0], 'rel')
+ae(p4.attrs[2][1], 'noopener')
+
+# ── 15. HTMLParser – self-closing tag ─────────────────────────────────────
+class _P5(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.events = []
+    def handle_starttag(self, tag, attrs):
+        self.events.push('start:' + tag)
+    def handle_endtag(self, tag):
+        self.events.push('end:' + tag)
+
+p5 = _P5()
+p5.feed('<br/>')
+ae(p5.events.length, 2)
+ae(p5.events[0], 'start:br')
+ae(p5.events[1], 'end:br')
+
+# ── 16. HTMLParser – get_starttag_text ───────────────────────────────────
+class _P6(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.last_raw = None
+    def handle_starttag(self, tag, attrs):
+        self.last_raw = self.get_starttag_text()
+
+p6 = _P6()
+p6.feed('<img src="pic.png" alt="photo">')
+ae(p6.last_raw, '<img src="pic.png" alt="photo">')
+
+# ── 17. HTMLParser – DOCTYPE declaration ─────────────────────────────────
+class _P7(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.decls = []
+    def handle_decl(self, decl):
+        self.decls.push(decl)
+
+p7 = _P7()
+p7.feed('<!DOCTYPE html>')
+ae(p7.decls.length, 1)
+ae(p7.decls[0], 'DOCTYPE html')
+
+# ── 18. HTMLParser – tag names lowercased ────────────────────────────────
+class _P8(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.tags = []
+    def handle_starttag(self, tag, attrs):
+        self.tags.push(tag)
+
+p8 = _P8()
+p8.feed('<DIV><SPAN></SPAN></DIV>')
+ae(p8.tags[0], 'div')
+ae(p8.tags[1], 'span')
+
+# ── 19. HTMLParser – valueless attribute yields None ──────────────────────
+class _P9(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.attrs = None
+    def handle_starttag(self, tag, attrs):
+        self.attrs = attrs
+
+p9 = _P9()
+p9.feed('<input disabled required>')
+ae(p9.attrs[0][0], 'disabled')
+ae(p9.attrs[0][1], None)
+ae(p9.attrs[1][0], 'required')
+ae(p9.attrs[1][1], None)
+
+# ── 20. HTMLParser – incremental feed ────────────────────────────────────
+class _P10(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.data = []
+    def handle_data(self, d):
+        self.data.push(d)
+
+p10 = _P10()
+p10.feed('<p>Hello')
+p10.feed(' World</p>')
+ok(p10.data.length >= 1)
+ae(p10.data.join(''), 'Hello World')

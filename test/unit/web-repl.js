@@ -2530,6 +2530,168 @@ var TESTS = [
     },
 
     {
+        name: "bundle_html_escape_unescape",
+        description: "html stdlib: escape and unescape functions in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from html import escape, unescape",
+                // escape basics
+                "assrt.equal(escape('<'), '&lt;')",
+                "assrt.equal(escape('>'), '&gt;')",
+                "assrt.equal(escape('&'), '&amp;')",
+                "assrt.equal(escape('\"'), '&quot;')",
+                "assrt.equal(escape(\"'\"), '&#x27;')",
+                // quote=False
+                "assrt.equal(escape('A & B', quote=False), 'A &amp; B')",
+                "assrt.equal(escape('\"hi\"', quote=False), '\"hi\"')",
+                // unescape named entities
+                "assrt.equal(unescape('&amp;'), '&')",
+                "assrt.equal(unescape('&lt;'), '<')",
+                "assrt.equal(unescape('&gt;'), '>')",
+                "assrt.equal(unescape('&quot;'), '\"')",
+                "assrt.equal(unescape('&copy;'), '\\u00a9')",
+                "assrt.equal(unescape('&euro;'), '\\u20ac')",
+                // numeric references
+                "assrt.equal(unescape('&#65;'), 'A')",
+                "assrt.equal(unescape('&#x41;'), 'A')",
+                // unknown entity left intact
+                "assrt.equal(unescape('&nosuchentity;'), '&nosuchentity;')",
+                // round-trip
+                "s = '<Hello & \"World\">'",
+                "assrt.equal(unescape(escape(s)), s)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_html_parser_basic",
+        description: "html stdlib: HTMLParser start/end/data callbacks in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from html import HTMLParser",
+                "class _P(HTMLParser):",
+                "    def __init__(self):",
+                "        HTMLParser.__init__(self)",
+                "        self.events = []",
+                "    def handle_starttag(self, tag, attrs):",
+                "        self.events.push(['start', tag])",
+                "    def handle_endtag(self, tag):",
+                "        self.events.push(['end', tag])",
+                "    def handle_data(self, data):",
+                "        self.events.push(['data', data])",
+                "p = _P()",
+                "p.feed('<p>Hello, World!</p>')",
+                "assrt.equal(p.events[0][0], 'start')",
+                "assrt.equal(p.events[0][1], 'p')",
+                "assrt.equal(p.events[1][0], 'data')",
+                "assrt.equal(p.events[1][1], 'Hello, World!')",
+                "assrt.equal(p.events[2][0], 'end')",
+                "assrt.equal(p.events[2][1], 'p')",
+                // entity conversion in data
+                "p2 = _P()",
+                "p2.feed('<p>A &amp; B</p>')",
+                "assrt.equal(p2.events[1][1], 'A & B')",
+                // tag names lowercased
+                "p3 = _P()",
+                "p3.feed('<DIV></DIV>')",
+                "assrt.equal(p3.events[0][1], 'div')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_html_parser_attrs",
+        description: "html stdlib: HTMLParser attribute parsing in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from html import HTMLParser",
+                "class _PA(HTMLParser):",
+                "    def __init__(self):",
+                "        HTMLParser.__init__(self)",
+                "        self.last_attrs = None",
+                "    def handle_starttag(self, tag, attrs):",
+                "        self.last_attrs = attrs",
+                // multiple attrs
+                "p = _PA()",
+                "p.feed('<a href=\"http://example.com\" target=\"_blank\">')",
+                "assrt.equal(p.last_attrs.length, 2)",
+                "assrt.equal(p.last_attrs[0][0], 'href')",
+                "assrt.equal(p.last_attrs[0][1], 'http://example.com')",
+                "assrt.equal(p.last_attrs[1][0], 'target')",
+                "assrt.equal(p.last_attrs[1][1], '_blank')",
+                // valueless attribute
+                "p2 = _PA()",
+                "p2.feed('<input disabled>')",
+                "assrt.equal(p2.last_attrs[0][0], 'disabled')",
+                "assrt.equal(p2.last_attrs[0][1], None)",
+                // self-closing
+                "class _PSC(HTMLParser):",
+                "    def __init__(self):",
+                "        HTMLParser.__init__(self)",
+                "        self.events = []",
+                "    def handle_starttag(self, tag, attrs):",
+                "        self.events.push('start:' + tag)",
+                "    def handle_endtag(self, tag):",
+                "        self.events.push('end:' + tag)",
+                "psc = _PSC()",
+                "psc.feed('<br/>')",
+                "assrt.equal(psc.events.length, 2)",
+                "assrt.equal(psc.events[0], 'start:br')",
+                "assrt.equal(psc.events[1], 'end:br')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_html_parser_special",
+        description: "html stdlib: HTMLParser comments, DOCTYPE, get_starttag_text in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from html import HTMLParser",
+                // comment
+                "class _PC(HTMLParser):",
+                "    def __init__(self):",
+                "        HTMLParser.__init__(self)",
+                "        self.comments = []",
+                "    def handle_comment(self, data):",
+                "        self.comments.push(data)",
+                "pc = _PC()",
+                "pc.feed('<!-- hello -->')",
+                "assrt.equal(pc.comments.length, 1)",
+                "assrt.equal(pc.comments[0], ' hello ')",
+                // doctype
+                "class _PD(HTMLParser):",
+                "    def __init__(self):",
+                "        HTMLParser.__init__(self)",
+                "        self.decls = []",
+                "    def handle_decl(self, decl):",
+                "        self.decls.push(decl)",
+                "pd = _PD()",
+                "pd.feed('<!DOCTYPE html>')",
+                "assrt.equal(pd.decls[0], 'DOCTYPE html')",
+                // get_starttag_text
+                "class _PR(HTMLParser):",
+                "    def __init__(self):",
+                "        HTMLParser.__init__(self)",
+                "        self.raw = None",
+                "    def handle_starttag(self, tag, attrs):",
+                "        self.raw = self.get_starttag_text()",
+                "pr = _PR()",
+                "pr.feed('<img src=\"pic.png\">')",
+                "assrt.equal(pr.raw, '<img src=\"pic.png\">')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",
         run: function () {

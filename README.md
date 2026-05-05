@@ -4118,7 +4118,7 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |
 | `hmac`        | ❌           | Keyed hashing not available                                                                   |
 | `urllib`      | ❌           | URL parsing/encoding (`urllib.parse`) not available; use JS `URL` API                         |
-| `html`        | ❌           | `escape`, `unescape` not available; use JS DOM APIs                                           |
+| `html`        | ✅           | `escape(s[, quote=True])`, `unescape(s)`, `HTMLParser` (event-driven parser; subclass and override `handle_starttag`, `handle_endtag`, `handle_data`, `handle_comment`, `handle_decl`, etc.) in `src/lib/html.pyj`; full HTML4 + common HTML5 named entity table; `convert_charrefs=True` by default (entities in text and attributes auto-decoded); `html.parser` sub-module not available as a separate import — use `from html import HTMLParser` |
 | `csv`         | ❌           | CSV parsing not available                                                                     |
 | `textwrap`    | ❌           | `wrap`, `fill`, `dedent`, `indent` not available                                              |
 | `pprint`      | ❌           | Pretty-printing not available                                                                 |

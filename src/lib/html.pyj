@@ -1,0 +1,382 @@
+###########################################################
+# RapydScript Standard Library
+# Author: RapydScript-NS Contributors
+# Copyright 2024 RapydScript-NS Contributors
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Python-compatible html module.
+#
+# Provides:
+#   escape(s, quote=True)  -- escape HTML special characters
+#   unescape(s)            -- decode HTML entities to Unicode characters
+#   HTMLParser             -- event-driven HTML parser; subclass and
+#                            override handle_* methods to process elements
+#
+# HTMLParser is modelled on Python's html.parser.HTMLParser.
+# It is implemented with a regex-based JS tokeniser and works in
+# both Node.js and browser environments.
+#
+# NOTE: Python's html.parser sub-module is not a separate import.
+# Use `from html import HTMLParser` or `import html; html.HTMLParser`.
+
+
+# ---------------------------------------------------------------------------
+# Internal JS helpers
+# ---------------------------------------------------------------------------
+
+v"""
+// Named HTML5 entities (full HTML4 set + selected HTML5 additions).
+var _html_named = {
+    'amp':'&','lt':'<','gt':'>','quot':'"','apos':"'",
+    'nbsp':' ','iexcl':'¡','cent':'¢','pound':'£',
+    'curren':'¤','yen':'¥','brvbar':'¦','sect':'§',
+    'uml':'¨','copy':'©','ordf':'ª','laquo':'«',
+    'not':'¬','shy':'­','reg':'®','macr':'¯',
+    'deg':'°','plusmn':'±','sup2':'²','sup3':'³',
+    'acute':'´','micro':'µ','para':'¶','middot':'·',
+    'cedil':'¸','sup1':'¹','ordm':'º','raquo':'»',
+    'frac14':'¼','frac12':'½','frac34':'¾','iquest':'¿',
+    'Agrave':'À','Aacute':'Á','Acirc':'Â','Atilde':'Ã',
+    'Auml':'Ä','Aring':'Å','AElig':'Æ','Ccedil':'Ç',
+    'Egrave':'È','Eacute':'É','Ecirc':'Ê','Euml':'Ë',
+    'Igrave':'Ì','Iacute':'Í','Icirc':'Î','Iuml':'Ï',
+    'ETH':'Ð','Ntilde':'Ñ','Ograve':'Ò','Oacute':'Ó',
+    'Ocirc':'Ô','Otilde':'Õ','Ouml':'Ö','times':'×',
+    'Oslash':'Ø','Ugrave':'Ù','Uacute':'Ú','Ucirc':'Û',
+    'Uuml':'Ü','Yacute':'Ý','THORN':'Þ','szlig':'ß',
+    'agrave':'à','aacute':'á','acirc':'â','atilde':'ã',
+    'auml':'ä','aring':'å','aelig':'æ','ccedil':'ç',
+    'egrave':'è','eacute':'é','ecirc':'ê','euml':'ë',
+    'igrave':'ì','iacute':'í','icirc':'î','iuml':'ï',
+    'eth':'ð','ntilde':'ñ','ograve':'ò','oacute':'ó',
+    'ocirc':'ô','otilde':'õ','ouml':'ö','divide':'÷',
+    'oslash':'ø','ugrave':'ù','uacute':'ú','ucirc':'û',
+    'uuml':'ü','yacute':'ý','thorn':'þ','yuml':'ÿ',
+    'OElig':'Œ','oelig':'œ','Scaron':'Š','scaron':'š',
+    'Yuml':'Ÿ','fnof':'ƒ','circ':'ˆ','tilde':'˜',
+    'Alpha':'Α','Beta':'Β','Gamma':'Γ','Delta':'Δ',
+    'Epsilon':'Ε','Zeta':'Ζ','Eta':'Η','Theta':'Θ',
+    'Iota':'Ι','Kappa':'Κ','Lambda':'Λ','Mu':'Μ',
+    'Nu':'Ν','Xi':'Ξ','Omicron':'Ο','Pi':'Π',
+    'Rho':'Ρ','Sigma':'Σ','Tau':'Τ','Upsilon':'Υ',
+    'Phi':'Φ','Chi':'Χ','Psi':'Ψ','Omega':'Ω',
+    'alpha':'α','beta':'β','gamma':'γ','delta':'δ',
+    'epsilon':'ε','zeta':'ζ','eta':'η','theta':'θ',
+    'iota':'ι','kappa':'κ','lambda':'λ','mu':'μ',
+    'nu':'ν','xi':'ξ','omicron':'ο','pi':'π',
+    'rho':'ρ','sigmaf':'ς','sigma':'σ','tau':'τ',
+    'upsilon':'υ','phi':'φ','chi':'χ','psi':'ψ',
+    'omega':'ω','thetasym':'ϑ','upsih':'ϒ','piv':'ϖ',
+    'ensp':' ','emsp':' ','thinsp':' ','zwnj':'‌',
+    'zwj':'‍','lrm':'‎','rlm':'‏','ndash':'–',
+    'mdash':'—','lsquo':'‘','rsquo':'’','sbquo':'‚',
+    'ldquo':'“','rdquo':'”','bdquo':'„','dagger':'†',
+    'Dagger':'‡','bull':'•','hellip':'…','permil':'‰',
+    'prime':'′','Prime':'″','lsaquo':'‹','rsaquo':'›',
+    'oline':'‾','frasl':'⁄','euro':'€','image':'ℑ',
+    'weierp':'℘','real':'ℜ','trade':'™','alefsym':'ℵ',
+    'larr':'←','uarr':'↑','rarr':'→','darr':'↓',
+    'harr':'↔','crarr':'↵','lArr':'⇐','uArr':'⇑',
+    'rArr':'⇒','dArr':'⇓','hArr':'⇔','forall':'∀',
+    'part':'∂','exist':'∃','empty':'∅','nabla':'∇',
+    'isin':'∈','notin':'∉','ni':'∋','prod':'∏',
+    'sum':'∑','minus':'−','lowast':'∗','radic':'√',
+    'prop':'∝','infin':'∞','ang':'∠','and':'∧',
+    'or':'∨','cap':'∩','cup':'∪','int':'∫',
+    'there4':'∴','sim':'∼','cong':'≅','asymp':'≈',
+    'ne':'≠','equiv':'≡','le':'≤','ge':'≥',
+    'sub':'⊂','sup':'⊃','nsub':'⊄','sube':'⊆',
+    'supe':'⊇','oplus':'⊕','otimes':'⊗','perp':'⊥',
+    'sdot':'⋅','lceil':'⌈','rceil':'⌉','lfloor':'⌊',
+    'rfloor':'⌋','lang':'〈','rang':'〉','loz':'◊',
+    'spades':'♠','clubs':'♣','hearts':'♥','diams':'♦',
+};
+
+function _html_do_escape(s, quote) {
+    s = String(s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
+    if (quote) {
+        s = s.split('"').join('&quot;').split("'").join('&#x27;');
+    }
+    return s;
+}
+
+function _html_do_unescape(s) {
+    return String(s).replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z][a-zA-Z0-9]*);/g, function(m, entity) {
+        if (entity.charAt(0) === '#') {
+            var e = entity.slice(1), code;
+            if (e.charAt(0) === 'x' || e.charAt(0) === 'X') {
+                code = parseInt(e.slice(1), 16);
+            } else {
+                code = parseInt(e, 10);
+            }
+            if (!isNaN(code)) {
+                return String.fromCodePoint ? String.fromCodePoint(code) : String.fromCharCode(code);
+            }
+        } else {
+            var ch = _html_named[entity];
+            if (ch !== undefined) return ch;
+        }
+        return m;
+    });
+}
+
+// Regex-based tokeniser that drives HTMLParser.handle_* callbacks.
+function _html_parser_feed(parser, data) {
+    var pos = 0;
+    var n = data.length;
+
+    while (pos < n) {
+        // Text run up to the next '<'
+        if (data[pos] !== '<') {
+            var nxt = data.indexOf('<', pos);
+            if (nxt < 0) nxt = n;
+            var text = data.slice(pos, nxt);
+            if (text) {
+                if (parser.convert_charrefs) text = _html_do_unescape(text);
+                parser.handle_data(text);
+            }
+            pos = nxt;
+            continue;
+        }
+
+        // Comment: <!-- ... -->
+        if (data.slice(pos, pos + 4) === '<!--') {
+            var ce = data.indexOf('-->', pos + 4);
+            if (ce < 0) {
+                var rem = data.slice(pos);
+                parser.handle_data(parser.convert_charrefs ? _html_do_unescape(rem) : rem);
+                break;
+            }
+            parser.handle_comment(data.slice(pos + 4, ce));
+            pos = ce + 3;
+            continue;
+        }
+
+        // CDATA section: <![CDATA[...]]>
+        if (data.slice(pos, pos + 9) === '<![CDATA[') {
+            var cd = data.indexOf(']]>', pos + 9);
+            if (cd < 0) { parser.handle_data(data.slice(pos)); break; }
+            parser.handle_data(data.slice(pos + 9, cd));
+            pos = cd + 3;
+            continue;
+        }
+
+        // Declaration: <!...> (DOCTYPE, etc.)
+        if (data.slice(pos, pos + 2) === '<!' && pos + 2 < n && data[pos + 2] !== '-') {
+            var de = data.indexOf('>', pos + 2);
+            if (de < 0) { parser.handle_data(data.slice(pos)); break; }
+            parser.handle_decl(data.slice(pos + 2, de));
+            pos = de + 1;
+            continue;
+        }
+
+        // Processing instruction: <?...?>
+        if (data.slice(pos, pos + 2) === '<?') {
+            var pe = data.indexOf('?>', pos + 2);
+            if (pe < 0) { parser.handle_data(data.slice(pos)); break; }
+            parser.handle_pi(data.slice(pos + 2, pe));
+            pos = pe + 2;
+            continue;
+        }
+
+        // End tag: </tag>
+        if (data.slice(pos, pos + 2) === '</') {
+            var em = /^<\/([a-zA-Z][a-zA-Z0-9_:.-]*)[ \t\n\r\f]*>/.exec(data.slice(pos));
+            if (em) {
+                parser.handle_endtag(em[1].toLowerCase());
+                pos += em[0].length;
+                continue;
+            }
+        }
+
+        // Start tag: <tag ...>
+        var sm = /^<([a-zA-Z][a-zA-Z0-9_:.-]*)/.exec(data.slice(pos));
+        if (sm) {
+            var tag_name = sm[1].toLowerCase();
+            var p = pos + sm[0].length;
+            var attrs = [];
+            var tag_done = false;
+
+            while (p < n) {
+                // skip whitespace
+                while (p < n && ' \t\n\r\f'.indexOf(data[p]) >= 0) p++;
+                if (p >= n) break;
+
+                if (data[p] === '>') { p++; break; }
+
+                // self-closing />
+                if (data[p] === '/' && p + 1 < n && data[p + 1] === '>') {
+                    p += 2;
+                    parser._starttag_text = data.slice(pos, p);
+                    parser.handle_starttag(tag_name, attrs);
+                    parser.handle_endtag(tag_name);
+                    pos = p;
+                    tag_done = true;
+                    break;
+                }
+
+                // attribute name
+                var anm = /^([^\s=\/>]+)/.exec(data.slice(p));
+                if (!anm) { p++; continue; }
+                var aname = anm[1];
+                p += anm[0].length;
+
+                // skip whitespace before optional '='
+                while (p < n && ' \t\n\r\f'.indexOf(data[p]) >= 0) p++;
+
+                var aval = null;
+                if (p < n && data[p] === '=') {
+                    p++;
+                    while (p < n && ' \t\n\r\f'.indexOf(data[p]) >= 0) p++;
+                    if (p < n && (data[p] === '"' || data[p] === "'")) {
+                        var q = data[p]; p++;
+                        var qe = data.indexOf(q, p);
+                        if (qe < 0) qe = n;
+                        aval = data.slice(p, qe);
+                        if (parser.convert_charrefs) aval = _html_do_unescape(aval);
+                        p = qe + 1;
+                    } else {
+                        var uv = /^([^ \t\n\r\f>\/]+)/.exec(data.slice(p));
+                        if (uv) {
+                            aval = uv[1];
+                            if (parser.convert_charrefs) aval = _html_do_unescape(aval);
+                            p += uv[0].length;
+                        }
+                    }
+                }
+                attrs.push([aname, aval]);
+            }
+
+            if (!tag_done) {
+                parser._starttag_text = data.slice(pos, p);
+                parser.handle_starttag(tag_name, attrs);
+                pos = p;
+            }
+            continue;
+        }
+
+        // Unmatched '<': treat as literal data
+        parser.handle_data('<');
+        pos++;
+    }
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def escape(s, quote=True):
+    """Escape special HTML characters in s.
+
+    Converts &, <, > to HTML-safe sequences.
+    If quote is True (default), also converts " to &quot; and ' to &#x27;.
+    Returns the escaped string.
+    """
+    return _html_do_escape(s, quote)
+
+
+def unescape(s):
+    """Convert all named and numeric character references in s to Unicode characters.
+
+    Handles &name; named references, &#NNN; decimal references, and &#xHH; hex
+    references.  Unknown named references are left intact.
+    """
+    return _html_do_unescape(s)
+
+
+class HTMLParser:
+    """Minimal, event-driven HTML parser.
+
+    Subclass and override handle_* methods to process the parsed HTML.
+
+    Parameters:
+      convert_charrefs -- if True (default), character references in text data
+                          and attribute values are automatically decoded to
+                          Unicode before the handle_* callback is invoked.
+
+    Usage::
+        class MyParser(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                print('Start:', tag, attrs)
+            def handle_endtag(self, tag):
+                print('End:', tag)
+            def handle_data(self, data):
+                print('Data:', data)
+        p = MyParser()
+        p.feed('<a href="http://example.com">Click &amp; go</a>')
+    """
+
+    def __init__(self, convert_charrefs=True):
+        self.convert_charrefs = convert_charrefs
+        self._starttag_text = None
+        self.reset()
+
+    def reset(self):
+        """Reset the parser state.  Called implicitly by __init__."""
+        pass
+
+    def feed(self, data):
+        """Feed a string of HTML to the parser.  May be called repeatedly."""
+        _html_parser_feed(self, data)
+
+    def close(self):
+        """Flush any remaining buffered data.  Call when done feeding."""
+        pass
+
+    def get_starttag_text(self):
+        """Return the raw text of the most recently opened start tag."""
+        return self._starttag_text
+
+    # ------------------------------------------------------------------
+    # Override these in subclasses
+    # ------------------------------------------------------------------
+
+    def handle_starttag(self, tag, attrs):
+        """Handle an opening tag.
+
+        tag   -- lowercase tag name
+        attrs -- list of [name, value] pairs; value is None for bare attributes
+        """
+        pass
+
+    def handle_endtag(self, tag):
+        """Handle a closing tag.  tag is lowercase."""
+        pass
+
+    def handle_data(self, data):
+        """Handle text content between tags."""
+        pass
+
+    def handle_comment(self, data):
+        """Handle a comment (text inside <!-- ... -->)."""
+        pass
+
+    def handle_entityref(self, name):
+        """Handle a named entity reference &name; (only when convert_charrefs=False)."""
+        pass
+
+    def handle_charref(self, name):
+        """Handle a numeric character reference &#NNN; (only when convert_charrefs=False)."""
+        pass
+
+    def handle_decl(self, decl):
+        """Handle a DOCTYPE or other declaration."""
+        pass
+
+    def handle_pi(self, data):
+        """Handle a processing instruction."""
+        pass
+
+    def unknown_decl(self, data):
+        """Handle an unrecognised declaration."""
+        pass
+
+    def error(self, message):
+        """Raise a parse error."""
+        raise Exception(message)
