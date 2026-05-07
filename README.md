@@ -592,30 +592,64 @@ RapydScript supports Python's ``/`` and ``*`` parameter separators:
 	greet("Bob", greeting="Hi")             # Hi, Bob!
 	greet("Carol", punctuation=".")         # Hello, Carol.
 	greet("Dave", greeting="Hey", punctuation="?")  # Hey, Dave?
-
-	# name is positional-only: greet(name="Alice") would silently ignore the kwarg
-	# punctuation is keyword-only: must be passed as punctuation="."
 ```
 
 The two separators can be combined, and each section can have its own default
 values.  All combinations supported by Python 3.8+ are accepted.
 
-RapydScript is lenient: passing a positional-only parameter by keyword will not
-raise a ``TypeError`` at runtime (the named value is silently ignored), and
-passing a keyword-only parameter positionally will not raise an error either.
-This is consistent with RapydScript's general approach of favouring
-interoperability over strict enforcement.
+By default RapydScript is lenient about argument conventions (to favour
+JavaScript interoperability).  Enable strict Python-style enforcement with the
+``type_enforcement`` flag described below.
 
 The Monaco language service correctly shows ``/`` and ``*`` separators in
 signature help and hover tooltips.
 
-One difference between RapydScript and Python is that RapydScript is not as
-strict as Python when it comes to validating function arguments. This is both
-for performance and to make it easier to interoperate with other JavaScript
-libraries. So if you do not pass enough arguments when calling a function, the
-extra arguments will be set to undefined instead of raising a TypeError, as in
-Python. Similarly, when mixing ``*args`` and optional arguments, RapydScript
-will not complain if an optional argument is specified twice.
+### Argument type enforcement
+
+``from __python__ import type_enforcement`` activates Python-compatible runtime
+argument checking for every function defined in that scope:
+
+| Check | Behaviour |
+|---|---|
+| Too many positional arguments | ``TypeError`` |
+| Missing required positional argument | ``TypeError`` |
+| Positional-only arg passed as a keyword argument | ``TypeError`` |
+| Missing required keyword-only argument | ``TypeError`` |
+| Argument value does not match its type annotation | ``TypeError`` |
+
+```py
+from __python__ import type_enforcement
+
+def greet(name, /, greeting="Hello", *, punctuation="!"):
+    return greeting + ", " + name + punctuation
+
+greet("Alice")                          # Hello, Alice!
+greet("Bob", greeting="Hi")             # Hi, Bob!
+greet("Carol", punctuation=".")         # Hello, Carol.
+
+greet(name="Dave")      # TypeError: positional-only arg 'name' passed as kwarg
+greet("Eve")            # TypeError: missing required keyword-only argument 'punctuation'
+                        #   (only when punctuation has no default)
+
+def add(a: int, b: int) -> int:
+    return a + b
+
+add(1, 2)       # 3
+add("x", 2)    # TypeError: argument 'a' must be int
+```
+
+The flag applies to the function definitions that follow it in scope — it does
+not retroactively affect imported functions or functions defined before the
+import.  It can be combined with any other ``from __python__ import`` flag.
+
+The Monaco language service also reports violations **statically** for
+calls to locally-defined enforced functions, underlining the problem at the
+call site with an error marker.
+
+One difference compared to un-enforced RapydScript: without
+``type_enforcement``, missing arguments become ``undefined`` (JavaScript
+default) instead of raising ``TypeError``, and positional/keyword-only
+conventions are not checked.
 
 When creating callbacks to pass to other JavaScript libraries, it is often the
 case that the external library expects a function that receives an *options
@@ -3958,6 +3992,7 @@ Python Feature Coverage
 | `list + list` concatenation                                                                                                                                                                                                                                   | `[1,2] + [3,4]` returns `[1, 2, 3, 4]`; `+=` extends in-place. No flag required. |
 | `match / case`                                                                                                                                                                                                                                                | Structural pattern matching (Python 3.10) fully supported |
 | Variable type annotations `x: int = 1`                                                                                                                                                                                                                        | Parsed and ignored (no runtime enforcement); annotated assignments work normally |
+| Argument type enforcement (`from __python__ import type_enforcement`)                                                                                                                                                                                          | Activates runtime `TypeError` for wrong argument count, positional-only kwargs, missing required keyword-only args, and type-annotated arg mismatches; Monaco language service reports violations statically at call sites |
 | Ellipsis literal `...` as expression                                                                                                                                                                                                                          | Parsed as a valid expression; evaluates to JS `undefined` at runtime |
 | Generator `.throw()`                                                                                                                                                                                                                                          | Works via JS generator protocol |
 | Generator `.send()`                                                                                                                                                                                                                                           | Works via `g.next(value)` |
@@ -3976,7 +4011,7 @@ Python Feature Coverage
 | Classes, inheritance, decorators, `__dunder__` methods                                                                                                                                                                                                        | Fully supported |
 | Nested class definitions                                                                                                                                                                                                                                      | Accessible as `Outer.Inner` and via instance (`self.Inner`); arbitrary nesting depth; nested class may inherit from outer-scope classes |
 | List / dict / set comprehensions, generator expressions                                                                                                                                                                                                       | Fully supported |
-| f-strings, `str.format()`, `format()` builtin, all common `str.*` methods                                                                                                                                                                                     | Fully supported |
+| f-strings, `str.format()`, `format()` builtin, all common `str.*` methods                                                                                                                                                                                     | Fully supported; includes `f'{x=}'` debug format (prints `x=<value>`), format-spec (`f'{x=:.2f}'`), and conversion (`f'{x=!r}'`) |
 | `abs()`, `divmod()`, `any()`, `all()`, `sum()`, `min()`, `max()`                                                                                                                                                                                              | All work |
 | `sorted()`, `reversed()`, `zip()`, `map()`, `filter()`                                                                                                                                                                                                        | All work |
 | `zip(strict=True)`                                                                                                                                                                                                                                            | Raises `ValueError` when iterables have different lengths; equal-length iterables work normally |
@@ -4118,14 +4153,14 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `urllib`      | ✅           | `urllib.parse`: `quote()`, `unquote()`, `quote_plus()`, `unquote_plus()`, `urlencode()`, `urlsplit()` → `SplitResult`, `urlparse()` → `ParseResult`, `urlunsplit()`, `urlunparse()`, `urljoin()`, `parse_qs()`, `parse_qsl()` in `src/lib/urllib/parse.pyj`; `urllib.error`: `URLError`, `HTTPError` in `src/lib/urllib/error.pyj`; `urllib.request`: `urlopen(url[, data[, timeout]])` returns a Promise wrapping the Fetch API in `src/lib/urllib/request.pyj` — use with `await` in an async function; `SplitResult`/`ParseResult` expose `.scheme`, `.netloc`, `.path`, `.query`, `.fragment` plus `.hostname`, `.port`, `.username`, `.password` and `.geturl()`; backed by the JS `URL` constructor and `encodeURIComponent`/`decodeURIComponent`; RFC 3986 unreserved characters (`A-Z a-z 0-9 - _ . ~`) never encoded |
 | `bisect`      | ✅           | `bisect_left(a, x[, lo[, hi[, key]]])`, `bisect_right(a, x[, lo[, hi[, key]]])`, `bisect` (alias for `bisect_right`), `insort_left(a, x[, lo[, hi[, key]]])`, `insort_right(a, x[, lo[, hi[, key]]])`, `insort` (alias for `insort_right`) in `src/lib/bisect.pyj`; pure binary-search implementation matching Python semantics; optional `lo`/`hi` bounds for sub-slice search; optional `key` function (Python 3.10+ API) applied to array elements only — `x` must be directly comparable to `key(a[i])` results |
 | `http`        | ✅           | `http`: `HTTPStatus` class with integer constants for all standard status codes (`OK=200`, `NOT_FOUND=404`, `IM_A_TEAPOT=418`, etc.) in `src/lib/http/__init__.pyj`; `http.client`: `HTTPConnection(host[, port[, timeout]])`, `HTTPSConnection(host[, port[, timeout]])`, `HTTPResponse` (`.status`, `.reason`, `.headers`, `.url`, `getheader(name[, default])`, `getheaders()`, `read()` → Promise, `json()` → Promise), `HTTPException`, `NotConnected`, `InvalidURL`, `RemoteDisconnected`, `HTTP_PORT=80`, `HTTPS_PORT=443` in `src/lib/http/client.pyj`; `http.cookies`: `SimpleCookie` (dict-like cookie container with `load(rawdata)`, `output([header, sep])`, `items()`, `keys()`, `values()`), `Morsel` (`.key`, `.value`, `.coded_value`, `OutputString()`, `output([header])`), `CookieError` in `src/lib/http/cookies.pyj`; `getresponse()` wraps the Fetch API and returns a Promise — use with `await`; non-2xx responses are returned normally (check `resp.status` yourself, unlike `urllib.request`); `http.server` not available |
+| `csv`         | ✅           | `reader(csvfile[, dialect][, **fmtparams])`, `writer(csvfile[, dialect][, **fmtparams])`, `DictReader(f[, fieldnames[, restkey[, restval[, dialect, ...]]]])`, `DictWriter(f, fieldnames[, restval[, extrasaction[, dialect, ...]]])` in `src/lib/csv.pyj`; `Dialect`, `excel`, `excel_tab`, `unix_dialect` classes; `register_dialect`, `unregister_dialect`, `get_dialect`, `list_dialects`, `field_size_limit`; `QUOTE_MINIMAL`, `QUOTE_ALL`, `QUOTE_NONNUMERIC`, `QUOTE_NONE` constants; `Error` exception; backed by pure-JS parser with full support for quoted fields (including multi-line), custom delimiters, `skipinitialspace`, double-quote escaping, escape characters; accepts list-of-strings, file-like objects (with `.read()`), or any iterable; note: `csv.Error` shadows the native JS Error if imported via `from csv import Error` in web-repl mode — catch via `Exception` instead |
+| `textwrap`    | ✅           | `wrap(text[, width=70[, ...]])`, `fill(text[, width=70[, ...]])`, `shorten(text, width[, ...])`, `dedent(text)`, `indent(text, prefix[, predicate])`, `TextWrapper` class in `src/lib/textwrap.pyj`; `TextWrapper` supports all standard options: `width`, `initial_indent`, `subsequent_indent`, `expand_tabs`, `tabsize`, `replace_whitespace`, `fix_sentence_endings`, `break_long_words`, `break_on_hyphens`, `drop_whitespace`, `max_lines`, `placeholder`; module-level `wrap`/`fill`/`shorten` accept the same options as explicit keyword parameters; `shorten()` normalises internal whitespace before truncating; `break_on_hyphens=True` (default) splits on em-dashes (2+ hyphens) between word characters, matching Python 3 behaviour |
+| `logging`     | ✅           | `getLogger(name)`, `basicConfig(**kwargs)`, `debug/info/warning/error/critical/exception/log()` module-level shortcuts, `disable(level)`, `addLevelName(level, name)`, `getLevelName(level)`, `captureWarnings(capture)`, `makeLogRecord(dict)`, `setLogRecordFactory(factory)`, `getLogRecordFactory()` in `src/lib/logging.pyj`; `Logger` class with `setLevel`, `isEnabledFor`, `getEffectiveLevel`, `addHandler`, `removeHandler`, `hasHandlers`, `addFilter`, `removeFilter`, `debug/info/warning/error/critical/exception/log` methods; `Handler` base class; `StreamHandler(stream=None)` (writes to `console.debug/info/warn/error` when no stream given, or to any object with `.write(s)`); `NullHandler`; `Formatter(fmt, datefmt, style)` with full `%(attr)s/d/f` record formatting and `formatTime(record, datefmt)` (supports `%Y %m %d %H %M %S %f` strftime codes); `Filter(name)` and `Filterer` mixin; `LogRecord` with `getMessage()` supporting `%s/%d/%f/%e/%g/%x/%o/%%` %-formatting; level constants `NOTSET=0`, `DEBUG=10`, `INFO=20`, `WARNING=30`, `ERROR=40`, `CRITICAL=50`; full logger hierarchy (dotted names, `propagate`, `parent`); `lastResort` handler; note: `FileHandler` raises `NotImplementedError` (no file I/O in JS); `exception()` logs at ERROR without automatic exc_info capture |
 | `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
 | `struct`      | ❌           | Binary packing/unpacking not available                                                        |
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |
 | `hmac`        | ❌           | Keyed hashing not available                                                                   |
-| `csv`         | ✅           | `reader(csvfile[, dialect][, **fmtparams])`, `writer(csvfile[, dialect][, **fmtparams])`, `DictReader(f[, fieldnames[, restkey[, restval[, dialect, ...]]]])`, `DictWriter(f, fieldnames[, restval[, extrasaction[, dialect, ...]]])` in `src/lib/csv.pyj`; `Dialect`, `excel`, `excel_tab`, `unix_dialect` classes; `register_dialect`, `unregister_dialect`, `get_dialect`, `list_dialects`, `field_size_limit`; `QUOTE_MINIMAL`, `QUOTE_ALL`, `QUOTE_NONNUMERIC`, `QUOTE_NONE` constants; `Error` exception; backed by pure-JS parser with full support for quoted fields (including multi-line), custom delimiters, `skipinitialspace`, double-quote escaping, escape characters; accepts list-of-strings, file-like objects (with `.read()`), or any iterable; note: `csv.Error` shadows the native JS Error if imported via `from csv import Error` in web-repl mode — catch via `Exception` instead |
-| `textwrap`    | ✅           | `wrap(text[, width=70[, ...]])`, `fill(text[, width=70[, ...]])`, `shorten(text, width[, ...])`, `dedent(text)`, `indent(text, prefix[, predicate])`, `TextWrapper` class in `src/lib/textwrap.pyj`; `TextWrapper` supports all standard options: `width`, `initial_indent`, `subsequent_indent`, `expand_tabs`, `tabsize`, `replace_whitespace`, `fix_sentence_endings`, `break_long_words`, `break_on_hyphens`, `drop_whitespace`, `max_lines`, `placeholder`; module-level `wrap`/`fill`/`shorten` accept the same options as explicit keyword parameters; `shorten()` normalises internal whitespace before truncating; `break_on_hyphens=True` (default) splits on em-dashes (2+ hyphens) between word characters, matching Python 3 behaviour |
 | `pprint`      | ❌           | Pretty-printing not available                                                                 |
-| `logging`     | ✅           | `getLogger(name)`, `basicConfig(**kwargs)`, `debug/info/warning/error/critical/exception/log()` module-level shortcuts, `disable(level)`, `addLevelName(level, name)`, `getLevelName(level)`, `captureWarnings(capture)`, `makeLogRecord(dict)`, `setLogRecordFactory(factory)`, `getLogRecordFactory()` in `src/lib/logging.pyj`; `Logger` class with `setLevel`, `isEnabledFor`, `getEffectiveLevel`, `addHandler`, `removeHandler`, `hasHandlers`, `addFilter`, `removeFilter`, `debug/info/warning/error/critical/exception/log` methods; `Handler` base class; `StreamHandler(stream=None)` (writes to `console.debug/info/warn/error` when no stream given, or to any object with `.write(s)`); `NullHandler`; `Formatter(fmt, datefmt, style)` with full `%(attr)s/d/f` record formatting and `formatTime(record, datefmt)` (supports `%Y %m %d %H %M %S %f` strftime codes); `Filter(name)` and `Filterer` mixin; `LogRecord` with `getMessage()` supporting `%s/%d/%f/%e/%g/%x/%o/%%` %-formatting; level constants `NOTSET=0`, `DEBUG=10`, `INFO=20`, `WARNING=30`, `ERROR=40`, `CRITICAL=50`; full logger hierarchy (dotted names, `propagate`, `parent`); `lastResort` handler; note: `FileHandler` raises `NotImplementedError` (no file I/O in JS); `exception()` logs at ERROR without automatic exc_info capture |
 | `unittest`    | ❌           | Not available; RapydScript uses a custom test runner (`node bin/rapydscript test`)            |
 
 ---

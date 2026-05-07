@@ -1,0 +1,164 @@
+# vim:fileencoding=utf-8
+# Tests for from __python__ import type_enforcement
+# globals: assrt
+
+from __python__ import type_enforcement
+
+eq     = assrt.equal
+de     = assrt.deepEqual
+throws = assrt.throws
+ok     = assrt.ok
+
+def _err(fn):
+    """Call fn and return the TypeError message, or raise if no error."""
+    try:
+        fn()
+        raise AssertionError("Expected TypeError but none was raised")
+    except TypeError as e:
+        return e.message or str(e)
+
+# ---------------------------------------------------------------------------
+# 1. Max positional-arg count
+# ---------------------------------------------------------------------------
+
+def _fixed(a, b):
+    return a + b
+
+throws(def(): _fixed(1, 2, 3);, TypeError)
+eq(_fixed(1, 2), 3)
+
+# With defaults
+def _with_def(a, b=10):
+    return a + b
+
+throws(def(): _with_def(1, 2, 3);, TypeError)
+eq(_with_def(5), 15)
+eq(_with_def(5, 20), 25)
+
+# With *args: no max limit
+def _varargs(a, *rest):
+    return [a] + list(rest)
+
+de(_varargs(1, 2, 3), [1, 2, 3])
+
+# ---------------------------------------------------------------------------
+# 2. Missing required positional arg
+# ---------------------------------------------------------------------------
+
+msg = _err(def(): _fixed(1);)
+ok(msg.indexOf('missing required positional argument') >= 0)
+ok(msg.indexOf('b') >= 0)
+
+# Simple function (no defaults)
+def _simple(x):
+    return x * 2
+
+throws(def(): _simple();, TypeError)
+eq(_simple(7), 14)
+
+# Required arg can be provided as kwarg (valid for non-posonly)
+eq(_fixed(a=3, b=4), 7)
+
+# ---------------------------------------------------------------------------
+# 3. Positional-only enforcement
+# ---------------------------------------------------------------------------
+
+def _po(a, b, /):
+    return a - b
+
+eq(_po(10, 3), 7)
+throws(def(): _po(a=10, b=3);, TypeError)
+throws(def(): _po(b=3);, TypeError)
+
+# Mixed: posonly + normal
+def _mixed(x, /, y=5):
+    return x + y
+
+eq(_mixed(1), 6)
+eq(_mixed(1, y=10), 11)
+throws(def(): _mixed(x=1);, TypeError)
+
+# ---------------------------------------------------------------------------
+# 4. Keyword-only enforcement (bare *)
+# ---------------------------------------------------------------------------
+
+def _ko(a, *, b):
+    return a + b
+
+# b is required kwonly; must be passed as keyword
+eq(_ko(1, b=2), 3)
+throws(def(): _ko(1);, TypeError)   # b missing
+
+def _ko_opt(a, *, b=100):
+    return a + b
+
+eq(_ko_opt(1), 101)
+eq(_ko_opt(1, b=200), 201)
+
+# Cannot pass kwonly positionally (it goes to *args slot which doesn't exist here)
+# Passing positionally puts value into wrong position; enforce checks that b is set
+# In RapydScript, _ko(1, 2) passes 2 positionally but b is kwonly → b === undefined
+throws(def(): _ko(1, 2);, TypeError)
+
+# ---------------------------------------------------------------------------
+# 5. Positional-only + keyword-only combined
+# ---------------------------------------------------------------------------
+
+def _combo(a, b, /, c=1, *, d):
+    return a + b + c + d
+
+eq(_combo(1, 2, d=10), 14)
+eq(_combo(1, 2, c=3, d=10), 16)
+throws(def(): _combo(a=1, b=2, d=10);, TypeError)   # a is posonly
+throws(def(): _combo(1, 2);, TypeError)              # d is required kwonly
+
+# ---------------------------------------------------------------------------
+# 6. Type annotation enforcement
+# ---------------------------------------------------------------------------
+
+def _typed(x: int, y: str):
+    return str(x) + y
+
+eq(_typed(1, 'a'), '1a')
+throws(def(): _typed('bad', 'a');, TypeError)
+throws(def(): _typed(1, 42);, TypeError)
+
+# Type error message mentions the arg name
+msg = _err(def(): _typed('bad', 'ok');)
+ok(msg.indexOf("argument 'x' must be") >= 0)
+
+# Annotated with default: type checked when provided
+def _ann_def(n: int = 0):
+    return n + 1
+
+eq(_ann_def(), 1)
+eq(_ann_def(5), 6)
+throws(def(): _ann_def('five');, TypeError)
+
+# ---------------------------------------------------------------------------
+# 7. Class method enforcement
+# ---------------------------------------------------------------------------
+
+class Calc:
+    def add(self, a: int, b: int):
+        return a + b
+
+    def greet(self, name, /, *, loud=False):
+        return name.upper() if loud else name
+
+c = Calc()
+eq(c.add(3, 4), 7)
+throws(def(): c.add(3, 'x');, TypeError)       # b must be int
+throws(def(): c.add(3, 4, 5);, TypeError)      # too many args
+throws(def(): c.greet(name='Alice');, TypeError)  # name is posonly
+
+# ---------------------------------------------------------------------------
+# 8. Return annotation stored but not enforced (Python-compatible)
+# ---------------------------------------------------------------------------
+
+def _ret(x: int) -> int:
+    return x * 2
+
+eq(_ret(3), 6)
+# Return type is metadata only — no TypeError from returning wrong type
+# (this matches Python's own behaviour without beartype etc.)

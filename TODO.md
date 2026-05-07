@@ -8,7 +8,9 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python f-string f'{x=}' debugging format] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [python-style argument type enforcement] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+
+Specifically, throw TypeError with the wrong count of arguments, and enforce kwarg-only and positional-only argument types 
 
 ### asyncio example
 
@@ -257,4 +259,36 @@ print(shorten("one two three four five six seven", width=20))
 wrapper = TextWrapper(width=20, max_lines=3, placeholder=" [...more]")
 for line in wrapper.wrap("alpha beta gamma delta epsilon zeta eta theta iota kappa"):
     print(line)
+```
+
+### f-string debugging format example
+
+```python
+x = 42
+pi = 3.14159
+name = "Alice"
+nums = [1, 2, 3]
+
+print(f'{x=}')          # x=42
+print(f'{pi=:.2f}')     # pi=3.14
+print(f'{name=!r}')     # name="Alice"  (repr uses double quotes)
+print(f'{nums=}')       # nums=[1, 2, 3]
+print(f'{x=} {pi=:.1f}')  # x=42 pi=3.1
+```
+
+
+### Argument type enforcement example
+
+```python
+from __python__ import type_enforcement
+
+def greet(name: str, /, *, loud: bool = False) -> str:
+    return name.upper() if loud else name
+
+print(greet("Alice"))              # Alice
+print(greet("Bob", loud=True))     # BOB
+
+# greet(name="Carol")              # TypeError: positional-only arg
+# greet("Dave", True)              # TypeError: missing required keyword-only arg 'loud'
+# greet(42)                        # TypeError: argument 'name' must be str
 ```

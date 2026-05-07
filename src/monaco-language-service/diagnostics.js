@@ -21,6 +21,10 @@ const MESSAGES = {
     'dup-key':        'Duplicate key "{name}" in object literal',
     'dup-method':     'The method "{name}" was defined previously at line: {line}',
     'infinite-loop':  'This while loop may never exit (condition is always true and there is no await in the body)',
+    // type_enforcement diagnostics
+    'type-posonly-kwarg':   '"{name}" is positional-only and cannot be passed as a keyword argument to {func}()',
+    'type-too-many-args':   '{func}() takes at most {max} positional argument{plural} but {got} were given',
+    'type-missing-kwonly':  '"{name}" is a required keyword-only argument of {func}() and must be passed by name',
 };
 
 // Built-in stdlib modules that are always available in RapydScript (bundled
@@ -619,6 +623,143 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
 }
 
 // ---------------------------------------------------------------------------
+// Type-enforcement static checker
+// Runs a two-pass walk when any function in the file has type_enforce=true:
+//   Pass 1 — collect signatures of enforced functions.
+//   Pass 2 — inspect call sites and report violations.
+// ---------------------------------------------------------------------------
+
+function check_type_enforcement(RS, toplevel, messages) {
+    // Pass 1: collect signatures of functions compiled with type_enforce=true
+    const sigs = Object.create(null);
+
+    const col1 = {
+        _visit: function(node, cont) {
+            if (node instanceof RS.AST_Lambda && node.type_enforce && node.name) {
+                const a    = node.argnames;
+                const is_m = node instanceof RS.AST_Method;
+                const off  = (is_m && !node.static) ? 1 : 0;
+                const posonly_names = [];
+                const kwonly_req    = [];
+                let max_pos = 0;
+                const defs = (a.defaults) || {};
+                for (let i = off; i < a.length; i++) {
+                    const arg = a[i];
+                    if (arg.posonly) posonly_names.push(arg.name);
+                    if (arg.kwonly) {
+                        if (!has_prop(defs, arg.name)) kwonly_req.push(arg.name);
+                        continue;
+                    }
+                    max_pos++;
+                }
+                sigs[node.name.name] = {
+                    node,
+                    posonly_names,
+                    kwonly_req,
+                    max_pos,
+                    has_starargs: !!a.starargs,
+                    has_kwargs:   !!a.kwargs,
+                };
+            }
+            if (cont) cont();
+        }
+    };
+    toplevel.walk(col1);
+
+    if (Object.keys(sigs).length === 0) return;
+
+    // Pass 2: check call sites
+    const col2 = {
+        _visit: function(node, cont) {
+            if (node instanceof RS.AST_BaseCall) {
+                let fname = null;
+                const expr = node.expression;
+                if (expr instanceof RS.AST_SymbolRef) fname = expr.name;
+                else if (expr instanceof RS.AST_Dot)  fname = expr.property;
+
+                if (fname && has_prop(sigs, fname)) {
+                    const sig         = sigs[fname];
+                    const args        = node.args;
+                    const pos_count   = args ? args.length : 0;
+                    const named_kw    = (args && args.kwargs) ? args.kwargs : [];
+                    const kw_expand   = args && args.kwarg_items && args.kwarg_items.length > 0;
+
+                    // Positional-only args passed as named kwargs
+                    sig.posonly_names.forEach(argname => {
+                        for (let ki = 0; ki < named_kw.length; ki++) {
+                            const knode = named_kw[ki][0];
+                            const kname = knode.name || (knode.value !== undefined ? String(knode.value) : null);
+                            if (kname === argname) {
+                                const msg = MESSAGES['type-posonly-kwarg']
+                                    .replace('{name}', argname)
+                                    .replace('{func}', fname);
+                                messages.push({
+                                    ident:      'type-posonly-kwarg',
+                                    message:    msg,
+                                    level:      ERROR,
+                                    name:       argname,
+                                    start_line: knode.start ? knode.start.line : 1,
+                                    start_col:  knode.start ? knode.start.col  : 0,
+                                    end_line:   knode.end   ? knode.end.line   : undefined,
+                                    end_col:    knode.end   ? knode.end.col    : undefined,
+                                });
+                            }
+                        }
+                    });
+
+                    // Too many positional args (skip when *args or **expansion present)
+                    if (!sig.has_starargs && !kw_expand && pos_count > sig.max_pos) {
+                        const plural = sig.max_pos === 1 ? '' : 's';
+                        const msg = MESSAGES['type-too-many-args']
+                            .replace('{func}', fname)
+                            .replace('{max}',  String(sig.max_pos))
+                            .replace('{plural}', plural)
+                            .replace('{got}',  String(pos_count));
+                        messages.push({
+                            ident:      'type-too-many-args',
+                            message:    msg,
+                            level:      ERROR,
+                            name:       fname,
+                            start_line: node.start ? node.start.line : 1,
+                            start_col:  node.start ? node.start.col  : 0,
+                            end_line:   node.end   ? node.end.line   : undefined,
+                            end_col:    node.end   ? node.end.col    : undefined,
+                        });
+                    }
+
+                    // Required keyword-only args not provided (skip when **expansion present)
+                    if (!kw_expand) {
+                        sig.kwonly_req.forEach(argname => {
+                            const provided = named_kw.some(pair => {
+                                const kn = pair[0].name || (pair[0].value !== undefined ? String(pair[0].value) : null);
+                                return kn === argname;
+                            });
+                            if (!provided) {
+                                const msg = MESSAGES['type-missing-kwonly']
+                                    .replace('{name}', argname)
+                                    .replace('{func}', fname);
+                                messages.push({
+                                    ident:      'type-missing-kwonly',
+                                    message:    msg,
+                                    level:      ERROR,
+                                    name:       argname,
+                                    start_line: node.start ? node.start.line : 1,
+                                    start_col:  node.start ? node.start.col  : 0,
+                                    end_line:   node.end   ? node.end.line   : undefined,
+                                    end_col:    node.end   ? node.end.col    : undefined,
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            if (cont) cont();
+        }
+    };
+    toplevel.walk(col2);
+}
+
+// ---------------------------------------------------------------------------
 // Convert lint message → Monaco IMarkerData
 // markerSeverity should be { Error, Warning, Info, Hint } numeric values
 // ---------------------------------------------------------------------------
@@ -746,6 +887,26 @@ export class Diagnostics {
         const linter = new Linter(RS, toplevel, code, this._builtins, knownModules);
         toplevel.walk(linter);
         messages = linter.resolve(noqa);
+
+        // --- Type enforcement static checks ---
+        // Run when type_enforcement is active at the file level (either via
+        // pythonFlags constructor arg or from __python__ import type_enforcement).
+        const te_active =
+            (this._scoped_flags && this._scoped_flags.type_enforcement) ||
+            (toplevel.scoped_flags && toplevel.scoped_flags.type_enforcement);
+        if (te_active) {
+            const te_messages = [];
+            check_type_enforcement(RS, toplevel, te_messages);
+            // Filter noqa, then convert to markers inline
+            te_messages.forEach(m => {
+                if (noqa && has_prop(noqa, m.ident)) return;
+                messages.push(m);
+            });
+            messages.sort((a, b) => {
+                const dl = (a.start_line || 0) - (b.start_line || 0);
+                return dl !== 0 ? dl : (a.start_col || 0) - (b.start_col || 0);
+            });
+        }
 
         return messages.map(m => to_marker(m, markerSeverity));
     }

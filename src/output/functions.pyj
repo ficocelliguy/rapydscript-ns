@@ -45,11 +45,59 @@ def function_args(argnames, output, strip_first):
 
 def function_preamble(node, output, offset):
     a = node.argnames
-    if a is None or a is undefined or a.is_simple_func:
+    if a is None or a is undefined:
+        return
+    type_enforce = node.type_enforce
+    if a.is_simple_func and not type_enforce:
         return
     # If this function has optional parameters/*args/**kwargs declare it differently
     fname = node.name.name if node.name else anonfunc
     kw = 'arguments[arguments.length-1]'
+
+    # === Type enforcement: max positional-arg count check ===
+    if type_enforce:
+        max_pos = 0
+        for c, arg in enumerate(a):
+            if c >= offset and not arg.kwonly:
+                max_pos += 1
+        if a.is_simple_func:
+            # Simple function: named JS params; arguments.length gives true count
+            if not a.starargs:
+                max_msg = fname + '() takes ' + max_pos + ' positional argument' + ('' if max_pos == 1 else 's') + ' but '
+                output.indent()
+                output.print('if (arguments.length > ' + max_pos + ') throw new TypeError(' + JSON.stringify(max_msg) + ' + arguments.length + " were given")')
+                output.end_statement()
+            # Required-arg and type-annotation checks (variables are direct JS params)
+            for c, arg in enumerate(a):
+                if c < offset:
+                    continue
+                if not arg.kwonly:
+                    miss_msg = fname + '() missing required positional argument: \'' + arg.name + '\''
+                    output.indent()
+                    output.print('if (' + arg.name + ' === undefined) throw new TypeError(' + JSON.stringify(miss_msg) + ')')
+                    output.end_statement()
+                if arg.annotation:
+                    type_msg = fname + '() argument \'' + arg.name + '\' must be '
+                    output.indent()
+                    output.print('if (' + arg.name + ' !== undefined && !ρσ_instanceof(' + arg.name + ', ')
+                    arg.annotation.print(output)
+                    output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ' + ρσ_arith_type_name(' + arg.name + '))')
+                    output.end_statement()
+            return  # simple func: only enforcement, no complex preamble
+
+        # Complex function: must handle arguments object; strip trailing kwargs marker
+        if not a.starargs:
+            output.indent()
+            output.spaced('var', 'ρσ_nargs', '=', 'arguments.length')
+            output.end_statement()
+            output.indent()
+            output.print('if (ρσ_nargs > 0 && arguments[ρσ_nargs-1] !== null && typeof arguments[ρσ_nargs-1] === "object" && arguments[ρσ_nargs-1][ρσ_kwargs_symbol] === true) ρσ_nargs--')
+            output.end_statement()
+            max_msg = fname + '() takes ' + max_pos + ' positional argument' + ('' if max_pos == 1 else 's') + ' but '
+            output.indent()
+            output.print('if (ρσ_nargs > ' + max_pos + ') throw new TypeError(' + JSON.stringify(max_msg) + ' + ρσ_nargs + " were given")')
+            output.end_statement()
+
     # Define all formal parameters
     positional_count = 0
     for c, arg in enumerate(a):
@@ -89,6 +137,22 @@ def function_preamble(node, output, offset):
         output.indent()
         output.spaced('if', '(' + kw, '===', 'null', '||', 'typeof', kw, '!==', '"object"', '||', kw, '[ρσ_kwargs_symbol]', '!==', 'true)', kw, '=', '{}')
         output.end_statement()
+        # === Type enforcement: positional-only args must not appear in kwargs ===
+        if type_enforce:
+            posonly_count = a.posonly_count or 0
+            for pi in range(posonly_count):
+                if pi < offset:
+                    continue
+                parg = a[pi]
+                posonly_msg = fname + '() got some positional-only arguments passed as keyword arguments: \'' + parg.name + '\''
+                output.indent()
+                output.spaced('if', '(Object.prototype.hasOwnProperty.call(' + kw + ',', '"' + parg.name + '"))')
+                output.with_block(def():
+                    output.indent()
+                    output.print('throw new TypeError(' + JSON.stringify(posonly_msg) + ')')
+                    output.end_statement()
+                )
+                output.newline()
         # Read values from the kwargs object for non-positional-only formal parameters with defaults
         if a.has_defaults:
             for dname in Object.keys(a.defaults):
@@ -138,6 +202,29 @@ def function_preamble(node, output, offset):
                         output.end_statement()
                 )
                 output.newline()
+    elif type_enforce and (a.posonly_count or 0) > 0:
+        # No kwargs block, but function has positional-only params.
+        # A caller using foo(posonly_name=val) still passes a kwargs object as the
+        # last argument; detect and reject it here.
+        posonly_count = a.posonly_count or 0
+        posonly_names = []
+        for pi in range(posonly_count):
+            if pi >= offset:
+                posonly_names.push(a[pi].name)
+        if posonly_names.length > 0:
+            output.indent()
+            output.spaced('var', 'ρσ_kw_chk', '=', 'arguments[arguments.length-1]')
+            output.end_statement()
+            output.indent()
+            output.spaced('if', '(ρσ_kw_chk !== null && typeof ρσ_kw_chk === "object" && ρσ_kw_chk[ρσ_kwargs_symbol] === true)')
+            output.with_block(def():
+                for pname in posonly_names:
+                    posonly_msg = fname + '() got some positional-only arguments passed as keyword arguments: \'' + pname + '\''
+                    output.indent()
+                    output.print('if (Object.prototype.hasOwnProperty.call(ρσ_kw_chk, "' + pname + '")) throw new TypeError(' + JSON.stringify(posonly_msg) + ')')
+                    output.end_statement()
+            )
+            output.newline()
 
     if a.starargs is not undefined:
         # Define the *args parameter, putting in whatever is left after assigning the formal parameters and the options object
@@ -159,6 +246,43 @@ def function_preamble(node, output, offset):
         output.indent()
         output.spaced(kw, '=', 'ρσ_kwargs_to_dict(' + kw + ')')
         output.end_statement()
+
+    # === Type enforcement: required-arg, required-kwonly, and type-annotation checks ===
+    # These run after all variable resolution (kwargs reading, starargs setup, dict conversion)
+    # so each variable holds its final value when checked.
+    if type_enforce:
+        # Required positional args (no default, not kwonly)
+        for c, arg in enumerate(a):
+            if c < offset:
+                continue
+            if arg.kwonly:
+                continue
+            if not Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
+                miss_msg = fname + '() missing required positional argument: \'' + arg.name + '\''
+                output.indent()
+                output.print('if (' + arg.name + ' === undefined) throw new TypeError(' + JSON.stringify(miss_msg) + ')')
+                output.end_statement()
+        # Required keyword-only args (no default)
+        for c, arg in enumerate(a):
+            if not arg.kwonly:
+                continue
+            if not Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
+                miss_kw = fname + '() missing required keyword-only argument: \'' + arg.name + '\''
+                output.indent()
+                output.print('if (' + arg.name + ' === undefined) throw new TypeError(' + JSON.stringify(miss_kw) + ')')
+                output.end_statement()
+        # Type annotation checks (skip *args and **kwargs)
+        for c, arg in enumerate(a):
+            if c < offset:
+                continue
+            if not arg.annotation:
+                continue
+            type_msg = fname + '() argument \'' + arg.name + '\' must be '
+            output.indent()
+            output.print('if (' + arg.name + ' !== undefined && !ρσ_instanceof(' + arg.name + ', ')
+            arg.annotation.print(output)
+            output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ' + ρσ_arith_type_name(' + arg.name + '))')
+            output.end_statement()
 
 def has_annotations(self):
     if self.return_annotation:

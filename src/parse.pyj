@@ -31,7 +31,7 @@ TreeWalker
 from tokenizer import tokenizer, is_token, RESERVED_WORDS
 
 COMPILER_VERSION = '__COMPILER_VERSION__'
-PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True, 'jsx':True, 'strict_arithmetic':True, 'python_modulo':True}
+PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True, 'jsx':True, 'strict_arithmetic':True, 'python_modulo':True, 'type_enforcement':True}
 
 
 def get_compiler_version():
@@ -1827,6 +1827,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             )(S.in_loop, S.labels)
         })
         definition.return_annotation = return_annotation
+        definition.type_enforce = S.scoped_flags.get('type_enforcement', False)
         definition.is_generator = is_generator[0]
         definition.is_async = is_async
         if is_node_type(definition, AST_Method):

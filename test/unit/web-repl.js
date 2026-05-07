@@ -1232,6 +1232,71 @@ var TESTS = [
         },
     },
 
+    // ── f-string {x=} debugging format ───────────────────────────────────────
+
+    {
+        name: "bundle_fstring_debug_simple",
+        description: "f'{x=}' produces 'x=<value>' for simple variable",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "x = 42",
+                "name = 'Alice'",
+                "flag = True",
+                "assrt.equal(f'{x=}', 'x=42')",
+                "assrt.equal(f'{name=}', \"name=Alice\")",
+                "assrt.equal(f'{flag=}', 'flag=true')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_fstring_debug_expr",
+        description: "f'{expr=}' preserves the full expression text as prefix",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "x = 5",
+                "nums = [10, 20, 30]",
+                "assrt.equal(f'{x*2=}', 'x*2=10')",
+                "assrt.equal(f'{nums[1]=}', 'nums[1]=20')",
+                "assrt.equal(f'{x=} and {x*2=}', 'x=5 and x*2=10')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_fstring_debug_format_spec",
+        description: "f'{x=:.2f}' combines debugging prefix with format spec",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "pi = 3.14159",
+                "n = 1234567",
+                "assrt.equal(f'{pi=:.2f}', 'pi=3.14')",
+                "assrt.equal(f'{n=:,}', 'n=' + (1234567).toLocaleString())",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_fstring_debug_repr",
+        description: "f'{x=!r}' combines debugging prefix with !r repr conversion",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "msg = 'hello'",
+                "nums = [1, 2, 3]",
+                "assrt.equal(f'{msg=!r}', 'msg=\"hello\"')",
+                "assrt.equal(f'{nums=!r}', 'nums=[1, 2, 3]')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     // ── object() builtin ──────────────────────────────────────────────────────
 
     {
@@ -3744,6 +3809,142 @@ var TESTS = [
                 "logging.error('also suppressed')",
                 "assrt.equal(_b.out.length, 3)",
                 "logging.disable(logging.NOTSET)",  // reset
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_type_enforcement_basic",
+        description: "type_enforcement: max args, missing required, type annotations",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import type_enforcement",
+                "def add(a: int, b: int):",
+                "    return a + b",
+                // correct call
+                "assrt.equal(add(2, 3), 5)",
+                // too many positional args
+                "caught = False",
+                "try:",
+                "    add(1, 2, 3)",
+                "except TypeError:",
+                "    caught = True",
+                "assrt.ok(caught)",
+                // missing required arg
+                "caught2 = False",
+                "try:",
+                "    add(1)",
+                "except TypeError:",
+                "    caught2 = True",
+                "assrt.ok(caught2)",
+                // type mismatch
+                "caught3 = False",
+                "try:",
+                "    add('x', 2)",
+                "except TypeError:",
+                "    caught3 = True",
+                "assrt.ok(caught3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_type_enforcement_posonly",
+        description: "type_enforcement: positional-only args cannot be passed as kwargs",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import type_enforcement",
+                "def sub(a, b, /):",
+                "    return a - b",
+                // valid positional call
+                "assrt.equal(sub(10, 3), 7)",
+                // posonly passed as kwarg → TypeError
+                "caught = False",
+                "try:",
+                "    sub(a=10, b=3)",
+                "except TypeError:",
+                "    caught = True",
+                "assrt.ok(caught)",
+                // mixed: posonly + default normal
+                "def greet(name, /, greeting='Hello'):",
+                "    return greeting + ' ' + name",
+                "assrt.equal(greet('Alice'), 'Hello Alice')",
+                "assrt.equal(greet('Bob', greeting='Hi'), 'Hi Bob')",
+                "caught2 = False",
+                "try:",
+                "    greet(name='Carol')",
+                "except TypeError:",
+                "    caught2 = True",
+                "assrt.ok(caught2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_type_enforcement_kwonly",
+        description: "type_enforcement: keyword-only args must be supplied by name",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import type_enforcement",
+                "def notify(msg, *, urgent):",
+                "    return msg + ('!' if urgent else '.')",
+                // correct kwonly usage
+                "assrt.equal(notify('hi', urgent=True), 'hi!')",
+                "assrt.equal(notify('hi', urgent=False), 'hi.')",
+                // missing required kwonly → TypeError
+                "caught = False",
+                "try:",
+                "    notify('hello')",
+                "except TypeError:",
+                "    caught = True",
+                "assrt.ok(caught)",
+                // optional kwonly with default — no error when omitted
+                "def fmt(val, *, prefix=''):",
+                "    return prefix + str(val)",
+                "assrt.equal(fmt(42), '42')",
+                "assrt.equal(fmt(42, prefix='>> '), '>> 42')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_type_enforcement_class",
+        description: "type_enforcement: class method arg enforcement",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import type_enforcement",
+                "class Vec:",
+                "    def __init__(self, x: int, y: int):",
+                "        self.x = x",
+                "        self.y = y",
+                "    def scale(self, factor: int, /, *, clamp=False):",
+                "        v = self.x * factor",
+                "        return min(v, 100) if clamp else v",
+                "v = Vec(3, 4)",
+                "assrt.equal(v.scale(2), 6)",
+                "assrt.equal(v.scale(50, clamp=True), 100)",
+                // type mismatch in __init__
+                "caught = False",
+                "try:",
+                "    Vec('a', 1)",
+                "except TypeError:",
+                "    caught = True",
+                "assrt.ok(caught)",
+                // factor is posonly → cannot be kwarg
+                "caught2 = False",
+                "try:",
+                "    v.scale(factor=2)",
+                "except TypeError:",
+                "    caught2 = True",
+                "assrt.ok(caught2)",
             ].join("\n"));
             run_js(js);
         },

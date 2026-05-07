@@ -562,6 +562,7 @@ class AST_Lambda(AST_Scope):
         'is_expression': "[bool*] True iff this function is a function expression",
         'is_anonymous': "[bool*] True iff this function is an anonymous function",
         "return_annotation": "[AST_Node?] The return type annotation provided (if any)",
+        'type_enforce': "[bool*] True iff type_enforcement scoped flag is active for this function",
     }
 
     def _walk(self, visitor):
