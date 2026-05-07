@@ -3327,6 +3327,275 @@ var TESTS = [
         },
     },
 
+    // ── csv stdlib ────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_csv_reader_basic",
+        description: "csv stdlib: reader parses CSV rows and writer produces CSV text in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "import csv",
+                "from io import StringIO",
+                // reader — list input
+                "rows = []",
+                "for row in csv.reader(['a,b,c', '1,2,3']):",
+                "    rows.push(row)",
+                "assrt.equal(rows.length, 2)",
+                "assrt.deepEqual(rows[0], ['a', 'b', 'c'])",
+                "assrt.deepEqual(rows[1], ['1', '2', '3'])",
+                // reader — quoted field
+                "rows2 = []",
+                "for row in csv.reader(['\"hello, world\",foo']):",
+                "    rows2.push(row)",
+                "assrt.equal(rows2[0][0], 'hello, world')",
+                "assrt.equal(rows2[0][1], 'foo')",
+                // writer
+                "sio = StringIO()",
+                "w = csv.writer(sio)",
+                "w.writerow(['name', 'age'])",
+                "w.writerow(['Alice', 30])",
+                "out = sio.getvalue()",
+                "assrt.ok('name,age' in out)",
+                "assrt.ok('Alice,30' in out)",
+                // round-trip
+                "buf = StringIO()",
+                "w2 = csv.writer(buf)",
+                "w2.writerow(['x', 'needs, quoting', 'y'])",
+                "buf.seek(0)",
+                "rt = []",
+                "for row in csv.reader(buf):",
+                "    rt.push(row)",
+                "assrt.deepEqual(rt[0], ['x', 'needs, quoting', 'y'])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_csv_dictreader",
+        description: "csv stdlib: DictReader reads rows as dicts with automatic fieldnames in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "import csv",
+                // DictReader — fieldnames from first row
+                "rows = []",
+                "for row in csv.DictReader(['name,age', 'Alice,30', 'Bob,25']):",
+                "    rows.push(row)",
+                "assrt.equal(rows.length, 2)",
+                "assrt.equal(rows[0]['name'], 'Alice')",
+                "assrt.equal(rows[0]['age'],  '30')",
+                "assrt.equal(rows[1]['name'], 'Bob')",
+                // DictReader — provided fieldnames
+                "rows2 = []",
+                "for row in csv.DictReader(['Alice,30', 'Bob,25'], fieldnames=['name','age']):",
+                "    rows2.push(row)",
+                "assrt.equal(rows2.length, 2)",
+                "assrt.equal(rows2[0]['name'], 'Alice')",
+                // DictReader — restval for missing field
+                "rows3 = []",
+                "for row in csv.DictReader(['name,age,city', 'Alice,30'], restval='?'):",
+                "    rows3.push(row)",
+                "assrt.equal(rows3[0]['city'], '?')",
+                // DictReader — empty input yields no rows
+                "empty_count = 0",
+                "for row in csv.DictReader([]):",
+                "    empty_count += 1",
+                "assrt.equal(empty_count, 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_csv_dictwriter",
+        description: "csv stdlib: DictWriter writes header and rows from dicts in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "import csv",
+                "from io import StringIO",
+                // DictWriter — writeheader + writerow
+                "sio = StringIO()",
+                "dw = csv.DictWriter(sio, ['name', 'score'])",
+                "dw.writeheader()",
+                "dw.writerow({'name': 'Eve', 'score': '99'})",
+                "dw.writerow({'name': 'Frank', 'score': '88'})",
+                "out = sio.getvalue()",
+                "assrt.ok('name,score' in out)",
+                "assrt.ok('Eve,99' in out)",
+                "assrt.ok('Frank,88' in out)",
+                // round-trip DictWriter → DictReader
+                "buf = StringIO()",
+                "dw2 = csv.DictWriter(buf, ['x', 'y'])",
+                "dw2.writeheader()",
+                "dw2.writerow({'x': 'hello', 'y': 'world'})",
+                "buf.seek(0)",
+                "rt = []",
+                "for row in csv.DictReader(buf):",
+                "    rt.push(row)",
+                "assrt.equal(rt.length, 1)",
+                "assrt.equal(rt[0]['x'], 'hello')",
+                "assrt.equal(rt[0]['y'], 'world')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_csv_dialects",
+        description: "csv stdlib: dialect options, register_dialect, list_dialects, field_size_limit in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "import csv",
+                "from io import StringIO",
+                // excel-tab dialect
+                "rows = []",
+                "for row in csv.reader(['a\\tb\\tc'], dialect='excel-tab'):",
+                "    rows.push(row)",
+                "assrt.deepEqual(rows[0], ['a', 'b', 'c'])",
+                // QUOTE_ALL
+                "sio = StringIO()",
+                "w = csv.writer(sio, quoting=csv.QUOTE_ALL)",
+                "w.writerow(['x', 'y'])",
+                "assrt.equal(sio.getvalue(), '\"x\",\"y\"\\r\\n')",
+                // register_dialect / list_dialects / unregister_dialect
+                "csv.register_dialect('pipes', delimiter='|')",
+                "dialects = csv.list_dialects()",
+                "assrt.ok(dialects.indexOf('pipes') >= 0)",
+                "sio2 = StringIO()",
+                "w2 = csv.writer(sio2, dialect='pipes')",
+                "w2.writerow(['a', 'b'])",
+                "assrt.equal(sio2.getvalue(), 'a|b\\r\\n')",
+                "csv.unregister_dialect('pipes')",
+                "assrt.ok(csv.list_dialects().indexOf('pipes') < 0)",
+                // field_size_limit
+                "old = csv.field_size_limit(65536)",
+                "assrt.equal(old, 131072)",
+                "assrt.equal(csv.field_size_limit(), 65536)",
+                "csv.field_size_limit(131072)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_textwrap_wrap",
+        description: "textwrap stdlib: wrap, fill, shorten in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from textwrap import wrap, fill, shorten",
+                // basic wrap
+                "r = wrap('one two three four five', 10)",
+                "assrt.equal(r.length, 3)",
+                "assrt.equal(r[0], 'one two')",
+                "assrt.equal(r[1], 'three four')",
+                "assrt.equal(r[2], 'five')",
+                // short text fits on one line
+                "assrt.deepEqual(wrap('hello', 20), ['hello'])",
+                // empty string
+                "assrt.deepEqual(wrap('', 10), [])",
+                // fill joins with newlines
+                "assrt.equal(fill('one two three', 8), 'one two\\nthree')",
+                // fill with indents
+                "assrt.equal(fill('one two three four', 12, initial_indent='> ', subsequent_indent='  '), '> one two\\n  three four')",
+                // shorten — fits
+                "assrt.equal(shorten('hello world', 20), 'hello world')",
+                // shorten — truncates; 'one two three' (13) + ' [...]' (6) = 19 ≤ 20
+                "assrt.equal(shorten('one two three four five', 20), 'one two three [...]')",
+                // shorten — custom placeholder
+                "assrt.equal(shorten('hello world foo bar', 14, placeholder='...'), 'hello world...')",
+                // shorten — normalises whitespace
+                "assrt.equal(shorten('hello    world', 20), 'hello world')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_textwrap_dedent",
+        description: "textwrap stdlib: dedent in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from textwrap import dedent",
+                // common indent removed
+                "assrt.equal(dedent('  hello\\n  world'), 'hello\\nworld')",
+                // no common indent
+                "assrt.equal(dedent('hello\\n  world'), 'hello\\n  world')",
+                // empty lines ignored when computing margin
+                "assrt.equal(dedent('  hello\\n\\n  world'), 'hello\\n\\nworld')",
+                // partial common indent: '    ' vs '  ' → margin '  '
+                "assrt.equal(dedent('    foo\\n  bar'), '  foo\\nbar')",
+                // leading blank line then indented
+                "assrt.equal(dedent('\\n    foo\\n    bar'), '\\nfoo\\nbar')",
+                // tab-based indent
+                "assrt.equal(dedent('\\thello\\n\\tworld'), 'hello\\nworld')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_textwrap_indent",
+        description: "textwrap stdlib: indent with and without predicate in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from textwrap import indent",
+                // basic
+                "assrt.equal(indent('hello\\nworld', '  '), '  hello\\n  world')",
+                // empty lines not indented by default
+                "assrt.equal(indent('hello\\n\\nworld', '  '), '  hello\\n\\n  world')",
+                // whitespace-only line not indented
+                "assrt.equal(indent('hello\\n   \\nworld', '> '), '> hello\\n   \\n> world')",
+                // custom predicate: indent all lines
+                "_pred = def(line): return True;",
+                "assrt.equal(indent('hello\\n\\nworld', '> ', _pred), '> hello\\n> \\n> world')",
+                // predicate: only lines starting with '#'
+                "_ph = def(line): return line.startsWith('#');",
+                "assrt.equal(indent('# a\\ncode\\n# b', '!! ', _ph), '!! # a\\ncode\\n!! # b')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_textwrap_textwrapper",
+        description: "textwrap stdlib: TextWrapper class with options in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from textwrap import TextWrapper",
+                // basic wrap and fill
+                "tw = TextWrapper(width=10)",
+                "assrt.deepEqual(tw.wrap('one two three'), ['one two', 'three'])",
+                "assrt.equal(tw.fill('one two three'), 'one two\\nthree')",
+                // max_lines with placeholder
+                // width=15, max_lines=2, placeholder=' ...' (4 chars)
+                // line 1: 'alpha beta' (10) fits; line 2 truncated to 'gamma delta ...' (15)
+                "tw2 = TextWrapper(width=15, max_lines=2, placeholder=' ...')",
+                "r2 = tw2.wrap('alpha beta gamma delta epsilon')",
+                "assrt.equal(r2.length, 2)",
+                "assrt.equal(r2[0], 'alpha beta')",
+                "assrt.equal(r2[1], 'gamma delta ...')",
+                // break_long_words=False
+                "tw3 = TextWrapper(width=5, break_long_words=False)",
+                "r3 = tw3.wrap('superlongword short')",
+                "assrt.equal(r3[0], 'superlongword')",
+                "assrt.equal(r3[1], 'short')",
+                // fix_sentence_endings
+                "tw4 = TextWrapper(width=70, fix_sentence_endings=True)",
+                "r4 = tw4.wrap('end of sentence. New sentence.')",
+                "assrt.equal(r4[0], 'end of sentence.  New sentence.')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

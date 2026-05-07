@@ -1,0 +1,172 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# textwrap.pyj
+# Tests for the textwrap standard library module.
+
+from textwrap import wrap, fill, dedent, indent, shorten, TextWrapper
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. wrap — basic ──────────────────────────────────────────────────────────
+
+# Short text fits on one line
+ade(wrap('hello world', 20), ['hello world'])
+
+# Empty string
+ade(wrap('', 10), [])
+
+# Single word
+ade(wrap('hello', 10), ['hello'])
+
+# Width-limited: "one two" (7), "three four" (10), "five" (4)
+_r1 = wrap('one two three four five', 10)
+ae(_r1.length, 3)
+ae(_r1[0], 'one two')
+ae(_r1[1], 'three four')
+ae(_r1[2], 'five')
+
+# Single word exactly equal to width
+ade(wrap('hello', 5), ['hello'])
+
+# Word longer than width with break_long_words=True (default)
+_r2 = wrap('superlongword', 5)
+ae(_r2[0], 'super')
+ae(_r2[1], 'longw')
+ae(_r2[2], 'ord')
+
+# ── 2. wrap — break_long_words=False ─────────────────────────────────────────
+
+_r3 = wrap('superlongword short', 5, break_long_words=False)
+ae(_r3[0], 'superlongword')
+ae(_r3[1], 'short')
+
+# ── 3. wrap — initial_indent / subsequent_indent ─────────────────────────────
+
+# Line 1 avail=12-2=10: "one two" (7); line 2 avail=10: "three four" (10)
+_r4 = wrap('one two three four', 12, initial_indent='> ', subsequent_indent='  ')
+ae(_r4.length, 2)
+ae(_r4[0], '> one two')
+ae(_r4[1], '  three four')
+
+# ── 4. fill ───────────────────────────────────────────────────────────────────
+
+ae(fill('one two three', 8), 'one two\nthree')
+ae(fill('hello', 20), 'hello')
+ae(fill('', 10), '')
+
+# ── 5. fill — initial/subsequent indent ──────────────────────────────────────
+
+ae(fill('one two three four', 12, initial_indent='> ', subsequent_indent='  '),
+   '> one two\n  three four')
+
+# ── 6. TextWrapper — basic ───────────────────────────────────────────────────
+
+_tw1 = TextWrapper(width=10)
+ade(_tw1.wrap('one two three'), ['one two', 'three'])
+ae(_tw1.fill('one two three'), 'one two\nthree')
+
+# ── 7. TextWrapper — max_lines with placeholder ──────────────────────────────
+
+# width=15, max_lines=2, placeholder=' ...' (4 chars)
+# Line 1: "alpha beta" (10), fits; line 2 needs truncation with placeholder.
+_tw2 = TextWrapper(width=15, max_lines=2, placeholder=' ...')
+_r5 = _tw2.wrap('alpha beta gamma delta epsilon')
+ae(_r5.length, 2)
+ae(_r5[0], 'alpha beta')
+ae(_r5[1], 'gamma delta ...')
+
+# ── 8. TextWrapper — fix_sentence_endings ────────────────────────────────────
+
+_tw3 = TextWrapper(width=70, fix_sentence_endings=True)
+_r6 = _tw3.wrap('end of sentence. New sentence.')
+ae(_r6.length, 1)
+ae(_r6[0], 'end of sentence.  New sentence.')
+
+# Without fix_sentence_endings: single space stays
+_tw4 = TextWrapper(width=70, fix_sentence_endings=False)
+_r7 = _tw4.wrap('end of sentence. New sentence.')
+ae(_r7[0], 'end of sentence. New sentence.')
+
+# ── 9. dedent — common indent removed ────────────────────────────────────────
+
+ae(dedent('  hello\n  world'), 'hello\nworld')
+
+# Tab-based common indent
+ae(dedent('\thello\n\tworld'), 'hello\nworld')
+
+# No common indent → unchanged
+ae(dedent('hello\n  world'), 'hello\n  world')
+
+# Empty lines ignored when computing margin
+ae(dedent('  hello\n\n  world'), 'hello\n\nworld')
+
+# Partial common indent: "    " vs "  " → margin is "  "
+ae(dedent('    foo\n  bar'), '  foo\nbar')
+
+# Already no indent
+ae(dedent('hello\nworld'), 'hello\nworld')
+
+# Leading blank line, then indented
+ae(dedent('\n    foo\n    bar'), '\nfoo\nbar')
+
+# ── 10. indent — basic ───────────────────────────────────────────────────────
+
+ae(indent('hello\nworld', '  '), '  hello\n  world')
+
+# Empty lines not indented by default (strip() == '')
+ae(indent('hello\n\nworld', '  '), '  hello\n\n  world')
+
+# Whitespace-only line not indented by default
+ae(indent('hello\n   \nworld', '> '), '> hello\n   \n> world')
+
+# ── 11. indent — custom predicate ────────────────────────────────────────────
+
+# Indent ALL lines including empty
+_pred_all = def(line): return True;
+ae(indent('hello\n\nworld', '> ', _pred_all), '> hello\n> \n> world')
+
+# Indent only lines starting with '#'
+_pred_hash = def(line): return line.startsWith('#');
+ae(indent('# comment\ncode\n# another', '!! ', _pred_hash),
+   '!! # comment\ncode\n!! # another')
+
+# ── 12. shorten — no truncation needed ───────────────────────────────────────
+
+ae(shorten('hello world', 20), 'hello world')
+
+# ── 13. shorten — truncation ─────────────────────────────────────────────────
+
+# "one two three [...]": "one two three" (13) + " [...]" (6) = 19 ≤ 20
+ae(shorten('one two three four five', 20), 'one two three [...]')
+
+# Custom placeholder
+ae(shorten('hello world foo bar', 14, placeholder='...'), 'hello world...')
+
+# ── 14. shorten — normalises internal whitespace ─────────────────────────────
+
+# Multiple spaces collapsed
+ae(shorten('hello    world', 20), 'hello world')
+
+# ── 15. wrap — drop_whitespace=False ─────────────────────────────────────────
+
+# With drop_whitespace=False trailing space is kept on the line.
+_r8 = wrap('  hello world', 10, drop_whitespace=False)
+ok(_r8.length >= 1)
+ae(_r8[0], '  hello ')
+
+# ── 16. wrap — replace_whitespace=False ──────────────────────────────────────
+
+# Newlines in source are treated as whitespace separators normally;
+# with replace_whitespace=False they appear in chunks.
+_r9 = wrap('hello\nworld extra long line here', 15, replace_whitespace=False)
+ok(_r9.length >= 1)
+
+# ── 17. wrap — max_lines=1 on module-level wrap ──────────────────────────────
+
+# "one two" (7) + " ..." (4) = 11 ≤ 15; "one two three" (13) + " ..." (4) = 17 > 15
+_r10 = wrap('one two three four five', 15, max_lines=1, placeholder=' ...')
+ae(_r10.length, 1)
+ae(_r10[0], 'one two ...')

@@ -1,0 +1,329 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+# Python-compatible textwrap module.
+#
+# Provides:
+#   TextWrapper class with .wrap(text), .fill(text)
+#   wrap(text[, width=70[, ...]])
+#   fill(text[, width=70[, ...]])
+#   shorten(text, width[, ...])
+#   dedent(text)
+#   indent(text, prefix[, predicate])
+#
+# All TextWrapper options supported:
+#   width, initial_indent, subsequent_indent, expand_tabs, tabsize,
+#   replace_whitespace, fix_sentence_endings, break_long_words,
+#   break_on_hyphens, drop_whitespace, max_lines, placeholder
+#
+# Notes:
+#   - break_on_hyphens=True (default) splits on em-dashes (2+ hyphens)
+#     between word characters, matching Python 3 behaviour.
+#   - shorten() normalises internal whitespace before truncating.
+
+v"""
+// ── textwrap internal helpers ────────────────────────────────────────────────
+
+function _tw_expand_tabs(text, tabsize) {
+    var _res = '';
+    var _col = 0;
+    for (var _i = 0; _i < text.length; _i++) {
+        var _c = text[_i];
+        if (_c === '\t') {
+            var _n = tabsize - (_col % tabsize);
+            for (var _j = 0; _j < _n; _j++) _res += ' ';
+            _col += _n;
+        } else {
+            _res += _c;
+            if (_c === '\n' || _c === '\r') _col = 0; else _col++;
+        }
+    }
+    return _res;
+}
+
+// Split into alternating non-whitespace / whitespace chunks.
+// break_on_hyphens: also split around em-dashes (2+ hyphens) between word chars.
+function _tw_split_chunks(text, break_on_hyphens) {
+    var _re = break_on_hyphens
+        ? /(\s+|(?<=[\w!"'&.,?])-{2,}(?=\w))/g
+        : /(\s+)/g;
+    var _chunks = [];
+    var _last = 0;
+    var _m;
+    while ((_m = _re.exec(text)) !== null) {
+        if (_m.index > _last) _chunks.push(text.slice(_last, _m.index));
+        _chunks.push(_m[0]);
+        _last = _re.lastIndex;
+    }
+    if (_last < text.length) _chunks.push(text.slice(_last));
+    return _chunks;
+}
+
+function _tw_fix_sentence_endings(chunks) {
+    var _re = /[a-z][.!?]$/;
+    for (var _i = 0; _i < chunks.length - 1; _i++) {
+        if (chunks[_i + 1] === ' ' && _re.test(chunks[_i])) {
+            chunks[_i + 1] = '  ';
+            _i++;
+        }
+    }
+}
+
+function _tw_handle_long_word(chunks, cur_line, cur_len, avail, break_long_words) {
+    var _space = avail > 0 ? avail - cur_len : 1;
+    if (break_long_words) {
+        var _word = chunks[chunks.length - 1];
+        if (_space > 0) {
+            cur_line.push(_word.slice(0, _space));
+            chunks[chunks.length - 1] = _word.slice(_space);
+        }
+        if (chunks[chunks.length - 1] === '') chunks.pop();
+    } else if (!cur_line.length) {
+        cur_line.push(chunks.pop());
+    }
+}
+
+function _tw_wrap_chunks(chunks, width, initial_indent, subsequent_indent,
+                         drop_whitespace, break_long_words, max_lines, placeholder) {
+    var _lines = [];
+    // Reverse so Array.pop() reads chunks left-to-right.
+    chunks = chunks.slice().reverse();
+
+    while (chunks.length > 0) {
+        var _cur_line = [];
+        var _cur_len  = 0;
+        var _indent   = _lines.length > 0 ? subsequent_indent : initial_indent;
+        var _avail    = width - _indent.length;
+
+        // Drop leading whitespace on continuation lines.
+        if (drop_whitespace && _lines.length > 0 &&
+            chunks.length > 0 && chunks[chunks.length - 1].trim() === '') {
+            chunks.pop();
+        }
+        if (chunks.length === 0) break;
+
+        // Fill the current line.
+        while (chunks.length > 0) {
+            var _l = chunks[chunks.length - 1].length;
+            if (_cur_len + _l <= _avail) {
+                _cur_len += _l;
+                _cur_line.push(chunks.pop());
+            } else {
+                break;
+            }
+        }
+
+        // Handle a word longer than the available width.
+        if (chunks.length > 0 && chunks[chunks.length - 1].length > _avail) {
+            _tw_handle_long_word(chunks, _cur_line, _cur_len, _avail, break_long_words);
+            _cur_len = 0;
+            for (var _ci = 0; _ci < _cur_line.length; _ci++) _cur_len += _cur_line[_ci].length;
+        }
+
+        // Drop trailing whitespace.
+        if (drop_whitespace && _cur_line.length > 0 &&
+            _cur_line[_cur_line.length - 1].trim() === '') {
+            _cur_len -= _cur_line[_cur_line.length - 1].length;
+            _cur_line.pop();
+        }
+
+        if (_cur_line.length > 0) {
+            var _will_be_last = chunks.length === 0 ||
+                (drop_whitespace && chunks.length === 1 && chunks[0].trim() === '');
+
+            if (max_lines === null || max_lines === undefined ||
+                _lines.length + 1 < max_lines ||
+                (_will_be_last && _cur_len <= _avail)) {
+                _lines.push(_indent + _cur_line.join(''));
+            } else {
+                // Truncate current line to fit placeholder.
+                var _done = false;
+                while (_cur_line.length > 0) {
+                    var _tok = _cur_line[_cur_line.length - 1];
+                    if (_tok.trim() !== '' && _cur_len + placeholder.length <= _avail) {
+                        _lines.push(_indent + _cur_line.join('') + placeholder);
+                        _done = true;
+                        break;
+                    }
+                    _cur_len -= _tok.length;
+                    _cur_line.pop();
+                }
+                if (!_done) {
+                    if (_lines.length > 0) {
+                        var _prev = _lines[_lines.length - 1].replace(/\s+$/, '');
+                        if (_prev.length + placeholder.length <= width) {
+                            _lines[_lines.length - 1] = _prev + placeholder;
+                        } else {
+                            _lines.push(_indent + placeholder.replace(/^\s+/, ''));
+                        }
+                    } else {
+                        _lines.push(_indent + placeholder.replace(/^\s+/, ''));
+                    }
+                }
+                break;
+            }
+        }
+    }
+    return _lines;
+}
+
+function _tw_do_wrap(text, width, opts) {
+    var _ii  = opts.initial_indent    != null ? opts.initial_indent    : '';
+    var _si  = opts.subsequent_indent != null ? opts.subsequent_indent : '';
+    var _et  = opts.expand_tabs       != null ? opts.expand_tabs       : true;
+    var _ts  = opts.tabsize           != null ? opts.tabsize           : 8;
+    var _rw  = opts.replace_whitespace != null ? opts.replace_whitespace : true;
+    var _fse = opts.fix_sentence_endings != null ? opts.fix_sentence_endings : false;
+    var _blw = opts.break_long_words  != null ? opts.break_long_words  : true;
+    var _boh = opts.break_on_hyphens  != null ? opts.break_on_hyphens  : true;
+    var _dw  = opts.drop_whitespace   != null ? opts.drop_whitespace   : true;
+    var _ml  = opts.max_lines         != null ? opts.max_lines         : null;
+    var _ph  = opts.placeholder       != null ? opts.placeholder       : ' [...]';
+
+    if (_et) text = _tw_expand_tabs(text, _ts);
+    if (_rw) text = text.replace(/[\t\n\x0b\x0c\r]/g, ' ');
+
+    var _chunks = _tw_split_chunks(text, _boh);
+    if (_fse) _tw_fix_sentence_endings(_chunks);
+
+    return _tw_wrap_chunks(_chunks, width, _ii, _si, _dw, _blw, _ml, _ph);
+}
+
+function _tw_do_fill(text, width, opts) {
+    return _tw_do_wrap(text, width, opts).join('\n');
+}
+
+function _tw_shorten(text, width, opts) {
+    text = text.trim().split(/\s+/).join(' ');
+    // Build a copy of opts with max_lines forced to 1.
+    var _sopts = {};
+    for (var _k in opts) {
+        if (Object.prototype.hasOwnProperty.call(opts, _k)) _sopts[_k] = opts[_k];
+    }
+    _sopts.max_lines = 1;
+    if (_sopts.placeholder === null || _sopts.placeholder === undefined) {
+        _sopts.placeholder = ' [...]';
+    }
+    return _tw_do_fill(text, width, _sopts);
+}
+
+function _tw_dedent(text) {
+    var _lines  = text.split('\n');
+    var _margin = null;
+    for (var _i = 0; _i < _lines.length; _i++) {
+        var _line = _lines[_i];
+        if (_line.trim() === '') continue;
+        var _m = /^(\s+)\S/.exec(_line);
+        if (_m) {
+            var _ind = _m[1];
+            if (_margin === null) {
+                _margin = _ind;
+            } else {
+                var _j = 0;
+                while (_j < _margin.length && _j < _ind.length && _margin[_j] === _ind[_j]) _j++;
+                _margin = _margin.slice(0, _j);
+            }
+        } else {
+            _margin = '';
+        }
+        if (_margin === '') break;
+    }
+    if (!_margin) return text;
+    var _result = [];
+    for (var _i2 = 0; _i2 < _lines.length; _i2++) {
+        var _l = _lines[_i2];
+        _result.push(_l.slice(0, _margin.length) === _margin ? _l.slice(_margin.length) : _l);
+    }
+    return _result.join('\n');
+}
+
+function _tw_indent(text, prefix, predicate) {
+    var _lines  = text.split('\n');
+    var _result = [];
+    var _use_default = (predicate === null || predicate === undefined);
+    for (var _i = 0; _i < _lines.length; _i++) {
+        var _line = _lines[_i];
+        var _add  = _use_default ? _line.trim() !== '' : predicate(_line);
+        _result.push(_add ? prefix + _line : _line);
+    }
+    return _result.join('\n');
+}
+"""
+
+
+class TextWrapper:
+    def __init__(self, width=70, initial_indent='', subsequent_indent='',
+                 expand_tabs=True, tabsize=8, replace_whitespace=True,
+                 fix_sentence_endings=False, break_long_words=True,
+                 break_on_hyphens=True, drop_whitespace=True,
+                 max_lines=None, placeholder=' [...]'):
+        self.width                = width
+        self.initial_indent       = initial_indent
+        self.subsequent_indent    = subsequent_indent
+        self.expand_tabs          = expand_tabs
+        self.tabsize              = tabsize
+        self.replace_whitespace   = replace_whitespace
+        self.fix_sentence_endings = fix_sentence_endings
+        self.break_long_words     = break_long_words
+        self.break_on_hyphens     = break_on_hyphens
+        self.drop_whitespace      = drop_whitespace
+        self.max_lines            = max_lines
+        self.placeholder          = placeholder
+
+    def wrap(self, text):
+        return v'_tw_do_wrap(text, this.width, this)'
+
+    def fill(self, text):
+        return v'_tw_do_fill(text, this.width, this)'
+
+
+def wrap(text, width=70, initial_indent='', subsequent_indent='',
+         expand_tabs=True, tabsize=8, replace_whitespace=True,
+         fix_sentence_endings=False, break_long_words=True,
+         break_on_hyphens=True, drop_whitespace=True,
+         max_lines=None, placeholder=' [...]'):
+    return TextWrapper(
+        width, initial_indent, subsequent_indent, expand_tabs,
+        tabsize, replace_whitespace, fix_sentence_endings,
+        break_long_words, break_on_hyphens, drop_whitespace,
+        max_lines, placeholder
+    ).wrap(text)
+
+
+def fill(text, width=70, initial_indent='', subsequent_indent='',
+         expand_tabs=True, tabsize=8, replace_whitespace=True,
+         fix_sentence_endings=False, break_long_words=True,
+         break_on_hyphens=True, drop_whitespace=True,
+         max_lines=None, placeholder=' [...]'):
+    return TextWrapper(
+        width, initial_indent, subsequent_indent, expand_tabs,
+        tabsize, replace_whitespace, fix_sentence_endings,
+        break_long_words, break_on_hyphens, drop_whitespace,
+        max_lines, placeholder
+    ).fill(text)
+
+
+def shorten(text, width, initial_indent='', subsequent_indent='',
+            expand_tabs=True, tabsize=8, replace_whitespace=True,
+            fix_sentence_endings=False, break_long_words=True,
+            break_on_hyphens=True, drop_whitespace=True,
+            placeholder=' [...]'):
+    opts = TextWrapper(
+        width, initial_indent, subsequent_indent, expand_tabs,
+        tabsize, replace_whitespace, fix_sentence_endings,
+        break_long_words, break_on_hyphens, drop_whitespace,
+        None, placeholder
+    )
+    return v'_tw_shorten(text, width, opts)'
+
+
+def dedent(text):
+    return v'_tw_dedent(text)'
+
+
+def indent(text, prefix, predicate=None):
+    return v'_tw_indent(text, prefix, predicate)'

@@ -29,7 +29,7 @@ const MESSAGES = {
 export const STDLIB_MODULES = [
     'abc', 'aes', 'asyncio', 'base64', 'bisect', 'collections', 'contextlib', 'copy', 'csv', 'dataclasses', 'datetime', 'elementmaker', 'encodings', 'enum',
     'functools', 'gettext', 'html', 'http', 'io', 'itertools', 'json', 'math', 'numpy', 'operator',
-    'pythonize', 'random', 're', 'react', 'string', 'traceback', 'typing', 'urllib', 'uuid',
+    'pythonize', 'random', 're', 'react', 'string', 'textwrap', 'traceback', 'typing', 'urllib', 'uuid',
     // Pseudo-modules for language feature flags (from __python__ import ...)
     '__python__', '__builtins__',
 ];

@@ -1,0 +1,405 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# csv.pyj
+# Tests for the csv standard library module.
+
+from csv import reader, writer, DictReader, DictWriter
+from csv import Dialect, excel, excel_tab, unix_dialect
+from csv import register_dialect, unregister_dialect, get_dialect, list_dialects
+from csv import field_size_limit, Error
+from csv import QUOTE_MINIMAL, QUOTE_ALL, QUOTE_NONNUMERIC, QUOTE_NONE
+from io import StringIO
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Constants ──────────────────────────────────────────────────────────────
+
+ae(QUOTE_MINIMAL,    0)
+ae(QUOTE_ALL,        1)
+ae(QUOTE_NONNUMERIC, 2)
+ae(QUOTE_NONE,       3)
+
+# ── 2. Basic reader — list input ──────────────────────────────────────────────
+
+_r1 = reader(['a,b,c', '1,2,3'])
+_row = _r1.__next__()
+ade(_row, ['a', 'b', 'c'])
+_row = _r1.__next__()
+ade(_row, ['1', '2', '3'])
+_done = False
+try:
+    _r1.__next__()
+except StopIteration:
+    _done = True
+ok(_done, 'reader raises StopIteration at end')
+
+# ── 3. Reader via for loop ─────────────────────────────────────────────────
+
+_rows = []
+for _row in reader(['x,y', 'p,q']):
+    _rows.push(_row)
+ae(_rows.length, 2)
+ade(_rows[0], ['x', 'y'])
+ade(_rows[1], ['p', 'q'])
+
+# ── 4. Reader — quoted fields ─────────────────────────────────────────────────
+
+_rows = []
+for _row in reader(['"hello, world",foo', '"has ""quotes""",bar']):
+    _rows.push(_row)
+ade(_rows[0], ['hello, world', 'foo'])
+ade(_rows[1], ['has "quotes"', 'bar'])
+
+# ── 5. Reader — custom delimiter ──────────────────────────────────────────────
+
+_rows = []
+for _row in reader(['a|b|c', '1|2|3'], delimiter='|'):
+    _rows.push(_row)
+ade(_rows[0], ['a', 'b', 'c'])
+ade(_rows[1], ['1', '2', '3'])
+
+# ── 6. Reader — skipinitialspace ──────────────────────────────────────────────
+
+_rows = []
+for _row in reader(['a, b, c'], skipinitialspace=True):
+    _rows.push(_row)
+ade(_rows[0], ['a', 'b', 'c'])
+
+# ── 7. Reader — tab-delimited (excel-tab dialect) ────────────────────────────
+
+_rows = []
+for _row in reader(['a\tb\tc'], dialect='excel-tab'):
+    _rows.push(_row)
+ade(_rows[0], ['a', 'b', 'c'])
+
+# ── 8. Reader — QUOTE_NONNUMERIC converts unquoted fields to float ────────────
+
+_rows = []
+for _row in reader(['"text",3.14,42'], quoting=QUOTE_NONNUMERIC):
+    _rows.push(_row)
+ae(_rows[0][0], 'text')          # quoted → stays string
+ae(_rows[0][1], 3.14)            # unquoted numeric → float
+ae(_rows[0][2], 42.0)            # unquoted int → float
+
+# ── 9. Reader — multi-line quoted field ───────────────────────────────────────
+
+_rows = []
+for _row in reader(['"line1\nline2",b']):
+    _rows.push(_row)
+ae(_rows[0][0], 'line1\nline2')
+ae(_rows[0][1], 'b')
+
+# ── 10. Reader — empty fields and trailing delimiter ─────────────────────────
+
+_rows = []
+for _row in reader(['a,,c', ',,']):
+    _rows.push(_row)
+ade(_rows[0], ['a', '', 'c'])
+ade(_rows[1], ['', '', ''])
+
+# ── 11. Reader — file-like input (StringIO) ───────────────────────────────────
+
+_sio_in = StringIO('hello,world\nfoo,bar\n')
+_rows = []
+for _row in reader(_sio_in):
+    _rows.push(_row)
+ae(_rows.length, 2)
+ade(_rows[0], ['hello', 'world'])
+ade(_rows[1], ['foo', 'bar'])
+
+# ── 12. Reader — line_num ─────────────────────────────────────────────────────
+
+_r2 = reader(['a,b', 'c,d', 'e,f'])
+ae(_r2.line_num, 0)
+_r2.__next__()
+ae(_r2.line_num, 1)
+_r2.__next__()
+ae(_r2.line_num, 2)
+
+# ── 13. Reader — list items with trailing newlines ───────────────────────────
+
+_rows = []
+for _row in reader(['a,b\n', 'c,d\n']):
+    _rows.push(_row)
+ae(_rows.length, 2)
+ade(_rows[0], ['a', 'b'])
+ade(_rows[1], ['c', 'd'])
+
+# ── 14. Reader — empty list ───────────────────────────────────────────────────
+
+_rows = []
+for _row in reader([]):
+    _rows.push(_row)
+ae(_rows.length, 0)
+
+# ── 15. Reader — single empty field ──────────────────────────────────────────
+
+_rows = []
+for _row in reader(['']):
+    _rows.push(_row)
+ae(_rows.length, 1)
+ade(_rows[0], [''])
+
+# ── 16. Reader — dialect attribute ────────────────────────────────────────────
+
+_r3 = reader(['a,b'])
+ae(_r3.dialect.delimiter, ',')
+ae(_r3.dialect.quotechar, '"')
+ok(_r3.dialect.doublequote)
+
+# ── 17. Writer — basic writerow ───────────────────────────────────────────────
+
+_out = StringIO()
+_w = writer(_out)
+_w.writerow(['a', 'b', 'c'])
+ae(_out.getvalue(), 'a,b,c\r\n')
+
+# ── 18. Writer — writerow with field needing quoting ─────────────────────────
+
+_out = StringIO()
+_w = writer(_out)
+_w.writerow(['hello, world', 'foo'])
+ae(_out.getvalue(), '"hello, world",foo\r\n')
+
+# ── 19. Writer — writerow quotes double-quote characters ─────────────────────
+
+_out = StringIO()
+_w = writer(_out)
+_w.writerow(['say "hi"', 'ok'])
+ae(_out.getvalue(), '"say ""hi""",ok\r\n')
+
+# ── 20. Writer — QUOTE_ALL ────────────────────────────────────────────────────
+
+_out = StringIO()
+_w = writer(_out, quoting=QUOTE_ALL)
+_w.writerow(['a', 'b', 'c'])
+ae(_out.getvalue(), '"a","b","c"\r\n')
+
+# ── 21. Writer — QUOTE_NONE with escapechar ───────────────────────────────────
+
+_out = StringIO()
+_w = writer(_out, quoting=QUOTE_NONE, escapechar='\\')
+_w.writerow(['a,b', 'c'])
+ae(_out.getvalue(), 'a\\,b,c\r\n')
+
+# ── 22. Writer — custom delimiter ─────────────────────────────────────────────
+
+_out = StringIO()
+_w = writer(_out, delimiter='|')
+_w.writerow(['x', 'y', 'z'])
+ae(_out.getvalue(), 'x|y|z\r\n')
+
+# ── 23. Writer — writerows ────────────────────────────────────────────────────
+
+_out = StringIO()
+_w = writer(_out)
+_w.writerows([['1', '2'], ['3', '4']])
+ae(_out.getvalue(), '1,2\r\n3,4\r\n')
+
+# ── 24. Writer — unix dialect (lineterminator=\n) ────────────────────────────
+
+_out = StringIO()
+_w = writer(_out, dialect='unix')
+_w.writerow(['a', 'b'])
+ae(_out.getvalue(), '"a","b"\n')
+
+# ── 25. Writer — numeric values ───────────────────────────────────────────────
+
+_out = StringIO()
+_w = writer(_out)
+_w.writerow([1, 3.14, True])
+ae(_out.getvalue(), '1,3.14,true\r\n')
+
+# ── 26. DictReader — fieldnames from first row ───────────────────────────────
+
+_dr = DictReader(['name,age', 'Alice,30', 'Bob,25'])
+_rows = []
+for _row in _dr:
+    _rows.push(_row)
+ae(_rows.length, 2)
+ae(_rows[0]['name'], 'Alice')
+ae(_rows[0]['age'],  '30')
+ae(_rows[1]['name'], 'Bob')
+ae(_rows[1]['age'],  '25')
+
+# ── 27. DictReader — provided fieldnames ─────────────────────────────────────
+
+_dr2 = DictReader(['Alice,30', 'Bob,25'], fieldnames=['name', 'age'])
+_rows = []
+for _row in _dr2:
+    _rows.push(_row)
+ae(_rows.length, 2)
+ae(_rows[0]['name'], 'Alice')
+ae(_rows[0]['age'],  '30')
+
+# ── 28. DictReader — restval for missing fields ───────────────────────────────
+
+_dr3 = DictReader(['name,age,city', 'Alice,30'], restval='N/A')
+_rows = []
+for _row in _dr3:
+    _rows.push(_row)
+ae(_rows[0]['city'], 'N/A')
+
+# ── 29. DictReader — extra fields go to restkey ──────────────────────────────
+
+_dr4 = DictReader(['name,age', 'Alice,30,extra1,extra2'])
+_row  = _dr4.__next__()
+ok(_row['EXTRA'] is not None)
+ae(_row['EXTRA'].length, 2)
+ae(_row['EXTRA'][0], 'extra1')
+
+# ── 30. DictReader — empty input ─────────────────────────────────────────────
+
+_dr5   = DictReader([])
+_empty = True
+for _row in _dr5:
+    _empty = False
+ok(_empty, 'DictReader on empty input produces no rows')
+
+# ── 31. DictWriter — basic writerow ──────────────────────────────────────────
+
+_out = StringIO()
+_dw  = DictWriter(_out, ['name', 'age'])
+_dw.writerow({'name': 'Alice', 'age': '30'})
+ae(_out.getvalue(), 'Alice,30\r\n')
+
+# ── 32. DictWriter — writeheader ──────────────────────────────────────────────
+
+_out = StringIO()
+_dw  = DictWriter(_out, ['name', 'age'])
+_dw.writeheader()
+ae(_out.getvalue(), 'name,age\r\n')
+
+# ── 33. DictWriter — restval for missing fields ───────────────────────────────
+
+_out = StringIO()
+_dw  = DictWriter(_out, ['name', 'age', 'city'], restval='')
+_dw.writerow({'name': 'Alice', 'age': '30'})
+ae(_out.getvalue(), 'Alice,30,\r\n')
+
+# ── 34. DictWriter — writerows ────────────────────────────────────────────────
+
+_out = StringIO()
+_dw  = DictWriter(_out, ['x', 'y'])
+_dw.writerows([{'x': '1', 'y': '2'}, {'x': '3', 'y': '4'}])
+ae(_out.getvalue(), '1,2\r\n3,4\r\n')
+
+# ── 35. DictWriter — extrasaction='raise' detects unknown fields ──────────────
+
+_out   = StringIO()
+_dw2   = DictWriter(_out, ['name'], extrasaction='raise')
+_extra_raised = False
+try:
+    _dw2.writerow({'name': 'Alice', 'foo': 'bar'})
+except ValueError:
+    _extra_raised = True
+ok(_extra_raised, "DictWriter extrasaction='raise' should raise ValueError for extra fields")
+
+# ── 36. DictWriter — extrasaction='ignore' silently ignores extra fields ──────
+
+_out  = StringIO()
+_dw3  = DictWriter(_out, ['name'], extrasaction='ignore')
+_dw3.writerow({'name': 'Alice', 'extra': 'ignored'})
+ae(_out.getvalue(), 'Alice\r\n')
+
+# ── 37. register_dialect / list_dialects / get_dialect ───────────────────────
+
+register_dialect('pipes', delimiter='|')
+_dl = list_dialects()
+ok(_dl.indexOf('pipes') >= 0, 'pipes dialect should be in list_dialects()')
+
+_d = get_dialect('pipes')
+ae(_d.delimiter, '|')
+
+_out = StringIO()
+_w   = writer(_out, dialect='pipes')
+_w.writerow(['a', 'b'])
+ae(_out.getvalue(), 'a|b\r\n')
+
+# ── 38. unregister_dialect ────────────────────────────────────────────────────
+
+unregister_dialect('pipes')
+_dl2 = list_dialects()
+ok(_dl2.indexOf('pipes') < 0, 'pipes dialect removed after unregister_dialect')
+
+_err_raised = False
+try:
+    get_dialect('pipes')
+except Error:
+    _err_raised = True
+ok(_err_raised, 'get_dialect on unknown name should raise csv.Error')
+
+# ── 39. unregister_dialect on built-ins raises Error ─────────────────────────
+
+_unregister_bad = False
+try:
+    unregister_dialect('no_such_dialect')
+except Error:
+    _unregister_bad = True
+ok(_unregister_bad, 'unregister_dialect on unknown name should raise csv.Error')
+
+# ── 40. reader with unknown dialect raises Error ──────────────────────────────
+
+_bad_dialect = False
+try:
+    reader(['a,b'], dialect='nonexistent')
+except Error:
+    _bad_dialect = True
+ok(_bad_dialect, 'reader with unknown dialect should raise csv.Error')
+
+# ── 41. field_size_limit ──────────────────────────────────────────────────────
+
+ae(field_size_limit(), 131072)
+_old = field_size_limit(65536)
+ae(_old, 131072)
+ae(field_size_limit(), 65536)
+field_size_limit(131072)         # restore
+
+# ── 42. list_dialects includes defaults ───────────────────────────────────────
+
+_default_dialects = list_dialects()
+ok(_default_dialects.indexOf('excel')     >= 0)
+ok(_default_dialects.indexOf('excel-tab') >= 0)
+ok(_default_dialects.indexOf('unix')      >= 0)
+
+# ── 43. Writer — dialect attribute ────────────────────────────────────────────
+
+_out = StringIO()
+_w4  = writer(_out, dialect='excel-tab')
+ae(_w4.dialect.delimiter, '\t')
+
+# ── 44. Round-trip: write then read ──────────────────────────────────────────
+
+_buf = StringIO()
+_wrt = writer(_buf)
+_wrt.writerow(['name', 'age', 'city'])
+_wrt.writerow(['Alice', '30', 'New York'])
+_wrt.writerow(['Bob\'s Diner', '25', 'Los Angeles, CA'])
+_buf.seek(0)
+_result = []
+for _r in reader(_buf):
+    _result.push(_r)
+ae(_result.length, 3)
+ade(_result[0], ['name', 'age', 'city'])
+ade(_result[1], ['Alice', '30', 'New York'])
+ade(_result[2], ["Bob's Diner", '25', 'Los Angeles, CA'])
+
+# ── 45. Round-trip: DictWriter then DictReader ───────────────────────────────
+
+_buf2 = StringIO()
+_dw4  = DictWriter(_buf2, ['name', 'score'])
+_dw4.writeheader()
+_dw4.writerow({'name': 'Eve', 'score': '99'})
+_dw4.writerow({'name': 'Frank', 'score': '88'})
+_buf2.seek(0)
+_result2 = []
+for _r in DictReader(_buf2):
+    _result2.push(_r)
+ae(_result2.length, 2)
+ae(_result2[0]['name'],  'Eve')
+ae(_result2[0]['score'], '99')
+ae(_result2[1]['name'],  'Frank')
+ae(_result2[1]['score'], '88')

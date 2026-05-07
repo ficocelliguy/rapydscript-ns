@@ -1,0 +1,494 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+# Python-compatible csv module.
+#
+# Provides: reader, writer, DictReader, DictWriter,
+#           Dialect, excel, excel_tab, unix_dialect,
+#           register_dialect, unregister_dialect,
+#           get_dialect, list_dialects, field_size_limit,
+#           QUOTE_MINIMAL, QUOTE_ALL, QUOTE_NONNUMERIC, QUOTE_NONE,
+#           Error.
+#
+# Usage:
+#   import csv
+#   from io import StringIO
+#
+#   rows = []
+#   for row in csv.reader(['a,b,c', '1,2,3']):
+#       rows.push(row)
+#
+#   sio = StringIO()
+#   w = csv.writer(sio)
+#   w.writerow(['name', 'age'])
+#   w.writerow(['Alice', 30])
+#   print(sio.getvalue())
+#
+# Notes:
+#   - DictReader rows are returned as plain JS objects (access with row.field
+#     or row['field']); they are NOT ρσ_dict instances.
+#   - `default` is a JS reserved word; csv.writer's dflt param is irrelevant
+#     here, but `dialect` parameters named `default` become `dialect=` positional.
+#   - csv.Error shadows the native JS Error constructor if imported with
+#     `from csv import Error` in web-repl mode; catch via Exception instead.
+
+
+QUOTE_MINIMAL    = 0
+QUOTE_ALL        = 1
+QUOTE_NONNUMERIC = 2
+QUOTE_NONE       = 3
+
+
+class Error(Exception):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Internal JS helpers
+# ---------------------------------------------------------------------------
+
+v"""
+// Convert csvfile input (string, file-like, array, or iterable) to a flat
+// text string suitable for _csv_parse_text.  Array inputs strip trailing
+// \r/\n from each element before joining so that lines like 'a,b\n' and
+// 'a,b' both produce the same row.  Returns null for an empty array (signals
+// zero rows, not one empty-field row).
+function _csv_to_text(src) {
+    if (typeof src === 'string') return src;
+    if (src && typeof src.read === 'function') {
+        return String(src.read() || '');
+    }
+    var arr = null;
+    if (Array.isArray(src)) {
+        arr = src;
+    } else if (src && typeof src[Symbol.iterator] === 'function') {
+        arr = [];
+        var it = src[Symbol.iterator]();
+        var r = it.next();
+        while (!r.done) { arr.push(r.value); r = it.next(); }
+    }
+    if (arr !== null) {
+        if (arr.length === 0) return null;
+        var stripped = arr.map(function(s) {
+            s = String(s);
+            var end = s.length;
+            while (end > 0 && (s[end-1] === '\r' || s[end-1] === '\n')) end--;
+            return s.slice(0, end);
+        });
+        return stripped.join('\n') + '\n';
+    }
+    return String(src || '');
+}
+
+// Parse a CSV text string into an array of row arrays.
+// Handles quoted fields (including multi-line), escape chars, and all
+// QUOTE_* modes.  Returns [] for null input (empty array source).
+function _csv_parse_text(text, delimiter, quotechar, escapechar,
+                         doublequote, skipinitialspace, quoting) {
+    if (text === null) return [];
+    var rows   = [];
+    var field  = '';
+    var fields = [];
+    var in_q   = false;
+    var i = 0, n = text.length;
+
+    function push_field() {
+        if (quoting === 2) {
+            var f = field;
+            field = '';
+            var num = parseFloat(f);
+            fields.push((f.trim() !== '' && !isNaN(num) && isFinite(num)) ? num : f);
+        } else {
+            fields.push(field);
+            field = '';
+        }
+    }
+
+    while (i < n) {
+        var c = text[i];
+        if (in_q) {
+            if (quotechar && c === quotechar) {
+                if (doublequote && i + 1 < n && text[i+1] === quotechar) {
+                    field += quotechar; i += 2;
+                } else {
+                    in_q = false; i++;
+                }
+            } else if (escapechar && c === escapechar && i + 1 < n) {
+                field += text[i+1]; i += 2;
+            } else {
+                field += c; i++;
+            }
+        } else {
+            if (c === '\r' || c === '\n') {
+                push_field();
+                rows.push(fields);
+                fields = [];
+                i++;
+                if (c === '\r' && i < n && text[i] === '\n') i++;
+            } else if (c === delimiter) {
+                push_field();
+                i++;
+                if (skipinitialspace && i < n && text[i] === ' ') i++;
+            } else if (quotechar && c === quotechar && quoting !== 3) {
+                in_q = true; i++;
+            } else if (escapechar && c === escapechar && i + 1 < n) {
+                field += text[i+1]; i += 2;
+            } else {
+                field += c; i++;
+            }
+        }
+    }
+    // final row when text does not end with a newline
+    if (fields.length > 0 || field !== '') {
+        push_field();
+        rows.push(fields);
+    }
+    return rows;
+}
+
+// Format a single CSV field value.
+function _csv_fmt_field(field, delimiter, quotechar, escapechar,
+                        doublequote, quoting) {
+    var s;
+    if (field === null || field === undefined) s = '';
+    else s = String(field);
+
+    var needs_q = false;
+    if (quoting === 1) {
+        needs_q = true;
+    } else if (quoting === 2) {
+        if (typeof field !== 'number') needs_q = true;
+    } else if (quoting === 0) {
+        for (var i = 0; i < s.length; i++) {
+            var c = s[i];
+            if (c === delimiter || c === '\r' || c === '\n' ||
+                (quotechar && c === quotechar)) { needs_q = true; break; }
+        }
+    }
+
+    if (quoting === 3) {   // QUOTE_NONE
+        if (!escapechar) return s;
+        var out = '';
+        for (var j = 0; j < s.length; j++) {
+            var ch = s[j];
+            if (ch === delimiter || ch === escapechar) out += escapechar;
+            out += ch;
+        }
+        return out;
+    }
+
+    if (!needs_q) return s;
+    var q = quotechar || '"';
+    var r = q;
+    for (var k = 0; k < s.length; k++) {
+        var fc = s[k];
+        if (fc === q) {
+            if (doublequote) r += q + q;
+            else if (escapechar) r += escapechar + q;
+            else r += q;
+        } else if (escapechar && fc === escapechar) {
+            r += escapechar + escapechar;
+        } else {
+            r += fc;
+        }
+    }
+    return r + q;
+}
+
+// Dict helpers — handle both plain JS objects and ρσ_dict (web-repl mode).
+function _csv_dict_keys(d) {
+    if (d && d.jsmap && typeof d.jsmap.forEach === 'function') {
+        var ks = [];
+        d.jsmap.forEach(function(v, k) { ks.push(k); });
+        return ks;
+    }
+    return Object.keys(d || {});
+}
+function _csv_dict_get(d, key, dflt) {
+    if (d && d.jsmap && typeof d.jsmap.get === 'function') {
+        return d.jsmap.has(key) ? d.jsmap.get(key) : dflt;
+    }
+    if (Object.prototype.hasOwnProperty.call(d || {}, key)) return d[key];
+    return dflt;
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Dialect classes
+# ---------------------------------------------------------------------------
+
+class Dialect:
+    delimiter        = ','
+    quotechar        = '"'
+    escapechar       = None
+    doublequote      = True
+    skipinitialspace = False
+    lineterminator   = '\r\n'
+    quoting          = QUOTE_MINIMAL
+    strict           = False
+
+
+class excel(Dialect):
+    pass
+
+
+class excel_tab(Dialect):
+    delimiter = '\t'
+
+
+class unix_dialect(Dialect):
+    lineterminator = '\n'
+    quoting        = QUOTE_ALL
+
+
+# ---------------------------------------------------------------------------
+# Dialect registry
+# ---------------------------------------------------------------------------
+
+_dialects = {}
+_dialects['excel']     = excel()
+_dialects['excel-tab'] = excel_tab()
+_dialects['unix']      = unix_dialect()
+
+
+def _build_dialect(dialect, delimiter, quotechar, escapechar, doublequote,
+                   skipinitialspace, lineterminator, quoting, strict):
+    if jstype(dialect) is 'string':
+        if dialect not in _dialects:
+            raise Error('unknown dialect: ' + dialect)
+        tmpl = _dialects[dialect]
+    elif dialect is None:
+        tmpl = _dialects['excel']
+    elif jstype(dialect) is 'function':
+        tmpl = dialect()
+    else:
+        tmpl = dialect
+    d                 = Dialect()
+    d.delimiter        = tmpl.delimiter
+    d.quotechar        = tmpl.quotechar
+    d.escapechar       = tmpl.escapechar
+    d.doublequote      = tmpl.doublequote
+    d.skipinitialspace = tmpl.skipinitialspace
+    d.lineterminator   = tmpl.lineterminator
+    d.quoting          = tmpl.quoting
+    d.strict           = tmpl.strict
+    if delimiter        is not None: d.delimiter        = delimiter
+    if quotechar        is not None: d.quotechar        = quotechar
+    if escapechar       is not None: d.escapechar       = escapechar
+    if doublequote      is not None: d.doublequote      = doublequote
+    if skipinitialspace is not None: d.skipinitialspace = skipinitialspace
+    if lineterminator   is not None: d.lineterminator   = lineterminator
+    if quoting          is not None: d.quoting          = quoting
+    if strict           is not None: d.strict           = strict
+    return d
+
+
+# ---------------------------------------------------------------------------
+# Reader
+# ---------------------------------------------------------------------------
+
+class _Reader:
+    def __init__(self, csvfile, d):
+        self.dialect  = d
+        self.line_num = 0
+        self._index   = 0
+        self._rows    = _csv_parse_text(
+            _csv_to_text(csvfile),
+            d.delimiter, d.quotechar, d.escapechar,
+            d.doublequote, d.skipinitialspace, d.quoting
+        )
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._index >= self._rows.length:
+            return {'value': undefined, 'done': True}
+        row = self._rows[self._index]
+        self._index   += 1
+        self.line_num  = self._index
+        return {'value': row, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+def reader(csvfile, dialect='excel', delimiter=None, quotechar=None,
+           escapechar=None, doublequote=None, skipinitialspace=None,
+           lineterminator=None, quoting=None, strict=None):
+    d = _build_dialect(dialect, delimiter, quotechar, escapechar, doublequote,
+                       skipinitialspace, lineterminator, quoting, strict)
+    return _Reader(csvfile, d)
+
+
+# ---------------------------------------------------------------------------
+# Writer
+# ---------------------------------------------------------------------------
+
+class _Writer:
+    def __init__(self, csvfile, d):
+        self.dialect = d
+        self._file   = csvfile
+
+    def writerow(self, row):
+        d     = self.dialect
+        parts = []
+        for field in row:
+            parts.push(_csv_fmt_field(field, d.delimiter, d.quotechar,
+                                      d.escapechar, d.doublequote, d.quoting))
+        self._file.write(parts.join(d.delimiter) + d.lineterminator)
+
+    def writerows(self, rows):
+        for row in rows:
+            self.writerow(row)
+
+
+def writer(csvfile, dialect='excel', delimiter=None, quotechar=None,
+           escapechar=None, doublequote=None, skipinitialspace=None,
+           lineterminator=None, quoting=None, strict=None):
+    d = _build_dialect(dialect, delimiter, quotechar, escapechar, doublequote,
+                       skipinitialspace, lineterminator, quoting, strict)
+    return _Writer(csvfile, d)
+
+
+# ---------------------------------------------------------------------------
+# DictReader
+# ---------------------------------------------------------------------------
+
+class DictReader:
+    def __init__(self, f, fieldnames=None, restkey=None, restval=None,
+                 dialect='excel', delimiter=None, quotechar=None,
+                 escapechar=None, doublequote=None, skipinitialspace=None,
+                 lineterminator=None, quoting=None, strict=None):
+        self._reader    = reader(f, dialect, delimiter, quotechar, escapechar,
+                                 doublequote, skipinitialspace, lineterminator,
+                                 quoting, strict)
+        self.fieldnames = fieldnames
+        self.restkey    = restkey if restkey is not None else 'EXTRA'
+        self.restval    = restval
+        self.dialect    = self._reader.dialect
+        self.line_num   = 0
+
+    def _ensure_fieldnames(self):
+        if self.fieldnames is None:
+            try:
+                self.fieldnames = self._reader.__next__()
+            except StopIteration:
+                self.fieldnames = []
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        self._ensure_fieldnames()
+        try:
+            row = self._reader.__next__()
+        except StopIteration:
+            return {'value': undefined, 'done': True}
+        self.line_num = self._reader.line_num
+        fields        = self.fieldnames
+        d             = {}
+        for i in range(fields.length):
+            d[fields[i]] = row[i] if i < row.length else self.restval
+        if row.length > fields.length:
+            d[self.restkey] = row.slice(fields.length)
+        return {'value': d, 'done': False}
+
+    def __next__(self):
+        r = self.next()
+        if r.done:
+            raise StopIteration()
+        return r.value
+
+
+# ---------------------------------------------------------------------------
+# DictWriter
+# ---------------------------------------------------------------------------
+
+class DictWriter:
+    def __init__(self, f, fieldnames, restval='', extrasaction='raise',
+                 dialect='excel', delimiter=None, quotechar=None,
+                 escapechar=None, doublequote=None, skipinitialspace=None,
+                 lineterminator=None, quoting=None, strict=None):
+        self.fieldnames   = fieldnames
+        self.restval      = restval
+        self.extrasaction = extrasaction
+        self._writer      = writer(f, dialect, delimiter, quotechar, escapechar,
+                                   doublequote, skipinitialspace, lineterminator,
+                                   quoting, strict)
+        self.dialect      = self._writer.dialect
+
+    def writeheader(self):
+        self._writer.writerow(self.fieldnames)
+
+    def writerow(self, rowdict):
+        row     = []
+        fields  = self.fieldnames
+        restval = self.restval
+        v"""
+        if (this.extrasaction === 'raise') {
+            var _dkeys = _csv_dict_keys(rowdict);
+            for (var _i = 0; _i < _dkeys.length; _i++) {
+                if (fields.indexOf(_dkeys[_i]) < 0) {
+                    throw new ValueError(
+                        "dict contains fields not in fieldnames: '" + _dkeys[_i] + "'");
+                }
+            }
+        }
+        for (var _j = 0; _j < fields.length; _j++) {
+            row.push(_csv_dict_get(rowdict, fields[_j], restval));
+        }
+        """
+        self._writer.writerow(row)
+
+    def writerows(self, rowdicts):
+        for rowdict in rowdicts:
+            self.writerow(rowdict)
+
+
+# ---------------------------------------------------------------------------
+# Dialect management
+# ---------------------------------------------------------------------------
+
+def register_dialect(name, dialect=None, delimiter=None, quotechar=None,
+                     escapechar=None, doublequote=None, skipinitialspace=None,
+                     lineterminator=None, quoting=None, strict=None):
+    base = excel if dialect is None else dialect
+    d    = _build_dialect(base, delimiter, quotechar, escapechar, doublequote,
+                          skipinitialspace, lineterminator, quoting, strict)
+    _dialects[name] = d
+
+
+def unregister_dialect(name):
+    if name not in _dialects:
+        raise Error('unknown dialect: ' + name)
+    v'delete _dialects[name]'
+
+
+def get_dialect(name):
+    if name not in _dialects:
+        raise Error('unknown dialect: ' + name)
+    return _dialects[name]
+
+
+def list_dialects():
+    return Object.keys(_dialects)
+
+
+_field_size_limit_val = 131072
+
+
+def field_size_limit(new_limit=None):
+    global _field_size_limit_val
+    old = _field_size_limit_val
+    if new_limit is not None:
+        _field_size_limit_val = new_limit
+    return old

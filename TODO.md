@@ -8,7 +8,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python http library ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [python textwrap library ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 ### asyncio example
 
@@ -136,4 +136,86 @@ async def main():
         print('Request failed:', e)
 
 asyncio.run(main())
+```
+
+### csv example
+
+```python
+import csv
+from io import StringIO
+
+# Parse CSV from a list of strings
+rows = []
+for row in csv.reader(['name,age,city', 'Alice,30,"New York"', 'Bob,25,"Los Angeles, CA"']):
+    rows.push(row)
+print(rows[1])  # ['Alice', '30', 'New York']
+print(rows[2])  # ['Bob', '25', 'Los Angeles, CA']
+
+# Write CSV to a StringIO buffer
+buf = StringIO()
+w = csv.writer(buf)
+w.writerow(['product', 'price', 'in stock'])
+w.writerows([
+    ['Widget', '9.99', 'True'],
+    ['Gadget', '24.99', 'False'],
+])
+print(buf.getvalue())
+
+# DictReader: access rows as dicts
+data = ['name,score', 'Eve,99', 'Frank,88']
+for row in csv.DictReader(data):
+    print(row['name'], '->', row['score'])
+
+# DictWriter: write dicts in field order
+out = StringIO()
+dw = csv.DictWriter(out, fieldnames=['name', 'score'])
+dw.writeheader()
+dw.writerow({'name': 'Grace', 'score': '95'})
+print(out.getvalue())  # name,score\r\nGrace,95\r\n
+
+# Custom dialect
+csv.register_dialect('pipes', delimiter='|')
+sio = StringIO()
+csv.writer(sio, dialect='pipes').writerow(['a', 'b', 'c'])
+print(sio.getvalue())  # a|b|c\r\n
+csv.unregister_dialect('pipes')
+```
+
+### textwrap example
+
+```python
+from textwrap import wrap, fill, dedent, indent, shorten, TextWrapper
+
+# Wrap a long string to 30 chars per line
+text = "The quick brown fox jumped over the lazy dog near the river bank."
+print(fill(text, 30))
+# The quick brown fox jumped
+# over the lazy dog near the
+# river bank.
+
+# Indented paragraph
+print(fill(text, 30, initial_indent="    ", subsequent_indent="    "))
+
+# Remove common indentation
+code = dedent("""
+    def greet(name):
+        return "Hello, " + name
+""")
+print(code)
+
+# Add > prefix to non-empty lines
+print(indent("Hello\nWorld\n\nFoo", "> "))
+# > Hello
+# > World
+#
+# > Foo
+
+# Shorten long text with ellipsis
+print(shorten("one two three four five six seven", width=20))
+# one two three [...]
+
+# TextWrapper for repeated wrapping with the same settings
+wrapper = TextWrapper(width=20, max_lines=3, placeholder=" [...more]")
+for line in wrapper.wrap("alpha beta gamma delta epsilon zeta eta theta iota kappa"):
+    print(line)
 ```
