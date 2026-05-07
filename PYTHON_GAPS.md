@@ -12,20 +12,19 @@ are excluded as they do not apply.
 These features exist but behave differently from Python in ways that will silently produce
 wrong results — no error is raised.
 
-### 1.1 `%` Modulo on Negative Numbers
+### 1.1 `%` Modulo on Negative Numbers *(partially resolved)*
 
 **Python:** `%` always returns a non-negative result (true modulo).
 ```python
 -7 % 3   # → 2  (Python)
--7 % 3   # → -1 (RapydScript — JS remainder semantics)
+-7 % 3   # → -1 (RapydScript default — JS remainder semantics)
 ```
-**Impact:** Any algorithm relying on modular arithmetic (wrapping, circular indexing) may
-produce wrong results silently. This is one of the most common numerical gotchas when porting
-Python to JavaScript.
+**Status:** Fixed when using `from __python__ import overload_operators` or
+`from __python__ import python_modulo`. In bare mode (no flags) the JS remainder semantics
+still apply.
 
-**Fix:** Add a `ρσ_op_mod` strict variant that applies `((a % b) + b) % b` for integers when
-the right operand is positive, matching Python's floor-modulo semantics. Could be toggled via
-a new `strict_modulo` flag (on by default alongside `overload_operators`).
+**Impact:** Any algorithm relying on modular arithmetic (wrapping, circular indexing) may
+produce wrong results in code that does not use the Python operator flags.
 
 ---
 
@@ -42,7 +41,6 @@ a is b   # False in Python (separate int objects)
          # True in RapydScript (1000 === 1000)
 ```
 **Impact:** Code that checks `obj is None` or `obj is sentinel_value` works correctly.
-Code that checks `x is y` expecting identity for mutable objects works correctly.
 Code that expects `is` to return `False` for equal-but-distinct numeric values will be wrong.
 
 **Note:** This is already documented in the README, but it is subtle and trips up experts.
@@ -50,21 +48,22 @@ The recommended pattern — using a unique sentinel object — works correctly.
 
 ---
 
-### 1.3 Function Arguments: No `TypeError` on Wrong Count
+### 1.3 Function Arguments: `TypeError` on Wrong Count *(opt-in, not default)*
 
 **Python:** Too few or too many positional arguments raises `TypeError` at call time.
-**RapydScript:** Extra args are silently discarded; missing args become `undefined`.
+**RapydScript default:** Extra args are silently discarded; missing args become `undefined`.
 
 ```python
 def f(a, b):
     return a + b
 
-f(1, 2, 3)   # Python: TypeError. RapydScript: silently returns 3
-f(1)         # Python: TypeError. RapydScript: returns NaN (1 + undefined)
+f(1, 2, 3)   # Python: TypeError. RapydScript default: silently returns 3
+f(1)         # Python: TypeError. RapydScript default: returns NaN (1 + undefined)
 ```
-**Impact:** Typos in call sites and API changes go undetected at runtime. This is particularly
-dangerous in refactors. A `--strict-args` compiler option that emits argument count guards
-would help.
+**Status:** Argument count and type-annotation enforcement is now available via the
+`type_enforce` flag on function definitions (emits runtime checks). Not enabled by default
+because it adds overhead to every call. Developers writing library code with strict APIs
+should opt in.
 
 ---
 
@@ -240,53 +239,7 @@ The non-parenthesized multi-context form (`with A() as a, B() as b:`) does work.
 
 These are absent from `src/lib/` and have no substitute.
 
-### 3.1 `heapq` — Priority Queues
-
-`heapq.heappush`, `heappop`, `heapify`, `nlargest`, `nsmallest`. Used heavily in graph
-algorithms (Dijkstra, A*), scheduling, and data processing pipelines — all common in
-browser apps. Pure Python logic that can be compiled directly.
-
----
-
-### 3.2 `bisect` — Binary Search
-
-`bisect.bisect_left`, `bisect_right`, `insort_left`, `insort_right`. Used for efficient
-sorted-list operations. Very common in algorithm-heavy code. Trivial to implement.
-
----
-
-### 3.3 `csv` — CSV Parsing and Writing
-
-CSV is the most common data interchange format for browser-based data tools (spreadsheets,
-file uploads, exports). `csv.reader`, `csv.writer`, `csv.DictReader`, `csv.DictWriter`
-would cover most cases. All pure JS logic, no file system needed.
-
----
-
-### 3.4 `urllib.parse` — URL Utilities
-
-`quote`, `unquote`, `urlencode`, `urldecode`, `urlparse`, `urlunparse`, `parse_qs`.
-Extremely common in web apps for building API URLs, parsing query strings, etc.
-The JS `URL` and `URLSearchParams` APIs provide the underlying primitives.
-
----
-
-### 3.5 `html` — HTML Escaping
-
-`html.escape(s)` and `html.unescape(s)` are critical for XSS prevention when interpolating
-user data into HTML strings. Currently unavailable — developers must use verbatim JS
-(`v'el.textContent = x'` is safe, string interpolation is not).
-
----
-
-### 3.6 `textwrap` — Text Formatting
-
-`textwrap.wrap`, `textwrap.fill`, `textwrap.dedent`, `textwrap.indent`. Useful for
-terminal-emulator UIs, code editors, and README rendering in browser apps.
-
----
-
-### 3.7 `decimal` — Decimal Arithmetic
+### 3.1 `decimal` — Decimal Arithmetic
 
 `Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
 calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
@@ -294,14 +247,14 @@ equivalent; a pure-JS implementation would need to be compiled in.
 
 ---
 
-### 3.8 `fractions` — Rational Arithmetic
+### 3.2 `fractions` — Rational Arithmetic
 
 `Fraction(numerator, denominator)` with full arithmetic. Useful for music theory apps,
 math tutoring tools, and any domain requiring exact rational computation.
 
 ---
 
-### 3.9 `statistics` — Statistical Functions
+### 3.3 `statistics` — Statistical Functions
 
 `mean`, `median`, `mode`, `stdev`, `variance`, `quantiles`. Very commonly needed in
 data-visualization browser apps. Currently `numpy` covers much of this but `statistics`
@@ -309,31 +262,21 @@ is lighter-weight and doesn't require the full numpy import.
 
 ---
 
-### 3.10 `difflib` — Sequence Comparison
+### 3.4 `difflib` — Sequence Comparison
 
 `difflib.unified_diff`, `difflib.SequenceMatcher`, `difflib.get_close_matches`. Useful
 for browser-based code editors, version comparison tools, and fuzzy matching UIs.
 
 ---
 
-### 3.11 `pprint` — Pretty Printing
+### 3.5 `pprint` — Pretty Printing
 
 `pprint.pformat` / `pprint.pprint`. Primarily a debugging/REPL aid. Given the in-browser
 REPL in this project, implementing `pprint` would make output more readable.
 
 ---
 
-### 3.12 `logging` — Logging Framework
-
-Python's `logging` module with levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`),
-formatters, and handlers. A browser-friendly implementation could map handlers to
-`console.debug`, `console.log`, `console.warn`, `console.error`. This pattern is very
-common in Python codebases and the absence of `logging` forces developers to litter code
-with `print()` calls.
-
----
-
-### 3.13 `hashlib` — Cryptographic Hashing
+### 3.6 `hashlib` — Cryptographic Hashing
 
 `hashlib.sha256`, `hashlib.md5`, etc. The Web Crypto API provides `crypto.subtle.digest`
 but its async/buffer-based interface is awkward. A thin `hashlib`-compatible wrapper over
@@ -342,7 +285,7 @@ for non-cryptographic hashes would be valuable.
 
 ---
 
-### 3.14 `enum.IntEnum` and `enum.Flag`
+### 3.7 `enum.IntEnum` and `enum.Flag`
 
 The `enum` module provides `Enum` but not `IntEnum` (auto-comparable with integers),
 `StrEnum` (Python 3.11+), or `Flag` (bitfield enums). These are common in protocol
@@ -358,7 +301,7 @@ Color.RED < Color.GREEN   # True — comparison with int semantics
 
 ---
 
-### 3.15 `collections.ChainMap`
+### 3.8 `collections.ChainMap`
 
 `ChainMap` provides a multi-level dict lookup (like layered config or scope chains) without
 copying. Not currently in `collections.pyj`.
@@ -479,70 +422,20 @@ The `jstype()` builtin is the RS equivalent of JS's `typeof`.
 
 ---
 
-## 5. Async/Web API Patterns Worth Considering
-
-Python developers porting async code to the browser face a vocabulary mismatch. While
-RapydScript supports `async def` and `await`, the following commonly expected patterns
-are missing:
-
-### 5.1 `asyncio.sleep(seconds)` Equivalent
-
-```python
-# Currently requires verbatim JS:
-await v'new Promise(r => setTimeout(r, 1000))'
-# Would be cleaner as:
-from asyncio import sleep
-await sleep(1)
-```
-
-A thin `asyncio` shim with `sleep`, `gather` (`Promise.all`), `wait_for`
-(`Promise.race` with timeout), and a simple `Queue` backed by async iterators would
-cover 80% of async Python patterns in a browser context.
-
-### 5.2 `fetch` / `requests`-style API
-
-An `http` or `requests`-compatible module wrapping the browser `fetch` API would let
-Python developers write:
-
-```python
-from http import get, post
-response = await get('https://api.example.com/data')
-data = response.json()
-```
-Rather than writing verbatim JS fetch calls.
-
-### 5.3 `asyncio.gather` / `Promise.all`
-
-```python
-results = await asyncio.gather(fetch_a(), fetch_b(), fetch_c())
-```
-Mapping directly to `Promise.all`.
-
----
-
-## 6. Summary Priority Table
+## 5. Summary Priority Table
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| High | `%` modulo fix for negative numbers | Low | Silent wrong results in many algorithms |
-| High | `html.escape`/`html.unescape` | Low | Security (XSS) critical for web apps |
-| High | `heapq` module | Low | Algorithm-heavy code, graph search |
-| High | `bisect` module | Low | Sorted-list operations, very common |
-| High | `urllib.parse` module | Medium | URL building/parsing in web apps |
-| High | `csv` module | Medium | Data import/export in browser apps |
 | High | `enum.IntEnum`, `Flag` | Medium | Protocol and permission modeling |
-| Medium | `asyncio` shim (sleep, gather) | Medium | Async patterns without raw JS |
-| Medium | `textwrap` module | Low | Text formatting in browser UIs |
-| Medium | `statistics` module | Low | Data analysis without numpy |
-| Medium | `logging` module | Medium | Structured logging vs print() |
-| Medium | `decimal` module | High | Financial calculations |
-| Medium | `difflib` module | High | Text diff, fuzzy matching |
+| High | `statistics` module | Low | Data analysis without full numpy import |
+| Medium | `pprint` module | Low | REPL output quality |
+| Medium | `collections.ChainMap` | Low | Multi-level scope/config dicts |
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
 | Medium | `__slots__` enforcement via `Proxy` | Medium | Memory + API documentation |
-| Medium | `collections.ChainMap` | Low | Multi-level scope/config dicts |
+| Medium | `fractions` module | Medium | Exact rational arithmetic |
+| Medium | `hashlib` shim over Web Crypto | Medium | Hashing without verbatim JS |
+| Low | `decimal` module | High | Financial calculations |
+| Low | `difflib` module | High | Text diff, fuzzy matching |
 | Low | Async generators | High | Streaming browser I/O |
 | Low | `asynccontextmanager` | Medium | Async resource management |
-| Low | `fractions` module | Medium | Exact rational arithmetic |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |
-| Low | `pprint` module | Low | REPL output quality |
-| Low | `hashlib` shim over Web Crypto | Medium | Hashing without verbatim JS |

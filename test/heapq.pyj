@@ -1,0 +1,174 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# heapq.pyj
+# Tests for the heapq standard library module.
+
+from heapq import heappush, heappop, heapify, heapreplace, heappushpop, nlargest, nsmallest
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. heappush / heappop — basic sort order ──────────────────────────────────
+
+h = []
+heappush(h, 3)
+heappush(h, 1)
+heappush(h, 4)
+heappush(h, 1)
+heappush(h, 5)
+ae(heappop(h), 1)
+ae(heappop(h), 1)
+ae(heappop(h), 3)
+ae(heappop(h), 4)
+ae(heappop(h), 5)
+ae(h.length, 0)
+
+# ── 2. heapify — min at root ──────────────────────────────────────────────────
+
+x = [5, 3, 8, 1, 2, 4]
+heapify(x)
+ae(x[0], 1)
+
+# verify heap invariant: every parent <= its children
+_hi = 0
+while _hi < Math.floor(x.length / 2):
+    _left = 2 * _hi + 1
+    _right = 2 * _hi + 2
+    ok(x[_hi] <= x[_left], 'parent <= left child at ' + str(_hi))
+    if _right < x.length:
+        ok(x[_hi] <= x[_right], 'parent <= right child at ' + str(_hi))
+    _hi += 1
+
+# ── 3. heapify + heappop produces sorted output ───────────────────────────────
+
+_sort_data = [5, 3, 8, 1, 2, 4]
+heapify(_sort_data)
+_sort_result = []
+while _sort_data.length > 0:
+    _sort_result.push(heappop(_sort_data))
+ade(_sort_result, [1, 2, 3, 4, 5, 8])
+
+# ── 4. heapreplace — returns old min, inserts new item ────────────────────────
+
+_r = [1, 3, 5, 7, 9]
+heapify(_r)
+_old = heapreplace(_r, 4)
+ae(_old, 1)
+ae(_r[0], 3)
+
+_r_sorted = []
+while _r.length > 0:
+    _r_sorted.push(heappop(_r))
+ade(_r_sorted, [3, 4, 5, 7, 9])
+
+# ── 5. heappushpop ────────────────────────────────────────────────────────────
+
+# item > heap[0]: swap root out, sift new item in
+_pp = [1, 3, 5]
+heapify(_pp)
+_res_pp = heappushpop(_pp, 2)
+ae(_res_pp, 1)
+ae(_pp[0], 2)
+
+# item <= heap[0]: return item unchanged, heap unmodified
+_pp2 = [5, 7, 9]
+heapify(_pp2)
+_res_pp2 = heappushpop(_pp2, 4)
+ae(_res_pp2, 4)
+ae(_pp2[0], 5)
+
+# ── 6. heappop raises IndexError on empty heap ────────────────────────────────
+
+_pop_err = False
+try:
+    heappop([])
+except IndexError:
+    _pop_err = True
+ok(_pop_err, 'heappop on empty heap raises IndexError')
+
+# ── 7. heapreplace raises IndexError on empty heap ───────────────────────────
+
+_rep_err = False
+try:
+    heapreplace([], 1)
+except IndexError:
+    _rep_err = True
+ok(_rep_err, 'heapreplace on empty heap raises IndexError')
+
+# ── 8. nsmallest — basic ─────────────────────────────────────────────────────
+
+_ns_data = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+ade(nsmallest(3, _ns_data), [1, 1, 2])
+ade(nsmallest(1, _ns_data), [1])
+ade(nsmallest(0, _ns_data), [])
+ade(nsmallest(100, _ns_data), [1, 1, 2, 3, 3, 4, 5, 5, 6, 9])
+
+# ── 9. nlargest — basic ──────────────────────────────────────────────────────
+
+ade(nlargest(3, _ns_data), [9, 6, 5])
+ade(nlargest(1, _ns_data), [9])
+ade(nlargest(0, _ns_data), [])
+ade(nlargest(100, _ns_data), [9, 6, 5, 5, 4, 3, 3, 2, 1, 1])
+
+# ── 10. nsmallest / nlargest with key ────────────────────────────────────────
+
+_pairs = [[3, 'c'], [1, 'a'], [4, 'd'], [1, 'b'], [5, 'e']]
+_kfn = def(p): return p[0];
+
+_sm2 = nsmallest(2, _pairs, key=_kfn)
+ae(_sm2.length, 2)
+ae(_sm2[0][0], 1)
+ae(_sm2[1][0], 1)
+
+_lg2 = nlargest(2, _pairs, key=_kfn)
+ae(_lg2.length, 2)
+ae(_lg2[0][0], 5)
+ae(_lg2[1][0], 4)
+
+# ── 11. Single element ────────────────────────────────────────────────────────
+
+_single = [42]
+heapify(_single)
+ae(_single[0], 42)
+ae(heappop(_single), 42)
+ae(_single.length, 0)
+
+# ── 12. Negative numbers ─────────────────────────────────────────────────────
+
+_neg = [-3, -1, -4, -1, -5]
+heapify(_neg)
+_neg_sorted = []
+while _neg.length > 0:
+    _neg_sorted.push(heappop(_neg))
+ade(_neg_sorted, [-5, -4, -3, -1, -1])
+
+# ── 13. Duplicates ───────────────────────────────────────────────────────────
+
+_dups = [2, 2, 2, 1, 1, 1, 3, 3, 3]
+heapify(_dups)
+_dups_sorted = []
+while _dups.length > 0:
+    _dups_sorted.push(heappop(_dups))
+ade(_dups_sorted, [1, 1, 1, 2, 2, 2, 3, 3, 3])
+
+# ── 14. heappush onto pre-existing heap ──────────────────────────────────────
+
+_pre = [2, 5, 8]
+heapify(_pre)
+heappush(_pre, 1)
+ae(_pre[0], 1)
+heappush(_pre, 3)
+_pre_sorted = []
+while _pre.length > 0:
+    _pre_sorted.push(heappop(_pre))
+ade(_pre_sorted, [1, 2, 3, 5, 8])
+
+# ── 15. nsmallest / nlargest do not mutate original ──────────────────────────
+
+_orig = [5, 2, 8, 1, 9]
+_orig_copy = _orig.slice()
+nsmallest(3, _orig)
+nlargest(3, _orig)
+ade(_orig, _orig_copy)

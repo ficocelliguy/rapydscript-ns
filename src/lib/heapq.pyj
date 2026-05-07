@@ -1,0 +1,98 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Implementation of Python's 'heapq' module.
+# Min-heap (priority queue) operations on lists.
+#
+# The heap invariant: heap[k] <= heap[2*k+1] and heap[k] <= heap[2*k+2].
+# Algorithms ported from CPython's heapq.py.
+
+
+def _siftdown(heap, startpos, pos):
+    newitem = heap[pos]
+    while pos > startpos:
+        parentpos = (pos - 1) >> 1
+        parent = heap[parentpos]
+        if newitem < parent:
+            heap[pos] = parent
+            pos = parentpos
+        else:
+            break
+    heap[pos] = newitem
+
+
+def _siftup(heap, pos):
+    endpos = heap.length
+    startpos = pos
+    newitem = heap[pos]
+    childpos = 2 * pos + 1
+    while childpos < endpos:
+        rightpos = childpos + 1
+        if rightpos < endpos and heap[childpos] >= heap[rightpos]:
+            childpos = rightpos
+        heap[pos] = heap[childpos]
+        pos = childpos
+        childpos = 2 * pos + 1
+    heap[pos] = newitem
+    _siftdown(heap, startpos, pos)
+
+
+def heappush(heap, item):
+    heap.push(item)
+    _siftdown(heap, 0, heap.length - 1)
+
+
+def heappop(heap):
+    if heap.length == 0:
+        raise IndexError('index out of range')
+    lastelt = heap.pop()
+    if heap.length > 0:
+        returnitem = heap[0]
+        heap[0] = lastelt
+        _siftup(heap, 0)
+        return returnitem
+    return lastelt
+
+
+def heapreplace(heap, item):
+    if heap.length == 0:
+        raise IndexError('index out of range')
+    returnitem = heap[0]
+    heap[0] = item
+    _siftup(heap, 0)
+    return returnitem
+
+
+def heappushpop(heap, item):
+    if heap.length > 0 and heap[0] < item:
+        tmp = heap[0]
+        heap[0] = item
+        item = tmp
+        _siftup(heap, 0)
+    return item
+
+
+def heapify(x):
+    i = Math.floor(x.length / 2) - 1
+    while i >= 0:
+        _siftup(x, i)
+        i -= 1
+
+
+def nsmallest(n, iterable, key=None):
+    if n <= 0:
+        return []
+    result = sorted(iterable, key=key)
+    return result[:n]
+
+
+def nlargest(n, iterable, key=None):
+    if n <= 0:
+        return []
+    result = sorted(iterable, key=key, reverse=True)
+    return result[:n]

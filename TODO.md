@@ -8,9 +8,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python-style argument type enforcement] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
-
-Specifically, throw TypeError with the wrong count of arguments, and enforce kwarg-only and positional-only argument types 
+I would like you to add support for [python heapq module] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there.
 
 ### asyncio example
 
@@ -291,4 +289,39 @@ print(greet("Bob", loud=True))     # BOB
 # greet(name="Carol")              # TypeError: positional-only arg
 # greet("Dave", True)              # TypeError: missing required keyword-only arg 'loud'
 # greet(42)                        # TypeError: argument 'name' must be str
+```
+
+### heapq (priority queue) example
+
+```python
+from heapq import heappush, heappop, heapify, nsmallest, nlargest
+
+# Build a min-heap by pushing items one at a time
+tasks = []
+heappush(tasks, (3, 'low priority task'))
+heappush(tasks, (1, 'urgent task'))
+heappush(tasks, (2, 'normal task'))
+
+# Pop in priority order (smallest first)
+while tasks:
+    priority, name = heappop(tasks)
+    print(priority, name)
+# 1 urgent task
+# 2 normal task
+# 3 low priority task
+
+# heapify converts an existing list in-place
+scores = [85, 42, 91, 17, 63]
+heapify(scores)
+print(scores[0])   # 17  (min is always at index 0)
+
+# nsmallest / nlargest without a heap
+data = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+print(nsmallest(3, data))   # [1, 1, 2]
+print(nlargest(3, data))    # [9, 6, 5]
+
+# nlargest with a key
+students = [('Alice', 88), ('Bob', 95), ('Carol', 73)]
+top2 = nlargest(2, students, key=def(s): return s[1];)
+print(top2)   # [('Bob', 95), ('Alice', 88)]
 ```

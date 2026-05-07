@@ -3950,6 +3950,132 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_heapq_push_pop",
+        description: "heapq stdlib: heappush and heappop in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from heapq import heappush, heappop",
+                // push in arbitrary order, pop should return sorted
+                "h = []",
+                "heappush(h, 3)",
+                "heappush(h, 1)",
+                "heappush(h, 4)",
+                "heappush(h, 1)",
+                "heappush(h, 5)",
+                "assrt.equal(heappop(h), 1)",
+                "assrt.equal(heappop(h), 1)",
+                "assrt.equal(heappop(h), 3)",
+                "assrt.equal(heappop(h), 4)",
+                "assrt.equal(heappop(h), 5)",
+                "assrt.equal(h.length, 0)",
+                // heappop on empty raises IndexError
+                "caught = False",
+                "try:",
+                "    heappop([])",
+                "except IndexError:",
+                "    caught = True",
+                "assrt.ok(caught)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_heapq_heapify",
+        description: "heapq stdlib: heapify in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from heapq import heapify, heappop",
+                // heapify puts min at root
+                "x = [5, 3, 8, 1, 2, 4]",
+                "heapify(x)",
+                "assrt.equal(x[0], 1)",
+                // heapify + repeated heappop gives sorted order
+                "data = [5, 3, 8, 1, 2, 4]",
+                "heapify(data)",
+                "result = []",
+                "while data.length > 0:",
+                "    result.push(heappop(data))",
+                "assrt.deepEqual(result, [1, 2, 3, 4, 5, 8])",
+                // negative numbers
+                "neg = [-3, -1, -4, -1, -5]",
+                "heapify(neg)",
+                "neg_out = []",
+                "while neg.length > 0:",
+                "    neg_out.push(heappop(neg))",
+                "assrt.deepEqual(neg_out, [-5, -4, -3, -1, -1])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_heapq_nsmallest_nlargest",
+        description: "heapq stdlib: nsmallest and nlargest in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from heapq import nsmallest, nlargest",
+                "data = [3, 1, 4, 1, 5, 9, 2, 6]",
+                "assrt.deepEqual(nsmallest(3, data), [1, 1, 2])",
+                "assrt.deepEqual(nlargest(3, data), [9, 6, 5])",
+                "assrt.deepEqual(nsmallest(0, data), [])",
+                "assrt.deepEqual(nlargest(0, data), [])",
+                // n > len returns all sorted
+                "assrt.deepEqual(nsmallest(100, [3, 1, 2]), [1, 2, 3])",
+                "assrt.deepEqual(nlargest(100, [3, 1, 2]), [3, 2, 1])",
+                // key function
+                "pairs = [[3, 'c'], [1, 'a'], [4, 'd'], [1, 'b'], [5, 'e']]",
+                "kfn = def(p): return p[0];",
+                "sm = nsmallest(2, pairs, key=kfn)",
+                "assrt.equal(sm[0][0], 1)",
+                "assrt.equal(sm[1][0], 1)",
+                "lg = nlargest(2, pairs, key=kfn)",
+                "assrt.equal(lg[0][0], 5)",
+                "assrt.equal(lg[1][0], 4)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_heapq_replace_pushpop",
+        description: "heapq stdlib: heapreplace and heappushpop in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from heapq import heapify, heappop, heapreplace, heappushpop",
+                // heapreplace: returns old min, inserts new item
+                "r = [1, 3, 5, 7, 9]",
+                "heapify(r)",
+                "old = heapreplace(r, 4)",
+                "assrt.equal(old, 1)",
+                "assrt.equal(r[0], 3)",
+                // heapreplace on empty raises IndexError
+                "caught_rep = False",
+                "try:",
+                "    heapreplace([], 1)",
+                "except IndexError:",
+                "    caught_rep = True",
+                "assrt.ok(caught_rep)",
+                // heappushpop: item > root — returns root
+                "pp = [1, 3, 5]",
+                "heapify(pp)",
+                "assrt.equal(heappushpop(pp, 2), 1)",
+                "assrt.equal(pp[0], 2)",
+                // heappushpop: item <= root — returns item unchanged
+                "pp2 = [5, 7, 9]",
+                "heapify(pp2)",
+                "assrt.equal(heappushpop(pp2, 4), 4)",
+                "assrt.equal(pp2[0], 5)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------
