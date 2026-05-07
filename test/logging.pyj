@@ -1,0 +1,356 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# logging.pyj
+# Tests for the logging standard library module.
+
+from logging import (
+    Logger, Handler, StreamHandler, NullHandler, Formatter, Filter,
+    LogRecord, makeLogRecord,
+    getLogger, basicConfig, disable,
+    addLevelName, getLevelName,
+    NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL,
+    lastResort, root,
+)
+import logging
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+
+# ── 1. Level constants ────────────────────────────────────────────────────────
+
+ae(NOTSET,   0)
+ae(DEBUG,    10)
+ae(INFO,     20)
+ae(WARNING,  30)
+ae(ERROR,    40)
+ae(CRITICAL, 50)
+ae(logging.WARN,  WARNING)
+ae(logging.FATAL, CRITICAL)
+
+
+# ── 2. getLevelName ───────────────────────────────────────────────────────────
+
+ae(getLevelName(DEBUG),    'DEBUG')
+ae(getLevelName(INFO),     'INFO')
+ae(getLevelName(WARNING),  'WARNING')
+ae(getLevelName(ERROR),    'ERROR')
+ae(getLevelName(CRITICAL), 'CRITICAL')
+ae(getLevelName(0),        'NOTSET')
+ae(getLevelName(42),       'Level 42')
+
+ae(getLevelName('DEBUG'),    DEBUG)
+ae(getLevelName('WARNING'),  WARNING)
+ae(getLevelName('CRITICAL'), CRITICAL)
+ae(getLevelName('WARN'),     WARNING)
+ae(getLevelName('FATAL'),    CRITICAL)
+
+
+# ── 3. addLevelName ───────────────────────────────────────────────────────────
+
+addLevelName(25, 'TRACE')
+ae(getLevelName(25),      'TRACE')
+ae(getLevelName('TRACE'), 25)
+
+
+# ── 4. LogRecord.getMessage — %-formatting ────────────────────────────────────
+
+_r1 = LogRecord('test', DEBUG, '', 0, 'hello world', [], None)
+ae(_r1.getMessage(), 'hello world')
+
+_r2 = LogRecord('test', INFO, '', 0, 'Hello %s', ['Alice'], None)
+ae(_r2.getMessage(), 'Hello Alice')
+
+_r3 = LogRecord('test', WARNING, '', 0, 'Val=%d x=%f', [42, 3.14], None)
+ae(_r3.getMessage(), 'Val=42 x=3.140000')
+
+_r4 = LogRecord('test', ERROR, '', 0, '100%%', [], None)
+ae(_r4.getMessage(), '100%')
+
+
+# ── 5. LogRecord attributes ───────────────────────────────────────────────────
+
+_r5 = LogRecord('myapp', ERROR, '/foo.py', 10, 'boom', [], None)
+ae(_r5.name,      'myapp')
+ae(_r5.levelno,   ERROR)
+ae(_r5.levelname, 'ERROR')
+ae(_r5.lineno,    10)
+ae(_r5.threadName, 'MainThread')
+ok(_r5.created > 0, 'created is positive')
+ok(_r5.relativeCreated >= 0, 'relativeCreated is non-negative')
+
+
+# ── 6. makeLogRecord ──────────────────────────────────────────────────────────
+
+_d = {}
+_d['name']    = 'foo'
+_d['levelno'] = WARNING
+_d['msg']     = 'hi'
+_mr = makeLogRecord(_d)
+ae(_mr.name,    'foo')
+ae(_mr.levelno, WARNING)
+ae(_mr.msg,     'hi')
+
+
+# ── 7. Formatter ──────────────────────────────────────────────────────────────
+
+class _Buf:
+    def __init__(self):
+        self.lines = []
+    def write(self, s):
+        self.lines.push(s)
+
+
+_fmt1 = Formatter('%(levelname)s:%(name)s:%(message)s')
+_rec  = LogRecord('myapp', INFO, '', 0, 'hello', [], None)
+ae(_fmt1.format(_rec), 'INFO:myapp:hello')
+
+_fmt2 = Formatter('%(levelno)d %(name)s %(message)s')
+_rec2 = LogRecord('app', WARNING, '', 0, 'watch out', [], None)
+ae(_fmt2.format(_rec2), '30 app watch out')
+
+ok(_fmt1.usesTime() is False, 'usesTime False')
+_fmt3 = Formatter('%(asctime)s %(message)s')
+ok(_fmt3.usesTime() is True, 'usesTime True')
+
+# asctime must be a non-empty string
+_rec3 = LogRecord('t', INFO, '', 0, 'msg', [], None)
+_s3   = _fmt3.format(_rec3)
+ok(_s3.length > 5, 'asctime result is non-empty')
+
+
+# ── 8. Filter ─────────────────────────────────────────────────────────────────
+
+_f_all  = Filter()
+_f_app  = Filter('myapp')
+_f_sub  = Filter('myapp.sub')
+
+_rA = LogRecord('myapp',        INFO, '', 0, 'm', [], None)
+_rB = LogRecord('myapp.sub',    INFO, '', 0, 'm', [], None)
+_rC = LogRecord('myapp.sub.x',  INFO, '', 0, 'm', [], None)
+_rD = LogRecord('otherapp',     INFO, '', 0, 'm', [], None)
+
+ok(_f_all.filter(_rA) is True,  'empty filter accepts all')
+ok(_f_all.filter(_rD) is True,  'empty filter accepts all 2')
+
+ok(_f_app.filter(_rA) is True,  'parent name matches')
+ok(_f_app.filter(_rB) is True,  'child name matches')
+ok(_f_app.filter(_rC) is True,  'deep child matches')
+ok(_f_app.filter(_rD) is False, 'unrelated rejected')
+
+ok(_f_sub.filter(_rB) is True,  'sub self-match')
+ok(_f_sub.filter(_rC) is True,  'sub child match')
+ok(_f_sub.filter(_rA) is False, 'parent of sub rejected')
+
+
+# ── 9. StreamHandler with custom stream ──────────────────────────────────────
+
+_buf9 = _Buf()
+_sh9  = StreamHandler(_buf9)
+_sh9.setFormatter(Formatter('%(levelname)s:%(name)s:%(message)s'))
+_sh9.setLevel(DEBUG)
+
+_l9 = Logger('test9')
+_l9.addHandler(_sh9)
+_l9.setLevel(DEBUG)
+_l9.propagate = False
+
+_l9.debug('dbg')
+_l9.info('inf')
+_l9.warning('wrn')
+_l9.error('err')
+_l9.critical('crit')
+
+ae(_buf9.lines.length, 5)
+ae(_buf9.lines[0], 'DEBUG:test9:dbg\n')
+ae(_buf9.lines[1], 'INFO:test9:inf\n')
+ae(_buf9.lines[2], 'WARNING:test9:wrn\n')
+ae(_buf9.lines[3], 'ERROR:test9:err\n')
+ae(_buf9.lines[4], 'CRITICAL:test9:crit\n')
+
+
+# ── 10. NullHandler ───────────────────────────────────────────────────────────
+
+_nh = NullHandler()
+_rn = LogRecord('x', WARNING, '', 0, 'msg', [], None)
+ok(_nh.handle(_rn) is None or _nh.handle(_rn) is False or True, 'NullHandler.handle does not throw')
+
+
+# ── 11. Logger.isEnabledFor / getEffectiveLevel ───────────────────────────────
+
+_la = Logger('lvltest')
+_la.setLevel(WARNING)
+_la.propagate = False
+
+ok(_la.isEnabledFor(DEBUG)    is False, 'DEBUG below WARNING')
+ok(_la.isEnabledFor(INFO)     is False, 'INFO below WARNING')
+ok(_la.isEnabledFor(WARNING)  is True,  'WARNING == WARNING')
+ok(_la.isEnabledFor(ERROR)    is True,  'ERROR above WARNING')
+ok(_la.isEnabledFor(CRITICAL) is True,  'CRITICAL above WARNING')
+
+ae(_la.getEffectiveLevel(), WARNING)
+
+_la.setLevel(NOTSET)
+_la.parent = None
+ae(_la.getEffectiveLevel(), WARNING)  # no parent → falls back to WARNING
+
+
+# ── 12. Logger level filtering (messages suppressed below level) ──────────────
+
+_buf12 = _Buf()
+_sh12  = StreamHandler(_buf12)
+_sh12.setFormatter(Formatter('%(levelname)s'))
+_sh12.setLevel(NOTSET)
+
+_l12 = Logger('filt12')
+_l12.addHandler(_sh12)
+_l12.setLevel(WARNING)
+_l12.propagate = False
+
+_l12.debug('no')
+_l12.info('no')
+_l12.warning('yes')
+_l12.error('yes')
+
+ae(_buf12.lines.length, 2)
+ae(_buf12.lines[0], 'WARNING\n')
+ae(_buf12.lines[1], 'ERROR\n')
+
+
+# ── 13. Logger.log() with numeric level ──────────────────────────────────────
+
+_buf13 = _Buf()
+_sh13  = StreamHandler(_buf13)
+_sh13.setFormatter(Formatter('%(levelno)d:%(message)s'))
+_l13   = Logger('log13')
+_l13.addHandler(_sh13)
+_l13.setLevel(DEBUG)
+_l13.propagate = False
+_l13.log(ERROR, 'test via log()')
+ae(_buf13.lines[0], '40:test via log()\n')
+
+
+# ── 14. %-style args in Logger methods ────────────────────────────────────────
+
+_buf14 = _Buf()
+_sh14  = StreamHandler(_buf14)
+_sh14.setFormatter(Formatter('%(message)s'))
+_l14   = Logger('args14')
+_l14.addHandler(_sh14)
+_l14.setLevel(DEBUG)
+_l14.propagate = False
+_l14.info('x=%d y=%s', 7, 'foo')
+ae(_buf14.lines[0], 'x=7 y=foo\n')
+
+
+# ── 15. Logger.addFilter / Filterer ──────────────────────────────────────────
+
+_buf15 = _Buf()
+_sh15  = StreamHandler(_buf15)
+_sh15.setFormatter(Formatter('%(message)s'))
+_l15   = Logger('parent15')
+_l15.addHandler(_sh15)
+_l15.setLevel(DEBUG)
+_l15.propagate = False
+_l15.addFilter(Filter('parent15.child'))  # only pass records from parent15.child*
+
+_ra15 = LogRecord('parent15',       DEBUG, '', 0, 'parent', [], None)
+_rb15 = LogRecord('parent15.child', DEBUG, '', 0, 'child',  [], None)
+_l15.handle(_ra15)
+_l15.handle(_rb15)
+ae(_buf15.lines.length, 1)
+ae(_buf15.lines[0], 'child\n')
+
+
+# ── 16. Handler.addFilter ─────────────────────────────────────────────────────
+
+_buf16 = _Buf()
+_sh16  = StreamHandler(_buf16)
+_sh16.setFormatter(Formatter('%(message)s'))
+_sh16.addFilter(Filter('ok'))
+
+_l16 = Logger('hdlr16')
+_l16.addHandler(_sh16)
+_l16.setLevel(DEBUG)
+_l16.propagate = False
+
+_l16.handle(LogRecord('ok',  DEBUG, '', 0, 'pass',  [], None))
+_l16.handle(LogRecord('bad', DEBUG, '', 0, 'block', [], None))
+ae(_buf16.lines.length, 1)
+ae(_buf16.lines[0], 'pass\n')
+
+
+# ── 17. getLogger — same name returns same instance ──────────────────────────
+
+_ga = getLogger('getlogger_test')
+_gb = getLogger('getlogger_test')
+ok(_ga is _gb, 'getLogger returns same instance for same name')
+ok(getLogger() is root, 'getLogger() returns root')
+ok(getLogger('root') is root, 'getLogger("root") returns root')
+
+
+# ── 18. Logger hierarchy — propagation ────────────────────────────────────────
+
+_buf18 = _Buf()
+_sh18  = StreamHandler(_buf18)
+_sh18.setFormatter(Formatter('%(name)s:%(message)s'))
+
+_parent18 = Logger('app18')
+_parent18.addHandler(_sh18)
+_parent18.setLevel(DEBUG)
+_parent18.propagate = False
+
+_child18  = Logger('app18.mod')
+_child18.parent    = _parent18
+_child18.setLevel(DEBUG)
+_child18.propagate = True
+
+_child18.info('from child')
+ae(_buf18.lines.length, 1)
+ae(_buf18.lines[0], 'app18.mod:from child\n')
+
+
+# ── 19. disable() ─────────────────────────────────────────────────────────────
+
+_buf19 = _Buf()
+_sh19  = StreamHandler(_buf19)
+_sh19.setFormatter(Formatter('%(message)s'))
+_l19 = Logger('dis19')
+_l19.addHandler(_sh19)
+_l19.setLevel(DEBUG)
+_l19.propagate = False
+
+_l19.warning('before disable')
+logging.disable(CRITICAL)
+_l19.warning('after disable – suppressed')
+_l19.critical('also suppressed')
+ae(_buf19.lines.length, 1)
+
+# reset disable level so later tests aren't affected
+logging.disable(NOTSET)
+
+
+# ── 20. hasHandlers ───────────────────────────────────────────────────────────
+
+_l20 = Logger('hashdlr20')
+_l20.parent = None
+_l20.propagate = False
+ok(_l20.hasHandlers() is False, 'no handlers')
+_l20.addHandler(NullHandler())
+ok(_l20.hasHandlers() is True, 'has handler')
+
+
+# ── 21. exception() logs at ERROR ─────────────────────────────────────────────
+
+_buf21 = _Buf()
+_sh21  = StreamHandler(_buf21)
+_sh21.setFormatter(Formatter('%(levelname)s:%(message)s'))
+_l21   = Logger('exc21')
+_l21.addHandler(_sh21)
+_l21.setLevel(DEBUG)
+_l21.propagate = False
+_l21.exception('something went wrong')
+ae(_buf21.lines.length, 1)
+ae(_buf21.lines[0], 'ERROR:something went wrong\n')

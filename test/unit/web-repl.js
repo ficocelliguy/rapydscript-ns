@@ -3596,6 +3596,159 @@ var TESTS = [
         },
     },
 
+    // ── logging ──────────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_logging_basic",
+        description: "logging stdlib: StreamHandler with custom stream in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from logging import Logger, StreamHandler, Formatter, DEBUG, INFO, WARNING, ERROR",
+                "class _Buf:",
+                "    def __init__(self):",
+                "        self.lines = []",
+                "    def write(self, s):",
+                "        self.lines.push(s)",
+                "_buf = _Buf()",
+                "_h = StreamHandler(_buf)",
+                "_h.setFormatter(Formatter('%(levelname)s:%(name)s:%(message)s'))",
+                "_h.setLevel(DEBUG)",
+                "_log = Logger('myapp')",
+                "_log.addHandler(_h)",
+                "_log.setLevel(DEBUG)",
+                "_log.propagate = False",
+                "_log.debug('dbg')",
+                "_log.info('hi')",
+                "_log.warning('warn')",
+                "_log.error('err')",
+                "assrt.equal(_buf.lines.length, 4)",
+                "assrt.equal(_buf.lines[0], 'DEBUG:myapp:dbg\\n')",
+                "assrt.equal(_buf.lines[1], 'INFO:myapp:hi\\n')",
+                "assrt.equal(_buf.lines[2], 'WARNING:myapp:warn\\n')",
+                "assrt.equal(_buf.lines[3], 'ERROR:myapp:err\\n')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_logging_levels",
+        description: "logging stdlib: level constants, getLevelName, addLevelName, %-format args",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from logging import getLevelName, addLevelName, DEBUG, INFO, WARNING, ERROR, CRITICAL, NOTSET",
+                "assrt.equal(NOTSET,   0)",
+                "assrt.equal(DEBUG,    10)",
+                "assrt.equal(INFO,     20)",
+                "assrt.equal(WARNING,  30)",
+                "assrt.equal(ERROR,    40)",
+                "assrt.equal(CRITICAL, 50)",
+                "assrt.equal(getLevelName(DEBUG),    'DEBUG')",
+                "assrt.equal(getLevelName(WARNING),  'WARNING')",
+                "assrt.equal(getLevelName(42),       'Level 42')",
+                "assrt.equal(getLevelName('ERROR'),  ERROR)",
+                "assrt.equal(getLevelName('WARN'),   WARNING)",
+                "addLevelName(15, 'VERBOSE')",
+                "assrt.equal(getLevelName(15),         'VERBOSE')",
+                "assrt.equal(getLevelName('VERBOSE'),  15)",
+                // %-format args via Logger
+                "from logging import Logger, StreamHandler, Formatter",
+                "class _B:",
+                "    def __init__(self):",
+                "        self.out = []",
+                "    def write(self, s):",
+                "        self.out.push(s)",
+                "_b = _B()",
+                "_h2 = StreamHandler(_b)",
+                "_h2.setFormatter(Formatter('%(message)s'))",
+                "_l2 = Logger('fmt')",
+                "_l2.addHandler(_h2)",
+                "_l2.setLevel(DEBUG)",
+                "_l2.propagate = False",
+                "_l2.info('x=%d y=%s', 7, 'foo')",
+                "assrt.equal(_b.out[0], 'x=7 y=foo\\n')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_logging_hierarchy",
+        description: "logging stdlib: parent/child logger hierarchy and propagation",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from logging import Logger, StreamHandler, Formatter, DEBUG, INFO",
+                "class _B:",
+                "    def __init__(self):",
+                "        self.out = []",
+                "    def write(self, s):",
+                "        self.out.push(s)",
+                "_b = _B()",
+                "_h = StreamHandler(_b)",
+                "_h.setFormatter(Formatter('%(name)s:%(message)s'))",
+                "_parent = Logger('app')",
+                "_parent.addHandler(_h)",
+                "_parent.setLevel(DEBUG)",
+                "_parent.propagate = False",
+                "_child = Logger('app.sub')",
+                "_child.parent = _parent",
+                "_child.setLevel(DEBUG)",
+                "_child.propagate = True",
+                "_child.info('from child')",
+                "assrt.equal(_b.out.length, 1)",
+                "assrt.equal(_b.out[0], 'app.sub:from child\\n')",
+                // child with propagate=False should NOT reach parent handler
+                "_b2 = _B()",
+                "_h2 = StreamHandler(_b2)",
+                "_h2.setFormatter(Formatter('%(message)s'))",
+                "_child2 = Logger('app.sub2')",
+                "_child2.parent = _parent",
+                "_child2.addHandler(_h2)",
+                "_child2.setLevel(DEBUG)",
+                "_child2.propagate = False",
+                "_child2.info('isolated')",
+                "assrt.equal(_b.out.length, 1)",   // parent buffer unchanged
+                "assrt.equal(_b2.out[0], 'isolated\\n')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_logging_basicconfig",
+        description: "logging stdlib: basicConfig sets up root logger with custom stream",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "import logging",
+                "class _B:",
+                "    def __init__(self):",
+                "        self.out = []",
+                "    def write(self, s):",
+                "        self.out.push(s)",
+                "_b = _B()",
+                "logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s', stream=_b)",
+                "logging.debug('d')",
+                "logging.info('i')",
+                "logging.warning('w')",
+                "assrt.equal(_b.out.length, 3)",
+                "assrt.equal(_b.out[0], 'DEBUG:d\\n')",
+                "assrt.equal(_b.out[1], 'INFO:i\\n')",
+                "assrt.equal(_b.out[2], 'WARNING:w\\n')",
+                // disable() suppresses messages at or below the given level
+                "logging.disable(logging.ERROR)",
+                "logging.warning('suppressed')",
+                "logging.error('also suppressed')",
+                "assrt.equal(_b.out.length, 3)",
+                "logging.disable(logging.NOTSET)",  // reset
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

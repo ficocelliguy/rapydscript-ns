@@ -8,7 +8,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python textwrap library ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
+I would like you to add support for [python f-string f'{x=}' debugging format] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file).
 
 ### asyncio example
 
@@ -179,6 +179,45 @@ sio = StringIO()
 csv.writer(sio, dialect='pipes').writerow(['a', 'b', 'c'])
 print(sio.getvalue())  # a|b|c\r\n
 csv.unregister_dialect('pipes')
+```
+
+### logging example
+
+```python
+import logging
+from logging import Logger, StreamHandler, Formatter, Filter, DEBUG, INFO
+
+# Root logger via basicConfig
+logging.basicConfig(level=DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+logging.info('app started')
+logging.warning('low disk space: %d%% remaining', 12)
+
+# Named logger with custom handler
+class BufferStream:
+    def __init__(self):
+        self.lines = []
+    def write(self, s):
+        self.lines.push(s)
+
+buf    = BufferStream()
+logger = logging.getLogger('myapp.db')
+logger.setLevel(DEBUG)
+logger.addHandler(StreamHandler(buf))
+logger.addFilter(Filter('myapp'))      # only pass records from myapp.*
+
+logger.debug('connecting to %s', 'localhost:5432')
+logger.info('query took %d ms', 42)
+
+# Child logger inherits parent's handlers via propagation
+child = logging.getLogger('myapp.db.pool')
+child.info('pool size: %d', 5)  # propagates to myapp.db handler
+
+# Silence a noisy subsystem
+logging.getLogger('myapp.cache').setLevel(logging.ERROR)
+
+# Custom level
+logging.addLevelName(25, 'AUDIT')
+logger.log(25, 'user %s logged in', 'alice')
 ```
 
 ### textwrap example

@@ -1,0 +1,672 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+# Python-compatible logging module.
+#
+# Provides: getLogger, basicConfig, debug, info, warning, error, critical,
+#           exception, log, disable, addLevelName, getLevelName,
+#           captureWarnings, makeLogRecord, setLogRecordFactory,
+#           getLogRecordFactory, Logger, Handler, StreamHandler,
+#           FileHandler, NullHandler, Formatter, Filter, LogRecord,
+#           NOTSET, DEBUG, INFO, WARNING, WARN, ERROR, CRITICAL, FATAL,
+#           lastResort, root.
+#
+# Notes:
+#   - FileHandler raises NotImplementedError (no file I/O in JS environments).
+#   - StreamHandler writes to console by default (debug→console.debug,
+#     info→console.info, warning→console.warn, error/critical→console.error).
+#     Pass a stream with a .write(s) method to capture output.
+#   - Logger hierarchy (dotted names, propagation) is fully supported.
+#   - exception() logs at ERROR level without automatic exc_info capture.
+#   - basicConfig() may be called multiple times; pass force=True to reconfigure.
+
+# ---------------------------------------------------------------------------
+# Level constants
+# ---------------------------------------------------------------------------
+
+NOTSET   = 0
+DEBUG    = 10
+INFO     = 20
+WARNING  = 30
+WARN     = WARNING
+ERROR    = 40
+CRITICAL = 50
+FATAL    = CRITICAL
+
+_level_to_name = {}
+_level_to_name[NOTSET]   = 'NOTSET'
+_level_to_name[DEBUG]    = 'DEBUG'
+_level_to_name[INFO]     = 'INFO'
+_level_to_name[WARNING]  = 'WARNING'
+_level_to_name[ERROR]    = 'ERROR'
+_level_to_name[CRITICAL] = 'CRITICAL'
+
+_name_to_level = {}
+_name_to_level['NOTSET']   = NOTSET
+_name_to_level['DEBUG']    = DEBUG
+_name_to_level['INFO']     = INFO
+_name_to_level['WARNING']  = WARNING
+_name_to_level['WARN']     = WARNING
+_name_to_level['ERROR']    = ERROR
+_name_to_level['CRITICAL'] = CRITICAL
+_name_to_level['FATAL']    = CRITICAL
+
+
+def getLevelName(level):
+    if jstype(level) is 'number':
+        return _level_to_name[level] if level in _level_to_name else ('Level ' + level)
+    if jstype(level) is 'string':
+        uname = level.toUpperCase()
+        return _name_to_level[uname] if uname in _name_to_level else None
+    return None
+
+
+def addLevelName(level, name):
+    _level_to_name[level] = name
+    _name_to_level[name.toUpperCase()] = level
+
+
+def _check_level(level):
+    if jstype(level) is 'string':
+        uname = level.toUpperCase()
+        if uname not in _name_to_level:
+            raise ValueError('Unknown level: ' + level)
+        return _name_to_level[uname]
+    if jstype(level) is 'number':
+        return level
+    raise TypeError('Level must be a string or integer')
+
+
+# ---------------------------------------------------------------------------
+# Internal JS helpers
+# ---------------------------------------------------------------------------
+
+v"""
+var _logging_start_time = Date.now();
+
+// %-style message formatting: %s %d %i %f %e %g %x %o %%
+function _logging_fmt_msg(tmpl, args) {
+    var i = 0, n = args ? args.length : 0;
+    return String(tmpl).replace(/%([sdifFeEgGxo%])/g, function(m, c) {
+        if (c === '%') return '%';
+        if (i >= n) return m;
+        var a = args[i++];
+        if (c === 'd' || c === 'i') return String(Math.trunc(Number(a)));
+        if (c === 'f' || c === 'F') return Number(a).toFixed(6);
+        if (c === 'e') return Number(a).toExponential();
+        if (c === 'E') return Number(a).toExponential().toUpperCase();
+        if (c === 'g' || c === 'G') return String(Number(a));
+        if (c === 'x') return Math.trunc(Number(a)).toString(16);
+        if (c === 'o') return Math.trunc(Number(a)).toString(8);
+        return String(a);
+    });
+}
+
+// %(attr)s / %(attr)d / %(attr)f style format for Formatter
+function _logging_format_record(fmt, record) {
+    return fmt.replace(/%\((\w+)\)(?:[-+# 0]*\d*(?:\.\d+)?)([sdifFeEgGxo%])/g,
+        function(match, key, conv) {
+            if (conv === '%') return '%';
+            var val = record[key];
+            if (val === undefined || val === null) return '';
+            if (conv === 'd' || conv === 'i') return String(Math.trunc(Number(val)));
+            if (conv === 'f' || conv === 'F') {
+                var pm = match.match(/\.(\d+)[fF]/);
+                return Number(val).toFixed(pm ? parseInt(pm[1]) : 6);
+            }
+            if (conv === 'e') return Number(val).toExponential();
+            if (conv === 'E') return Number(val).toExponential().toUpperCase();
+            if (conv === 'g' || conv === 'G') return String(Number(val));
+            if (conv === 'x') return Math.trunc(Number(val)).toString(16);
+            if (conv === 'o') return Math.trunc(Number(val)).toString(8);
+            return String(val);
+        }
+    );
+}
+
+// Route to the right console method based on level number
+function _logging_console_emit(levelno, msg) {
+    if (typeof console === 'undefined') return;
+    if (levelno >= 40) {
+        console.error(msg);
+    } else if (levelno >= 30) {
+        console.warn(msg);
+    } else if (levelno >= 20) {
+        console.info(msg);
+    } else {
+        console.debug(msg);
+    }
+}
+
+// Format a timestamp from record.created (seconds since epoch)
+function _logging_iso_time(created, datefmt) {
+    var d = new Date(created * 1000);
+    function pad2(n) { return n < 10 ? '0' + n : String(n); }
+    function pad3(n) { return n < 10 ? '00' + n : (n < 100 ? '0' + n : String(n)); }
+    if (datefmt) {
+        return datefmt
+            .replace('%Y', d.getFullYear())
+            .replace('%m', pad2(d.getMonth() + 1))
+            .replace('%d', pad2(d.getDate()))
+            .replace('%H', pad2(d.getHours()))
+            .replace('%M', pad2(d.getMinutes()))
+            .replace('%S', pad2(d.getSeconds()))
+            .replace('%f', pad3(d.getMilliseconds()) + '000');
+    }
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' +
+           pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()) + ',' +
+           pad3(d.getMilliseconds());
+}
+
+// Safe kwargs accessor — handles plain JS objects and ρσ_dict (web-repl mode)
+function _logging_kwget(kw, key, dflt) {
+    if (kw && kw.jsmap && typeof kw.jsmap.get === 'function') {
+        return kw.jsmap.has(key) ? kw.jsmap.get(key) : dflt;
+    }
+    return (kw && kw[key] !== undefined) ? kw[key] : dflt;
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# LogRecord
+# ---------------------------------------------------------------------------
+
+class LogRecord:
+    def __init__(self, name, level, pathname, lineno, msg, args, exc_info, func=None):
+        self.name        = name
+        self.levelno     = level
+        self.levelname   = _level_to_name[level] if level in _level_to_name else ('Level ' + level)
+        self.pathname    = pathname or ''
+        self.filename    = pathname or ''
+        self.module      = ''
+        self.funcName    = func or '(unknown)'
+        self.lineno      = lineno or 0
+        self.msg         = msg
+        self.args        = args
+        self.exc_info    = exc_info
+        self.exc_text    = None
+        self.stack_info  = None
+        now              = v'Date.now()'
+        self.created     = now / 1000.0
+        self.msecs       = now % 1000
+        self.relativeCreated = now - v'_logging_start_time'
+        self.thread      = 0
+        self.threadName  = 'MainThread'
+        self.process     = 0
+        self.processName = 'MainProcess'
+        self.message     = ''
+
+    def getMessage(self):
+        msg = str(self.msg)
+        msg = v'_logging_fmt_msg(msg, this.args)'
+        return msg
+
+
+_log_record_factory = LogRecord
+
+
+def makeLogRecord(d):
+    rv = LogRecord('', 0, '', 0, '', None, None)
+    v"""
+    var _src = (d && d.jsmap) ? (function(){
+        var o = {}; d.jsmap.forEach(function(v,k){ o[k]=v; }); return o;
+    })() : (d || {});
+    var _ks = Object.keys(_src);
+    for (var _i = 0; _i < _ks.length; _i++) { rv[_ks[_i]] = _src[_ks[_i]]; }
+    """
+    return rv
+
+
+def setLogRecordFactory(factory):
+    global _log_record_factory
+    _log_record_factory = factory
+
+
+def getLogRecordFactory():
+    return _log_record_factory
+
+
+def _make_log_record(name, level, msg, args, exc_info=None):
+    return _log_record_factory(name, level, '', 0, msg, args, exc_info)
+
+
+# ---------------------------------------------------------------------------
+# Filter / Filterer
+# ---------------------------------------------------------------------------
+
+class Filter:
+    def __init__(self, name=''):
+        self.name = name
+        self.nlen = name.length
+
+    def filter(self, record):
+        if self.nlen == 0:
+            return True
+        if record.name == self.name:
+            return True
+        return record.name.startsWith(self.name + '.')
+
+
+class Filterer:
+    def __init__(self):
+        self.filters = []
+
+    def addFilter(self, fltr):
+        if self.filters.indexOf(fltr) < 0:
+            self.filters.push(fltr)
+
+    def removeFilter(self, fltr):
+        idx = self.filters.indexOf(fltr)
+        if idx >= 0:
+            self.filters.splice(idx, 1)
+
+    def filter(self, record):
+        for f in self.filters:
+            result = True
+            if hasattr(f, 'filter'):
+                result = f.filter(record)
+            elif jstype(f) is 'function':
+                result = f(record)
+            if not result:
+                return False
+        return True
+
+
+# ---------------------------------------------------------------------------
+# Formatter
+# ---------------------------------------------------------------------------
+
+_DEFAULT_FMT     = '%(levelname)s:%(name)s:%(message)s'
+_DEFAULT_DATEFMT = None
+
+
+class Formatter:
+    def __init__(self, fmt=None, datefmt=None, style='%', validate=True):
+        self._fmt    = fmt if fmt is not None else _DEFAULT_FMT
+        self.datefmt = datefmt
+        self._style  = style
+
+    def format(self, record):
+        record.message = record.getMessage()
+        if self._fmt.indexOf('%(asctime)') >= 0:
+            record.asctime = self.formatTime(record, self.datefmt)
+        s = v'_logging_format_record(this._fmt, record)'
+        if record.exc_info and not record.exc_text:
+            record.exc_text = self.formatException(record.exc_info)
+        if record.exc_text:
+            if s and not s.endsWith('\n'):
+                s += '\n'
+            s += record.exc_text
+        if record.stack_info:
+            if s and not s.endsWith('\n'):
+                s += '\n'
+            s += self.formatStack(record.stack_info)
+        return s
+
+    def formatTime(self, record, datefmt=None):
+        return v'_logging_iso_time(record.created, datefmt)'
+
+    def formatException(self, exc_info):
+        if exc_info is None:
+            return ''
+        exc = exc_info[1] if Array.isArray(exc_info) and exc_info.length > 1 else exc_info
+        if exc is None:
+            return ''
+        if hasattr(exc, 'stack'):
+            return str(exc.stack)
+        return str(exc)
+
+    def formatStack(self, stack_info):
+        return str(stack_info)
+
+    def usesTime(self):
+        return self._fmt.indexOf('%(asctime)') >= 0
+
+
+# ---------------------------------------------------------------------------
+# Handler
+# ---------------------------------------------------------------------------
+
+class Handler(Filterer):
+    def __init__(self, level=NOTSET):
+        Filterer.__init__(self)
+        self.level     = _check_level(level)
+        self._name     = None
+        self.formatter = None
+
+    def setLevel(self, level):
+        self.level = _check_level(level)
+
+    def setFormatter(self, fmt):
+        self.formatter = fmt
+
+    def format(self, record):
+        if self.formatter is not None:
+            return self.formatter.format(record)
+        return _default_formatter.format(record)
+
+    def emit(self, record):
+        raise NotImplementedError('Handler subclasses must implement emit()')
+
+    def handle(self, record):
+        if not self.filter(record):
+            return False
+        self.emit(record)
+        return True
+
+    def handleError(self, record):
+        pass
+
+    def close(self):
+        pass
+
+    def createLock(self):
+        pass
+
+    def acquire(self):
+        pass
+
+    def release(self):
+        pass
+
+
+class StreamHandler(Handler):
+    def __init__(self, stream=None):
+        Handler.__init__(self)
+        self.stream = stream
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            if self.stream is not None:
+                self.stream.write(msg + '\n')
+            else:
+                _logging_console_emit(record.levelno, msg)
+        except Exception:
+            self.handleError(record)
+
+    def flush(self):
+        pass
+
+
+class FileHandler(StreamHandler):
+    def __init__(self, filename, mode='a', encoding=None, delay=False):
+        raise NotImplementedError('FileHandler is not available in JS environments; use StreamHandler with a custom stream instead')
+
+
+class NullHandler(Handler):
+    def emit(self, record):
+        pass
+
+    def handle(self, record):
+        pass
+
+    def createLock(self):
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Default formatter / last-resort handler (initialised after class defs)
+# ---------------------------------------------------------------------------
+
+_default_formatter = Formatter()
+
+
+class _LastResortHandler(StreamHandler):
+    def __init__(self):
+        StreamHandler.__init__(self)
+        self.level = WARNING
+
+    def emit(self, record):
+        msg = record.getMessage()
+        _logging_console_emit(record.levelno,
+                              record.levelname + ':' + record.name + ':' + msg)
+
+
+lastResort = _LastResortHandler()
+
+
+# ---------------------------------------------------------------------------
+# Logger
+# ---------------------------------------------------------------------------
+
+_manager_loggers = {}
+_disable_level   = NOTSET
+
+
+class Logger(Filterer):
+    def __init__(self, name, level=NOTSET):
+        Filterer.__init__(self)
+        self.name      = name
+        self.level     = _check_level(level)
+        self.parent    = None
+        self.propagate = True
+        self.handlers  = []
+        self.disabled  = False
+
+    def setLevel(self, level):
+        self.level = _check_level(level)
+
+    def isEnabledFor(self, level):
+        if self.disabled:
+            return False
+        if level <= _disable_level:
+            return False
+        return level >= self.getEffectiveLevel()
+
+    def getEffectiveLevel(self):
+        logger = self
+        while logger is not None:
+            if logger.level != NOTSET:
+                return logger.level
+            logger = logger.parent
+        return WARNING
+
+    def addHandler(self, hdlr):
+        if self.handlers.indexOf(hdlr) < 0:
+            self.handlers.push(hdlr)
+
+    def removeHandler(self, hdlr):
+        idx = self.handlers.indexOf(hdlr)
+        if idx >= 0:
+            self.handlers.splice(idx, 1)
+
+    def hasHandlers(self):
+        c = self
+        while c is not None:
+            if c.handlers.length > 0:
+                return True
+            if not c.propagate:
+                break
+            c = c.parent
+        return False
+
+    def callHandlers(self, record):
+        c     = self
+        found = 0
+        while c is not None:
+            for hdlr in c.handlers:
+                found += 1
+                if record.levelno >= hdlr.level:
+                    hdlr.handle(record)
+            if not c.propagate:
+                c = None
+            else:
+                c = c.parent
+        if found == 0 and lastResort is not None:
+            if record.levelno >= lastResort.level:
+                lastResort.handle(record)
+
+    def handle(self, record):
+        if self.disabled:
+            return
+        if not self.filter(record):
+            return
+        self.callHandlers(record)
+
+    def _log(self, level, msg, args, exc_info=None, stack_info=None):
+        record            = _make_log_record(self.name, level, msg, args, exc_info)
+        record.stack_info = stack_info
+        self.handle(record)
+
+    def debug(self, msg, *args):
+        if self.isEnabledFor(DEBUG):
+            self._log(DEBUG, msg, args)
+
+    def info(self, msg, *args):
+        if self.isEnabledFor(INFO):
+            self._log(INFO, msg, args)
+
+    def warning(self, msg, *args):
+        if self.isEnabledFor(WARNING):
+            self._log(WARNING, msg, args)
+
+    def warn(self, msg, *args):
+        if self.isEnabledFor(WARNING):
+            self._log(WARNING, msg, args)
+
+    def error(self, msg, *args):
+        if self.isEnabledFor(ERROR):
+            self._log(ERROR, msg, args)
+
+    def critical(self, msg, *args):
+        if self.isEnabledFor(CRITICAL):
+            self._log(CRITICAL, msg, args)
+
+    def fatal(self, msg, *args):
+        if self.isEnabledFor(CRITICAL):
+            self._log(CRITICAL, msg, args)
+
+    def exception(self, msg, *args):
+        self._log(ERROR, msg, args)
+
+    def log(self, level, msg, *args):
+        lvl = _check_level(level)
+        if self.isEnabledFor(lvl):
+            self._log(lvl, msg, args)
+
+
+# ---------------------------------------------------------------------------
+# Root logger and hierarchy
+# ---------------------------------------------------------------------------
+
+root        = Logger('root', WARNING)
+root.parent = None
+
+
+def _fix_up_parents(alogger):
+    name = alogger.name
+    i    = name.lastIndexOf('.')
+    rv   = None
+    while i > 0 and rv is None:
+        substr = name.slice(0, i)
+        if substr in _manager_loggers:
+            rv = _manager_loggers[substr]
+        i = substr.lastIndexOf('.')
+    alogger.parent = rv if rv is not None else root
+
+
+def getLogger(name=None):
+    if name is None or name == '' or name == 'root':
+        return root
+    if name in _manager_loggers:
+        return _manager_loggers[name]
+    logger = Logger(name)
+    _manager_loggers[name] = logger
+    _fix_up_parents(logger)
+    return logger
+
+
+def disable(level=CRITICAL):
+    global _disable_level
+    _disable_level = _check_level(level)
+
+
+# ---------------------------------------------------------------------------
+# Module-level convenience functions
+# ---------------------------------------------------------------------------
+
+def debug(msg, *args):
+    if root.isEnabledFor(DEBUG):
+        root._log(DEBUG, msg, args)
+
+
+def info(msg, *args):
+    if root.isEnabledFor(INFO):
+        root._log(INFO, msg, args)
+
+
+def warning(msg, *args):
+    if root.isEnabledFor(WARNING):
+        root._log(WARNING, msg, args)
+
+
+def warn(msg, *args):
+    if root.isEnabledFor(WARNING):
+        root._log(WARNING, msg, args)
+
+
+def error(msg, *args):
+    if root.isEnabledFor(ERROR):
+        root._log(ERROR, msg, args)
+
+
+def critical(msg, *args):
+    if root.isEnabledFor(CRITICAL):
+        root._log(CRITICAL, msg, args)
+
+
+def exception(msg, *args):
+    root._log(ERROR, msg, args)
+
+
+def log(level, msg, *args):
+    lvl = _check_level(level)
+    if root.isEnabledFor(lvl):
+        root._log(lvl, msg, args)
+
+
+def captureWarnings(capture):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# basicConfig
+# ---------------------------------------------------------------------------
+
+_basic_config_done = False
+
+
+def basicConfig(**kwargs):
+    global _basic_config_done
+    force = v'_logging_kwget(kwargs, "force", false)'
+    if _basic_config_done and not force:
+        return
+    if force:
+        root.handlers = []
+
+    level        = v'_logging_kwget(kwargs, "level", null)'
+    fmt          = v'_logging_kwget(kwargs, "format", null)'
+    datefmt      = v'_logging_kwget(kwargs, "datefmt", null)'
+    stream       = v'_logging_kwget(kwargs, "stream", null)'
+    handlers_arg = v'_logging_kwget(kwargs, "handlers", null)'
+
+    if handlers_arg is not None:
+        for h in handlers_arg:
+            if h.formatter is None and (fmt is not None or datefmt is not None):
+                h.setFormatter(Formatter(fmt, datefmt))
+            root.addHandler(h)
+    elif root.handlers.length == 0:
+        h = StreamHandler(stream)
+        h.setFormatter(Formatter(fmt, datefmt))
+        root.addHandler(h)
+
+    if level is not None:
+        root.setLevel(level)
+
+    _basic_config_done = True
