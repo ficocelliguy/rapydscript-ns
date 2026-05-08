@@ -4076,6 +4076,105 @@ var TESTS = [
         },
     },
 
+    // ── parenthesized with (Python 3.10+) ────────────────────────────────────
+
+    {
+        name: "bundle_paren_with_single",
+        description: "parenthesized with: single clause with alias compiles and runs in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class _CM:",
+                "    def __init__(self, val):",
+                "        self.val = val",
+                "    def __enter__(self):",
+                "        return self.val",
+                "    def __exit__(self):",
+                "        pass",
+                "with (_CM(42) as x):",
+                "    assrt.equal(x, 42)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_paren_with_multi",
+        description: "parenthesized with: multi-clause LIFO exit order compiles and runs in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "log = []",
+                "class _CM:",
+                "    def __init__(self, name):",
+                "        self.name = name",
+                "    def __enter__(self):",
+                "        log.push('enter:' + self.name)",
+                "        return self",
+                "    def __exit__(self):",
+                "        log.push('exit:' + self.name)",
+                "with (_CM('a') as a, _CM('b') as b):",
+                "    log.push('body')",
+                "assrt.equal(log[0], 'enter:a')",
+                "assrt.equal(log[1], 'enter:b')",
+                "assrt.equal(log[2], 'body')",
+                "assrt.equal(log[3], 'exit:b')",
+                "assrt.equal(log[4], 'exit:a')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_paren_with_multiline",
+        description: "parenthesized with: multi-line trailing-comma form compiles and runs in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "log = []",
+                "class _CM:",
+                "    def __init__(self, name):",
+                "        self.name = name",
+                "    def __enter__(self):",
+                "        log.push('enter:' + self.name)",
+                "        return self",
+                "    def __exit__(self):",
+                "        log.push('exit:' + self.name)",
+                "with (",
+                "    _CM('x') as x,",
+                "    _CM('y') as y,",
+                "):",
+                "    log.push('body')",
+                "assrt.equal(log[0], 'enter:x')",
+                "assrt.equal(log[1], 'enter:y')",
+                "assrt.equal(log[2], 'body')",
+                "assrt.equal(log[3], 'exit:y')",
+                "assrt.equal(log[4], 'exit:x')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_paren_with_trailing_comma",
+        description: "parenthesized with: trailing comma accepted in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class _CM:",
+                "    def __init__(self, val):",
+                "        self.val = val",
+                "    def __enter__(self):",
+                "        return self.val",
+                "    def __exit__(self):",
+                "        pass",
+                "with (_CM(7) as v,):",
+                "    assrt.equal(v, 7)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

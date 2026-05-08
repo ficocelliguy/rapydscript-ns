@@ -1,0 +1,141 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# parenthesized_with.pyj
+# Tests for Python 3.10+ parenthesized `with` statement.
+
+ae  = assrt.equal
+ok  = assrt.ok
+
+# ── Helper context manager ────────────────────────────────────────────────────
+
+class _CM:
+    def __init__(self, name, log):
+        self.name = name
+        self.log = log
+
+    def __enter__(self):
+        self.log.push('enter:' + self.name)
+        return self
+
+    def __exit__(self, *args):
+        self.log.push('exit:' + self.name)
+        return False
+
+# ── 1. Single clause, alias inside parens ─────────────────────────────────────
+
+_log1 = []
+with (_CM('a', _log1) as cm):
+    _log1.push('body')
+ae(_log1[0], 'enter:a')
+ae(_log1[1], 'body')
+ae(_log1[2], 'exit:a')
+
+# ── 2. Single clause, no alias ────────────────────────────────────────────────
+
+_log2 = []
+
+class _SimpleCM:
+    def __init__(self, log):
+        self.log = log
+    def __enter__(self):
+        self.log.push('entered')
+        return self
+    def __exit__(self):
+        self.log.push('exited')
+
+with (_SimpleCM(_log2)):
+    _log2.push('body')
+ae(_log2[0], 'entered')
+ae(_log2[1], 'body')
+ae(_log2[2], 'exited')
+
+# ── 3. Multi-clause, LIFO exit order ──────────────────────────────────────────
+
+_log3 = []
+with (_CM('a', _log3) as a, _CM('b', _log3) as b):
+    _log3.push('body')
+ae(_log3[0], 'enter:a')
+ae(_log3[1], 'enter:b')
+ae(_log3[2], 'body')
+ae(_log3[3], 'exit:b')  # LIFO: b exits before a
+ae(_log3[4], 'exit:a')
+
+# ── 4. Trailing comma ─────────────────────────────────────────────────────────
+
+_log4 = []
+with (_CM('x', _log4) as x,):
+    _log4.push('body')
+ae(_log4[0], 'enter:x')
+ae(_log4[1], 'body')
+ae(_log4[2], 'exit:x')
+
+# ── 5. Multi-line form ────────────────────────────────────────────────────────
+
+_log5 = []
+with (
+    _CM('p', _log5) as p,
+    _CM('q', _log5) as q,
+):
+    _log5.push('body')
+ae(_log5[0], 'enter:p')
+ae(_log5[1], 'enter:q')
+ae(_log5[2], 'body')
+ae(_log5[3], 'exit:q')
+ae(_log5[4], 'exit:p')
+
+# ── 6. __enter__ return value assigned to alias ───────────────────────────────
+
+class _ValCM:
+    def __init__(self, val):
+        self.val = val
+    def __enter__(self):
+        return self.val
+    def __exit__(self):
+        pass
+
+with (_ValCM(99) as v):
+    ae(v, 99)
+
+# ── 7. Exception suppression via __exit__ ─────────────────────────────────────
+
+class _SuppressCM:
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        return True  # suppress any exception
+
+_raised = False
+with (_SuppressCM()):
+    raise Error('suppressed')
+_raised = True
+ok(_raised)
+
+# ── 8. Exception propagation (unsuppressed) ──────────────────────────────────
+
+_caught = False
+try:
+    with (_CM('err', []) as _ignored):
+        raise Error('propagated')
+except Exception as _e:
+    _caught = True
+ok(_caught)
+
+# ── 9. Non-parenthesized form still works (regression) ───────────────────────
+
+_log9 = []
+with _CM('r', _log9) as r, _CM('s', _log9) as s:
+    _log9.push('body')
+ae(_log9[0], 'enter:r')
+ae(_log9[3], 'exit:s')
+ae(_log9[4], 'exit:r')
+
+# ── 10. Parenthesized expression (not parenthesized-with) still works ─────────
+
+_log10 = []
+_cm10 = _CM('t', _log10)
+with (_cm10) as t:
+    _log10.push('body')
+ae(_log10[0], 'enter:t')
+ae(_log10[1], 'body')
+ae(_log10[2], 'exit:t')

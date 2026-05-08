@@ -708,21 +708,70 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
     def with_():
         clauses = v'[]'
         start = S.token
-        while True:
-            if is_('eof'):
-                unexpected()
-            expr = expression()
-            alias = None
-            if is_('keyword', 'as'):
-                next()
-                alias = as_symbol(AST_SymbolAlias)
-            clauses.push(new AST_WithClause({'expression':expr, 'alias':alias}))
-            if is_('punc', ','):
-                next()
-                continue
-            if not is_('punc', ':'):
-                unexpected()
-            break
+
+        # Detect Python 3.10+ parenthesized form: with (cm1 as a, cm2 as b):
+        # vs traditional: with cm as a:  or  with (expr) as a:
+        # Lookahead: scan tokens inside the `(` for an `as` keyword at depth 0
+        # before the matching `)`. If found, it's the parenthesized form.
+        is_parenthesized_with = False
+        if is_('punc', '('):
+            depth = 0
+            i = 0
+            while True:
+                while S.peeked.length <= i:
+                    S.peeked.push(S.input())
+                tok = S.peeked[i]
+                if tok.type is 'eof':
+                    break
+                if tok.type is 'punc':
+                    if tok.value is '(' or tok.value is '[' or tok.value is '{':
+                        depth += 1
+                    elif tok.value is ')' or tok.value is ']' or tok.value is '}':
+                        if depth is 0:
+                            break
+                        depth -= 1
+                elif tok.type is 'keyword' and tok.value is 'as' and depth is 0:
+                    is_parenthesized_with = True
+                    break
+                i += 1
+
+        if is_parenthesized_with:
+            next()  # consume `(`
+            while True:
+                if is_('eof'):
+                    unexpected()
+                if is_('punc', ')'):
+                    next()  # trailing comma before closing `)`
+                    break
+                expr = expression()
+                alias = None
+                if is_('keyword', 'as'):
+                    next()
+                    alias = as_symbol(AST_SymbolAlias)
+                clauses.push(new AST_WithClause({'expression': expr, 'alias': alias}))
+                if is_('punc', ','):
+                    next()
+                    continue
+                if not is_('punc', ')'):
+                    unexpected()
+                next()  # consume `)`
+                break
+        else:
+            while True:
+                if is_('eof'):
+                    unexpected()
+                expr = expression()
+                alias = None
+                if is_('keyword', 'as'):
+                    next()
+                    alias = as_symbol(AST_SymbolAlias)
+                clauses.push(new AST_WithClause({'expression':expr, 'alias':alias}))
+                if is_('punc', ','):
+                    next()
+                    continue
+                if not is_('punc', ':'):
+                    unexpected()
+                break
 
         if not clauses.length:
             token_error(start, 'with statement must have at least one clause')

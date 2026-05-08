@@ -225,16 +225,6 @@ Python's `Ellipsis` singleton object. Code that stores `...` in containers or ch
 
 ---
 
-### 2.9 `parenthesized with` (Python 3.10+) Not Supported
-
-```python
-with (open('a') as f, open('b') as g):   # not supported
-    ...
-```
-The non-parenthesized multi-context form (`with A() as a, B() as b:`) does work.
-
----
-
 ## 3. Missing Standard Library Modules (Browser-Relevant)
 
 These are absent from `src/lib/` and have no substitute.

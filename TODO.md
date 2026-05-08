@@ -8,7 +8,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python heapq module] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there.
+I would like you to add support for [python parenthesized with] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there.
 
 ### asyncio example
 
@@ -324,4 +324,39 @@ print(nlargest(3, data))    # [9, 6, 5]
 students = [('Alice', 88), ('Bob', 95), ('Carol', 73)]
 top2 = nlargest(2, students, key=def(s): return s[1];)
 print(top2)   # [('Bob', 95), ('Alice', 88)]
+```
+
+### parenthesized with example
+
+```python
+from contextlib import closing
+
+class DBConn:
+    def __init__(self, url):
+        self.url = url
+    def __enter__(self):
+        print('open:', self.url)
+        return self
+    def __exit__(self, *args):
+        print('close:', self.url)
+        return False
+
+class LogFile:
+    def __init__(self, path):
+        self.path = path
+        self.lines = []
+    def __enter__(self):
+        return self
+    def write(self, msg):
+        self.lines.push(msg)
+    def __exit__(self, *args):
+        print(self.path, '->', '\n'.join(self.lines))
+        return False
+
+with (
+    DBConn('postgres://localhost/mydb') as db,
+    LogFile('/tmp/audit.log') as log,
+):
+    log.write('connected to ' + db.url)
+    log.write('running queries...')
 ```
