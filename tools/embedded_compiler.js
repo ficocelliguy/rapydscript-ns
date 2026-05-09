@@ -7,7 +7,7 @@
 "use strict";  /*jshint node:true */
 
 var has_prop = Object.prototype.hasOwnProperty.call.bind(Object.prototype.hasOwnProperty);
-var PYTHON_MODE_FLAGS = ['dict_literals', 'overload_getitem', 'bound_methods', 'hash_literals', 'overload_operators', 'truthiness', 'jsx'];
+var PYTHON_MODE_FLAGS = ['dict_literals', 'overload_getitem', 'bound_methods', 'hash_literals', 'overload_operators', 'truthiness', 'jsx', 'type_enforcement'];
 
 function build_scoped_flags(flags_str) {
     var result = Object.create(null);

@@ -6,6 +6,13 @@ version 0.9.3
 * Added the `html` standard library module (`escape`, `unescape`, `HTMLParser`, etc.)
 * Added the `asyncio` standard library module (`sleep()`, `gather()`, `create_task()`, etc.)
 * Added the `urllib` standard library module
+* Added the `http` standard library module (`HTTPStatus`, `HTTPConnection`, `HTTPSConnection`, `HTTPResponse`, `SimpleCookie`, `Morsel`, `CookieError`)
+* Added the `csv` standard library module (`reader`, `writer`, `DictReader`, `DictWriter`, `Dialect`, `register_dialect`, QUOTE_* constants, etc.)
+* Added the `textwrap` standard library module (`TextWrapper`, `wrap`, `fill`, `shorten`, `dedent`, `indent`)
+* Added the `logging` standard library module (`getLogger`, `basicConfig`, `Logger`, `Handler`, `StreamHandler`, `Formatter`, `Filter`, level constants, etc.)
+* Added the `heapq` standard library module (`heappush`, `heappop`, `heapify`, `heapreplace`, `heappushpop`, `nlargest`, `nsmallest`)
+* Added support for parenthesized `with` statements: `with (A() as a, B() as b):` — multi-line and trailing comma supported
+* Added support for async generators (`async def` with `yield`) and `async for` — compiles to JS `async function*` (wrapped) and `for await ... of`
 * Added support for `float("inf")` and `float("-inf")`
 * Added `long()` type and improved pretty-printing of `type()` return values
 * Language service: bare imports now correctly provide type hints; infinite loop warning

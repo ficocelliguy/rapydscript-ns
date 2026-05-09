@@ -119,7 +119,10 @@ def print_for_loop_body(output):
         if not (self.simple_for_index or is_simple_for_in(self)):
             # if we're using multiple iterators, unpack them
             output.indent()
-            if output.options.js_version is 5:
+            # `async for` always emits ES6+ `for await ... of` syntax (regardless
+            # of js_version), so the loop variable holds the value directly —
+            # not an integer index into an array.
+            if output.options.js_version is 5 and not self.is_async:
                 itervar = "ρσ_Iter" + output.index_counter + "[ρσ_Index" + output.index_counter + "]"
             else:
                 itervar = "ρσ_Index" + output.index_counter
@@ -237,7 +240,19 @@ def print_for_in(self, output):
         )
     else:
         # regular loop
-        if output.options.js_version is 5:
+        if self.is_async:
+            # async for: emit native `for await ... of` regardless of js_version.
+            # Async iteration is an ES2018 feature; if the user wrote `async for`
+            # they have already opted into a modern runtime. The ρσ_Iterable
+            # bridge is skipped because async iterators don't expose .length
+            # or Map keys — the JS engine handles Symbol.asyncIterator natively.
+            itervar = "ρσ_Iter" + output.index_counter
+            output.assign("var " + itervar)
+            write_object()
+            output.end_statement()
+            output.indent()
+            output.spaced('for', 'await', '(var', 'ρσ_Index' + output.index_counter, 'of', itervar + ')')
+        elif output.options.js_version is 5:
             output.assign("var ρσ_Iter" + output.index_counter)
             output.print("ρσ_Iterable")
             output.with_parens(write_object)

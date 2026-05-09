@@ -3123,6 +3123,34 @@ By default, generators are down-converted to ES 5 switch statements. Pass
 compiler options) to emit native ES 6 generator functions instead, which are
 smaller and faster.
 
+### Async generators (`async def` with `yield`)
+
+Async generators — `async def` functions that contain `yield` — are also
+supported, with the same syntax as Python:
+
+```py
+async def stream(urls):
+    for url in urls:
+        body = await fetch(url)
+        yield body
+
+async def main():
+    async for body in stream(['/a', '/b']):
+        print(body)
+```
+
+Calling an async-generator function returns an async iterator immediately
+(not a `Promise`). Each `.next()` call returns a `Promise` that resolves to a
+`{value, done}` record, matching the JS async-iterator protocol. Manual
+iteration via `await it.next()` and `await it.asend()` works (`.asend` is
+aliased to `.next`, mirroring Python's async-generator API). Whole iterators
+are best consumed with `async for x in iter:`, which compiles to JS
+`for await ... of`.
+
+`async for` is an ES2018 feature, so it is always emitted in modern form
+regardless of `--js-version`. The runtime must support `Symbol.asyncIterator`
+(Node 10+, Chrome 63+, Firefox 57+, Safari 11.1+).
+
 Modules
 -------
 
@@ -3997,6 +4025,8 @@ Python Feature Coverage
 | Generator `.throw()`                                                                                                                                                                                                                                          | Works via JS generator protocol |
 | Generator `.send()`                                                                                                                                                                                                                                           | Works via `g.next(value)` |
 | `yield from`                                                                                                                                                                                                                                                  | Works; return value of sub-generator is not accessible |
+| `async def` with `yield` (async generators)                                                                                                                                                                                                                   | Combining `async def` with `yield` produces an async generator. Calling it returns an async iterator immediately; `.next()` / `.asend()` return `Promise` objects, matching Python's `__anext__` / `asend` API (`.send` and `.asend` are aliased to `.next`). `await` may appear before, between, or after `yield`. Compiled to a sync wrapper around `async function*`. |
+| `async for x in iter:`                                                                                                                                                                                                                                        | Drives async iterators (`Symbol.asyncIterator`) and async generators. Compiles to native `for await ... of` (ES2018) regardless of `--js-version`. Works with sync iterables that yield Promises as well. |
 | `+=`, `-=`, `*=`, `/=`, `//=`, `**=`, `%=`, `&=`, `\|=`, `^=`, `<<=`, `>>=`                                                                                                                                                                                   | All augmented assignments work |
 | `raise X from Y` exception chaining                                                                                                                                                                                                                           | Sets `__cause__` on the thrown exception; `from None` also supported |
 | Starred assignment `a, *b, c = ...`                                                                                                                                                                                                                           | Works |
@@ -4149,7 +4179,7 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `base64`      | ✅           | `b64encode(s[, altchars])`, `b64decode(s[, altchars][, validate])`, `standard_b64encode`, `standard_b64decode`, `urlsafe_b64encode`, `urlsafe_b64decode`, `b32encode`, `b32decode([casefold][, map01])`, `b16encode`, `b16decode([casefold])`, `encodebytes`, `decodebytes`, `Error` in `src/lib/base64.pyj`; pure-JS implementation, works in browser and Node; all encode functions return `bytes` |
 | `string`      | ✅           | Character constants (`ascii_letters`, `ascii_lowercase`, `ascii_uppercase`, `digits`, `hexdigits`, `octdigits`, `punctuation`, `whitespace`, `printable`), `Template` ($-substitution with `substitute(mapping)` and `safe_substitute(mapping)`), `Formatter` (`format(*args)`, `vformat(fmt, args, kwargs)`, `format_field`, `convert_field`, `get_value`, `get_field`, `parse`) in `src/lib/string.pyj`; `Formatter.format()` accepts positional args — for named-field substitution use `vformat(fmt, [], {'key': val})`; `Template.substitute()` and `safe_substitute()` accept a dict (or plain object) |
 | `html`        | ✅           | `escape(s[, quote=True])`, `unescape(s)`, `HTMLParser` (event-driven parser; subclass and override `handle_starttag`, `handle_endtag`, `handle_data`, `handle_comment`, `handle_decl`, etc.) in `src/lib/html.pyj`; full HTML4 + common HTML5 named entity table; `convert_charrefs=True` by default (entities in text and attributes auto-decoded); `html.parser` sub-module not available as a separate import — use `from html import HTMLParser` |
-| `asyncio`     | ✅           | `sleep()`, `gather()`, `create_task()`, `ensure_future()`, `run()`, `shield()`, `wait_for()`, `wait()`, `iscoroutine()`, `iscoroutinefunction()`, `current_task()`, `all_tasks()`, `get_event_loop()`, `get_running_loop()`, `new_event_loop()` in `src/lib/asyncio.pyj`; synchronization primitives: `Lock`, `Event`, `Semaphore`, `BoundedSemaphore`, `Queue`, `LifoQueue`, `PriorityQueue`; exceptions: `CancelledError`, `TimeoutError`, `InvalidStateError`, `QueueEmpty`, `QueueFull`; `async def` / `await` syntax compiles to native JS async functions; `asyncio.run(coro)` returns the Promise (cannot block in JS); `async with` / `async for` not supported — use `.acquire()`/`.release()` and `.get()`/`.put()` directly |
+| `asyncio`     | ✅           | `sleep()`, `gather()`, `create_task()`, `ensure_future()`, `run()`, `shield()`, `wait_for()`, `wait()`, `iscoroutine()`, `iscoroutinefunction()`, `current_task()`, `all_tasks()`, `get_event_loop()`, `get_running_loop()`, `new_event_loop()` in `src/lib/asyncio.pyj`; synchronization primitives: `Lock`, `Event`, `Semaphore`, `BoundedSemaphore`, `Queue`, `LifoQueue`, `PriorityQueue`; exceptions: `CancelledError`, `TimeoutError`, `InvalidStateError`, `QueueEmpty`, `QueueFull`; `async def` / `await` syntax compiles to native JS async functions; `async def` with `yield` (async generators) and `async for` are supported (see "Async generators" section); `asyncio.run(coro)` returns the Promise (cannot block in JS); `async with` is not supported — use `.acquire()`/`.release()` directly |
 | `urllib`      | ✅           | `urllib.parse`: `quote()`, `unquote()`, `quote_plus()`, `unquote_plus()`, `urlencode()`, `urlsplit()` → `SplitResult`, `urlparse()` → `ParseResult`, `urlunsplit()`, `urlunparse()`, `urljoin()`, `parse_qs()`, `parse_qsl()` in `src/lib/urllib/parse.pyj`; `urllib.error`: `URLError`, `HTTPError` in `src/lib/urllib/error.pyj`; `urllib.request`: `urlopen(url[, data[, timeout]])` returns a Promise wrapping the Fetch API in `src/lib/urllib/request.pyj` — use with `await` in an async function; `SplitResult`/`ParseResult` expose `.scheme`, `.netloc`, `.path`, `.query`, `.fragment` plus `.hostname`, `.port`, `.username`, `.password` and `.geturl()`; backed by the JS `URL` constructor and `encodeURIComponent`/`decodeURIComponent`; RFC 3986 unreserved characters (`A-Z a-z 0-9 - _ . ~`) never encoded |
 | `bisect`      | ✅           | `bisect_left(a, x[, lo[, hi[, key]]])`, `bisect_right(a, x[, lo[, hi[, key]]])`, `bisect` (alias for `bisect_right`), `insort_left(a, x[, lo[, hi[, key]]])`, `insort_right(a, x[, lo[, hi[, key]]])`, `insort` (alias for `insort_right`) in `src/lib/bisect.pyj`; pure binary-search implementation matching Python semantics; optional `lo`/`hi` bounds for sub-slice search; optional `key` function (Python 3.10+ API) applied to array elements only — `x` must be directly comparable to `key(a[i])` results |
 | `http`        | ✅           | `http`: `HTTPStatus` class with integer constants for all standard status codes (`OK=200`, `NOT_FOUND=404`, `IM_A_TEAPOT=418`, etc.) in `src/lib/http/__init__.pyj`; `http.client`: `HTTPConnection(host[, port[, timeout]])`, `HTTPSConnection(host[, port[, timeout]])`, `HTTPResponse` (`.status`, `.reason`, `.headers`, `.url`, `getheader(name[, default])`, `getheaders()`, `read()` → Promise, `json()` → Promise), `HTTPException`, `NotConnected`, `InvalidURL`, `RemoteDisconnected`, `HTTP_PORT=80`, `HTTPS_PORT=443` in `src/lib/http/client.pyj`; `http.cookies`: `SimpleCookie` (dict-like cookie container with `load(rawdata)`, `output([header, sep])`, `items()`, `keys()`, `values()`), `Morsel` (`.key`, `.value`, `.coded_value`, `OutputString()`, `output([header])`), `CookieError` in `src/lib/http/cookies.pyj`; `getresponse()` wraps the Fetch API and returns a Promise — use with `await`; non-2xx responses are returned normally (check `resp.status` yourself, unlike `urllib.request`); `http.server` not available |

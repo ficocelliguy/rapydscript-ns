@@ -614,6 +614,38 @@ function make_tests(SourceAnalyzer, RS) {
         },
 
         {
+            name: "async_generator_local_var_visible",
+            description: "Inside `async def` with `yield`, local vars are tracked in scope",
+            run: function () {
+                // Async generators (async def + yield) should not break scope analysis.
+                // Local assignments should be picked up the same as in regular functions.
+                var m = analyze([
+                    "async def aiter():",
+                    "    counter = 0",
+                    "    yield counter",
+                    "    counter += 1",
+                    "    yield counter",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "counter");
+                assert.ok(sym, "Expected 'counter' symbol in async-generator scope");
+            },
+        },
+
+        {
+            name: "async_for_loop_var_visible",
+            description: "`async for x in ...` loop variable is registered in scope",
+            run: function () {
+                var m = analyze([
+                    "async def consume(it):",
+                    "    async for item in it:",
+                    "        print(item)",
+                ].join("\n"));
+                var sym = find(m.getAllSymbols(), "item");
+                assert.ok(sym, "Expected 'item' loop variable in async-for scope");
+            },
+        },
+
+        {
             name: "inferred_class_no_inference_for_variable_rhs",
             description: "x = some_var does not set inferred_class (unknown rhs)",
             run: function () {

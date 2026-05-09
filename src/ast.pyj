@@ -247,7 +247,8 @@ class AST_ForIn(AST_StatementWithBody):
         'init': "[AST_Node] the `for/in` initialization code",
         'name': "[AST_SymbolRef?] the loop variable, only if `init` is AST_Var",
         'object': "[AST_Node] the object that we're looping through",
-        'belse': "[AST_Else?] the `else` clause, run when no break occurred"
+        'belse': "[AST_Else?] the `else` clause, run when no break occurred",
+        'is_async': "[bool*] True iff this is an `async for` (uses `for await ... of`)"
     }
 
     def _walk(self, visitor):

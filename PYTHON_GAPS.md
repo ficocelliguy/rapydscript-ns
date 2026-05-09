@@ -190,23 +190,13 @@ who rely on them (e.g., `from math import *`) must enumerate imports explicitly.
 
 ---
 
-### 2.5 Async Generators Not Supported
-
-`async def` functions with `yield` (async generators) are not supported. Only basic
-`async def` + `await` (coroutines) and synchronous generators work.
-
-**Browser relevance:** Async generators are useful for streaming data (e.g., consuming a
-`ReadableStream` line by line). This gap is significant for browser I/O patterns.
-
----
-
-### 2.6 `asynccontextmanager` Not Available
+### 2.5 `asynccontextmanager` Not Available
 
 `contextlib.asynccontextmanager` is absent. Only synchronous `@contextmanager` is implemented.
 
 ---
 
-### 2.7 f-string Debugging Format `f'{x=}'` Not Supported
+### 2.6 f-string Debugging Format `f'{x=}'` Not Supported
 
 Python 3.8+ supports `f'{x=}'` which expands to `f'x={repr(x)}'`. This is not implemented.
 
@@ -217,7 +207,7 @@ print(f'{x=}')   # Python: "x=42". RapydScript: syntax error or wrong output
 
 ---
 
-### 2.8 Ellipsis Evaluates to `undefined`
+### 2.7 Ellipsis Evaluates to `undefined`
 
 `...` (Ellipsis) parses as a valid expression but evaluates to JS `undefined` rather than
 Python's `Ellipsis` singleton object. Code that stores `...` in containers or checks
@@ -426,6 +416,5 @@ The `jstype()` builtin is the RS equivalent of JS's `typeof`.
 | Medium | `hashlib` shim over Web Crypto | Medium | Hashing without verbatim JS |
 | Low | `decimal` module | High | Financial calculations |
 | Low | `difflib` module | High | Text diff, fuzzy matching |
-| Low | Async generators | High | Streaming browser I/O |
 | Low | `asynccontextmanager` | Medium | Async resource management |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |

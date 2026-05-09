@@ -77,11 +77,12 @@ def function_preamble(node, output, offset):
                     output.print('if (' + arg.name + ' === undefined) throw new TypeError(' + JSON.stringify(miss_msg) + ')')
                     output.end_statement()
                 if arg.annotation:
-                    type_msg = fname + '() argument \'' + arg.name + '\' must be '
+                    annot_name = arg.annotation.name or ''
+                    type_msg = fname + '() argument \'' + arg.name + '\' must be ' + annot_name
                     output.indent()
                     output.print('if (' + arg.name + ' !== undefined && !ρσ_instanceof(' + arg.name + ', ')
                     arg.annotation.print(output)
-                    output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ' + ρσ_arith_type_name(' + arg.name + '))')
+                    output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ')')
                     output.end_statement()
             return  # simple func: only enforcement, no complex preamble
 
@@ -277,11 +278,12 @@ def function_preamble(node, output, offset):
                 continue
             if not arg.annotation:
                 continue
-            type_msg = fname + '() argument \'' + arg.name + '\' must be '
+            annot_name = arg.annotation.name or ''
+            type_msg = fname + '() argument \'' + arg.name + '\' must be ' + annot_name
             output.indent()
             output.print('if (' + arg.name + ' !== undefined && !ρσ_instanceof(' + arg.name + ', ')
             arg.annotation.print(output)
-            output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ' + ρσ_arith_type_name(' + arg.name + '))')
+            output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ')')
             output.end_statement()
 
 def has_annotations(self):
@@ -385,27 +387,37 @@ def function_definition(self, output, strip_first, as_expression):
         output.set_indentation(output.next_indent())
         output.spaced('(function()', '{'), output.newline()
         output.indent(), output.spaced('var', anonfunc, '='), output.space()
-    if self.is_async:
+    # Async generators (async def with yield) are emitted as a sync wrapper that
+    # returns the async iterator directly (matching Python semantics, where calling
+    # an async generator function returns the iterator immediately without await).
+    # The inner js_generator is `async function*`. The outer wrapper is sync.
+    if self.is_async and not self.is_generator:
         output.print("async"), output.space()
     output.print("function"), output.space()
     if self.name:
         self.name.print(output)
 
     if self.is_generator:
+        inner_decl = 'async function* js_generator' if self.is_async else 'function* js_generator'
         output.print('()'), output.space()
         output.with_block(def():
             output.indent()
-            output.print('function* js_generator')
+            output.print(inner_decl)
             function_args(self.argnames, output, strip_first)
             print_bracketed(self, output, True, function_preamble)
             output.newline()
             output.indent()
             output.spaced('var', 'result', '=', 'js_generator.apply(this,', 'arguments)')
             output.end_statement()
-            # Python's generator objects use a separate method to send data to the generator
+            # Python's generator objects use a separate method to send data to the generator.
+            # For async generators, asend() is the async equivalent — alias it to next as well.
             output.indent()
             output.spaced('result.send', '=', 'result.next')
             output.end_statement()
+            if self.is_async:
+                output.indent()
+                output.spaced('result.asend', '=', 'result.next')
+                output.end_statement()
             output.indent()
             output.spaced('return', 'result')
             output.end_statement()

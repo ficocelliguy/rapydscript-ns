@@ -1536,6 +1536,45 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "async_generator_no_diagnostics",
+            description: "async def with yield (async generator) parses cleanly with no syntax errors",
+            run: function () {
+                var markers = d().check([
+                    "async def aiter():",
+                    "    yield 1",
+                    "    yield 2",
+                    "",
+                    "async def consume():",
+                    "    out = []",
+                    "    async for x in aiter():",
+                    "        out.append(x)",
+                    "    return out",
+                ].join("\n"));
+                var errs = markers.filter(function (m) { return m.severity === 1 || m.severity === 8; });
+                assert.deepStrictEqual(errs, [],
+                    "Expected no syntax errors for async generator + async for, got: " + JSON.stringify(errs));
+            },
+        },
+
+        {
+            name: "async_generator_local_no_undef",
+            description: "Local vars inside an async generator (with `await` and `yield`) resolve correctly",
+            run: function () {
+                var markers = d().check([
+                    "async def stream():",
+                    "    n = await Promise.resolve(3)",
+                    "    i = 0",
+                    "    while i < n:",
+                    "        yield i",
+                    "        i += 1",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.message.indexOf("Undefined symbol") !== -1; });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no 'Undefined symbol' errors in async generator, got: " + JSON.stringify(undef));
+            },
+        },
+
+        {
             name: "infinite_loop_no_false_positive_for_condition",
             description: "while x > 0: (non-constant condition) does not produce a warning",
             run: function () {

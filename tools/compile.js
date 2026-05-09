@@ -76,7 +76,7 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
 
     var global_scoped_flags = build_scoped_flags(argv.python_flags);
     if (!argv.legacy_rapydscript) {
-        var python_mode_flags = ['dict_literals', 'overload_getitem', 'bound_methods', 'hash_literals', 'overload_operators', 'truthiness', 'jsx'];
+        var python_mode_flags = ['dict_literals', 'overload_getitem', 'bound_methods', 'hash_literals', 'overload_operators', 'truthiness', 'jsx', 'type_enforcement'];
         python_mode_flags.forEach(function(f) { if (!(f in global_scoped_flags)) global_scoped_flags[f] = true; });
         if (!argv.pythonize_strings) OUTPUT_OPTIONS.pythonize_strings = true;
     }

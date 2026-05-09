@@ -620,8 +620,15 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     })
             elif tmp_ is "async":
                 start = prev()
+                if is_("keyword", "for"):
+                    # async for: consume an async iterable using JS `for await ... of`
+                    next()
+                    forstmt = for_()
+                    forstmt.is_async = True
+                    forstmt.start = start
+                    return forstmt
                 if not is_("keyword", "def"):
-                    croak("Expected 'def' after 'async'")
+                    croak("Expected 'def' or 'for' after 'async'")
                 next()
                 func = function_(S.in_class[-1], False, True)
                 func.start = start

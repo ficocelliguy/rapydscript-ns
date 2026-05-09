@@ -2985,6 +2985,106 @@ var TESTS = [
     },
 
     {
+        name: "bundle_async_generator_shape",
+        description: "async def with yield returns an async iterator with .next/.send/.asend (web-repl bundle)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "async def aiter():",
+                "    yield 1",
+                "    yield 2",
+                "    yield 3",
+                "it = aiter()",
+                // The wrapper is sync — calling the async generator returns the
+                // iterator immediately, NOT a Promise.
+                "assrt.equal(jstype(it.next), 'function')",
+                "assrt.equal(jstype(it.send), 'function')",   // Python alias
+                "assrt.equal(jstype(it.asend), 'function')",  // async-gen alias
+                "assrt.equal(jstype(it[v'Symbol.asyncIterator']), 'function')",
+                // .next() returns a thenable Promise
+                "p = it.next()",
+                "assrt.equal(jstype(p.then), 'function')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_async_generator_await_inside",
+        description: "async generators may use `await` between yields (web-repl bundle)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "async def gen():",
+                "    a = await Promise.resolve(10)",
+                "    yield a",
+                "    b = await Promise.resolve(20)",
+                "    yield a + b",
+                "it = gen()",
+                "assrt.equal(jstype(it.next), 'function')",
+                "assrt.equal(jstype(it[v'Symbol.asyncIterator']), 'function')",
+                // .next() is thenable even when the body awaits before yielding
+                "assrt.equal(jstype(it.next().then), 'function')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_async_for_compiles_and_resolves",
+        description: "async for loop drives an async generator and resolves to expected values (web-repl bundle)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "async def aiter():",
+                "    yield 'a'",
+                "    yield 'b'",
+                "    yield 'c'",
+                "async def consume():",
+                "    out = []",
+                "    async for x in aiter():",
+                "        out.append(x)",
+                "    return out",
+                "p = consume()",
+                "assrt.equal(jstype(p.then), 'function')",
+                // The resolved value is verified via a microtask callback that
+                // throws on mismatch. Failing the assertion in a Promise chain
+                // surfaces as an unhandled rejection — Node exits non-zero,
+                // failing the test.
+                "v\"p.then(function(v){ if (v.length !== 3 || v[0] !== 'a' || v[1] !== 'b' || v[2] !== 'c') throw new Error('async-for produced ' + JSON.stringify(v)); })\"",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_async_generator_class_method",
+        description: "async generator method on a class compiles and exposes async iterator (web-repl bundle)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Counter:",
+                "    def __init__(self, limit):",
+                "        self.limit = limit",
+                "",
+                "    async def values(self):",
+                "        i = 0",
+                "        while i < self.limit:",
+                "            yield i",
+                "            i += 1",
+                "",
+                "it = Counter(3).values()",
+                "assrt.equal(jstype(it.next), 'function')",
+                "assrt.equal(jstype(it.send), 'function')",
+                "assrt.equal(jstype(it.asend), 'function')",
+                "assrt.equal(jstype(it[v'Symbol.asyncIterator']), 'function')",
+                "assrt.equal(jstype(it.next().then), 'function')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_urllib_parse_quote",
         description: "urllib.parse stdlib: quote, unquote, quote_plus, unquote_plus in the web-repl bundle",
         run: function () {
