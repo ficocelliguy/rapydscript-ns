@@ -63,9 +63,18 @@ def function_preamble(node, output, offset):
         if a.is_simple_func:
             # Simple function: named JS params; arguments.length gives true count
             if not a.starargs:
+                # Strip a trailing kwargs-marker object so a `*args, **kwargs`
+                # caller does not get blamed for an extra positional argument
+                # (matches the complex-func variant below).
+                output.indent()
+                output.spaced('var', 'ρσ_nargs', '=', 'arguments.length')
+                output.end_statement()
+                output.indent()
+                output.print('if (ρσ_nargs > 0 && arguments[ρσ_nargs-1] !== null && typeof arguments[ρσ_nargs-1] === "object" && arguments[ρσ_nargs-1][ρσ_kwargs_symbol] === true) ρσ_nargs--')
+                output.end_statement()
                 max_msg = fname + '() takes ' + max_pos + ' positional argument' + ('' if max_pos == 1 else 's') + ' but '
                 output.indent()
-                output.print('if (arguments.length > ' + max_pos + ') throw new TypeError(' + JSON.stringify(max_msg) + ' + arguments.length + " were given")')
+                output.print('if (ρσ_nargs > ' + max_pos + ') throw new TypeError(' + JSON.stringify(max_msg) + ' + ρσ_nargs + " were given")')
                 output.end_statement()
             # Required-arg and type-annotation checks (variables are direct JS params)
             for c, arg in enumerate(a):

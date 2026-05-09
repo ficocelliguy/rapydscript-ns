@@ -278,7 +278,7 @@ if (!ρσ_round.__argnames__) Object.defineProperties(ρσ_round, {
 
 function ρσ_bin(x) {
     var ans;
-    if (typeof x !== "number" || x % 1 !== 0) {
+    if (typeof x !== "number" || ρσ_op_mod_ns(x, 1) !== 0) {
         throw new TypeError("integer required");
     }
     ans = x.toString(2);
@@ -296,7 +296,7 @@ if (!ρσ_bin.__argnames__) Object.defineProperties(ρσ_bin, {
 
 function ρσ_hex(x) {
     var ans;
-    if (typeof x !== "number" || x % 1 !== 0) {
+    if (typeof x !== "number" || ρσ_op_mod_ns(x, 1) !== 0) {
         throw new TypeError("integer required");
     }
     ans = x.toString(16);
@@ -734,7 +734,7 @@ function ρσ_pow(x, y, z) {
     var ans;
     ans = Math.pow(x, y);
     if (z !== undefined) {
-        ans %= z;
+        ans = ρσ_op_mod_ns(ans, z);
     }
     return ans;
 };
@@ -2032,7 +2032,7 @@ if (!ρσ_bytes.prototype.decode.__argnames__) Object.defineProperties(ρσ_byte
 ρσ_bytes.fromhex = function fromhex(s) {
     var data, val;
     s = s.replace(/ /g, "");
-    if (s.length % 2 !== 0) {
+    if (ρσ_op_mod_ns(s.length, 2) !== 0) {
         throw new ValueError("non-hexadecimal number found in fromhex() arg");
     }
     data = ρσ_list_decorate([]);
@@ -5296,7 +5296,7 @@ function ρσ_eslice(arr, step, start, end) {
     }
     arr = arr.slice(start, end).filter((function() {
         var ρσ_anonfunc = function (e, i) {
-            return i % step === 0;
+            return ρσ_op_mod_ns(i, step) === 0;
         };
         if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
             __argnames__ : {value: ["e", "i"]},
@@ -5955,7 +5955,7 @@ function ρσ_op_mod(a, b) {
     ta = typeof a;
     tb = typeof b;
     if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
-        return a % b;
+        var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;;
     }
     if (ta === "bigint" && tb === "bigint") {
         var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;;
@@ -6516,13 +6516,19 @@ if (!ρσ_op_floordiv_ns.__argnames__) Object.defineProperties(ρσ_op_floordiv_
 });
 
 function ρσ_op_mod_ns(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__mod__ === "function") {
         return a.__mod__(b);
     }
     if (b !== null && typeof b.__rmod__ === "function") {
         return b.__rmod__(a);
     }
-    if (typeof a === "bigint" && typeof b === "bigint") {
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;;
+    }
+    if (ta === "bigint" && tb === "bigint") {
         var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;;
     }
     return a % b;
@@ -6733,7 +6739,13 @@ function ρσ_instanceof() {
         if ((q === Array || q === ρσ_list_constructor) && Array.isArray(obj)) {
             return true;
         }
+        if (q === ρσ_tuple_constructor && Array.isArray(obj)) {
+            return true;
+        }
         if (q === ρσ_str && (typeof obj === "string" || obj instanceof String)) {
+            return true;
+        }
+        if (q === ρσ_bool && (typeof obj === "boolean" || obj instanceof Boolean)) {
             return true;
         }
         if (q === ρσ_int && typeof obj === "number" && Number.isInteger(obj)) {
@@ -8208,7 +8220,7 @@ define_str_func("split", (function() {
                 for (var i = 0; i < ans.length; i++) {
                     if (parts.length >= ρσ_list_add(maxsplit, 1)) {
                         extra = ρσ_list_iadd(extra, ans[(typeof i === "number" && i < 0) ? ans.length + i : i]);
-                    } else if (i % 2 === 0) {
+                    } else if (ρσ_op_mod_ns(i, 2) === 0) {
                         parts.push(ans[(typeof i === "number" && i < 0) ? ans.length + i : i]);
                     }
                 }
@@ -8320,7 +8332,7 @@ define_str_func("splitlines", (function() {
             parts = split(this, /((?:\r?\n)|\r)/);
             ans = [];
             for (var i = 0; i < parts.length; i++) {
-                if (i % 2 === 0) {
+                if (ρσ_op_mod_ns(i, 2) === 0) {
                     ans.push(parts[(typeof i === "number" && i < 0) ? parts.length + i : i]);
                 } else {
                     ans[ans.length-1] = ρσ_list_iadd(ans[ans.length-1], parts[(typeof i === "number" && i < 0) ? parts.length + i : i]);
@@ -8384,7 +8396,7 @@ define_str_func("expandtabs", (function() {
             ch = string[(typeof i === "number" && i < 0) ? string.length + i : i];
             if (ch === "\t") {
                 if (tabsize > 0) {
-                    spaces = tabsize - col % tabsize;
+                    spaces = tabsize - ρσ_op_mod_ns(col, tabsize);
                     ans = ρσ_list_iadd(ans, new Array(spaces + 1).join(" "));
                     col = ρσ_list_iadd(col, spaces);
                 }

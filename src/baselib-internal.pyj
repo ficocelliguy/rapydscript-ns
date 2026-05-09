@@ -704,6 +704,8 @@ def ρσ_instanceof():
             return True
         if (q is Array or q is ρσ_list_constructor) and Array.isArray(obj):
             return True
+        if q is ρσ_tuple_constructor and Array.isArray(obj):
+            return True
         if q is ρσ_str and (jstype(obj) is 'string' or v'obj instanceof String'):
             return True
         if q is ρσ_bool and (jstype(obj) is 'boolean' or v'obj instanceof Boolean'):
