@@ -5,6 +5,9 @@ or behave differently in RapydScript-NS, with a focus on what is relevant and us
 browser context. Server-side features (file I/O, subprocesses, sockets, threading, etc.)
 are excluded as they do not apply.
 
+Items that are fully supported — even if only behind a flag — are not listed here. See the
+README for the full feature and module support tables.
+
 ---
 
 ## 1. Silent Behavioral Differences (Gotchas)
@@ -12,23 +15,7 @@ are excluded as they do not apply.
 These features exist but behave differently from Python in ways that will silently produce
 wrong results — no error is raised.
 
-### 1.1 `%` Modulo on Negative Numbers *(partially resolved)*
-
-**Python:** `%` always returns a non-negative result (true modulo).
-```python
--7 % 3   # → 2  (Python)
--7 % 3   # → -1 (RapydScript default — JS remainder semantics)
-```
-**Status:** Fixed when using `from __python__ import overload_operators` or
-`from __python__ import python_modulo`. In bare mode (no flags) the JS remainder semantics
-still apply.
-
-**Impact:** Any algorithm relying on modular arithmetic (wrapping, circular indexing) may
-produce wrong results in code that does not use the Python operator flags.
-
----
-
-### 1.2 `is` / `is not` — Identity vs. Equality
+### 1.1 `is` / `is not` — Identity vs. Equality
 
 **Python:** `is` tests object identity (pointer comparison).
 **RapydScript:** `is` compiles to `===` (strict equality), so `x is y` is true whenever
@@ -48,43 +35,7 @@ The recommended pattern — using a unique sentinel object — works correctly.
 
 ---
 
-### 1.3 Function Arguments: `TypeError` on Wrong Count *(opt-in, not default)*
-
-**Python:** Too few or too many positional arguments raises `TypeError` at call time.
-**RapydScript default:** Extra args are silently discarded; missing args become `undefined`.
-
-```python
-def f(a, b):
-    return a + b
-
-f(1, 2, 3)   # Python: TypeError. RapydScript default: silently returns 3
-f(1)         # Python: TypeError. RapydScript default: returns NaN (1 + undefined)
-```
-**Status:** Argument count and type-annotation enforcement is now available via the
-`type_enforce` flag on function definitions (emits runtime checks). Not enabled by default
-because it adds overhead to every call. Developers writing library code with strict APIs
-should opt in.
-
----
-
-### 1.4 Positional-Only and Keyword-Only Parameters Not Enforced
-
-**Python:** Positional-only params (`/`) cannot be passed by keyword; keyword-only params
-(`*`) cannot be passed positionally. Both raise `TypeError` on violations.
-**RapydScript:** Violations are silently discarded — the param gets `undefined` with no error.
-
-```python
-def f(a, b, /, *, c):
-    return a + b + c
-
-f(1, b=2, c=3)   # Python: TypeError (b is positional-only)
-                  # RapydScript: b silently becomes undefined, a=1, c=3
-```
-**Impact:** API design contracts expressed via param ordering are not enforced.
-
----
-
-### 1.5 String Encoding — UTF-16 Surrogate Pairs
+### 1.2 String Encoding — UTF-16 Surrogate Pairs
 
 **Python:** Strings are sequences of Unicode code points (full 21-bit range).
 **RapydScript:** Strings are JS strings — UTF-16. Emoji and other non-BMP characters
@@ -103,7 +54,7 @@ produce wrong lengths or corrupt characters when sliced.
 
 ---
 
-### 1.6 `global` Scoping in Nested Functions
+### 1.3 `global` Scoping in Nested Functions
 
 **Python:** `global x` inside a nested function forces `x` to refer to the module-level
 variable, bypassing any intermediate closure scopes.
@@ -115,7 +66,7 @@ scope silently.
 
 ---
 
-### 1.7 Numeric Dict Keys Are Coerced to Strings
+### 1.4 Numeric Dict Keys Are Coerced to Strings
 
 **Python:** `d = {}; d[1] = 'a'; d['1'] = 'b'; len(d) == 2` (integer and string keys distinct).
 **RapydScript:** The Python `dict` type (backed by ES6 `Map`) stores them distinctly, but
@@ -126,7 +77,7 @@ when interoperating with JS APIs that return plain objects.
 
 ---
 
-### 1.8 `Exception.args` vs `.message`
+### 1.5 `Exception.args` vs `.message`
 
 **Python:** `Exception('msg').args == ('msg',)` and `.message` is not a standard attribute.
 **RapydScript:** `.message` is the primary attribute (JS `Error` convention). `.args` is
@@ -136,7 +87,7 @@ not populated as a tuple with the message.
 
 ---
 
-### 1.9 Multiple Inheritance MRO
+### 1.6 Multiple Inheritance MRO
 
 **Python:** C3 linearization guarantees a deterministic and consistent method resolution order.
 **RapydScript:** Built on the JS prototype chain. In diamond inheritance or complex hierarchies
@@ -175,8 +126,10 @@ that timing is not guaranteed.
 
 ### 2.3 `locals()` Always Returns Empty Dict
 
-JavaScript provides no mechanism to introspect local variables at runtime. `locals()` always
-returns an empty dict. Python code that uses `locals()` for string template substitution
+`vars()`, `locals()`, and `globals()` all exist as builtins. JavaScript provides no mechanism
+to introspect local variables at runtime, so `locals()` always returns an empty dict.
+`globals()` works on module-level/global state, and `vars(obj)` introspects the passed object.
+Python code that uses `locals()` for string template substitution
 (e.g., `'{x}'.format(**locals())`) will break silently.
 
 ---
@@ -193,6 +146,8 @@ who rely on them (e.g., `from math import *`) must enumerate imports explicitly.
 ### 2.5 `asynccontextmanager` Not Available
 
 `contextlib.asynccontextmanager` is absent. Only synchronous `@contextmanager` is implemented.
+`async with` itself is also not supported — async context managers need `.acquire()`/`.release()`
+calls instead.
 
 ---
 
@@ -219,56 +174,18 @@ Python's `Ellipsis` singleton object. Code that stores `...` in containers or ch
 
 These are absent from `src/lib/` and have no substitute.
 
-### 3.1 `decimal` — Decimal Arithmetic
+### 3.1 `collections.ChainMap`
 
-`Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
-calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
-equivalent; a pure-JS implementation would need to be compiled in.
-
----
-
-### 3.2 `fractions` — Rational Arithmetic
-
-`Fraction(numerator, denominator)` with full arithmetic. Useful for music theory apps,
-math tutoring tools, and any domain requiring exact rational computation.
+`ChainMap` provides a multi-level dict lookup (like layered config or scope chains) without
+copying. Not currently in `collections.pyj`. Small, self-contained, and useful for config
+layering, scope chains, and CLI option resolution.
 
 ---
 
-### 3.3 `statistics` — Statistical Functions
-
-`mean`, `median`, `mode`, `stdev`, `variance`, `quantiles`. Very commonly needed in
-data-visualization browser apps. Currently `numpy` covers much of this but `statistics`
-is lighter-weight and doesn't require the full numpy import.
-
----
-
-### 3.4 `difflib` — Sequence Comparison
-
-`difflib.unified_diff`, `difflib.SequenceMatcher`, `difflib.get_close_matches`. Useful
-for browser-based code editors, version comparison tools, and fuzzy matching UIs.
-
----
-
-### 3.5 `pprint` — Pretty Printing
-
-`pprint.pformat` / `pprint.pprint`. Primarily a debugging/REPL aid. Given the in-browser
-REPL in this project, implementing `pprint` would make output more readable.
-
----
-
-### 3.6 `hashlib` — Cryptographic Hashing
-
-`hashlib.sha256`, `hashlib.md5`, etc. The Web Crypto API provides `crypto.subtle.digest`
-but its async/buffer-based interface is awkward. A thin `hashlib`-compatible wrapper over
-`crypto.subtle` with a synchronous-friendly API (using the sync `crypto.getRandomValues`)
-for non-cryptographic hashes would be valuable.
-
----
-
-### 3.7 `enum.IntEnum` and `enum.Flag`
+### 3.2 `enum.IntEnum`, `IntFlag`, and `Flag`
 
 The `enum` module provides `Enum` but not `IntEnum` (auto-comparable with integers),
-`StrEnum` (Python 3.11+), or `Flag` (bitfield enums). These are common in protocol
+`StrEnum` (Python 3.11+), `IntFlag`, or `Flag` (bitfield enums). These are common in protocol
 implementations, permission systems, and state machines.
 
 ```python
@@ -281,10 +198,42 @@ Color.RED < Color.GREEN   # True — comparison with int semantics
 
 ---
 
-### 3.8 `collections.ChainMap`
+### 3.3 `statistics` — Statistical Functions
 
-`ChainMap` provides a multi-level dict lookup (like layered config or scope chains) without
-copying. Not currently in `collections.pyj`.
+`mean`, `median`, `mode`, `stdev`, `variance`, `quantiles`. Very commonly needed in
+data-visualization browser apps. Currently `numpy` covers much of this but `statistics`
+is lighter-weight and doesn't require the full numpy import.
+
+---
+
+### 3.4 `hashlib` — Cryptographic Hashing
+
+`hashlib.sha256`, `hashlib.md5`, etc. The Web Crypto API provides `crypto.subtle.digest`
+but its async/buffer-based interface is awkward. A thin `hashlib`-compatible wrapper over
+`crypto.subtle` with a synchronous-friendly API (using the sync `crypto.getRandomValues`)
+for non-cryptographic hashes would be valuable.
+
+---
+
+### 3.5 `fractions` — Rational Arithmetic
+
+`Fraction(numerator, denominator)` with full arithmetic. Useful for music theory apps,
+math tutoring tools, and any domain requiring exact rational computation.
+
+---
+
+### 3.6 `difflib` — Sequence Comparison
+
+`difflib.unified_diff`, `difflib.SequenceMatcher`, `difflib.get_close_matches`. Useful
+for browser-based code editors, version comparison tools, and fuzzy matching UIs.
+
+---
+
+### 3.7 `decimal` — Decimal Arithmetic
+
+`Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
+calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
+equivalent; a pure-JS implementation would need to be compiled in.
 
 ---
 
@@ -404,17 +353,18 @@ The `jstype()` builtin is the RS equivalent of JS's `typeof`.
 
 ## 5. Summary Priority Table
 
+Priority weighs frequency-of-need, effort-to-implement, and whether a workaround exists.
+
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| High | `enum.IntEnum`, `Flag` | Medium | Protocol and permission modeling |
-| High | `statistics` module | Low | Data analysis without full numpy import |
-| Medium | `pprint` module | Low | REPL output quality |
-| Medium | `collections.ChainMap` | Low | Multi-level scope/config dicts |
-| Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
-| Medium | `__slots__` enforcement via `Proxy` | Medium | Memory + API documentation |
+| High | `collections.ChainMap` | Low | Layered config and scope chains; tiny implementation |
+| High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
+| High | `statistics` module | Low | Lightweight stats without pulling in full numpy |
+| Medium | `__slots__` enforcement via `Proxy` | Medium | Memory and API documentation |
+| Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | `fractions` module | Medium | Exact rational arithmetic |
-| Medium | `hashlib` shim over Web Crypto | Medium | Hashing without verbatim JS |
-| Low | `decimal` module | High | Financial calculations |
-| Low | `difflib` module | High | Text diff, fuzzy matching |
-| Low | `asynccontextmanager` | Medium | Async resource management |
+| Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
+| Low | `asynccontextmanager` + `async with` | Medium | Async resource management |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |
+| Low | `difflib` module | High | Text diff, fuzzy matching |
+| Low | `decimal` module | High | Financial calculations |

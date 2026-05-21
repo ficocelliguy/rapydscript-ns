@@ -1,0 +1,455 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Implementation of Python's 'pprint' module.
+#
+# Pretty-prints arbitrary RapydScript / Python data structures.
+#
+# A value's repr() is used when it fits within `width`; otherwise containers
+# are broken across multiple lines with Python-style indentation.
+#
+# Public API:
+#   pformat(object, ...)   -> str
+#   pprint(object, ...)
+#   pp(object, ...)        same as pprint but defaults sort_dicts=False
+#   saferepr(object)       repr() with recursive references marked
+#   isreadable(object)     whether pformat output can be parsed back
+#   isrecursive(object)    whether the object has recursive references
+#   class PrettyPrinter
+
+
+# ── private helpers ─────────────────────────────────────────────────────────
+
+v"""
+function _pp_is_plain_dict_like(obj) {
+    if (obj === null || obj === undefined) return false;
+    if (typeof obj !== 'object') return false;
+    if (Array.isArray(obj)) return false;
+    if (obj.jsmap && typeof obj.jsmap.forEach === 'function') return false;
+    if (obj.jsset && typeof obj.jsset.values === 'function') return false;
+    var proto = Object.getPrototypeOf(obj);
+    return proto === null || proto === Object.prototype;
+}
+var _pp_id_counter = 0;
+function _pp_id(obj) {
+    if (obj === null || obj === undefined) return 0;
+    if (typeof obj !== 'object') return 0;
+    if (!obj.__pp_id__) {
+        Object.defineProperty(obj, '__pp_id__',
+            { value: ++_pp_id_counter, configurable: true, writable: true });
+    }
+    return obj.__pp_id__;
+}
+"""
+
+
+def _try_repr(x):
+    try:
+        return repr(x)
+    except:
+        return str(x)
+
+
+def _cmp_pair(a, b):
+    try:
+        if a[0] < b[0]:
+            return -1
+        if a[0] > b[0]:
+            return 1
+        return 0
+    except:
+        return 0
+
+
+def _cmp_value(a, b):
+    try:
+        if a < b:
+            return -1
+        if a > b:
+            return 1
+        return 0
+    except:
+        return 0
+
+
+def _is_dict(obj):
+    if isinstance(obj, dict):
+        return True
+    return v'_pp_is_plain_dict_like(obj)'
+
+
+def _get_dict_pairs(obj, sort_dicts):
+    pairs = v'[]'
+    if isinstance(obj, dict):
+        iterator = obj.items()
+        r = iterator.next()
+        while not r.done:
+            pairs.push(v'[r.value[0], r.value[1]]')
+            r = iterator.next()
+    else:
+        v"""
+        var _keys = Object.keys(obj);
+        for (var _i = 0; _i < _keys.length; _i++) {
+            pairs.push([_keys[_i], obj[_keys[_i]]]);
+        }
+        """
+    if sort_dicts:
+        pairs.sort(_cmp_pair)
+    return pairs
+
+
+def _get_set_items(obj):
+    items = v'[]'
+    iterator = obj.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        items.push(r.value)
+        r = iterator.next()
+    items.sort(_cmp_value)
+    return items
+
+
+def _recursion_marker(obj):
+    name = 'object'
+    try:
+        if obj.constructor and obj.constructor.name:
+            name = obj.constructor.name
+        elif isinstance(obj, dict):
+            name = 'dict'
+        elif isinstance(obj, set):
+            name = 'set'
+        elif Array.isArray(obj):
+            name = 'list'
+    except:
+        pass
+    return '<Recursion on ' + name + ' with id=' + str(v'_pp_id(obj)') + '>'
+
+
+def _safe_repr(obj, context, maxlevels, level, sort_dicts):
+    """Return [repr_string, readable, recursive].
+
+    readable  -- True if the output is parseable back by eval
+    recursive -- True if obj (or any sub-object) recursively contains itself
+    """
+    if obj is None:
+        return v'["None", true, false]'
+    if obj is True:
+        return v'["True", true, false]'
+    if obj is False:
+        return v'["False", true, false]'
+    t = jstype(obj)
+    if t is 'number' or t is 'string' or t is 'bigint':
+        return v'[_try_repr(obj), true, false]'
+
+    obj_id = v'_pp_id(obj)'
+
+    if Array.isArray(obj):
+        if obj.length is 0:
+            return v'["[]", true, false]'
+        if maxlevels is not None and level >= maxlevels:
+            return v'["[...]", false, false]'
+        if context.has(obj):
+            return v'[_recursion_marker(obj), false, true]'
+        context.set(obj, 1)
+        components = v'[]'
+        readable = True
+        recursive = False
+        for v'var i = 0; i < obj.length; i++':
+            r = _safe_repr(obj[i], context, maxlevels, level + 1, sort_dicts)
+            components.push(r[0])
+            if not r[1]:
+                readable = False
+            if r[2]:
+                recursive = True
+        context.delete(obj)
+        return v'["[" + components.join(", ") + "]", readable, recursive]'
+
+    if isinstance(obj, set):
+        if obj.size is 0:
+            return v'["set()", false, false]'
+        if maxlevels is not None and level >= maxlevels:
+            return v'["{...}", false, false]'
+        if context.has(obj):
+            return v'[_recursion_marker(obj), false, true]'
+        context.set(obj, 1)
+        items = _get_set_items(obj)
+        components = v'[]'
+        readable = True
+        recursive = False
+        for v'var j = 0; j < items.length; j++':
+            r = _safe_repr(items[j], context, maxlevels, level + 1, sort_dicts)
+            components.push(r[0])
+            if not r[1]:
+                readable = False
+            if r[2]:
+                recursive = True
+        context.delete(obj)
+        return v'["{" + components.join(", ") + "}", readable, recursive]'
+
+    if isinstance(obj, frozenset):
+        if obj.size is 0:
+            return v'["frozenset()", true, false]'
+        if maxlevels is not None and level >= maxlevels:
+            return v'["frozenset({...})", false, false]'
+        items = _get_set_items(obj)
+        components = v'[]'
+        readable = True
+        recursive = False
+        for v'var k = 0; k < items.length; k++':
+            r = _safe_repr(items[k], context, maxlevels, level + 1, sort_dicts)
+            components.push(r[0])
+            if not r[1]:
+                readable = False
+            if r[2]:
+                recursive = True
+        return v'["frozenset({" + components.join(", ") + "})", readable, recursive]'
+
+    if _is_dict(obj):
+        pairs = _get_dict_pairs(obj, sort_dicts)
+        if pairs.length is 0:
+            return v'["{}", true, false]'
+        if maxlevels is not None and level >= maxlevels:
+            return v'["{...}", false, false]'
+        if context.has(obj):
+            return v'[_recursion_marker(obj), false, true]'
+        context.set(obj, 1)
+        components = v'[]'
+        readable = True
+        recursive = False
+        for v'var m = 0; m < pairs.length; m++':
+            kr = _safe_repr(pairs[m][0], context, maxlevels, level + 1, sort_dicts)
+            vr = _safe_repr(pairs[m][1], context, maxlevels, level + 1, sort_dicts)
+            components.push(kr[0] + ': ' + vr[0])
+            if not kr[1] or not vr[1]:
+                readable = False
+            if kr[2] or vr[2]:
+                recursive = True
+        context.delete(obj)
+        return v'["{" + components.join(", ") + "}", readable, recursive]'
+
+    # Class instance, function, etc. — fall back to repr().
+    rep = _try_repr(obj)
+    return v'[rep, false, false]'
+
+
+# ── stream buffer used when no stream is given ──────────────────────────────
+
+class _StreamBuffer:
+    def __init__(self):
+        self.parts = v'[]'
+
+    def write(self, s):
+        self.parts.push(s)
+
+    def getvalue(self):
+        return self.parts.join('')
+
+
+# ── PrettyPrinter ───────────────────────────────────────────────────────────
+
+class PrettyPrinter:
+    """Handle pretty-printing operations onto a stream."""
+
+    def __init__(self, indent=1, width=80, depth=None, stream=None,
+                 compact=False, sort_dicts=True, underscore_numbers=False):
+        if jstype(indent) is not 'number' or indent < 0:
+            raise ValueError('indent must be a non-negative integer')
+        if jstype(width) is not 'number' or width < 0:
+            raise ValueError('width must be a non-negative integer')
+        if depth is not None:
+            if jstype(depth) is not 'number' or depth <= 0:
+                raise ValueError('depth must be > 0')
+        self._depth = depth
+        self._indent_per_level = indent
+        self._width = width
+        self._compact = bool(compact)
+        self._sort_dicts = bool(sort_dicts)
+        self._underscore_numbers = bool(underscore_numbers)
+        self._stream = stream
+
+    def pprint(self, object):
+        if self._stream is not None:
+            self._format(object, self._stream, 0, 0, v'new Map()', 0)
+            self._stream.write('\n')
+        else:
+            print(self.pformat(object))
+
+    def pformat(self, object):
+        buf = _StreamBuffer()
+        self._format(object, buf, 0, 0, v'new Map()', 0)
+        return buf.getvalue()
+
+    def isreadable(self, object):
+        r = _safe_repr(object, v'new Map()', self._depth, 0, self._sort_dicts)
+        return r[1] and not r[2]
+
+    def isrecursive(self, object):
+        r = _safe_repr(object, v'new Map()', self._depth, 0, self._sort_dicts)
+        return r[2]
+
+    def _format(self, obj, stream, indent, allowance, context, level):
+        if obj is not None and jstype(obj) is 'object' and context.has(obj):
+            stream.write(_recursion_marker(obj))
+            return
+
+        rep = self._repr(obj, context, level)
+        max_width = self._width - indent - allowance
+
+        if rep.length <= max_width:
+            stream.write(rep)
+            return
+
+        # too wide -- try to expand the container across multiple lines
+        if Array.isArray(obj) and obj.length > 0:
+            if self._depth is not None and level >= self._depth:
+                stream.write(rep)
+                return
+            context.set(obj, 1)
+            stream.write('[')
+            self._format_items(obj, stream, indent, allowance + 1, context, level + 1)
+            stream.write(']')
+            context.delete(obj)
+            return
+
+        if isinstance(obj, set) and obj.size > 0:
+            if self._depth is not None and level >= self._depth:
+                stream.write(rep)
+                return
+            context.set(obj, 1)
+            items = _get_set_items(obj)
+            stream.write('{')
+            self._format_items(items, stream, indent, allowance + 1, context, level + 1)
+            stream.write('}')
+            context.delete(obj)
+            return
+
+        if isinstance(obj, frozenset) and obj.size > 0:
+            if self._depth is not None and level >= self._depth:
+                stream.write(rep)
+                return
+            items = _get_set_items(obj)
+            stream.write('frozenset({')
+            self._format_items(items, stream, indent + 10, allowance + 2, context, level + 1)
+            stream.write('})')
+            return
+
+        if _is_dict(obj):
+            pairs = _get_dict_pairs(obj, self._sort_dicts)
+            if pairs.length > 0:
+                if self._depth is not None and level >= self._depth:
+                    stream.write(rep)
+                    return
+                context.set(obj, 1)
+                stream.write('{')
+                if self._indent_per_level > 1:
+                    stream.write(' '.repeat(self._indent_per_level - 1))
+                self._format_dict_items(pairs, stream, indent, allowance + 1, context, level + 1)
+                stream.write('}')
+                context.delete(obj)
+                return
+
+        stream.write(rep)
+
+    def _format_items(self, items, stream, indent, allowance, context, level):
+        indent = indent + self._indent_per_level
+        if self._indent_per_level > 1:
+            stream.write(' '.repeat(self._indent_per_level - 1))
+        delimnl = ',\n' + ' '.repeat(indent)
+        delim = ''
+        width = self._width - indent + 1
+        max_width = width
+        last_index = items.length - 1
+        for v'var i = 0; i < items.length; i++':
+            last = i is last_index
+            ent = items[i]
+            if self._compact:
+                rep = self._repr(ent, context, level)
+                w = rep.length + 2
+                if width < w:
+                    width = max_width
+                    if delim:
+                        delim = delimnl
+                if width >= w:
+                    width -= w
+                    stream.write(delim)
+                    delim = ', '
+                    stream.write(rep)
+                    continue
+            stream.write(delim)
+            delim = delimnl
+            self._format(ent, stream, indent,
+                         allowance if last else 1,
+                         context, level)
+
+    def _format_dict_items(self, items, stream, indent, allowance, context, level):
+        indent = indent + self._indent_per_level
+        delimnl = ',\n' + ' '.repeat(indent)
+        last_index = items.length - 1
+        for v'var i = 0; i < items.length; i++':
+            last = i is last_index
+            key = items[i][0]
+            ent = items[i][1]
+            rep = self._repr(key, context, level)
+            stream.write(rep)
+            stream.write(': ')
+            self._format(ent, stream, indent + rep.length + 2,
+                         allowance if last else 1, context, level)
+            if not last:
+                stream.write(delimnl)
+
+    def _repr(self, obj, context, level):
+        r = _safe_repr(obj, context, self._depth, level, self._sort_dicts)
+        return r[0]
+
+    def format(self, object, context, maxlevels, level):
+        """Hook for subclasses; returns (string, readable, recursive)."""
+        return _safe_repr(object, context, maxlevels, level, self._sort_dicts)
+
+
+# ── module-level convenience functions ──────────────────────────────────────
+
+def pformat(object, indent=1, width=80, depth=None, compact=False,
+            sort_dicts=True, underscore_numbers=False):
+    """Pretty-print a value as a string."""
+    return PrettyPrinter(indent=indent, width=width, depth=depth,
+                         compact=compact, sort_dicts=sort_dicts,
+                         underscore_numbers=underscore_numbers).pformat(object)
+
+
+def pprint(object, stream=None, indent=1, width=80, depth=None,
+           compact=False, sort_dicts=True, underscore_numbers=False):
+    """Pretty-print a value to a stream, or to stdout if stream is None."""
+    PrettyPrinter(indent=indent, width=width, depth=depth, stream=stream,
+                  compact=compact, sort_dicts=sort_dicts,
+                  underscore_numbers=underscore_numbers).pprint(object)
+
+
+def pp(object, stream=None, indent=1, width=80, depth=None,
+       compact=False, sort_dicts=False, underscore_numbers=False):
+    """Pretty-print with sort_dicts=False by default."""
+    pprint(object, stream=stream, indent=indent, width=width, depth=depth,
+           compact=compact, sort_dicts=sort_dicts,
+           underscore_numbers=underscore_numbers)
+
+
+def saferepr(object):
+    """Like repr() but recursive references are marked as <Recursion ...>."""
+    r = _safe_repr(object, v'new Map()', None, 0, True)
+    return r[0]
+
+
+def isreadable(object):
+    """True if pformat(object) is readable by eval()."""
+    r = _safe_repr(object, v'new Map()', None, 0, True)
+    return r[1] and not r[2]
+
+
+def isrecursive(object):
+    """True if object contains any recursive references."""
+    r = _safe_repr(object, v'new Map()', None, 0, True)
+    return r[2]

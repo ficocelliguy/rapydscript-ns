@@ -3914,6 +3914,121 @@ var TESTS = [
         },
     },
 
+    // ── pprint stdlib ────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_pprint_basic",
+        description: "pprint stdlib: pformat of atoms and short containers in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from pprint import pformat",
+                // atoms -> repr()
+                "assrt.equal(pformat(None), 'None')",
+                "assrt.equal(pformat(True), 'True')",
+                "assrt.equal(pformat(42), '42')",
+                "assrt.equal(pformat('hi'), '\"hi\"')",
+                // empty containers
+                "assrt.equal(pformat([]), '[]')",
+                "assrt.equal(pformat({}), '{}')",
+                "assrt.equal(pformat(set()), 'set()')",
+                // short containers fit on one line
+                "assrt.equal(pformat([1, 2, 3]), '[1, 2, 3]')",
+                "assrt.equal(pformat({'a': 1, 'b': 2}), '{\"a\": 1, \"b\": 2}')",
+                "assrt.equal(pformat(frozenset([1])), 'frozenset({1})')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_pprint_wrap",
+        description: "pprint stdlib: wide containers break across lines in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from pprint import pformat",
+                // wide list breaks one element per line
+                "assrt.equal(pformat([1, 2, 3], width=5), '[1,\\n 2,\\n 3]')",
+                // wide dict breaks, keys sorted by default
+                "assrt.equal(pformat({'name': 'Al', 'age': 3}, width=12), '{\"age\": 3,\\n \"name\": \"Al\"}')",
+                // indent parameter widens inner indentation
+                "assrt.equal(pformat([1, 2, 3], width=5, indent=4), '[   1,\\n    2,\\n    3]')",
+                // single-element containers never break
+                "assrt.equal(pformat([42], width=1), '[42]')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_pprint_features",
+        description: "pprint stdlib: depth, compact, sort_dicts, and pp() in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from pprint import pformat, pp",
+                // depth limits expansion
+                "assrt.equal(pformat([1, [2, [3]]], depth=1), '[1, [...]]')",
+                "assrt.equal(pformat([1, [2, [3]]], depth=2), '[1, [2, [...]]]')",
+                // sort_dicts=False keeps insertion order (ρσ_dict preserves it)
+                "d = dict()",
+                "d.set('c', 1)",
+                "d.set('a', 2)",
+                "assrt.equal(pformat(d, sort_dicts=False), '{\"c\": 1, \"a\": 2}')",
+                "assrt.equal(pformat(d, sort_dicts=True), '{\"a\": 2, \"c\": 1}')",
+                // compact packs multiple items per line
+                "compact_out = pformat([1, 2, 3, 4, 5, 6, 7, 8], compact=True, width=15)",
+                "assrt.equal(compact_out, '[1, 2, 3, 4, 5,\\n 6, 7, 8]')",
+                // pp() writes to a custom stream and defaults sort_dicts=False
+                "class _C:",
+                "    def __init__(self):",
+                "        self.parts = []",
+                "    def write(self, s):",
+                "        self.parts.push(s)",
+                "col = _C()",
+                "pp(d, stream=col)",
+                "assrt.equal(col.parts.join(''), '{\"c\": 1, \"a\": 2}\\n')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_pprint_safe",
+        description: "pprint stdlib: saferepr, isreadable, isrecursive, PrettyPrinter in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from pprint import saferepr, isreadable, isrecursive, PrettyPrinter",
+                // saferepr of normal structures == single-line repr
+                "assrt.equal(saferepr([1, 2, 3]), '[1, 2, 3]')",
+                "assrt.equal(saferepr({'a': 1}), '{\"a\": 1}')",
+                // isreadable / isrecursive on plain structures
+                "assrt.ok(isreadable([1, 2, 3]))",
+                "assrt.ok(not isrecursive([1, 2, 3]))",
+                // self-referential list -> recursion detected and marked
+                "cyclic = [1, 2]",
+                "cyclic.push(cyclic)",
+                "assrt.ok(isrecursive(cyclic))",
+                "assrt.ok(not isreadable(cyclic))",
+                "assrt.ok(saferepr(cyclic).indexOf('<Recursion on') >= 0)",
+                // PrettyPrinter class: pformat + instance predicates
+                "p = PrettyPrinter(indent=2, width=8)",
+                "assrt.equal(p.pformat([10, 20, 30]), '[ 10,\\n  20,\\n  30]')",
+                "assrt.ok(p.isrecursive(cyclic))",
+                // invalid args raise ValueError
+                "caught = False",
+                "try:",
+                "    PrettyPrinter(depth=0)",
+                "except ValueError:",
+                "    caught = True",
+                "assrt.ok(caught)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     {
         name: "bundle_type_enforcement_basic",
         description: "type_enforcement: max args, missing required, type annotations",

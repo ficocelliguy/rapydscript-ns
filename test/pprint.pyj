@@ -1,0 +1,232 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# pprint.pyj
+# Tests for the pprint standard library module.
+
+from pprint import (
+    pformat,
+    pprint,
+    pp,
+    saferepr,
+    isreadable,
+    isrecursive,
+    PrettyPrinter,
+)
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Atoms — pformat returns repr() for primitives ────────────────────────
+
+ae(pformat(None), 'None')
+ae(pformat(True), 'True')
+ae(pformat(False), 'False')
+ae(pformat(42), '42')
+ae(pformat(3.14), '3.14')
+ae(pformat('hello'), '"hello"')
+ae(pformat(''), '""')
+
+# ── 2. Empty containers ─────────────────────────────────────────────────────
+
+ae(pformat([]), '[]')
+ae(pformat({}), '{}')
+ae(pformat(set()), 'set()')
+ae(pformat(frozenset()), 'frozenset()')
+
+# ── 3. Short containers fit on a single line ────────────────────────────────
+
+ae(pformat([1, 2, 3]), '[1, 2, 3]')
+ae(pformat({'a': 1, 'b': 2}), '{"a": 1, "b": 2}')
+ae(pformat({1, 2, 3}), '{1, 2, 3}')
+ae(pformat(frozenset([1, 2, 3])), 'frozenset({1, 2, 3})')
+
+# ── 4. Wide list breaks across lines ────────────────────────────────────────
+
+_wide = pformat([1, 2, 3, 4, 5], width=8)
+ae(_wide, '[1,\n 2,\n 3,\n 4,\n 5]')
+
+# ── 5. Wide dict breaks across lines, keys sorted by default ────────────────
+
+_wd = pformat({'name': 'Alice', 'age': 30}, width=15)
+ae(_wd, '{"age": 30,\n "name": "Alice"}')
+
+# ── 6. sort_dicts=False preserves insertion order ───────────────────────────
+
+# Use ρσ_dict-backed dict() to guarantee Map ordering
+_d = dict()
+_d.set('c', 1)
+_d.set('a', 2)
+_d.set('b', 3)
+ae(pformat(_d, sort_dicts=False), '{"c": 1, "a": 2, "b": 3}')
+ae(pformat(_d, sort_dicts=True),  '{"a": 2, "b": 3, "c": 1}')
+
+# ── 7. pp() defaults sort_dicts=False, has same parameters as pprint ────────
+
+# pp prints rather than returning; we just confirm it runs without throwing.
+pp({'c': 1, 'a': 2})
+
+# ── 8. depth parameter limits expansion ─────────────────────────────────────
+
+ae(pformat([1, [2, [3, [4]]]], depth=1), '[1, [...]]')
+ae(pformat([1, [2, [3, [4]]]], depth=2), '[1, [2, [...]]]')
+ae(pformat({'a': {'b': {'c': 1}}}, depth=1), '{"a": {...}}')
+
+# ── 9. Nested containers — multi-line indentation ───────────────────────────
+
+# After "[" at col 0, items align at col 1 (default indent=1).
+ae(pformat([[1, 2], [3, 4]], width=20),
+   '[[1, 2], [3, 4]]')
+
+# With smaller width, both inner lists must break to their own lines.
+_nested = pformat([[1, 2], [3, 4], [5, 6], [7, 8]], width=12)
+ade(_nested.split('\n'), ['[[1, 2],', ' [3, 4],', ' [5, 6],', ' [7, 8]]'])
+
+# ── 10. indent parameter adjusts inner indentation ──────────────────────────
+
+ae(pformat([1, 2, 3], width=5, indent=4),
+   '[   1,\n    2,\n    3]')
+
+# ── 11. compact=True packs multiple items per line ──────────────────────────
+
+_c = pformat([1, 2, 3, 4, 5, 6, 7, 8], compact=True, width=15)
+ade(_c.split('\n'), ['[1, 2, 3, 4, 5,', ' 6, 7, 8]'])
+
+# ── 12. saferepr — single-line repr; recursive marker for cycles ────────────
+
+ae(saferepr([1, 2, 3]), '[1, 2, 3]')
+ae(saferepr({'a': 1}), '{"a": 1}')
+ae(saferepr('text'), '"text"')
+
+# Self-referential list -> recursive marker, not infinite recursion
+_self_list = [1, 2]
+_self_list.push(_self_list)
+_rep = saferepr(_self_list)
+ok(_rep.indexOf('<Recursion on') >= 0,
+   'saferepr should emit <Recursion on ...> for cycles')
+
+# ── 13. isreadable — True only when no recursion and only readable types ────
+
+ok(isreadable([1, 2, 3]))
+ok(isreadable({'a': 1, 'b': 2}))
+ok(isreadable('hi'))
+ok(isreadable(42))
+
+# Sets are not readable in Python's pprint (set literal != set()).
+ok(not isreadable(set()))   # explicitly empty set -> 'set()' is *not* a readable literal
+
+# A self-referential structure is never readable
+ok(not isreadable(_self_list))
+
+# ── 14. isrecursive — True only for recursive structures ────────────────────
+
+ok(not isrecursive([1, 2, 3]))
+ok(not isrecursive({'a': 1}))
+ok(isrecursive(_self_list))
+
+_self_dict = {}
+_self_dict['k'] = _self_dict
+ok(isrecursive(_self_dict))
+
+# ── 15. PrettyPrinter — class-based use ─────────────────────────────────────
+
+_pp_class = PrettyPrinter(indent=2, width=10)
+ae(_pp_class.pformat([1, 2, 3]), '[1, 2, 3]')
+
+_pp_wide = PrettyPrinter(indent=2, width=8)
+ae(_pp_wide.pformat([10, 20, 30]),
+   '[ 10,\n  20,\n  30]')
+# `[` at col 0, then indent_per_level-1 == 1 space pad, then "10" at col 2
+# subsequent lines indented to col 2
+
+# ── 16. PrettyPrinter.isreadable / isrecursive instance methods ─────────────
+
+_pp_ir = PrettyPrinter()
+ok(_pp_ir.isreadable([1, 2, 3]))
+ok(not _pp_ir.isrecursive([1, 2, 3]))
+ok(_pp_ir.isrecursive(_self_list))
+
+# ── 17. Validation — ValueError for invalid PrettyPrinter args ──────────────
+
+_caught = False
+try:
+    PrettyPrinter(indent=-1)
+except ValueError:
+    _caught = True
+ok(_caught, 'PrettyPrinter should reject indent < 0')
+
+_caught2 = False
+try:
+    PrettyPrinter(depth=0)
+except ValueError:
+    _caught2 = True
+ok(_caught2, 'PrettyPrinter should reject depth <= 0')
+
+# ── 18. Mixed nested structure formatting ───────────────────────────────────
+
+_data = {
+    'count': 2,
+    'users': [
+        {'age': 30, 'name': 'Alice'},
+        {'age': 25, 'name': 'Bob'},
+    ],
+}
+
+# Width permits inline lists.
+ae(pformat(_data, width=120),
+   '{"count": 2, "users": [{"age": 30, "name": "Alice"}, {"age": 25, "name": "Bob"}]}')
+
+# Narrow width forces multi-line expansion.
+_narrow = pformat(_data, width=30)
+ok(_narrow.indexOf('\n') > 0, 'narrow width should produce multi-line output')
+
+# ── 19. Stream output (PrettyPrinter with custom stream) ────────────────────
+
+class _Collector:
+    def __init__(self):
+        self.parts = v'[]'
+
+    def write(self, s):
+        self.parts.push(s)
+
+    def getvalue(self):
+        return self.parts.join('')
+
+_col = _Collector()
+_pp_s = PrettyPrinter(stream=_col)
+_pp_s.pprint([1, 2, 3])
+ae(_col.getvalue(), '[1, 2, 3]\n')
+
+# ── 20. pprint() module-level function with custom stream ───────────────────
+
+_col2 = _Collector()
+pprint({'a': 1}, stream=_col2)
+ae(_col2.getvalue(), '{"a": 1}\n')
+
+# ── 21. Empty / single-element containers do not break ──────────────────────
+
+ae(pformat([42]), '[42]')
+ae(pformat({'k': 'v'}), '{"k": "v"}')
+ae(pformat([], width=1), '[]')
+ae(pformat({}, width=1), '{}')
+
+# ── 22. Numbers and booleans preserved as repr ──────────────────────────────
+
+ae(pformat([True, False, None, 0]), '[True, False, None, 0]')
+
+# ── 23. Strings with special characters get repr-escaped ────────────────────
+
+ae(pformat('a\nb'), '"a\\nb"')
+ae(pformat('"quoted"'), '"\\"quoted\\""')
+
+# ── 24. underscore_numbers parameter is accepted (currently ignored) ────────
+
+ae(pformat(1000000, underscore_numbers=True), '1000000')
+
+# ── 25. pp() with kwargs forwarded ──────────────────────────────────────────
+
+_col3 = _Collector()
+pp({'b': 2, 'a': 1}, stream=_col3, width=80)
+# pp defaults sort_dicts=False, so 'b' comes before 'a' (insertion order)
+ae(_col3.getvalue(), '{"b": 2, "a": 1}\n')
