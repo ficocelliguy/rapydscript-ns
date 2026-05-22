@@ -111,8 +111,19 @@ define_str_func = def(name, func):
     if func.__argnames__:
         Object.defineProperty(f, '__argnames__', {'value':v"['string']".concat(func.__argnames__)})
 
-ρσ_orig_split = String.prototype.split.call.bind(String.prototype.split)
-ρσ_orig_replace = String.prototype.replace.call.bind(String.prototype.replace)
+# Guard against multiple evaluations of the baselib in the same JS context
+# (e.g. web_repl()/create_compiler() being called repeatedly).  Without this,
+# each eval captures the PREVIOUS patched String.prototype.split as ρσ_orig_split,
+# creating a chain that eventually overflows the call stack.
+if v'typeof globalThis !== "undefined" && globalThis._ρσ_orig_split':
+    ρσ_orig_split = v'globalThis._ρσ_orig_split'
+    ρσ_orig_replace = v'globalThis._ρσ_orig_replace'
+else:
+    ρσ_orig_split = String.prototype.split.call.bind(String.prototype.split)
+    ρσ_orig_replace = String.prototype.replace.call.bind(String.prototype.replace)
+    if v'typeof globalThis !== "undefined"':
+        v'globalThis._ρσ_orig_split = ρσ_orig_split'
+        v'globalThis._ρσ_orig_replace = ρσ_orig_replace'
 
 # format()  {{{
 define_str_func('format', def ():

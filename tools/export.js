@@ -229,7 +229,8 @@ function compile(code, filename, options) {
 
 function create_embedded_compiler(runjs) {
     var c = vrequire('tools/embedded_compiler.js');
-    return c(create_compiler(), data['baselib-plain-pretty.js'], runjs);
+    if (!RapydScript) RapydScript = create_compiler();
+    return c(RapydScript, data['baselib-plain-pretty.js'], runjs);
 }
 
 function web_repl() {
@@ -238,7 +239,8 @@ function web_repl() {
         set: function(vf) { current_virtual_files = vf; },
         clear: function() { current_virtual_files = null; }
     };
-    return repl(create_compiler(), data['baselib-plain-pretty.js'], vf_context);
+    if (!RapydScript) RapydScript = create_compiler();
+    return repl(RapydScript, data['baselib-plain-pretty.js'], vf_context);
 }
 
 function init_repl(options) {
