@@ -174,15 +174,7 @@ Python's `Ellipsis` singleton object. Code that stores `...` in containers or ch
 
 These are absent from `src/lib/` and have no substitute.
 
-### 3.1 `collections.ChainMap`
-
-`ChainMap` provides a multi-level dict lookup (like layered config or scope chains) without
-copying. Not currently in `collections.pyj`. Small, self-contained, and useful for config
-layering, scope chains, and CLI option resolution.
-
----
-
-### 3.2 `enum.IntEnum`, `IntFlag`, and `Flag`
+### 3.1 `enum.IntEnum`, `IntFlag`, and `Flag`
 
 The `enum` module provides `Enum` but not `IntEnum` (auto-comparable with integers),
 `StrEnum` (Python 3.11+), `IntFlag`, or `Flag` (bitfield enums). These are common in protocol
@@ -198,7 +190,7 @@ Color.RED < Color.GREEN   # True — comparison with int semantics
 
 ---
 
-### 3.3 `statistics` — Statistical Functions
+### 3.2 `statistics` — Statistical Functions
 
 `mean`, `median`, `mode`, `stdev`, `variance`, `quantiles`. Very commonly needed in
 data-visualization browser apps. Currently `numpy` covers much of this but `statistics`
@@ -206,7 +198,7 @@ is lighter-weight and doesn't require the full numpy import.
 
 ---
 
-### 3.4 `hashlib` — Cryptographic Hashing
+### 3.3 `hashlib` — Cryptographic Hashing
 
 `hashlib.sha256`, `hashlib.md5`, etc. The Web Crypto API provides `crypto.subtle.digest`
 but its async/buffer-based interface is awkward. A thin `hashlib`-compatible wrapper over
@@ -215,21 +207,21 @@ for non-cryptographic hashes would be valuable.
 
 ---
 
-### 3.5 `fractions` — Rational Arithmetic
+### 3.4 `fractions` — Rational Arithmetic
 
 `Fraction(numerator, denominator)` with full arithmetic. Useful for music theory apps,
 math tutoring tools, and any domain requiring exact rational computation.
 
 ---
 
-### 3.6 `difflib` — Sequence Comparison
+### 3.5 `difflib` — Sequence Comparison
 
 `difflib.unified_diff`, `difflib.SequenceMatcher`, `difflib.get_close_matches`. Useful
 for browser-based code editors, version comparison tools, and fuzzy matching UIs.
 
 ---
 
-### 3.7 `decimal` — Decimal Arithmetic
+### 3.6 `decimal` — Decimal Arithmetic
 
 `Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
 calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
@@ -357,7 +349,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| High | `collections.ChainMap` | Low | Layered config and scope chains; tiny implementation |
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
 | High | `statistics` module | Low | Lightweight stats without pulling in full numpy |
 | Medium | `__slots__` enforcement via `Proxy` | Medium | Memory and API documentation |

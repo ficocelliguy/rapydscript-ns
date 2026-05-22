@@ -3455,7 +3455,7 @@ One of Python's main strengths is the number of libraries available to the devel
 	                    # fields(), asdict(), astuple(), replace(), is_dataclass(), frozen=True, order=True
 	abc                 # ABC base class, @abstractmethod, Protocol, @runtime_checkable;
 	                    # abstract enforcement at instantiation; ABC.register() virtual subclasses
-	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict
+	collections         # namedtuple, deque, Counter, OrderedDict, defaultdict, ChainMap
 	copy                # copy (shallow), deepcopy; honours __copy__ / __deepcopy__ hooks
 	typing              # TYPE_CHECKING, Any, Union, Optional, List, Dict, Set, Tuple, TypeVar,
 	                    # Generic, Protocol, Callable, Literal, Final, TypedDict, NamedTuple,
@@ -4163,7 +4163,7 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `random`      | ✅           | RC4-seeded PRNG in `src/lib/random.pyj`                                                       |
 | `re`          | ✅           | Regex wrapper in `src/lib/re.pyj`; uses the JS engine — full PCRE-level support on modern runtimes: positive/negative lookbehind (ES2018+, including variable-width), unicode via automatic `u` flag (ES2015+), `re.fullmatch()`, `re.S`/`re.NOFLAG` aliases. `MatchObject.start()`/`.end()` return exact positions on runtimes with the ES2022 `d` flag (Node 18+); heuristic fallback on older runtimes. Conditional groups `(?(id)yes\|no)` are not supported (JS limitation) and raise `re.error`. |
 | `encodings`   | ✅           | UTF-8 encode/decode helpers and low-level base64 utilities; for the standard Python API use the `base64` module instead |
-| `collections` | ✅           | `defaultdict`, `Counter`, `OrderedDict`, `deque`                                              |
+| `collections` | ✅           | `defaultdict`, `Counter`, `OrderedDict`, `deque`, `namedtuple`, `ChainMap`                     |
 | `functools`   | ✅           | `reduce`, `partial`, `wraps`, `lru_cache`                                                     |
 | `itertools`   | ✅           | Common iteration tools                                                                        |
 | `numpy`       | ✅           | Full numpy-like library in `src/lib/numpy.pyj`; `numpy.random` and `numpy.linalg` sub-modules |

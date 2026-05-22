@@ -1,0 +1,185 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# chainmap.pyj
+# Tests for collections.ChainMap.
+
+from __python__ import overload_getitem
+from collections import ChainMap
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. construction and lookup — first map wins ───────────────────────────────
+
+defaults = {'color': 'red', 'user': 'guest', 'depth': 1}
+overrides = {'user': 'admin'}
+cm = ChainMap(overrides, defaults)
+
+ae(cm['user'], 'admin')      # found in first map
+ae(cm['color'], 'red')       # falls through to second map
+ae(cm['depth'], 1)
+ae(len(cm), 3)               # unique keys across all maps
+
+# ── 2. empty construction uses a single empty dict ────────────────────────────
+
+empty = ChainMap()
+ae(len(empty), 0)
+ae(empty.maps.length, 1)
+
+# ── 3. missing key raises KeyError ────────────────────────────────────────────
+
+_err = False
+try:
+    cm['missing']
+except KeyError:
+    _err = True
+ok(_err, 'missing key raises KeyError')
+
+# ── 4. writes, deletes and updates affect only the first map ──────────────────
+
+cm['depth'] = 99
+ae(cm['depth'], 99)          # shadows the value in defaults
+ae(defaults['depth'], 1)     # underlying map untouched
+ae(overrides['depth'], 99)   # written to the first map
+
+cm['user'] = 'root'
+ae(cm['user'], 'root')
+
+del cm['user']
+ae(cm['user'], 'guest')      # first-map entry removed; falls through again
+
+_del_err = False
+try:
+    del cm['color']          # 'color' lives in the second map, not the first
+except KeyError:
+    _del_err = True
+ok(_del_err, 'deleting a key absent from the first map raises KeyError')
+
+# ── 5. membership, get, and iteration ─────────────────────────────────────────
+
+ok('color' in cm)
+ok('user' in cm)
+ok('nope' not in cm)
+ae(cm.get('color'), 'red')
+ae(cm.get('nope'), None)
+ae(cm.get('nope', 'fallback'), 'fallback')
+
+m1 = {'a': 1, 'b': 2}
+m2 = {'c': 3}
+ordered = ChainMap(m1, m2)
+ade(list(ordered), ['c', 'a', 'b'])     # Python order: later maps first
+ade(ordered.keys(), ['c', 'a', 'b'])
+ade(ordered.values(), [3, 1, 2])
+ade(ordered.items(), [['c', 3], ['a', 1], ['b', 2]])
+
+_seen = []
+for k in ordered:
+    _seen.push(k)
+ade(_seen, ['c', 'a', 'b'])
+
+# ── 6. maps attribute, new_child and parents ──────────────────────────────────
+
+base = ChainMap({'x': 1})
+child = base.new_child({'x': 2, 'y': 3})
+ae(child['x'], 2)            # child's own map shadows the parent
+ae(child['y'], 3)
+ae(base['x'], 1)             # parent unchanged
+ae(child.maps.length, 2)
+
+# new_child() with no argument adds a fresh empty map
+fresh = base.new_child()
+ae(fresh.maps.length, 2)
+ae(len(fresh), 1)
+fresh['z'] = 7
+ae(fresh['z'], 7)
+ok('z' not in base)
+
+# parents drops the first map
+parents = child.parents
+ae(parents['x'], 1)
+ae(parents.maps.length, 1)
+
+# ── 7. copy is shallow — first map cloned, rest shared ────────────────────────
+
+src = ChainMap({'a': 1}, {'b': 2})
+dup = src.copy()
+dup['a'] = 100
+ae(src['a'], 1)              # first map was cloned
+dup['c'] = 9                 # writes to the cloned first map
+ok('c' not in src)
+ae(dup['b'], 2)              # tail maps are shared
+
+# ── 8. pop, popitem, clear, setdefault, update ────────────────────────────────
+
+p = ChainMap({'a': 1, 'b': 2}, {'c': 3})
+ae(p.pop('a'), 1)
+ok('a' not in p.maps[0])
+ae(p.pop('missing', 'dflt'), 'dflt')
+
+_pop_err = False
+try:
+    p.pop('c')               # 'c' is not in the first map
+except KeyError:
+    _pop_err = True
+ok(_pop_err, 'pop of a key absent from the first map raises KeyError')
+
+pi = ChainMap({'only': 42})
+ade(pi.popitem(), ['only', 42])
+ae(len(pi.maps[0]), 0)
+
+sd = ChainMap({'a': 1}, {'b': 2})
+ae(sd.setdefault('a', 999), 1)       # existing key — unchanged
+ae(sd.setdefault('new', 5), 5)       # missing key — inserted into first map
+ae(sd['new'], 5)
+ae(sd.setdefault('b', 0), 2)         # found in tail map — not copied forward
+ok('b' not in sd.maps[0])
+
+up = ChainMap({'a': 1}, {'b': 2})
+up.update({'a': 10, 'd': 4})
+ae(up['a'], 10)
+ae(up['d'], 4)
+up.update(e=5)
+ae(up['e'], 5)
+up.update([['f', 6]])
+ae(up['f'], 6)
+
+cl = ChainMap({'a': 1, 'b': 2}, {'c': 3})
+cl.clear()
+ae(len(cl.maps[0]), 0)
+ae(cl['c'], 3)               # tail map survives clear()
+
+# ── 9. nested ChainMap as a member map ────────────────────────────────────────
+
+inner = ChainMap({'a': 1}, {'b': 2})
+outer = ChainMap({'c': 3}, inner)
+ae(outer['a'], 1)
+ae(outer['b'], 2)
+ae(outer['c'], 3)
+ok('a' in outer)
+ae(len(outer), 3)
+
+# ── 10. equality ──────────────────────────────────────────────────────────────
+
+ok(ChainMap({'a': 1}, {'b': 2}) == ChainMap({'a': 1}, {'b': 2}))
+ok(ChainMap({'a': 1}) == {'a': 1})
+ok(not (ChainMap({'a': 1}) == ChainMap({'a': 2})))
+ok(not (ChainMap({'a': 1}) == {'a': 1, 'b': 2}))
+
+# ── 11. repr ──────────────────────────────────────────────────────────────────
+
+# RapydScript's repr() quotes strings with double quotes (as Counter/OrderedDict do)
+ae(ChainMap({'a': 1}, {'b': 2}).__repr__(), 'ChainMap({"a": 1}, {"b": 2})')
+
+# ── 12. dynamic — changes to underlying maps are visible ──────────────────────
+
+live = {'k': 'v1'}
+dyn = ChainMap({}, live)
+ae(dyn['k'], 'v1')
+live['k'] = 'v2'
+ae(dyn['k'], 'v2')           # ChainMap reflects the mutation
+live['extra'] = 'x'
+ok('extra' in dyn)
+
+print('chainmap tests passed')

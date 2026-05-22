@@ -969,6 +969,7 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 assert_has(list, 'Counter',     'Counter in collections completions');
                 assert_has(list, 'OrderedDict', 'OrderedDict in collections completions');
                 assert_has(list, 'defaultdict', 'defaultdict in collections completions');
+                assert_has(list, 'ChainMap',    'ChainMap in collections completions');
             },
         },
 
@@ -1370,6 +1371,7 @@ function make_tests(CompletionEngine, detect_context, SourceAnalyzer, DtsRegistr
                 assert_has(list, 'Counter',     'Counter from collections');
                 assert_has(list, 'OrderedDict', 'OrderedDict from collections');
                 assert_has(list, 'defaultdict', 'defaultdict from collections');
+                assert_has(list, 'ChainMap',    'ChainMap from collections');
             },
         },
 

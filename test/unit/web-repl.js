@@ -271,6 +271,95 @@ var TESTS = [
     },
 
     {
+        name: "bundle_chainmap_basic",
+        description: "ChainMap construction and first-map-wins lookup work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from collections import ChainMap",
+                "defaults = {'color': 'red', 'user': 'guest'}",
+                "overrides = {'user': 'admin'}",
+                "cm = ChainMap(overrides, defaults)",
+                "assrt.equal(cm['user'], 'admin')",
+                "assrt.equal(cm['color'], 'red')",
+                "assrt.equal(len(cm), 2)",
+                "assrt.ok('color' in cm)",
+                "assrt.ok('missing' not in cm)",
+                "assrt.equal(cm.get('missing', 'fallback'), 'fallback')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_chainmap_writes",
+        description: "ChainMap writes, deletes and updates affect only the first map in the bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from collections import ChainMap",
+                "defaults = {'depth': 1}",
+                "cm = ChainMap({}, defaults)",
+                "cm['depth'] = 99",
+                "assrt.equal(cm['depth'], 99)",
+                "assrt.equal(defaults['depth'], 1)",
+                "del cm['depth']",
+                "assrt.equal(cm['depth'], 1)",
+                "cm.update({'a': 1}, b=2)",
+                "assrt.equal(cm['a'], 1)",
+                "assrt.equal(cm['b'], 2)",
+                "assrt.equal(cm.pop('a'), 1)",
+                "assrt.equal(cm.pop('depth', 'dflt'), 'dflt')",
+                "assrt.equal(cm.setdefault('new', 7), 7)",
+                "assrt.equal(cm['new'], 7)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_chainmap_new_child",
+        description: "ChainMap new_child and parents work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from collections import ChainMap",
+                "base = ChainMap({'x': 1})",
+                "child = base.new_child({'x': 2, 'y': 3})",
+                "assrt.equal(child['x'], 2)",
+                "assrt.equal(child['y'], 3)",
+                "assrt.equal(base['x'], 1)",
+                "assrt.equal(child.maps.length, 2)",
+                "parents = child.parents",
+                "assrt.equal(parents['x'], 1)",
+                "assrt.equal(parents.maps.length, 1)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_chainmap_iteration",
+        description: "ChainMap keys/values/items, iteration order and copy work in the bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from collections import ChainMap",
+                "cm = ChainMap({'a': 1, 'b': 2}, {'c': 3})",
+                "assrt.deepEqual(list(cm), ['c', 'a', 'b'])",
+                "assrt.deepEqual(cm.keys(), ['c', 'a', 'b'])",
+                "assrt.deepEqual(cm.values(), [3, 1, 2])",
+                "dup = cm.copy()",
+                "dup['a'] = 100",
+                "assrt.equal(cm['a'], 1)",
+                "assrt.equal(dup['a'], 100)",
+                "assrt.equal(dup['c'], 3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_operator_overloading",
         description: "overload_operators flag works in the web-repl bundle",
         run: function () {

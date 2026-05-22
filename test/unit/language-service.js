@@ -900,13 +900,14 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             description: "Importing all collections classes produces no errors",
             run: function () {
                 var markers = d().check([
-                    "from collections import defaultdict, Counter, OrderedDict, deque, namedtuple",
+                    "from collections import defaultdict, Counter, OrderedDict, deque, namedtuple, ChainMap",
                     "d = defaultdict(list)",
                     "c = Counter([1, 2, 2, 3])",
                     "od = OrderedDict()",
                     "dq = deque([1, 2, 3])",
                     "Point = namedtuple('Point', 'x y')",
-                    "print(d, c, od, dq, Point)",
+                    "cm = ChainMap({'a': 1}, {'b': 2})",
+                    "print(d, c, od, dq, Point, cm)",
                 ].join("\n"),
                     { virtualFiles: { mymod: "def foo(): pass" } }
                 );

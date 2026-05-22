@@ -2,10 +2,11 @@
 # License: BSD
 # RapydScript implementation of Python's collections standard library.
 #
-# Supported: namedtuple, deque, Counter, OrderedDict, defaultdict
+# Supported: namedtuple, deque, Counter, OrderedDict, defaultdict, ChainMap
 #
-# Note: Counter, OrderedDict, and defaultdict use __getitem__/__setitem__.
-# For Python-compatible subscript syntax (obj[key]) in user code, add:
+# Note: Counter, OrderedDict, defaultdict, and ChainMap use
+# __getitem__/__setitem__. For Python-compatible subscript syntax (obj[key])
+# in user code, add:
 #   from __python__ import overload_getitem
 
 
@@ -693,3 +694,226 @@ class defaultdict:
             if self._data[k] != src[k]:
                 return False
         return True
+
+
+class ChainMap:
+    """Combine several mappings into a single, updateable view.
+
+    Lookups search the underlying mappings in order, so the first mapping
+    wins. Writes, updates, and deletions affect only the first mapping.
+    Mirrors Python's collections.ChainMap.
+    """
+
+    def __init__(self, *maps):
+        if maps.length == 0:
+            self.maps = [{}]
+        else:
+            self.maps = list(maps)
+
+    # ── internal mapping-access helpers ───────────────────────────────────
+    # A "map" may be a plain JS object, a RapydScript dict (ρσ_dict, used for
+    # {...} literals in the web-repl), or any RapydScript mapping defining
+    # __getitem__/__setitem__/__contains__ (OrderedDict, defaultdict, Counter,
+    # or a nested ChainMap).
+
+    def _is_rdict(self, m):
+        return v'!!(m && m.jsmap && typeof m.jsmap.get === "function")'
+
+    def _is_mapping(self, m):
+        return v'!!(m && typeof m.__getitem__ === "function" && typeof m.__contains__ === "function")'
+
+    def _mkeys(self, m):
+        if self._is_rdict(m):
+            return v'Array.from(m.jsmap.keys())'
+        if self._is_mapping(m):
+            return list(m.keys())
+        return Object.keys(m)
+
+    def _mhas(self, m, key):
+        if self._is_rdict(m):
+            return v'm.jsmap.has(key)'
+        if self._is_mapping(m):
+            return m.__contains__(key)
+        return v'Object.prototype.hasOwnProperty.call(m, key)'
+
+    def _mget(self, m, key):
+        if self._is_rdict(m):
+            return v'm.jsmap.get(key)'
+        if self._is_mapping(m):
+            return m.__getitem__(key)
+        return v'm[key]'
+
+    def _mset(self, m, key, value):
+        if self._is_rdict(m):
+            v'm.jsmap.set(key, value)'
+        elif self._is_mapping(m):
+            m.__setitem__(key, value)
+        else:
+            v'm[key] = value'
+
+    def _mdel(self, m, key):
+        if self._is_rdict(m):
+            v'm.jsmap["delete"](key)'
+        elif self._is_mapping(m):
+            m.__delitem__(key)
+        else:
+            v'delete m[key]'
+
+    def _all_keys(self):
+        # Unique keys across every map. Maps are scanned last-to-first so that
+        # earlier maps keep their key positions, matching Python's iteration.
+        seen = {}
+        result = []
+        i = self.maps.length - 1
+        while i >= 0:
+            for k in self._mkeys(self.maps[i]):
+                if k not in seen:
+                    seen[k] = True
+                    result.push(k)
+            i -= 1
+        return result
+
+    def __getitem__(self, key):
+        for m in self.maps:
+            if self._mhas(m, key):
+                return self._mget(m, key)
+        raise KeyError(repr(key))
+
+    def __setitem__(self, key, value):
+        self._mset(self.maps[0], key, value)
+
+    def __delitem__(self, key):
+        if not self._mhas(self.maps[0], key):
+            raise KeyError('Key not found in the first mapping: ' + repr(key))
+        self._mdel(self.maps[0], key)
+
+    def __contains__(self, key):
+        for m in self.maps:
+            if self._mhas(m, key):
+                return True
+        return False
+
+    def __len__(self):
+        return self._all_keys().length
+
+    def __iter__(self):
+        return iter(self._all_keys())
+
+    def __bool__(self):
+        for m in self.maps:
+            if self._mkeys(m).length > 0:
+                return True
+        return False
+
+    def _map_repr(self, m):
+        pairs = [repr(k) + ': ' + repr(self._mget(m, k)) for k in self._mkeys(m)]
+        return '{' + pairs.join(', ') + '}'
+
+    def __repr__(self):
+        parts = [self._map_repr(m) for m in self.maps]
+        return 'ChainMap(' + parts.join(', ') + ')'
+
+    def __eq__(self, other):
+        if other is None:
+            return False
+        is_mapish = self._is_rdict(other) or self._is_mapping(other) or (jstype(other) is 'object' and not Array.isArray(other))
+        if not is_mapish:
+            return False
+        a = self._all_keys()
+        b = self._mkeys(other)
+        if a.length != b.length:
+            return False
+        for k in a:
+            if not self._mhas(other, k):
+                return False
+            if self.__getitem__(k) != self._mget(other, k):
+                return False
+        return True
+
+    def get(self, key, dflt=None):
+        if self.__contains__(key):
+            return self.__getitem__(key)
+        return dflt
+
+    def keys(self):
+        return self._all_keys()
+
+    def values(self):
+        return [self.__getitem__(k) for k in self._all_keys()]
+
+    def items(self):
+        return [[k, self.__getitem__(k)] for k in self._all_keys()]
+
+    @property
+    def parents(self):
+        cm = ChainMap()
+        cm.maps = self.maps.slice(1)
+        return cm
+
+    def new_child(self, m=None):
+        if m is None:
+            m = {}
+        cm = ChainMap()
+        cm.maps = [m].concat(self.maps)
+        return cm
+
+    def _copy_map(self, m):
+        if jstype(m.copy) is 'function':
+            return m.copy()
+        result = {}
+        for k in Object.keys(m):
+            result[k] = m[k]
+        return result
+
+    def copy(self):
+        cm = ChainMap()
+        cm.maps = [self._copy_map(self.maps[0])].concat(self.maps.slice(1))
+        return cm
+
+    def pop(self, key, *rest):
+        first = self.maps[0]
+        if self._mhas(first, key):
+            val = self._mget(first, key)
+            self._mdel(first, key)
+            return val
+        if len(rest) > 0:
+            return rest[0]
+        raise KeyError('Key not found in the first mapping: ' + repr(key))
+
+    def popitem(self):
+        first = self.maps[0]
+        keys = self._mkeys(first)
+        if keys.length == 0:
+            raise KeyError('No keys found in the first mapping.')
+        k = keys[keys.length - 1]
+        val = self._mget(first, k)
+        self._mdel(first, k)
+        return [k, val]
+
+    def setdefault(self, key, dflt=None):
+        if not self.__contains__(key):
+            self._mset(self.maps[0], key, dflt)
+        return self.__getitem__(key)
+
+    def clear(self):
+        first = self.maps[0]
+        if jstype(first.clear) is 'function':
+            first.clear()
+        else:
+            for k in Object.keys(first):
+                v'delete first[k]'
+
+    def update(self, other=None, **kwargs):
+        first = self.maps[0]
+        if other is not None:
+            if self._is_rdict(other) or self._is_mapping(other):
+                for k in self._mkeys(other):
+                    self._mset(first, k, self._mget(other, k))
+            elif jstype(other) is 'object' and not Array.isArray(other):
+                for k in Object.keys(other):
+                    self._mset(first, k, other[k])
+            else:
+                for pair in other:
+                    self._mset(first, pair[0], pair[1])
+        for k in kwargs:
+            self._mset(first, k, kwargs[k])
