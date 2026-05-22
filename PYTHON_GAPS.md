@@ -190,15 +190,7 @@ Color.RED < Color.GREEN   # True — comparison with int semantics
 
 ---
 
-### 3.2 `statistics` — Statistical Functions
-
-`mean`, `median`, `mode`, `stdev`, `variance`, `quantiles`. Very commonly needed in
-data-visualization browser apps. Currently `numpy` covers much of this but `statistics`
-is lighter-weight and doesn't require the full numpy import.
-
----
-
-### 3.3 `hashlib` — Cryptographic Hashing
+### 3.2 `hashlib` — Cryptographic Hashing
 
 `hashlib.sha256`, `hashlib.md5`, etc. The Web Crypto API provides `crypto.subtle.digest`
 but its async/buffer-based interface is awkward. A thin `hashlib`-compatible wrapper over
@@ -207,21 +199,21 @@ for non-cryptographic hashes would be valuable.
 
 ---
 
-### 3.4 `fractions` — Rational Arithmetic
+### 3.3 `fractions` — Rational Arithmetic
 
 `Fraction(numerator, denominator)` with full arithmetic. Useful for music theory apps,
 math tutoring tools, and any domain requiring exact rational computation.
 
 ---
 
-### 3.5 `difflib` — Sequence Comparison
+### 3.4 `difflib` — Sequence Comparison
 
 `difflib.unified_diff`, `difflib.SequenceMatcher`, `difflib.get_close_matches`. Useful
 for browser-based code editors, version comparison tools, and fuzzy matching UIs.
 
 ---
 
-### 3.6 `decimal` — Decimal Arithmetic
+### 3.5 `decimal` — Decimal Arithmetic
 
 `Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
 calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
@@ -350,7 +342,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
-| High | `statistics` module | Low | Lightweight stats without pulling in full numpy |
 | Medium | `__slots__` enforcement via `Proxy` | Medium | Memory and API documentation |
 | Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | `fractions` module | Medium | Exact rational arithmetic |

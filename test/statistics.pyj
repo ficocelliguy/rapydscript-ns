@@ -1,0 +1,224 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# statistics.pyj
+# Tests for the statistics standard library module.
+
+from statistics import (
+    StatisticsError,
+    mean, fmean, geometric_mean, harmonic_mean,
+    median, median_low, median_high, median_grouped, mode, multimode,
+    variance, pvariance, stdev, pstdev,
+    quantiles,
+    covariance, correlation, linear_regression,
+    NormalDist,
+)
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+
+def close(a, b, tol=1e-9):
+    return Math.abs(a - b) < tol
+
+
+# ── 1. mean ───────────────────────────────────────────────────────────────────
+
+ae(mean([1, 2, 3, 4]), 2.5)
+ae(mean([1, 2, 3]), 2)
+ae(mean([5]), 5)
+ae(mean([-1, 1]), 0)
+ok(close(mean([1, 2, 4]), 7 / 3))
+# any iterable works
+ae(mean(x for x in [2, 4, 6]), 4)
+
+# ── 2. fmean ──────────────────────────────────────────────────────────────────
+
+ae(fmean([1, 2, 3, 4]), 2.5)
+ok(close(fmean([3.5, 4.0, 5.25]), 4.25))
+# weighted
+ok(close(fmean([10, 20, 30], [1, 1, 1]), 20))
+ok(close(fmean([1, 2, 3, 4], [4, 3, 2, 1]), 2.0))
+
+# ── 3. geometric_mean ─────────────────────────────────────────────────────────
+
+ok(close(geometric_mean([4, 1, 1 / 32]), 0.5))
+ok(close(geometric_mean([2, 8]), 4.0))
+ok(close(geometric_mean([10]), 10.0))
+
+# ── 4. harmonic_mean ──────────────────────────────────────────────────────────
+
+ok(close(harmonic_mean([40, 60]), 48.0))
+ok(close(harmonic_mean([1, 2, 4]), 12 / 7))
+ae(harmonic_mean([0, 5, 10]), 0)        # a zero forces the result to zero
+# weighted
+ok(close(harmonic_mean([40, 60], [5, 30]), 56.0))
+
+# ── 5. median family ──────────────────────────────────────────────────────────
+
+ae(median([1, 3, 5]), 3)
+ae(median([1, 3, 5, 7]), 4)
+ae(median([5, 1, 3]), 3)                # unsorted input
+ae(median_low([1, 3, 5, 7]), 3)
+ae(median_low([1, 3, 5]), 3)
+ae(median_high([1, 3, 5, 7]), 5)
+ae(median_high([1, 3, 5]), 3)
+ae(median_grouped([52, 52, 53, 54]), 52.5)
+ok(close(median_grouped([1, 2, 2, 3, 4, 4, 4, 4, 4, 5]), 3.7))
+ok(close(median_grouped([1, 3, 3, 5, 7], 2), 3.5))
+
+# ── 6. mode / multimode ───────────────────────────────────────────────────────
+
+ae(mode([1, 1, 2, 3, 3, 3, 4]), 3)
+ae(mode([1, 1, 1, 2, 2]), 1)
+ae(mode(['red', 'blue', 'red', 'green']), 'red')
+ae(mode([7]), 7)
+# ties: first mode encountered wins
+ae(mode([4, 4, 5, 5]), 4)
+ade(multimode([1, 1, 2, 2, 3]), [1, 2])
+ade(multimode([1, 2, 3]), [1, 2, 3])
+ade(multimode([]), [])
+ade(multimode(['a', 'a', 'b', 'c', 'c']), ['a', 'c'])
+
+# ── 7. variance / stdev ───────────────────────────────────────────────────────
+
+ae(variance([1, 2, 3, 4, 5]), 2.5)
+ae(pvariance([1, 2, 3, 4, 5]), 2.0)
+ok(close(stdev([1, 2, 3, 4, 5]), Math.sqrt(2.5)))
+ok(close(pstdev([1, 2, 3, 4, 5]), Math.sqrt(2.0)))
+ok(close(variance([2.75, 1.75, 1.25, 0.25, 0.5, 1.25, 3.5]), 1.3720238095238095))
+ok(close(pvariance([0.0, 0.25, 0.25, 1.25, 1.5, 1.75, 2.75, 3.25]), 1.25))
+# explicit centre argument
+ae(variance([1, 2, 3, 4, 5], 3), 2.5)
+ae(pvariance([1, 2, 3, 4, 5], 3), 2.0)
+
+# ── 8. quantiles ──────────────────────────────────────────────────────────────
+
+ade(quantiles([1, 2, 3, 4]), [1.25, 2.5, 3.75])
+_q = quantiles([1, 2, 3, 4, 5, 6, 7, 8, 9])
+ae(_q.length, 3)
+_qi = quantiles([1, 2, 3, 4, 5], n=4, method='inclusive')
+ae(_qi.length, 3)
+ade(quantiles([0, 100], n=2, method='inclusive'), [50])
+# deciles
+ae(quantiles([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], n=10).length, 9)
+
+# ── 9. covariance / correlation / linear_regression ──────────────────────────
+
+_cx = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+_cy = [1, 2, 3, 1, 2, 3, 1, 2, 3]
+ok(close(covariance(_cx, _cy), 0.75))
+
+_px = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+_py = [9, 8, 7, 6, 5, 4, 3, 2, 1]
+ok(close(correlation(_px, _px), 1.0))
+ok(close(correlation(_px, _py), -1.0))
+# ranked (Spearman) correlation handles a monotonic non-linear relation
+ok(close(correlation([1, 2, 3, 4, 5], [1, 4, 9, 16, 25], method='ranked'), 1.0))
+
+_lr = linear_regression([1, 2, 3, 4, 5], [2, 4, 6, 8, 10])
+ok(close(_lr.slope, 2.0))
+ok(close(_lr.intercept, 0.0))
+_lr2 = linear_regression([0, 1, 2, 3], [1, 3, 5, 7])
+ok(close(_lr2.slope, 2.0))
+ok(close(_lr2.intercept, 1.0))
+_lrp = linear_regression([1, 2, 3], [2, 4, 6], proportional=True)
+ok(close(_lrp.slope, 2.0))
+ae(_lrp.intercept, 0.0)
+
+# ── 10. NormalDist — basics ───────────────────────────────────────────────────
+
+_nd = NormalDist(100, 15)
+ae(_nd.mean, 100)
+ae(_nd.median, 100)
+ae(_nd.mode, 100)
+ae(_nd.stdev, 15)
+ae(_nd.variance, 225)
+ae(NormalDist().mean, 0)
+ae(NormalDist().stdev, 1)
+
+# ── 11. NormalDist — pdf / cdf / inv_cdf ─────────────────────────────────────
+
+ok(close(_nd.cdf(100), 0.5, 1e-6))
+ok(close(_nd.cdf(115), 0.8413447460685429, 1e-5))
+ok(close(_nd.cdf(85), 0.15865525393145707, 1e-5))
+ae(_nd.inv_cdf(0.5), 100)               # exact: q = 0 ⇒ x = mu
+ok(close(_nd.inv_cdf(0.8413447460685429), 115, 1e-4))
+ok(close(_nd.pdf(100), 1 / Math.sqrt(2 * Math.PI * 225)))
+# cdf and inv_cdf are inverses
+ok(close(_nd.cdf(_nd.inv_cdf(0.25)), 0.25, 1e-5))
+
+# ── 12. NormalDist — zscore / quantiles / from_samples ───────────────────────
+
+ae(_nd.zscore(115), 1.0)
+ae(_nd.zscore(70), -2.0)
+_ndq = _nd.quantiles(4)
+ae(_ndq.length, 3)
+ok(close(_ndq[1], 100))                 # the median cut point
+
+_fs = NormalDist.from_samples([1, 2, 3, 4, 5])
+ok(close(_fs.mean, 3.0))
+ok(close(_fs.stdev, Math.sqrt(2.5)))
+
+# ── 13. NormalDist — overlap / samples / arithmetic ──────────────────────────
+
+ok(close(NormalDist(0, 1).overlap(NormalDist(0, 1)), 1.0, 1e-5))
+_ov = NormalDist(0, 1).overlap(NormalDist(1, 1))
+ok(_ov > 0.5 and _ov < 0.7)             # ~0.6171
+
+_samp = _nd.samples(50, seed=42)
+ae(_samp.length, 50)
+# deterministic with a fixed seed
+_samp2 = _nd.samples(50, seed=42)
+ade(_samp, _samp2)
+
+# arithmetic combines distributions / scalars
+_sum = NormalDist(2, 3).__add__(NormalDist(4, 4))
+ae(_sum.mean, 6)
+ae(_sum.stdev, 5)                        # hypot(3, 4)
+_shift = NormalDist(10, 2).__add__(5)
+ae(_shift.mean, 15)
+ae(_shift.stdev, 2)
+_scaled = NormalDist(10, 2).__mul__(3)
+ae(_scaled.mean, 30)
+ae(_scaled.stdev, 6)
+
+ok(NormalDist(1, 2).__eq__(NormalDist(1, 2)))
+ok(not NormalDist(1, 2).__eq__(NormalDist(1, 3)))
+
+# ── 14. error handling ────────────────────────────────────────────────────────
+
+def raises(fn):
+    try:
+        fn()
+    except StatisticsError:
+        return True
+    return False
+
+ok(raises(def(): return mean([]);))
+ok(raises(def(): return median([]);))
+ok(raises(def(): return mode([]);))
+ok(raises(def(): return variance([1]);))
+ok(raises(def(): return pvariance([]);))
+ok(raises(def(): return geometric_mean([1, -2, 3]);))
+ok(raises(def(): return harmonic_mean([1, -2]);))
+ok(raises(def(): return covariance([1, 2], [1, 2, 3]);))
+ok(raises(def(): return correlation([1, 1, 1], [2, 3, 4]);))
+ok(raises(def(): return linear_regression([1, 1, 1], [2, 3, 4]);))
+
+# inv_cdf rejects out-of-range probabilities
+ok(raises(def(): return NormalDist(0, 1).inv_cdf(0);))
+ok(raises(def(): return NormalDist(0, 1).inv_cdf(1.5);))
+# negative sigma is rejected
+ok(raises(def(): return NormalDist(0, -1);))
+
+# StatisticsError is a subclass of ValueError
+_is_value_error = False
+try:
+    mean([])
+except ValueError:
+    _is_value_error = True
+ok(_is_value_error, 'StatisticsError should be catchable as ValueError')
+
+print('statistics: all tests passed')

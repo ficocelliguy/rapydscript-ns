@@ -932,6 +932,36 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "stdlib_statistics_no_bad_import",
+            description: "Importing and using statistics functions produces no errors",
+            run: function () {
+                var markers = d().check([
+                    "from statistics import mean, median, mode, stdev, variance",
+                    "from statistics import quantiles, correlation, linear_regression",
+                    "from statistics import NormalDist, StatisticsError",
+                    "data = [1, 2, 3, 4, 5]",
+                    "m = mean(data)",
+                    "md = median(data)",
+                    "mo = mode(data)",
+                    "sd = stdev(data)",
+                    "v = variance(data)",
+                    "q = quantiles(data)",
+                    "c = correlation(data, data)",
+                    "lr = linear_regression(data, data)",
+                    "nd = NormalDist(0, 1)",
+                    "print(m, md, mo, sd, v, q, c, lr.slope, lr.intercept)",
+                    "print(nd.mean, nd.stdev, nd.cdf(0), nd.pdf(0), StatisticsError)",
+                ].join("\n"),
+                    { virtualFiles: { sentinel: "x = 1" } }
+                );
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for statistics imports and usage, got: " +
+                    JSON.stringify(errors.map(function (m) { return m.message; })));
+            },
+        },
+
+        {
             name: "copy_no_bad_import",
             description: "from copy import copy, deepcopy produces no bad-import error",
             run: function () {

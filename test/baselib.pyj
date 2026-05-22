@@ -159,6 +159,29 @@ a.sort()
 assrt.deepEqual(a, [1,2,3,4])
 a.sort(reverse=True)
 assrt.deepEqual(a, [4,3,2,1])
+
+# sort: a positional two-argument function is treated as a comparator
+assrt.deepEqual(sorted([3, 1, 2, 10], def(x, y): return x - y;), [1, 2, 3, 10])
+assrt.deepEqual(sorted([3, 1, 2, 10], def(x, y): return y - x;), [10, 3, 2, 1])
+sort_cmp = [5, 2, 8, 1]
+sort_cmp.sort(def(x, y): return x - y;)
+assrt.deepEqual(sort_cmp, [1, 2, 5, 8])
+# a one-argument function is still a key function
+assrt.deepEqual(sorted([3, 1, 2], key=def(x): return -x;), [3, 2, 1])
+# comparator path keeps ties in their original order (stable)
+assrt.deepEqual(sorted([[1, 'a'], [1, 'b'], [0, 'c']], def(p, q): return p[0] - q[0];),
+                [[0, 'c'], [1, 'a'], [1, 'b']])
+
+# sort: custom objects are ordered via their __lt__ method
+class SortOrd:
+    def __init__(self, v):
+        self.v = v
+    def __lt__(self, other):
+        return self.v < other.v
+ord_asc = sorted([SortOrd(3), SortOrd(1), SortOrd(2)])
+assrt.deepEqual([ord_asc[0].v, ord_asc[1].v, ord_asc[2].v], [1, 2, 3])
+ord_desc = sorted([SortOrd(3), SortOrd(1), SortOrd(2)], reverse=True)
+assrt.deepEqual([ord_desc[0].v, ord_desc[1].v, ord_desc[2].v], [3, 2, 1])
 assrt.deepEqual(a, a.slice())
 assrt.ok(a is not a.slice())
 assrt.ok(a.slice().extend is not undefined)

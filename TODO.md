@@ -8,7 +8,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python collections.ChainMap] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there.
+I would like you to add support for [python statistics module] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there.
 
 ### Async generator example
 
@@ -86,4 +86,27 @@ print(local['color'])        # 'purple'
 print(local.parents['color'])  # 'red'  — the view without the new layer
 ```
 
+### statistics example
+
+```py
+# The statistics module computes mathematical statistics of numeric data —
+# a lightweight alternative to pulling in the full numpy library.
+
+from statistics import mean, median, stdev, quantiles, NormalDist
+
+scores = [88, 92, 75, 91, 68, 84, 79, 95, 71, 87]
+
+print(mean(scores))      # 83      — arithmetic average
+print(median(scores))    # 85.5    — middle value
+print(stdev(scores))     # ~9.31   — sample standard deviation
+
+# quantiles() splits the data into n equal-probability intervals,
+# returning the n - 1 cut points (quartiles by default)
+print(quantiles(scores))           # [74.0, 85.5, 91.25]
+
+# NormalDist models a normal distribution; from_samples() fits one to data
+grades = NormalDist.from_samples(scores)
+print(grades.cdf(90))              # probability a score is <= 90
+print(grades.zscore(95))           # how many stdevs above the mean a 95 is
+```
 

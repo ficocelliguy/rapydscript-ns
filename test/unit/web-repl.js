@@ -4479,6 +4479,125 @@ var TESTS = [
         },
     },
 
+    // ── statistics ───────────────────────────────────────────────────────────
+
+    {
+        name: "bundle_statistics_averages",
+        description: "statistics stdlib: averages and central location in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from statistics import mean, fmean, median, median_low, median_high",
+                "from statistics import mode, multimode, harmonic_mean, geometric_mean",
+                "assrt.equal(mean([1, 2, 3, 4]), 2.5)",
+                "assrt.equal(mean([1, 2, 3]), 2)",
+                "assrt.equal(fmean([1, 2, 3, 4]), 2.5)",
+                "assrt.equal(median([1, 3, 5]), 3)",
+                "assrt.equal(median([1, 3, 5, 7]), 4)",
+                "assrt.equal(median([5, 1, 3]), 3)",            // unsorted input
+                "assrt.equal(median_low([1, 3, 5, 7]), 3)",
+                "assrt.equal(median_high([1, 3, 5, 7]), 5)",
+                "assrt.equal(mode([1, 1, 2, 3, 3, 3]), 3)",
+                "assrt.equal(mode(['x', 'y', 'x']), 'x')",
+                "assrt.deepEqual(multimode([1, 1, 2, 2, 3]), [1, 2])",
+                "assrt.ok(Math.abs(harmonic_mean([40, 60]) - 48.0) < 1e-9)",
+                "assrt.ok(Math.abs(geometric_mean([2, 8]) - 4.0) < 1e-9)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_statistics_spread",
+        description: "statistics stdlib: variance, stdev and quantiles in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from statistics import variance, pvariance, stdev, pstdev, quantiles",
+                "assrt.equal(variance([1, 2, 3, 4, 5]), 2.5)",
+                "assrt.equal(pvariance([1, 2, 3, 4, 5]), 2.0)",
+                "assrt.ok(Math.abs(stdev([1, 2, 3, 4, 5]) - Math.sqrt(2.5)) < 1e-9)",
+                "assrt.ok(Math.abs(pstdev([1, 2, 3, 4, 5]) - Math.sqrt(2.0)) < 1e-9)",
+                "assrt.deepEqual(quantiles([1, 2, 3, 4]), [1.25, 2.5, 3.75])",
+                "q = quantiles([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], n=10)",
+                "assrt.equal(q.length, 9)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_statistics_relations",
+        description: "statistics stdlib: covariance, correlation, linear_regression in the bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from statistics import covariance, correlation, linear_regression",
+                "x = [1, 2, 3, 4, 5, 6, 7, 8, 9]",
+                "y = [1, 2, 3, 1, 2, 3, 1, 2, 3]",
+                "assrt.ok(Math.abs(covariance(x, y) - 0.75) < 1e-9)",
+                "assrt.ok(Math.abs(correlation(x, x) - 1.0) < 1e-9)",
+                "lr = linear_regression([1, 2, 3, 4, 5], [2, 4, 6, 8, 10])",
+                "assrt.ok(Math.abs(lr.slope - 2.0) < 1e-9)",
+                "assrt.ok(Math.abs(lr.intercept - 0.0) < 1e-9)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_statistics_normaldist",
+        description: "statistics stdlib: NormalDist in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from statistics import NormalDist",
+                "nd = NormalDist(100, 15)",
+                "assrt.equal(nd.mean, 100)",
+                "assrt.equal(nd.stdev, 15)",
+                "assrt.equal(nd.variance, 225)",
+                "assrt.ok(Math.abs(nd.cdf(100) - 0.5) < 1e-6)",
+                "assrt.equal(nd.inv_cdf(0.5), 100)",
+                "assrt.equal(nd.zscore(115), 1.0)",
+                "fs = NormalDist.from_samples([1, 2, 3, 4, 5])",
+                "assrt.ok(Math.abs(fs.mean - 3.0) < 1e-9)",
+                // operator overloading dispatches to __add__
+                "combined = nd + NormalDist(50, 20)",
+                "assrt.equal(combined.mean, 150)",
+                "assrt.equal(combined.stdev, 25)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── list sort: comparator detection + __lt__ dispatch ────────────────────
+
+    {
+        name: "bundle_sort_comparator_and_lt",
+        description: "list sort: positional comparator and __lt__ dispatch in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                // a positional two-argument function is treated as a comparator
+                "assrt.deepEqual(sorted([3, 1, 2, 10], def(x, y): return x - y;), [1, 2, 3, 10])",
+                "m = [5, 2, 8, 1]",
+                "m.sort(def(x, y): return y - x;)",
+                "assrt.deepEqual(m, [8, 5, 2, 1])",
+                // a one-argument function is still a key function
+                "assrt.deepEqual(sorted([3, 1, 2], key=def(x): return -x;), [3, 2, 1])",
+                // custom objects are ordered through their __lt__ method
+                "class Ord:",
+                "    def __init__(self, v):",
+                "        self.v = v",
+                "    def __lt__(self, other):",
+                "        return self.v < other.v",
+                "s = sorted([Ord(3), Ord(1), Ord(2)])",
+                "assrt.deepEqual([s[0].v, s[1].v, s[2].v], [1, 2, 3])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

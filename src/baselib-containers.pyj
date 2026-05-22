@@ -122,9 +122,22 @@ def ρσ_list_sort_key(value):
     t = jstype(value)
     if t is 'string' or t is 'number':
         return value
+    # Keep objects that define __lt__ unchanged so ρσ_list_sort_cmp can
+    # dispatch the dunder; everything else falls back to a string key.
+    if value is not None and value is not undefined and jstype(value.__lt__) is 'function':
+        return value
     return value.toString()
 
 def ρσ_list_sort_cmp(a, b, ap, bp):
+    # When the elements define __lt__, order them the Pythonic way via
+    # ρσ_op_lt (which also handles a reflected __gt__); otherwise compare
+    # the precomputed primitive keys directly.
+    if a is not None and a is not undefined and jstype(a.__lt__) is 'function':
+        if ρσ_op_lt(a, b):
+            return -1
+        if ρσ_op_lt(b, a):
+            return 1
+        return ap - bp
     if a < b:
         return -1
     if a > b:
@@ -132,8 +145,17 @@ def ρσ_list_sort_cmp(a, b, ap, bp):
     return ap - bp
 
 def ρσ_list_sort(key=None, reverse=False):
-    key = key or ρσ_list_sort_key
     mult = -1 if reverse else 1
+    if key is not None and key is not undefined and jstype(key) is 'function' and key.length is 2:
+        # A two-argument function is treated as a comparator (à la
+        # functools.cmp_to_key) rather than a key function, so a JS-style
+        # `.sort((a, b) => ...)` callback works as expected.
+        cmpposmap = dict()
+        for v'var i=0; i < this.length; i++':
+            cmpposmap.set(this[i], i)  # noqa:undef
+        Array.prototype.sort.call(this, def (a, b): return (mult * key(a, b)) or (cmpposmap.get(a) - cmpposmap.get(b));)
+        return
+    key = key or ρσ_list_sort_key
     keymap = dict()
     posmap = dict()
     for v'var i=0; i < this.length; i++':
