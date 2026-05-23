@@ -33,11 +33,24 @@ function colored(string, color, bold) {
 
 function supports_color(stdout) {
     stdout = stdout || process.stdout;
-	if (stdout && !stdout.isTTY) {
+
+	if (process.platform === 'win32') {
+		// MSYS2/MINGW/Git Bash/Cygwin: isTTY is unreliable, check TERM instead
+		if (/^screen|^xterm|^vt100|color|ansi|cygwin|linux/i.test(process.env.TERM)) {
+			return true;
+		}
+		// Modern Windows terminals (Windows Terminal, VS Code, etc.)
+		if ('WT_SESSION' in process.env || process.env.TERM_PROGRAM === 'vscode' || 'COLORTERM' in process.env) {
+			return true;
+		}
+		// ConEmu / cmder
+		if (process.env.ConEmuANSI === 'ON') {
+			return true;
+		}
 		return false;
 	}
 
-	if (process.platform === 'win32') {
+	if (stdout && !stdout.isTTY) {
 		return false;
 	}
 

@@ -2996,6 +2996,96 @@ assrt.equal(fib(15), 610)
         js_checks: ["ρσ_op_add(", "ρσ_op_sub(", "ρσ_op_or(", "ρσ_op_and("],
     },
 
+    {
+        name: "operator_dict_or",
+        description: "| on plain objects creates a new merged dict; numeric | still works",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "a = {'x': 1, 'y': 2}",
+            "b = {'z': 3}",
+            "c = a | b",
+            "assrt.deepEqual(c, {'x': 1, 'y': 2, 'z': 3})",
+            "assrt.notStrictEqual(c, a)",
+            "assrt.equal(5 | 3, 7)",
+        ].join("\n"),
+    },
+
+    {
+        name: "operator_dict_ior",
+        description: "|= on plain objects merges in-place",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "d = {'a': 1}",
+            "ref = d",
+            "d |= {'b': 2}",
+            "assrt.deepEqual(d, {'a': 1, 'b': 2})",
+            "assrt.strictEqual(d, ref)",
+        ].join("\n"),
+    },
+
+    {
+        name: "operator_dict_or_override",
+        description: "| on plain objects: right-hand values override left on key collision",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "a = {'x': 1, 'y': 2}",
+            "b = {'y': 99, 'z': 3}",
+            "c = a | b",
+            "assrt.equal(c['y'], 99)",
+            "assrt.equal(c['x'], 1)",
+            "assrt.equal(c['z'], 3)",
+        ].join("\n"),
+    },
+
+    {
+        name: "operator_type_error_bitwise",
+        description: "bitwise operators raise TypeError for invalid types",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "def check(fn, msg):",
+            "    try:",
+            "        fn()",
+            "        assrt.ok(False, 'expected TypeError for ' + msg)",
+            "    except TypeError:",
+            "        assrt.ok(True)",
+            'check(def(): "str" & 5;, "str & int")',
+            'check(def(): None | 5;, "None | int")',
+            'check(def(): "a" ^ 1;, "str ^ int")',
+            'check(def(): "a" << 1;, "str << int")',
+            'check(def(): "a" >> 1;, "str >> int")',
+            "assrt.equal(7 & 3, 3)",
+            "assrt.equal(1 | 2, 3)",
+            "assrt.equal(5 ^ 3, 6)",
+            "assrt.equal(1 << 3, 8)",
+            "assrt.equal(8 >> 2, 2)",
+        ].join("\n"),
+    },
+
+    {
+        name: "operator_type_error_unary",
+        description: "unary operators raise TypeError for invalid types",
+        src: [
+            "# globals: assrt",
+            "from __python__ import overload_operators",
+            "def check(fn, msg):",
+            "    try:",
+            "        fn()",
+            "        assrt.ok(False, 'expected TypeError for ' + msg)",
+            "    except TypeError:",
+            "        assrt.ok(True)",
+            'check(def(): -"hello";, "neg str")',
+            'check(def(): +None;, "pos None")',
+            'check(def(): ~"world";, "invert str")',
+            "assrt.equal(-5, -5)",
+            "assrt.equal(+3, 3)",
+            "assrt.equal(~0, -1)",
+        ].join("\n"),
+    },
+
     // ── nested comprehensions ──────────────────────────────────────────────
 
     {

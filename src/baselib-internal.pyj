@@ -385,37 +385,49 @@ def ρσ_op_pow(a, b):
 def ρσ_op_and(a, b):
     if a is not None and jstype(a.__and__) is 'function': return a.__and__(b)
     if b is not None and jstype(b.__rand__) is 'function': return b.__rand__(a)
-    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
-        raise TypeError("unsupported operand type(s) for &: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
-    return v'a & b'
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a & b'
+    if ta is 'bigint' and tb is 'bigint': return v'a & b'
+    raise TypeError("unsupported operand type(s) for &: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_or(a, b):
     if a is not None and jstype(a.__or__) is 'function': return a.__or__(b)
     if b is not None and jstype(b.__ror__) is 'function': return b.__ror__(a)
-    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
-        raise TypeError("unsupported operand type(s) for |: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
-    return v'a | b'
+    ta = jstype(a)
+    tb = jstype(b)
+    if ta is 'object' and tb is 'object' and a is not None and b is not None and not Array.isArray(a) and not Array.isArray(b) and v'a.constructor === Object' and v'b.constructor === Object':
+        return Object.assign({}, a, b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a | b'
+    if ta is 'bigint' and tb is 'bigint': return v'a | b'
+    raise TypeError("unsupported operand type(s) for |: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_xor(a, b):
     if a is not None and jstype(a.__xor__) is 'function': return a.__xor__(b)
     if b is not None and jstype(b.__rxor__) is 'function': return b.__rxor__(a)
-    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
-        raise TypeError("unsupported operand type(s) for ^: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
-    return v'a ^ b'
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a ^ b'
+    if ta is 'bigint' and tb is 'bigint': return v'a ^ b'
+    raise TypeError("unsupported operand type(s) for ^: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_lshift(a, b):
     if a is not None and jstype(a.__lshift__) is 'function': return a.__lshift__(b)
     if b is not None and jstype(b.__rlshift__) is 'function': return b.__rlshift__(a)
-    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
-        raise TypeError("unsupported operand type(s) for <<: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
-    return v'a << b'
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a << b'
+    if ta is 'bigint' and tb is 'bigint': return v'a << b'
+    raise TypeError("unsupported operand type(s) for <<: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_rshift(a, b):
     if a is not None and jstype(a.__rshift__) is 'function': return a.__rshift__(b)
     if b is not None and jstype(b.__rrshift__) is 'function': return b.__rrshift__(a)
-    if (jstype(a) is 'bigint') is not (jstype(b) is 'bigint'):
-        raise TypeError("unsupported operand type(s) for >>: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
-    return v'a >> b'
+    ta = jstype(a)
+    tb = jstype(b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a >> b'
+    if ta is 'bigint' and tb is 'bigint': return v'a >> b'
+    raise TypeError("unsupported operand type(s) for >>: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 # Ordered-comparison operator overloading helpers.
 # ρσ_op_lt dispatches __lt__ (forward) then __gt__ (reflected), handles lists
@@ -505,15 +517,22 @@ def ρσ_list_iadd(a, b):
 # Unary operator overloading helpers
 def ρσ_op_neg(a):
     if a is not None and jstype(a.__neg__) is 'function': return a.__neg__()
-    return -a
+    ta = jstype(a)
+    if ta is 'number' or ta is 'boolean' or ta is 'bigint': return -a
+    raise TypeError("bad operand type for unary -: '" + ρσ_arith_type_name(a) + "'")
 
 def ρσ_op_pos(a):
     if a is not None and jstype(a.__pos__) is 'function': return a.__pos__()
-    return +a
+    ta = jstype(a)
+    if ta is 'number' or ta is 'boolean': return +a
+    if ta is 'bigint': return a
+    raise TypeError("bad operand type for unary +: '" + ρσ_arith_type_name(a) + "'")
 
 def ρσ_op_invert(a):
     if a is not None and jstype(a.__invert__) is 'function': return a.__invert__()
-    return ~a
+    ta = jstype(a)
+    if ta is 'number' or ta is 'boolean' or ta is 'bigint': return ~a
+    raise TypeError("bad operand type for unary ~: '" + ρσ_arith_type_name(a) + "'")
 
 # Augmented-assignment helpers: try __i<op>__ first, fall back to binary op
 def ρσ_op_iadd(a, b):
@@ -550,6 +569,11 @@ def ρσ_op_iand(a, b):
 
 def ρσ_op_ior(a, b):
     if a is not None and jstype(a.__ior__) is 'function': return a.__ior__(b)
+    ta = jstype(a)
+    tb = jstype(b)
+    if ta is 'object' and tb is 'object' and a is not None and b is not None and not Array.isArray(a) and not Array.isArray(b) and v'a.constructor === Object' and v'b.constructor === Object':
+        Object.assign(a, b)
+        return a
     return ρσ_op_or(a, b)
 
 def ρσ_op_ixor(a, b):
