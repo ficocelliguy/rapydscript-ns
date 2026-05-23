@@ -1652,6 +1652,40 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── Exception.args ───────────────────────────────────────────────
+        {
+            name: "exception_args_no_errors",
+            description: "Accessing .args on caught exception produces no diagnostics",
+            run: function () {
+                var markers = d().check([
+                    "try:",
+                    "    raise ValueError('oops', 123)",
+                    "except ValueError as e:",
+                    "    x = e.args",
+                    "    y = e.args[0]",
+                    "    z = len(e.args)",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for exception .args access, got: " + JSON.stringify(markers));
+            },
+        },
+        {
+            name: "exception_args_custom_class_no_errors",
+            description: "Custom exception class with variadic __init__ produces no diagnostics",
+            run: function () {
+                var markers = d().check([
+                    "class MyError(Exception):",
+                    "    def __init__(self, code, detail):",
+                    "        Exception.__init__(self, code, detail)",
+                    "        self.code = code",
+                    "e = MyError(404, 'not found')",
+                    "x = e.args",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for custom exception .args, got: " + JSON.stringify(markers));
+            },
+        },
+
     ];
 
     return TESTS;

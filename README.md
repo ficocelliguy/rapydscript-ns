@@ -3312,16 +3312,26 @@ finally:
     cleanup()
 ```
 
+Like Python, exceptions accept variadic arguments stored in `.args`:
+
+```py
+e = ValueError('bad input', 42)
+print(e.args)       # ['bad input', 42]
+print(e.args[0])    # 'bad input'
+print(e.message)    # 'bad input' (first arg, for JS Error compatibility)
+```
+
 You can create your own Exception classes by inheriting from `Exception`, which
 is the JavaScript Error class, for more details on this, see the [MDN documentation](https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Error).
 
 ```py
 class MyError(Exception):
-	def __init__(self, message):
-		self.name = 'MyError'
-		self.message = message
+	def __init__(self, code, detail):
+		Exception.__init__(self, code, detail)
+		self.code = code
+		self.detail = detail
 
-raise MyError('This is a custom error!')
+raise MyError(404, 'not found')
 ```
 
 You can catch multiple exception types in one `except` clause. Both the comma form and the tuple form are supported:
@@ -4013,6 +4023,7 @@ Python Feature Coverage
 | `super()` — 0-arg and 2-arg forms                                                                                                                                                                                                                             | `super().method()` and `super(Cls, self).method()` both work |
 | `except TypeA, TypeB as e:`                                                                                                                                                                                                                                   | RapydScript comma-separated form; catches multiple exception types |
 | `except (TypeA, TypeError) as e:`                                                                                                                                                                                                                             | Tuple form also supported |
+| `Exception.args` variadic constructor                                                                                                                                                                                                                          | `Exception('a', 'b').args == ['a', 'b']`; `.message` set to first arg for JS compatibility; works on all builtin and custom exception subclasses |
 | `except*` / `ExceptionGroup` (Python 3.11+)                                                                                                                                                                                                                   | Full support: `ExceptionGroup` class with `subgroup()`/`split()`; `except*` dispatches to typed handlers, re-raises unmatched; bare `except*:` catches all remaining |
 | `try / else`                                                                                                                                                                                                                                                  | `else` block runs only when no exception was raised |
 | `for / else`                                                                                                                                                                                                                                                  | `else` block runs when loop completes without `break`; nested break isolation works |
@@ -4226,7 +4237,7 @@ Features that exist in RapydScript but behave differently from standard Python:
 | `//` floor division on floats | `math.floor(a/b)` always | uses `Math.floor` - same result for well-behaved floats                                                                                                                                                                    |
 | `%` on negative numbers | Result takes the sign of the divisor (`-7 % 3 == 2`) | Same as Python by default (via `python_modulo`, on by default). Disable with `from __python__ import no_python_modulo` to revert to raw JS remainder semantics.                                                              |
 | `global` / `nonlocal` scoping | Full cross-scope declaration | `global` works for module-level; if a variable exists in both an intermediate outer scope **and** the module-level scope, the outer scope takes precedence (differs from Python where `global` always forces module-level) |
-| `Exception.message` | Not standard; use `.args[0]` | `.message` is the standard attribute (JS `Error` style)                                                                                                                                                                    |
+| `Exception.message` | Not standard; use `.args[0]` | `.args` is populated (like Python); `.message` also set to first arg for JS `Error` compatibility                                                                                                                          |
 | Function call argument count | Too few args → `TypeError`; too many → `TypeError` | Too few args → extra params are `undefined`; too many → extras silently discarded. No `TypeError` is raised in either case.                                                                                                |
 | Positional-only param enforcement | Passing by keyword raises `TypeError` | Passing by keyword is silently ignored — the named arg is discarded and the parameter gets `undefined` (no error raised)                                                                                                   |
 | Keyword-only param enforcement | Passing positionally raises `TypeError` | Passing positionally raises no error — the extra positional arg is silently discarded and the default value is used                                                                                                        |

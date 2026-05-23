@@ -5463,6 +5463,105 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── Exception.args ───────────────────────────────────────────────────────
+    {
+        name: "exception_args_single",
+        description: "Exception with single arg populates .args and .message",
+        src: [
+            "# globals: assrt",
+            "e = Exception('hello')",
+            "assrt.deepEqual(e.args, ['hello'])",
+            "assrt.equal(e.message, 'hello')",
+        ].join("\n"),
+    },
+    {
+        name: "exception_args_multiple",
+        description: "Exception with multiple args populates .args tuple",
+        src: [
+            "# globals: assrt",
+            "e = Exception('err', 42, 'extra')",
+            "assrt.deepEqual(e.args, ['err', 42, 'extra'])",
+            "assrt.equal(e.message, 'err')",
+            "assrt.equal(e.args[1], 42)",
+            "assrt.equal(e.args[2], 'extra')",
+        ].join("\n"),
+    },
+    {
+        name: "exception_args_empty",
+        description: "Exception with no args has empty .args and empty .message",
+        src: [
+            "# globals: assrt",
+            "e = Exception()",
+            "assrt.deepEqual(e.args, [])",
+            "assrt.equal(e.message, '')",
+        ].join("\n"),
+    },
+    {
+        name: "exception_args_subclass",
+        description: "Exception subclass inherits .args behavior",
+        src: [
+            "# globals: assrt",
+            "e = ValueError('bad', 'value')",
+            "assrt.deepEqual(e.args, ['bad', 'value'])",
+            "assrt.equal(e.message, 'bad')",
+            "assrt.ok(isinstance(e, ValueError))",
+            "assrt.ok(isinstance(e, Exception))",
+        ].join("\n"),
+    },
+    {
+        name: "exception_args_catch",
+        description: "Caught exception preserves .args",
+        src: [
+            "# globals: assrt",
+            "try:",
+            "    raise ValueError('oops', 123)",
+            "except ValueError as e:",
+            "    assrt.deepEqual(e.args, ['oops', 123])",
+            "    assrt.equal(e.message, 'oops')",
+            "    assrt.equal(e.args[1], 123)",
+        ].join("\n"),
+    },
+    {
+        name: "exception_args_len",
+        description: "len() works on exception .args",
+        src: [
+            "# globals: assrt",
+            "e = Exception('a', 'b', 'c')",
+            "assrt.equal(len(e.args), 3)",
+            "e2 = Exception()",
+            "assrt.equal(len(e2.args), 0)",
+        ].join("\n"),
+    },
+    {
+        name: "exception_args_exception_group",
+        description: "ExceptionGroup .args contains message and exceptions list",
+        src: [
+            "# globals: assrt",
+            "eg = ExceptionGroup('grp', [ValueError('v')])",
+            "assrt.equal(eg.args[0], 'grp')",
+            "assrt.equal(len(eg.args), 2)",
+            "assrt.equal(eg.message, 'grp')",
+            "assrt.ok(isinstance(eg.args[1][0], ValueError))",
+        ].join("\n"),
+    },
+    {
+        name: "exception_args_custom_class",
+        description: "Custom exception class with __init__ can use .args",
+        src: [
+            "# globals: assrt",
+            "class MyError(Exception):",
+            "    def __init__(self, code, detail):",
+            "        Exception.__init__(self, code, detail)",
+            "        self.code = code",
+            "        self.detail = detail",
+            "e = MyError(404, 'not found')",
+            "assrt.deepEqual(e.args, [404, 'not found'])",
+            "assrt.equal(e.code, 404)",
+            "assrt.equal(e.detail, 'not found')",
+            "assrt.equal(e.message, 404)",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

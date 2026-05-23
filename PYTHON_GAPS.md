@@ -77,17 +77,7 @@ when interoperating with JS APIs that return plain objects.
 
 ---
 
-### 1.5 `Exception.args` vs `.message`
-
-**Python:** `Exception('msg').args == ('msg',)` and `.message` is not a standard attribute.
-**RapydScript:** `.message` is the primary attribute (JS `Error` convention). `.args` is
-not populated as a tuple with the message.
-
-**Impact:** Code accessing `.args[0]` to get the error message will get `undefined`.
-
----
-
-### 1.6 Multiple Inheritance MRO
+### 1.5 Multiple Inheritance MRO
 
 **Python:** C3 linearization guarantees a deterministic and consistent method resolution order.
 **RapydScript:** Built on the JS prototype chain. In diamond inheritance or complex hierarchies

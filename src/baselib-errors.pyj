@@ -8,8 +8,9 @@ v'var _ρσ_NativeError = Error'
 
 class Exception(Error):
 
-    def __init__(self, message):
-        self.message = message
+    def __init__(self):
+        self.args = v'Array.prototype.slice.call(arguments)'
+        self.message = self.args[0] if self.args.length > 0 else ''
         self.stack = v'_ρσ_NativeError'().stack
         self.name = self.constructor.name
 
@@ -57,7 +58,7 @@ def _is_exc_class(obj):
 class ExceptionGroup(Exception):
 
     def __init__(self, message, exceptions):
-        Exception.__init__(self, message)
+        Exception.__init__(self, message, exceptions)
         self.exceptions = exceptions if exceptions else []
 
     def subgroup(self, condition):
