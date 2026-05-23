@@ -1622,6 +1622,20 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             if parent_details and parent_details.has_attr_dunders:
                 definition.has_attr_dunders = True
                 class_details.has_attr_dunders = True
+        # Detect __slots__ = [...] in class body
+        for stmt in definition.body:
+            assign = stmt
+            if is_node_type(stmt, AST_SimpleStatement):
+                assign = stmt.body
+            if is_node_type(assign, AST_Assign) and is_node_type(assign.left, AST_SymbolRef) and assign.left.name is '__slots__':
+                if is_node_type(assign.right, AST_Array):
+                    slot_names = []
+                    for elem in assign.right.elements:
+                        if is_node_type(elem, AST_String):
+                            slot_names.push(elem.value)
+                    definition.slots = slot_names
+                    class_details.slots = slot_names
+                break
         # find the class variables
         class_var_names = {}
         # Ensure that if a class variable refers to another class variable in

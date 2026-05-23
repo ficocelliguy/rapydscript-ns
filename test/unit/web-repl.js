@@ -4598,6 +4598,31 @@ var TESTS = [
         },
     },
 
+    // ── __slots__ ──────────────────────────────────────────────────────────
+    {
+        name: "slots_basic",
+        description: "Basic __slots__ enforcement in web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Point:",
+                "    __slots__ = ['x', 'y']",
+                "    def __init__(self, x, y):",
+                "        self.x = x",
+                "        self.y = y",
+                "p = Point(1, 2)",
+                "assrt.equal(p.x, 1)",
+                "assrt.equal(p.y, 2)",
+                "try:",
+                "    p.z = 3",
+                "    assrt.ok(False, 'should have raised')",
+                "except AttributeError:",
+                "    assrt.ok(True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

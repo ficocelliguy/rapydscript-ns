@@ -1686,6 +1686,44 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── __slots__ ──────────────────────────────────────────────────────
+        {
+            name: "slots_no_errors",
+            description: "Class with __slots__ produces no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "class Point:",
+                    "    __slots__ = ['x', 'y']",
+                    "    def __init__(self, x, y):",
+                    "        self.x = x",
+                    "        self.y = y",
+                    "p = Point(1, 2)",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for __slots__ class, got: " + JSON.stringify(markers));
+            },
+        },
+        {
+            name: "slots_subclass_no_errors",
+            description: "Subclass with __slots__ produces no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "class Base:",
+                    "    __slots__ = ['x']",
+                    "    def __init__(self):",
+                    "        self.x = 1",
+                    "class Child(Base):",
+                    "    __slots__ = ['y']",
+                    "    def __init__(self):",
+                    "        Base.__init__(self)",
+                    "        self.y = 2",
+                    "c = Child()",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for __slots__ subclass, got: " + JSON.stringify(markers));
+            },
+        },
+
     ];
 
     return TESTS;

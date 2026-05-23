@@ -523,7 +523,7 @@ def _test_raise_from_none():
 _test_raise_from_none()
 
 # ── 23. __slots__ ────────────────────────────────────────────────────────────
-# STATUS: ✗ NOT ENFORCED — __slots__ is accepted but does not restrict attrs.
+# STATUS: ✓ WORKS — __slots__ enforced via Proxy; raises AttributeError for undeclared attrs.
 
 # ── 24. Nested classes ───────────────────────────────────────────────────────
 # STATUS: ✓ WORKS — added in commit 44c9802; tested fully in test/classes.pyj

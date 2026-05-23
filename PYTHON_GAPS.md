@@ -90,18 +90,7 @@ name. Hard to debug because no error is raised.
 
 ## 2. Missing Language Features
 
-### 2.1 `__slots__` Not Enforced
-
-`__slots__ = ['x', 'y']` is parsed and accepted but has no runtime effect — arbitrary
-attributes can still be set on instances. No `AttributeError` is raised for assignments to
-undeclared attributes.
-
-**Browser relevance:** Used frequently for memory efficiency and API documentation. Enforcement
-via `Object.seal()` or a `Proxy`-based guard would be possible in modern browsers.
-
----
-
-### 2.2 `__del__` Destructor — No Guaranteed Finalizer
+### 2.1 `__del__` Destructor — No Guaranteed Finalizer
 
 `__del__` methods are not called reliably. JavaScript's GC is non-deterministic and provides
 no equivalent to CPython's reference-counting finalizer.
@@ -114,7 +103,7 @@ that timing is not guaranteed.
 
 ---
 
-### 2.3 `locals()` Always Returns Empty Dict
+### 2.2 `locals()` Always Returns Empty Dict
 
 `vars()`, `locals()`, and `globals()` all exist as builtins. JavaScript provides no mechanism
 to introspect local variables at runtime, so `locals()` always returns an empty dict.
@@ -124,7 +113,7 @@ Python code that uses `locals()` for string template substitution
 
 ---
 
-### 2.4 `from module import *` Not Allowed
+### 2.3 `from module import *` Not Allowed
 
 Star imports are intentionally unsupported to prevent namespace pollution. Python developers
 who rely on them (e.g., `from math import *`) must enumerate imports explicitly.
@@ -133,7 +122,7 @@ who rely on them (e.g., `from math import *`) must enumerate imports explicitly.
 
 ---
 
-### 2.5 `asynccontextmanager` Not Available
+### 2.4 `asynccontextmanager` Not Available
 
 `contextlib.asynccontextmanager` is absent. Only synchronous `@contextmanager` is implemented.
 `async with` itself is also not supported — async context managers need `.acquire()`/`.release()`
@@ -141,7 +130,7 @@ calls instead.
 
 ---
 
-### 2.6 f-string Debugging Format `f'{x=}'` Not Supported
+### 2.5 f-string Debugging Format `f'{x=}'` Not Supported
 
 Python 3.8+ supports `f'{x=}'` which expands to `f'x={repr(x)}'`. This is not implemented.
 
@@ -152,7 +141,7 @@ print(f'{x=}')   # Python: "x=42". RapydScript: syntax error or wrong output
 
 ---
 
-### 2.7 Ellipsis Evaluates to `undefined`
+### 2.6 Ellipsis Evaluates to `undefined`
 
 `...` (Ellipsis) parses as a valid expression but evaluates to JS `undefined` rather than
 Python's `Ellipsis` singleton object. Code that stores `...` in containers or checks
@@ -332,7 +321,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
-| Medium | `__slots__` enforcement via `Proxy` | Medium | Memory and API documentation |
 | Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | `fractions` module | Medium | Exact rational arithmetic |
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |

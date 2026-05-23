@@ -125,8 +125,8 @@ def print_class(output):
             output.indent()
             output.spaced('if', '(this.ρσ_object_id', '===', 'undefined)', 'Object.defineProperty(this,', '"ρσ_object_id",', '{"value":++ρσ_object_counter})')
             output.end_statement()
-            if self.has_attr_dunders:
-                # Wrap in a Proxy so __getattr__/__setattr__/__delattr__/__getattribute__ are triggered.
+            if self.has_attr_dunders or self.slots:
+                # Wrap in a Proxy so __getattr__/__setattr__/__delattr__/__getattribute__/__slots__ are triggered.
                 output.indent()
                 output.print('var ρσ_proxy = ρσ_JS_Proxy ? new ρσ_JS_Proxy(this, ρσ_attr_proxy_handler) : this')
                 output.end_statement()
@@ -329,6 +329,29 @@ def print_class(output):
     self.name.print(output)
     output.print('.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true})')
     output.end_statement()
+
+    # __slots__ enforcement: emit allowed attribute set on prototype
+    if self.slots:
+        output.indent()
+        self.name.print(output)
+        # Merge parent slots (if any) with this class's slots + bound methods
+        slot_obj = '{'
+        for i in range(self.slots.length):
+            if i > 0:
+                slot_obj += ', '
+            slot_obj += JSON.stringify(self.slots[i]) + ': true'
+        for i in range(self.bound.length):
+            if self.slots.length or i > 0:
+                slot_obj += ', '
+            slot_obj += JSON.stringify(self.bound[i]) + ': true'
+        slot_obj += '}'
+        if self.parent:
+            output.print('.prototype.__ρσ_slots__ = Object.assign({}, ')
+            self.parent.print(output)
+            output.print('.prototype.__ρσ_slots__, ' + slot_obj + ')')
+        else:
+            output.print('.prototype.__ρσ_slots__ = Object.assign({}, ' + slot_obj + ')')
+        output.end_statement()
 
     # Other statements in the class context (including nested class definitions).
     # Emitted BEFORE __init_subclass__ so that the hook can see class variables.

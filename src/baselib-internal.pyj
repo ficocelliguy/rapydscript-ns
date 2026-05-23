@@ -790,6 +790,11 @@ v'var ρσ_proxy_target_symbol = typeof Symbol === "function" ? Symbol("ρσ_pro
         if jstype(target.__setattr__) is 'function':
             target.__setattr__.call(receiver, prop, value)
             return True
+        # __slots__ enforcement: check if the class restricts instance attributes.
+        if jstype(prop) is 'string' and prop[0] is not 'ρ':
+            slots = v'target.constructor && target.constructor.prototype.__ρσ_slots__'
+            if slots and not v'slots.hasOwnProperty(prop)':
+                raise AttributeError("'" + (target.constructor.__name__ or 'object') + "' object has no attribute '" + prop + "'")
         # Pass 'target' as receiver (not proxy) to avoid infinite recursion through the Proxy set trap.
         return v'Reflect.set(target, prop, value, target)'
     ,

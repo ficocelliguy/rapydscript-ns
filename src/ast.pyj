@@ -605,6 +605,7 @@ class AST_Class(AST_Scope):
         'has_new': "[boolean] true if the class defines a __new__ method",
         'has_attr_dunders': "[boolean] true if the class defines any of __getattr__/__setattr__/__delattr__/__getattribute__",
         'class_kwargs': "[array] keyword arguments from class header (e.g. class C(Base, key=val):) as [[key_node, value_node], ...]",
+        'slots': "[array|null] list of __slots__ attribute names, null if not defined",
     }
 
     def _walk(self, visitor):

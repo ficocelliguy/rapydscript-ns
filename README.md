@@ -4169,7 +4169,6 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 
 | Feature                               | Notes                                                                                   |
 |---------------------------------------|-----------------------------------------------------------------------------------------|
-| `__slots__` enforcement               | Accepted, but does not restrict attribute assignment                                    |
 | `locals()`                            | Returns an empty `dict`. JS has no runtime mechanism for introspecting local variables. |
 | `input(prompt)`                       | There is no simple cli input in browser; use `prompt()`                                 |
 | `compile()`                           | Python compile/code objects have no JS equivalent                                       |
