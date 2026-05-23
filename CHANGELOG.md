@@ -1,3 +1,12 @@
+version 0.9.4
+=======================
+* Added the `statistics` standard library module (`mean`, `fmean`, `median`, `median_low`, `median_high`, `median_grouped`, `mode`, `multimode`, `stdev`, `pstdev`, `variance`, `pvariance`, `harmonic_mean`, `geometric_mean`, `quantiles`, `covariance`, `correlation`, `linear_regression`, `NormalDist`)
+* Added the `pprint` standard library module (`pprint`, `pformat`, `PrettyPrinter`, `isreadable`, `isrecursive`, `saferepr`)
+* Added `ChainMap` to the `collections` standard library module
+* Added support for `bigint` literals and the `bigint()` builtin
+* Fix: Added the `type` builtin to global scope
+* Fix: Performance problem during long editor sessions in the language service
+
 version 0.9.3
 =======================
 * Added the `bisect` standard library module (`bisect_left`, `bisect_right`, `bisect`, `insort_left`, `insort_right`, `insort`, optional `key` parameter)
