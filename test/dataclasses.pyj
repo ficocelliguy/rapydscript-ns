@@ -76,7 +76,7 @@ class _Hidden:
     secret: str = field('s3cr3t', repr=False)
 
 h = _Hidden("visible")
-ae(repr(h), '_Hidden(public="visible")')
+ae(repr(h), "_Hidden(public='visible')")
 ae(h.secret, 's3cr3t')
 
 # ── 6. field() init=False ─────────────────────────────────────────────────────
@@ -209,11 +209,10 @@ ae(ch2.y, 0)
 ae(ch2.z, 'default')
 
 # repr shows all fields including inherited
-# (RapydScript repr() uses double quotes for strings, like JavaScript)
 r = repr(ch2)
 ok('x=10' in r)
 ok('y=0' in r)
-ok('z="default"' in r)
+ok("z='default'" in r)
 
 # ── 15. MISSING sentinel ──────────────────────────────────────────────────────
 
@@ -240,7 +239,7 @@ class _Explicit:
 
 ex = _Explicit()
 ae(ex.name, 'x')
-ae(repr(ex), '_Explicit(name="x")')
+ae(repr(ex), "_Explicit(name='x')")
 
 # ── 18. Nested list field with asdict ────────────────────────────────────────
 

@@ -93,7 +93,10 @@ def ρσ_list_remove(value):
     raise ValueError(value + ' not in list')
 
 def ρσ_list_to_string():
-    return '[' + this.join(', ') + ']'
+    ans = v'[]'
+    for v'var i = 0; i < this.length; i++':
+        ans.push(ρσ_repr(this[i]))
+    return '[' + ans.join(', ') + ']'
 
 def ρσ_list_insert(index, val):
     if index < 0:
@@ -511,7 +514,13 @@ Object.defineProperties(ρσ_set.prototype, {
             r = iterator.next()
 
 ρσ_set.prototype.toString = ρσ_set.prototype.__repr__ = ρσ_set.prototype.__str__ = ρσ_set.prototype.inspect = def():
-    return '{' + list(this).join(', ') + '}'
+    ans = v'[]'
+    iterator = this.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        ans.push(ρσ_repr(r.value))
+        r = iterator.next()
+    return '{' + ans.join(', ') + '}'
 
 ρσ_set.prototype.__eq__ = def(other):
     if v'!other || !other.jsset':
@@ -653,7 +662,13 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     return ans
 
 ρσ_frozenset.prototype.toString = ρσ_frozenset.prototype.__repr__ = ρσ_frozenset.prototype.__str__ = ρσ_frozenset.prototype.inspect = def():
-    return 'frozenset({' + list(this).join(', ') + '})'
+    ans = v'[]'
+    iterator = this.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        ans.push(ρσ_repr(r.value))
+        r = iterator.next()
+    return 'frozenset({' + ans.join(', ') + '})'
 
 ρσ_frozenset.prototype.__eq__ = def(other):
     if v'!other || !other.jsset':

@@ -170,7 +170,7 @@ ok(not (ChainMap({'a': 1}) == {'a': 1, 'b': 2}))
 # ── 11. repr ──────────────────────────────────────────────────────────────────
 
 # RapydScript's repr() quotes strings with double quotes (as Counter/OrderedDict do)
-ae(ChainMap({'a': 1}, {'b': 2}).__repr__(), 'ChainMap({"a": 1}, {"b": 2})')
+ae(ChainMap({'a': 1}, {'b': 2}).__repr__(), "ChainMap({'a': 1}, {'b': 2})")
 
 # ── 12. dynamic — changes to underlying maps are visible ──────────────────────
 

@@ -94,7 +94,7 @@ ae(_Direction.NORTH.name,  'NORTH')
 ae(_Direction.NORTH.value, 'north')
 ae(_Direction.SOUTH.value, 'south')
 # RapydScript repr() wraps strings in double quotes (JS convention)
-ae(repr(_Direction.NORTH), '<_Direction.NORTH: "north">')
+ae(repr(_Direction.NORTH), "<_Direction.NORTH: 'north'>")
 ae(str(_Direction.EAST),   '_Direction.EAST')
 ae(len(list(_Direction)), 4)
 

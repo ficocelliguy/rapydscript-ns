@@ -38,3 +38,13 @@ p.x = 10       # OK — 'x' is declared in __slots__
 p.z = 3         # AttributeError — 'z' is not in __slots__
 ```
 
+### Pretty-print containers example
+
+```python
+print([1, 'hello', None, True])   # [1, 'hello', None, True]
+print({'key': 'val'})             # {'key': 'val'}
+print({1, 'two'})                 # {1, 'two'}
+print([[1, 2], [3, 4]])           # [[1, 2], [3, 4]]
+print(repr('hello'))              # 'hello'
+```
+

@@ -5677,6 +5677,77 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── Container pretty-printing ─────────────────────────────────────────────
+
+    {
+        name: "repr_list_pretty",
+        description: "repr/str of lists uses repr on elements (quotes strings, shows None/True)",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(repr([1, 'hello', None, True]), \"[1, 'hello', None, True]\")",
+            "assrt.equal(str([1, 'hello', None, True]), \"[1, 'hello', None, True]\")",
+            "assrt.equal(repr([]), '[]')",
+            "assrt.equal(str([]), '[]')",
+        ].join("\n"),
+    },
+
+    {
+        name: "repr_dict_pretty",
+        description: "repr/str of dicts uses single-quoted keys and values",
+        src: [
+            "# globals: assrt",
+            "d = dict()",
+            "d.set('key', 'val')",
+            "assrt.equal(repr(d), \"{'key': 'val'}\")",
+            "assrt.equal(str(d), \"{'key': 'val'}\")",
+        ].join("\n"),
+    },
+
+    {
+        name: "repr_set_pretty",
+        description: "repr/str of sets uses repr on elements",
+        src: [
+            "# globals: assrt",
+            "s = {1, 'two'}",
+            "r = repr(s)",
+            "assrt.ok(r.indexOf(\"'two'\") >= 0, 'set repr should quote strings')",
+            "assrt.ok(r.indexOf('1') >= 0, 'set repr should include numbers')",
+            "assrt.ok(r[0] is '{' and r[r.length-1] is '}', 'set repr uses braces')",
+        ].join("\n"),
+    },
+
+    {
+        name: "repr_nested_containers",
+        description: "repr handles nested containers correctly",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(repr([[1], [2, 3]]), '[[1], [2, 3]]')",
+            "assrt.equal(repr([None, True, False]), '[None, True, False]')",
+        ].join("\n"),
+    },
+
+    {
+        name: "repr_string_single_quotes",
+        description: "repr of strings uses Python-style single quotes",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(repr('hello'), \"'hello'\")",
+            "assrt.equal(repr(''), \"''\")",
+        ].join("\n"),
+    },
+
+    {
+        name: "repr_frozenset_pretty",
+        description: "repr/str of frozenset uses repr on elements",
+        src: [
+            "# globals: assrt",
+            "fs = frozenset([1, 'x'])",
+            "r = repr(fs)",
+            "assrt.ok(r.indexOf('frozenset(') is 0, 'starts with frozenset(')",
+            "assrt.ok(r.indexOf(\"'x'\") >= 0, 'frozenset repr should quote strings')",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
