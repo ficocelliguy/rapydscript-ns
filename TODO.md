@@ -1,112 +1,15 @@
 
-### libraries
-
-- The 7n literal isn't supported by the parser — use BigInt()
 
 - remove repl_mode and make repl make a new context for each "run" press
 
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python statistics module] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there.
+I would like you to add support for [python 7n style literal] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there.
 
-### Async generator example
-
-```py
-# `async def` + `yield` makes an async generator. The function returns an
-# async iterator immediately; values are pulled with `await it.next()` or
-# consumed with `async for`.
-
-from asyncio import sleep
-
-async def countdown(n):
-    while n > 0:
-        await sleep(0)            # cooperative yield to the event loop
-        yield n
-        n -= 1
-
-async def main():
-    async for x in countdown(3):
-        print(x)                  # prints 3, then 2, then 1
-
-main()
+```python
+# BigInt literal example
+x = 42n
+y = 0xFFn
+total = x + y  # 297n
 ```
-
-### pprint example
-
-```py
-# pprint pretty-prints nested data structures. A value is shown on one line
-# when it fits within `width`; otherwise containers are broken across lines
-# with Python-style indentation.
-
-from pprint import pprint, pformat
-
-data = {
-    'name': 'RapydScript',
-    'tags': ['python', 'javascript', 'compiler'],
-    'stats': {'modules': 30, 'tests': 158},
-}
-
-pprint(data, width=50)
-# {"name": "RapydScript",
-#  "stats": {"modules": 30, "tests": 158},
-#  "tags": ["python", "javascript", "compiler"]}
-
-# pformat returns the string instead of printing it
-text = pformat(data, width=50)
-```
-
-### ChainMap example
-
-```py
-# ChainMap layers several dicts into one view. Lookups search the maps in
-# order, so the first map wins. Writes, updates and deletes affect only the
-# first map — handy for config layering: CLI flags over env over defaults.
-
-from __python__ import overload_getitem
-from collections import ChainMap
-
-defaults = {'color': 'blue', 'verbose': False}
-env      = {'color': 'green'}
-cli      = {'verbose': True}
-
-settings = ChainMap(cli, env, defaults)
-
-print(settings['color'])     # 'green'  — from env, shadows defaults
-print(settings['verbose'])   # True     — from cli, shadows defaults
-
-# Writes go to the first map only
-settings['color'] = 'red'
-print(settings['color'])     # 'red'
-print(defaults['color'])     # 'blue'   — underlying map untouched
-
-# new_child() adds a fresh layer on top (e.g. a nested scope)
-local = settings.new_child({'color': 'purple'})
-print(local['color'])        # 'purple'
-print(local.parents['color'])  # 'red'  — the view without the new layer
-```
-
-### statistics example
-
-```py
-# The statistics module computes mathematical statistics of numeric data —
-# a lightweight alternative to pulling in the full numpy library.
-
-from statistics import mean, median, stdev, quantiles, NormalDist
-
-scores = [88, 92, 75, 91, 68, 84, 79, 95, 71, 87]
-
-print(mean(scores))      # 83      — arithmetic average
-print(median(scores))    # 85.5    — middle value
-print(stdev(scores))     # ~9.31   — sample standard deviation
-
-# quantiles() splits the data into n equal-probability intervals,
-# returning the n - 1 cut points (quartiles by default)
-print(quantiles(scores))           # [74.0, 85.5, 91.25]
-
-# NormalDist models a normal distribution; from_samples() fits one to data
-grades = NormalDist.from_samples(scores)
-print(grades.cdf(90))              # probability a score is <= 90
-print(grades.zscore(95))           # how many stdevs above the mean a 95 is
-```
-

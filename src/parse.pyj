@@ -6,7 +6,7 @@ from __python__ import hash_literals
 from utils import make_predicate, array_to_hash, defaults, has_prop, cache_file_name
 from errors import SyntaxError, ImportError
 from ast import (
-AST_Array, AST_Assign, AST_Binary, AST_BlockStatement, AST_Break,
+AST_Array, AST_Assign, AST_BigInt, AST_Binary, AST_BlockStatement, AST_Break,
 AST_Call, AST_Catch, AST_Class, AST_ClassCall, AST_Conditional,
 AST_Constant, AST_Continue, AST_DWLoop, AST_Debugger, AST_Decorator,
 AST_Definitions, AST_DictComprehension, AST_Directive, AST_Do, AST_Dot,
@@ -144,7 +144,7 @@ PRECEDENCE = (def(a, ret):
 
 STATEMENTS_WITH_LABELS = array_to_hash([ "for", "do", "while", "switch" ])
 
-ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "imaginary", "string", "bytes_literal", "regexp", "name", "js" ])
+ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "bigint", "imaginary", "string", "bytes_literal", "regexp", "name", "js" ])
 
 compile_time_decorators = ['staticmethod', 'classmethod', 'external', 'property']
 
@@ -520,7 +520,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             return new AST_Directive({
                 'value': tmp_
             })
-        elif tmp_ is "num" or tmp_ is "regexp" or tmp_ is "operator" or tmp_ is "atom" or tmp_ is "js":
+        elif tmp_ is "num" or tmp_ is "bigint" or tmp_ is "regexp" or tmp_ is "operator" or tmp_ is "atom" or tmp_ is "js":
             return simple_statement()
         elif tmp_ is "punc":
             tmp_ = S.token.value
@@ -797,6 +797,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             return new AST_String({'start': tok, 'value': tok.value, 'end': tok})
         elif tok.type is 'num':
             return new AST_Number({'start': tok, 'value': tok.value, 'end': tok})
+        elif tok.type is 'bigint':
+            return new AST_BigInt({'start': tok, 'value': tok.value, 'end': tok})
         elif tok.type is 'atom':
             if tok.value is 'True':
                 return new AST_True({'start': tok, 'end': tok})
@@ -810,15 +812,18 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         """Parse a single atomic/closed pattern (no OR, no AS)."""
         start = S.token
 
-        # Negative number literal: -42
-        if is_('operator', '-') and peek().type is 'num':
+        # Negative number literal: -42 or -42n
+        if is_('operator', '-') and (peek().type is 'num' or peek().type is 'bigint'):
             next()  # consume '-'
-            val = -S.token.value
             tok = S.token
+            if tok.type is 'bigint':
+                val_node = new AST_BigInt({'start': start, 'value': '-' + tok.value, 'end': tok})
+            else:
+                val_node = new AST_Number({'start': start, 'value': -tok.value, 'end': tok})
             next()
             return new AST_MatchLiteral({
                 'start': start,
-                'value': new AST_Number({'start': start, 'value': val, 'end': tok}),
+                'value': val_node,
                 'end': prev()
             })
 
@@ -829,6 +834,16 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             return new AST_MatchLiteral({
                 'start': tok,
                 'value': new AST_Number({'start': tok, 'value': tok.value, 'end': tok}),
+                'end': prev()
+            })
+
+        # BigInt literal
+        if is_('bigint'):
+            tok = S.token
+            next()
+            return new AST_MatchLiteral({
+                'start': tok,
+                'value': new AST_BigInt({'start': tok, 'value': tok.value, 'end': tok}),
                 'end': prev()
             })
 
@@ -2241,6 +2256,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             return token_as_symbol(tok, AST_SymbolRef)
         elif tmp_ is "num":
             return new AST_Number({
+                'start': tok,
+                'end': tok,
+                'value': tok.value
+            })
+        elif tmp_ is "bigint":
+            return new AST_BigInt({
                 'start': tok,
                 'end': tok,
                 'value': tok.value

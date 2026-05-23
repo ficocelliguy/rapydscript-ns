@@ -7,7 +7,7 @@ from __python__ import hash_literals
 from utils import noop
 from parse import PRECEDENCE
 from ast import (
-    AST_Array, AST_Assign, AST_BaseCall, AST_Binary, AST_BlockStatement, AST_Break,
+    AST_Array, AST_Assign, AST_BaseCall, AST_BigInt, AST_Binary, AST_BlockStatement, AST_Break,
     AST_Class, AST_Conditional, AST_Constant, AST_Continue,
     AST_Debugger, AST_Definitions, AST_Directive, AST_Do, AST_Dot, is_node_type,
     AST_EmptyStatement, AST_Exit, AST_ExpressiveObject, AST_ForIn,
@@ -529,6 +529,9 @@ def generate_code():
     )
     DEFPRINT(AST_Number, def(self, output):
         output.print(make_num(self.value))
+    )
+    DEFPRINT(AST_BigInt, def(self, output):
+        output.print(self.value + "n")
     )
     DEFPRINT(AST_RegExp, print_regexp)
 

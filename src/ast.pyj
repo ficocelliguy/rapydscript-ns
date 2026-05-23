@@ -1280,6 +1280,12 @@ class AST_Number(AST_Constant):
         'value': "[number] the numeric value"
     }
 
+class AST_BigInt(AST_Constant):
+    "A BigInt literal (e.g. 42n)"
+    properties = {
+        'value': "[string] the raw numeric string (without n suffix)"
+    }
+
 class AST_RegExp(AST_Constant):
     "A regexp literal"
     properties = {

@@ -1622,6 +1622,36 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── BigInt literals ──────────────────────────────────────────────
+
+        {
+            name: "bigint_literal_no_errors",
+            description: "BigInt literals (42n, 0xFFn, 0b1010n, 0o77n) produce no markers",
+            run: function () {
+                var markers = d().check([
+                    "x = 42n",
+                    "y = 0xFFn",
+                    "z = 0b1010n",
+                    "w = 0o77n",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for bigint literals, got: " + JSON.stringify(markers));
+            },
+        },
+
+        {
+            name: "bigint_literal_assignment_no_errors",
+            description: "BigInt literal assignment and arithmetic produce no markers",
+            run: function () {
+                var markers = d().check([
+                    "x = 42n",
+                    "y = x + 1n",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for bigint assignment, got: " + JSON.stringify(markers));
+            },
+        },
+
     ];
 
     return TESTS;

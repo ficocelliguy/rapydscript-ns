@@ -334,6 +334,19 @@ def tokenizer(raw_text, filename):
             valid = parseInt(num, 2)
             if isNaN(valid):
                 parse_error('Invalid syntax for a binary number')
+            if peek() is 'n':
+                next()
+                return token('bigint', '0b' + num)
+            return token('num', valid)
+        if not prefix and peek() is '0' and S.text.charAt(S.pos + 1) is 'o':
+            next(), next()
+            num = read_while(def(ch): return ch >= '0' and ch <= '7';)
+            valid = parseInt(num, 8)
+            if isNaN(valid):
+                parse_error('Invalid syntax for an octal number')
+            if peek() is 'n':
+                next()
+                return token('bigint', '0o' + num)
             return token('num', valid)
         seen = v'[]'
         num = read_while(def(ch, i):
@@ -363,8 +376,8 @@ def tokenizer(raw_text, filename):
                 return False
             elif ch is '.':
                 return (has_dot = True) if not has_dot and not has_x and not has_e else False
-            elif ch is 'j' or ch is 'J':
-                return False  # imaginary suffix — stop here; handled after loop
+            elif ch is 'j' or ch is 'J' or ch is 'n':
+                return False  # imaginary/bigint suffix — stop here; handled after loop
             return is_alphanumeric_char(ch.charCodeAt(0))
         )
         if prefix:
@@ -375,6 +388,9 @@ def tokenizer(raw_text, filename):
             if peek() is 'j' or peek() is 'J':
                 next()
                 return token("imaginary", valid)
+            if peek() is 'n':
+                next()
+                return token("bigint", num)
             return token("num", valid)
         else:
             parse_error("Invalid syntax: " + num)

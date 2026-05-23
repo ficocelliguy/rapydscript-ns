@@ -5275,6 +5275,86 @@ assrt.equal(fib(15), 610)
         js_checks: [/let\s[^;]*ρσ_with_exception/, /let\s[^;]*ρσ_with_suppress/],
     },
 
+    // ── BigInt literals ────────────────────────────────────────────────────
+
+    {
+        name: "bigint_literal_basic",
+        description: "42n compiles to JS BigInt literal and has bigint type",
+        src: [
+            "# globals: assrt",
+            "x = 42n",
+            "assrt.ok(jstype(x) == 'bigint', 'type is bigint')",
+            "assrt.ok(x == 42n, 'value is 42n')",
+        ].join("\n"),
+        js_checks: ["42n"],
+    },
+
+    {
+        name: "bigint_literal_hex",
+        description: "0xFFn compiles to JS hex BigInt literal",
+        src: [
+            "# globals: assrt",
+            "x = 0xFFn",
+            "assrt.ok(x == 255n, 'hex bigint value')",
+        ].join("\n"),
+        js_checks: ["0xFFn"],
+    },
+
+    {
+        name: "bigint_literal_binary",
+        description: "0b1010n compiles to JS binary BigInt literal",
+        src: [
+            "# globals: assrt",
+            "x = 0b1010n",
+            "assrt.ok(x == 10n, 'binary bigint value')",
+        ].join("\n"),
+        js_checks: ["0b1010n"],
+    },
+
+    {
+        name: "bigint_literal_octal",
+        description: "0o77n compiles to JS octal BigInt literal",
+        src: [
+            "# globals: assrt",
+            "x = 0o77n",
+            "assrt.ok(x == 63n, 'octal bigint value')",
+        ].join("\n"),
+        js_checks: ["0o77n"],
+    },
+
+    {
+        name: "bigint_literal_zero",
+        description: "0n compiles and works",
+        src: [
+            "# globals: assrt",
+            "x = 0n",
+            "assrt.ok(jstype(x) == 'bigint', 'type is bigint')",
+            "assrt.ok(x == 0n, 'value is 0n')",
+        ].join("\n"),
+        js_checks: ["0n"],
+    },
+
+    {
+        name: "bigint_literal_arithmetic",
+        description: "BigInt arithmetic works correctly",
+        src: [
+            "# globals: assrt",
+            "x = 10n + 3n",
+            "assrt.ok(x == 13n, 'addition')",
+        ].join("\n"),
+    },
+
+    {
+        name: "bigint_literal_large",
+        description: "Large BigInt literal preserves precision",
+        src: [
+            "# globals: assrt",
+            "x = 999999999999999999999n",
+            "assrt.ok(x == 999999999999999999999n, 'large bigint')",
+        ].join("\n"),
+        js_checks: ["999999999999999999999n"],
+    },
+
     {
         name: "with_statement_suppresses_exception",
         description: "with statement __exit__ returning True suppresses the exception",
