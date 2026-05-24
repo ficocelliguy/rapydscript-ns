@@ -2837,7 +2837,12 @@ if (!ρσ_list_remove.__argnames__) Object.defineProperties(ρσ_list_remove, {
 });
 
 function ρσ_list_to_string() {
-    return ρσ_list_add(ρσ_list_add("[", this.join(", ")), "]");
+    var ans;
+    ans = [];
+    for (var i = 0; i < this.length; i++) {
+        ans.push(ρσ_repr((ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i]));
+    }
+    return ρσ_list_add(ρσ_list_add("[", ans.join(", ")), "]");
 };
 if (!ρσ_list_to_string.__module__) Object.defineProperties(ρσ_list_to_string, {
     __module__ : {value: "__main__"}
@@ -2906,6 +2911,9 @@ function ρσ_list_sort_key(value) {
     if (t === "string" || t === "number") {
         return value;
     }
+    if (value !== null && value !== undefined && typeof value.__lt__ === "function") {
+        return value;
+    }
     return value.toString();
 };
 if (!ρσ_list_sort_key.__argnames__) Object.defineProperties(ρσ_list_sort_key, {
@@ -2914,6 +2922,15 @@ if (!ρσ_list_sort_key.__argnames__) Object.defineProperties(ρσ_list_sort_key
 });
 
 function ρσ_list_sort_cmp(a, b, ap, bp) {
+    if (a !== null && a !== undefined && typeof a.__lt__ === "function") {
+        if (ρσ_op_lt(a, b)) {
+            return -1;
+        }
+        if (ρσ_op_lt(b, a)) {
+            return 1;
+        }
+        return ap - bp;
+    }
     if (a < b) {
         return -1;
     }
@@ -2938,9 +2955,26 @@ function ρσ_list_sort() {
     if (Object.prototype.hasOwnProperty.call(ρσ_kwargs_obj, "reverse")){
         reverse = ρσ_kwargs_obj.reverse;
     }
-    var mult, keymap, posmap, k;
-    key = key || ρσ_list_sort_key;
+    var mult, cmpposmap, keymap, posmap, k;
     mult = (reverse) ? -1 : 1;
+    if (key !== null && key !== undefined && typeof key === "function" && key.length === 2) {
+        cmpposmap = dict();
+        for (var i=0; i < this.length; i++) {
+            cmpposmap.set((ρσ_expr_temp = this)[(typeof i === "number" && i < 0) ? ρσ_expr_temp.length + i : i], i);
+        }
+        Array.prototype.sort.call(this, (function() {
+            var ρσ_anonfunc = function (a, b) {
+                return mult * key(a, b) || cmpposmap.get(a) - cmpposmap.get(b);
+            };
+            if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+                __argnames__ : {value: ["a", "b"]},
+                __module__ : {value: "__main__"}
+            });
+            return ρσ_anonfunc;
+        })());
+        return;
+    }
+    key = key || ρσ_list_sort_key;
     keymap = dict();
     posmap = dict();
     for (var i=0; i < this.length; i++) {
@@ -3690,7 +3724,15 @@ Object.defineProperties(ρσ_set.prototype, (function(){
 })();
 ρσ_set.prototype.toString = ρσ_set.prototype.__repr__ = ρσ_set.prototype.__str__ = ρσ_set.prototype.inspect = (function() {
     var ρσ_anonfunc = function () {
-        return ρσ_list_add(ρσ_list_add("{", list(this).join(", ")), "}");
+        var ans, iterator, r;
+        ans = [];
+        iterator = this.jsset.values();
+        r = iterator.next();
+        while (!r.done) {
+            ans.push(ρσ_repr(r.value));
+            r = iterator.next();
+        }
+        return ρσ_list_add(ρσ_list_add("{", ans.join(", ")), "}");
     };
     if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
         __module__ : {value: "__main__"}
@@ -3991,7 +4033,15 @@ Object.defineProperties(ρσ_frozenset.prototype, (function(){
 })();
 ρσ_frozenset.prototype.toString = ρσ_frozenset.prototype.__repr__ = ρσ_frozenset.prototype.__str__ = ρσ_frozenset.prototype.inspect = (function() {
     var ρσ_anonfunc = function () {
-        return ρσ_list_add(ρσ_list_add("frozenset({", list(this).join(", ")), "})");
+        var ans, iterator, r;
+        ans = [];
+        iterator = this.jsset.values();
+        r = iterator.next();
+        while (!r.done) {
+            ans.push(ρσ_repr(r.value));
+            r = iterator.next();
+        }
+        return ρσ_list_add(ρσ_list_add("frozenset({", ans.join(", ")), "})");
     };
     if (!ρσ_anonfunc.__module__) Object.defineProperties(ρσ_anonfunc, {
         __module__ : {value: "__main__"}
@@ -4734,14 +4784,14 @@ function Exception() {
     Exception.prototype.__init__.apply(this, arguments);
 }
 ρσ_extends(Exception, Error);
-Exception.prototype.__init__ = function __init__(message) {
+Exception.prototype.__init__ = function __init__() {
     var self = this;
-    self.message = message;
+    self.args = Array.prototype.slice.call(arguments);
+    self.message = (self.args.length > 0) ? self.args[0] : "";
     self.stack = _ρσ_NativeError().stack;
     self.name = self.constructor.name;
 };
-if (!Exception.prototype.__init__.__argnames__) Object.defineProperties(Exception.prototype.__init__, {
-    __argnames__ : {value: ["message"]},
+if (!Exception.prototype.__init__.__module__) Object.defineProperties(Exception.prototype.__init__, {
     __module__ : {value: "__main__"}
 });
 Exception.__argnames__ = Exception.prototype.__init__.__argnames__;
@@ -5115,7 +5165,7 @@ function ExceptionGroup() {
 ρσ_extends(ExceptionGroup, Exception);
 ExceptionGroup.prototype.__init__ = function __init__(message, exceptions) {
     var self = this;
-    Exception.prototype.__init__.call(self, message);
+    Exception.prototype.__init__.call(self, message, exceptions);
     self.exceptions = (exceptions) ? exceptions : ρσ_list_decorate([]);
 };
 if (!ExceptionGroup.prototype.__init__.__argnames__) Object.defineProperties(ExceptionGroup.prototype.__init__, {
@@ -5994,16 +6044,22 @@ if (!ρσ_op_pow.__argnames__) Object.defineProperties(ρσ_op_pow, {
 });
 
 function ρσ_op_and(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__and__ === "function") {
         return a.__and__(b);
     }
     if (b !== null && typeof b.__rand__ === "function") {
         return b.__rand__(a);
     }
-    if (typeof a === "bigint" !== (typeof b === "bigint")) {
-        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for &: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a & b;
     }
-    return a & b;
+    if (ta === "bigint" && tb === "bigint") {
+        return a & b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for &: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_and.__argnames__) Object.defineProperties(ρσ_op_and, {
     __argnames__ : {value: ["a", "b"]},
@@ -6011,16 +6067,25 @@ if (!ρσ_op_and.__argnames__) Object.defineProperties(ρσ_op_and, {
 });
 
 function ρσ_op_or(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__or__ === "function") {
         return a.__or__(b);
     }
     if (b !== null && typeof b.__ror__ === "function") {
         return b.__ror__(a);
     }
-    if (typeof a === "bigint" !== (typeof b === "bigint")) {
-        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for |: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+    ta = typeof a;
+    tb = typeof b;
+    if (ta === "object" && tb === "object" && a !== null && b !== null && !Array.isArray(a) && !Array.isArray(b) && a.constructor === Object && b.constructor === Object) {
+        return Object.assign({}, a, b);
     }
-    return a | b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a | b;
+    }
+    if (ta === "bigint" && tb === "bigint") {
+        return a | b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for |: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_or.__argnames__) Object.defineProperties(ρσ_op_or, {
     __argnames__ : {value: ["a", "b"]},
@@ -6028,16 +6093,22 @@ if (!ρσ_op_or.__argnames__) Object.defineProperties(ρσ_op_or, {
 });
 
 function ρσ_op_xor(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__xor__ === "function") {
         return a.__xor__(b);
     }
     if (b !== null && typeof b.__rxor__ === "function") {
         return b.__rxor__(a);
     }
-    if (typeof a === "bigint" !== (typeof b === "bigint")) {
-        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for ^: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a ^ b;
     }
-    return a ^ b;
+    if (ta === "bigint" && tb === "bigint") {
+        return a ^ b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for ^: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_xor.__argnames__) Object.defineProperties(ρσ_op_xor, {
     __argnames__ : {value: ["a", "b"]},
@@ -6045,16 +6116,22 @@ if (!ρσ_op_xor.__argnames__) Object.defineProperties(ρσ_op_xor, {
 });
 
 function ρσ_op_lshift(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__lshift__ === "function") {
         return a.__lshift__(b);
     }
     if (b !== null && typeof b.__rlshift__ === "function") {
         return b.__rlshift__(a);
     }
-    if (typeof a === "bigint" !== (typeof b === "bigint")) {
-        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for <<: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a << b;
     }
-    return a << b;
+    if (ta === "bigint" && tb === "bigint") {
+        return a << b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for <<: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_lshift.__argnames__) Object.defineProperties(ρσ_op_lshift, {
     __argnames__ : {value: ["a", "b"]},
@@ -6062,16 +6139,22 @@ if (!ρσ_op_lshift.__argnames__) Object.defineProperties(ρσ_op_lshift, {
 });
 
 function ρσ_op_rshift(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__rshift__ === "function") {
         return a.__rshift__(b);
     }
     if (b !== null && typeof b.__rrshift__ === "function") {
         return b.__rrshift__(a);
     }
-    if (typeof a === "bigint" !== (typeof b === "bigint")) {
-        throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for >>: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
+    ta = typeof a;
+    tb = typeof b;
+    if ((ta === "number" || ta === "boolean") && (tb === "number" || tb === "boolean")) {
+        return a >> b;
     }
-    return a >> b;
+    if (ta === "bigint" && tb === "bigint") {
+        return a >> b;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("unsupported operand type(s) for >>: '", ρσ_arith_type_name(a)), "' and '"), ρσ_arith_type_name(b)), "'"));
 };
 if (!ρσ_op_rshift.__argnames__) Object.defineProperties(ρσ_op_rshift, {
     __argnames__ : {value: ["a", "b"]},
@@ -6252,10 +6335,15 @@ if (!ρσ_list_iadd.__argnames__) Object.defineProperties(ρσ_list_iadd, {
 });
 
 function ρσ_op_neg(a) {
+    var ta;
     if (a !== null && typeof a.__neg__ === "function") {
         return a.__neg__();
     }
-    return -a;
+    ta = typeof a;
+    if (ta === "number" || ta === "boolean" || ta === "bigint") {
+        return -a;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("bad operand type for unary -: '", ρσ_arith_type_name(a)), "'"));
 };
 if (!ρσ_op_neg.__argnames__) Object.defineProperties(ρσ_op_neg, {
     __argnames__ : {value: ["a"]},
@@ -6263,10 +6351,18 @@ if (!ρσ_op_neg.__argnames__) Object.defineProperties(ρσ_op_neg, {
 });
 
 function ρσ_op_pos(a) {
+    var ta;
     if (a !== null && typeof a.__pos__ === "function") {
         return a.__pos__();
     }
-    return +a;
+    ta = typeof a;
+    if (ta === "number" || ta === "boolean") {
+        return +a;
+    }
+    if (ta === "bigint") {
+        return a;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("bad operand type for unary +: '", ρσ_arith_type_name(a)), "'"));
 };
 if (!ρσ_op_pos.__argnames__) Object.defineProperties(ρσ_op_pos, {
     __argnames__ : {value: ["a"]},
@@ -6274,10 +6370,15 @@ if (!ρσ_op_pos.__argnames__) Object.defineProperties(ρσ_op_pos, {
 });
 
 function ρσ_op_invert(a) {
+    var ta;
     if (a !== null && typeof a.__invert__ === "function") {
         return a.__invert__();
     }
-    return ~a;
+    ta = typeof a;
+    if (ta === "number" || ta === "boolean" || ta === "bigint") {
+        return ~a;
+    }
+    throw new TypeError(ρσ_list_add(ρσ_list_add("bad operand type for unary ~: '", ρσ_arith_type_name(a)), "'"));
 };
 if (!ρσ_op_invert.__argnames__) Object.defineProperties(ρσ_op_invert, {
     __argnames__ : {value: ["a"]},
@@ -6373,8 +6474,15 @@ if (!ρσ_op_iand.__argnames__) Object.defineProperties(ρσ_op_iand, {
 });
 
 function ρσ_op_ior(a, b) {
+    var ta, tb;
     if (a !== null && typeof a.__ior__ === "function") {
         return a.__ior__(b);
+    }
+    ta = typeof a;
+    tb = typeof b;
+    if (ta === "object" && tb === "object" && a !== null && b !== null && !Array.isArray(a) && !Array.isArray(b) && a.constructor === Object && b.constructor === Object) {
+        Object.assign(a, b);
+        return a;
     }
     return ρσ_op_or(a, b);
 };
@@ -6821,9 +6929,16 @@ var ρσ_proxy_target_symbol = typeof Symbol === "function" ? Symbol("ρσ_proxy
     })();
     ρσ_d["set"] = (function() {
         var ρσ_anonfunc = function (target, prop, value, receiver) {
+            var slots;
             if (typeof target.__setattr__ === "function") {
                 target.__setattr__.call(receiver, prop, value);
                 return true;
+            }
+            if (typeof prop === "string" && prop[0] !== "ρ") {
+                slots = target.constructor && target.constructor.prototype.__ρσ_slots__;
+                if (slots && !slots.hasOwnProperty(prop)) {
+                    throw new AttributeError(ρσ_list_add(ρσ_list_add(ρσ_list_add(ρσ_list_add("'", (target.constructor.__name__ || "object")), "' object has no attribute '"), prop), "'"));
+                }
             }
             return Reflect.set(target, prop, value, target);
         };
@@ -7117,7 +7232,7 @@ function ρσ_repr_js_builtin(x, as_array) {
         keys = Object.keys(x);
         for (var k = 0; k < keys.length; k++) {
             key = keys[(typeof k === "number" && k < 0) ? keys.length + k : k];
-            ans.push(ρσ_list_add(ρσ_list_add(JSON.stringify(key), ":"), ρσ_repr(x[(typeof key === "number" && key < 0) ? x.length + key : key])));
+            ans.push(ρσ_list_add(ρσ_list_add(ρσ_repr(key), ": "), ρσ_repr(x[(typeof key === "number" && key < 0) ? x.length + key : key])));
         }
     }
     return ρσ_list_add(ρσ_list_add(b[0], ans.join(", ")), b[1]);
@@ -7164,6 +7279,8 @@ function ρσ_repr(x) {
         ans = x.__repr__();
     } else if (x === true || x === false) {
         ans = (x) ? "True" : "False";
+    } else if (typeof x === "string") {
+        ans = ρσ_list_add(ρσ_list_add("'", x.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")), "'");
     } else if (Array.isArray(x)) {
         ans = ρσ_repr_js_builtin(x, true);
     } else if (typeof x === "function") {
@@ -7278,8 +7395,17 @@ define_str_func = (function() {
     });
     return ρσ_anonfunc;
 })();
-ρσ_orig_split = String.prototype.split.call.bind(String.prototype.split);
-ρσ_orig_replace = String.prototype.replace.call.bind(String.prototype.replace);
+if (typeof globalThis !== "undefined" && globalThis._ρσ_orig_split) {
+    ρσ_orig_split = globalThis._ρσ_orig_split;
+    ρσ_orig_replace = globalThis._ρσ_orig_replace;
+} else {
+    ρσ_orig_split = String.prototype.split.call.bind(String.prototype.split);
+    ρσ_orig_replace = String.prototype.replace.call.bind(String.prototype.replace);
+    if (typeof globalThis !== "undefined") {
+        globalThis._ρσ_orig_split = ρσ_orig_split;
+        globalThis._ρσ_orig_replace = ρσ_orig_replace;
+    }
+}
 define_str_func("format", (function() {
     var ρσ_anonfunc = function () {
         var template, args, kwargs, explicit, implicit, idx, split, ans, pos, in_brace, markup, ch;

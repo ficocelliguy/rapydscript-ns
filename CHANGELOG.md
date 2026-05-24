@@ -1,3 +1,12 @@
+version 0.9.5
+=======================
+* Added support for `__slots__` enforcement via JS Proxy (subclass merging, graceful fallback)
+* Added support for exception `.args` property (all exception classes capture constructor arguments)
+* Added support for dict `|` (merge) and `|=` (update) operators
+* Added Python-style `repr()` formatting: single-quoted strings, `repr()` applied to container elements
+* Added `interface extends` support in the language service TypeScript definition parser
+* Fix: Improved type checking for bitwise and unary operators (raises `TypeError` for invalid types)
+
 version 0.9.4
 =======================
 * Added the `statistics` standard library module (`mean`, `fmean`, `median`, `median_low`, `median_high`, `median_grouped`, `mode`, `multimode`, `stdev`, `pstdev`, `variance`, `pvariance`, `harmonic_mean`, `geometric_mean`, `quantiles`, `covariance`, `correlation`, `linear_regression`, `NormalDist`)
