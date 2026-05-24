@@ -32,13 +32,14 @@ export class TypeInfo {
      * @param {string}      [opts.source]       'dts'
      */
     constructor(opts) {
-        this.name        = opts.name;
-        this.kind        = opts.kind;
-        this.params      = opts.params      || null;
-        this.return_type = opts.return_type || null;
-        this.members     = opts.members     || null;
-        this.doc         = opts.doc         || null;
-        this.source      = opts.source      || 'dts';
+        this.name          = opts.name;
+        this.kind          = opts.kind;
+        this.params        = opts.params        || null;
+        this.return_type   = opts.return_type   || null;
+        this.members       = opts.members       || null;
+        this.doc           = opts.doc           || null;
+        this.source        = opts.source        || 'dts';
+        this.extends_names = opts.extends_names || null;
     }
 }
 
@@ -351,21 +352,28 @@ export function parse_dts(text) {
         }
 
         // ── class / interface / abstract class / namespace / module ────────
-        const block_m = l.match(/^(abstract\s+class|class|interface|namespace|module)\s+(\w+)/);
+        const block_m = l.match(/^(abstract\s+class|class|interface|namespace|module)\s+(\w+)(?:<[^>]*>)?(?:\s+extends\s+(.+?))?(?:\s*\{|\s*$)/);
         if (block_m) {
             const kind_raw = block_m[1].replace('abstract ', '').trim();
             const kind     = (kind_raw === 'module') ? 'namespace' : kind_raw;
             const name     = block_m[2];
+            let extends_names = null;
+            if (block_m[3]) {
+                extends_names = block_m[3].split(',').map(function (s) {
+                    return s.trim().replace(/<.*>$/, '');
+                }).filter(function (s) { return s.length > 0; });
+                if (extends_names.length === 0) extends_names = null;
+            }
 
             if (l.includes('{')) {
                 // Block opens on this line — collect to matching '}'
                 const { inner, next_i } = collect_block(lines, i);
                 const members = parse_members(inner);
-                results.push(new TypeInfo({ name, kind, members, doc }));
+                results.push(new TypeInfo({ name, kind, members, extends_names, doc }));
                 i = next_i;
             } else {
                 // Declaration without body (e.g. `declare class Foo;`)
-                results.push(new TypeInfo({ name, kind, doc }));
+                results.push(new TypeInfo({ name, kind, extends_names, doc }));
                 i++;
             }
             continue;
@@ -462,10 +470,43 @@ export class DtsRegistry {
      * @param {string} name
      * @returns {string[]}
      */
+    /**
+     * Return a merged Map of all members for a type, including inherited ones.
+     * Child members override parent members. Uses a visited set to avoid cycles.
+     * @param {TypeInfo} ti
+     * @returns {Map<string, TypeInfo>}
+     */
+    getAllMembers(ti) {
+        const result = new Map();
+        const visited = new Set();
+        this._collectMembers(ti, result, visited);
+        return result;
+    }
+
+    /** @private */
+    _collectMembers(ti, result, visited) {
+        if (!ti || visited.has(ti.name)) return;
+        visited.add(ti.name);
+        // Recurse into parents first so child members override
+        if (ti.extends_names) {
+            for (const parent_name of ti.extends_names) {
+                const parent_ti = this._globals.get(parent_name);
+                if (parent_ti) this._collectMembers(parent_ti, result, visited);
+            }
+        }
+        // Own members override inherited ones
+        if (ti.members) {
+            for (const [name, member] of ti.members) {
+                result.set(name, member);
+            }
+        }
+    }
+
     getMemberNames(name) {
         const ti = this.getGlobal(name);
-        if (!ti || !ti.members) return [];
-        return Array.from(ti.members.keys());
+        if (!ti) return [];
+        const all = this.getAllMembers(ti);
+        return Array.from(all.keys());
     }
 
     /**
@@ -489,7 +530,8 @@ export class DtsRegistry {
         }
         // Walk remaining path segments
         for (let i = 1; i < parts.length && ti; i++) {
-            const member = ti.members ? ti.members.get(parts[i]) : null;
+            const all = this.getAllMembers(ti);
+            const member = all.get(parts[i]) || null;
             if (!member) { ti = null; break; }
             if (member.members) {
                 ti = member;
@@ -499,8 +541,9 @@ export class DtsRegistry {
                 ti = null;
             }
         }
-        if (!ti || !ti.members) return null;
-        return ti.members.get(memberName) || null;
+        if (!ti) return null;
+        const all_members = this.getAllMembers(ti);
+        return all_members.get(memberName) || null;
     }
 
     /**

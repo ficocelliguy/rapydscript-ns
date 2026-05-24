@@ -452,7 +452,8 @@ export class CompletionEngine {
             }
             // Walk remaining path segments through member types
             for (let i = 1; i < parts.length && ti; i++) {
-                const member = ti.members ? ti.members.get(parts[i]) : null;
+                const all = this._dts.getAllMembers(ti);
+                const member = all.get(parts[i]) || null;
                 if (!member) { ti = null; break; }
                 if (member.members) {
                     ti = member;
@@ -462,8 +463,9 @@ export class CompletionEngine {
                     ti = null;
                 }
             }
-            if (ti && ti.members) {
-                for (const [name, member] of ti.members) {
+            if (ti) {
+                const all_members = this._dts.getAllMembers(ti);
+                for (const [name, member] of all_members) {
                     if (!ctx.prefix || name.startsWith(ctx.prefix)) {
                         items.push(_dts_member_to_item(member, range, monacoKind));
                     }
@@ -583,13 +585,16 @@ export class CompletionEngine {
                 const member_ti   = this._dts.getMemberInfo(object_path, method_name);
                 if (member_ti && member_ti.return_type) {
                     const return_ti = this._dts.getGlobal(resolve_first_type(member_ti.return_type));
-                    if (return_ti && return_ti.members) {
-                        scope_matched = true;
-                        for (const [name, member] of return_ti.members) {
-                            if (!ctx.prefix || name.startsWith(ctx.prefix)) {
-                                if (!seen.has(name)) {
-                                    seen.add(name);
-                                    items.push(_dts_member_to_item(member, range, monacoKind));
+                    if (return_ti) {
+                        const rt_members = this._dts.getAllMembers(return_ti);
+                        if (rt_members.size > 0) {
+                            scope_matched = true;
+                            for (const [name, member] of rt_members) {
+                                if (!ctx.prefix || name.startsWith(ctx.prefix)) {
+                                    if (!seen.has(name)) {
+                                        seen.add(name);
+                                        items.push(_dts_member_to_item(member, range, monacoKind));
+                                    }
                                 }
                             }
                         }
@@ -606,8 +611,9 @@ export class CompletionEngine {
             if (ti && !ti.members && ti.return_type) {
                 ti = this._dts.getGlobal(resolve_first_type(ti.return_type));
             }
-            if (ti && ti.members) {
-                for (const [name, member] of ti.members) {
+            if (ti) {
+                const all_members = this._dts.getAllMembers(ti);
+                for (const [name, member] of all_members) {
                     if (!ctx.prefix || name.startsWith(ctx.prefix)) {
                         if (!seen.has(name)) {
                             seen.add(name);
@@ -642,8 +648,9 @@ export class CompletionEngine {
             }
             if (member_ti && member_ti.return_type) {
                 const return_ti = this._dts.getGlobal(resolve_first_type(member_ti.return_type));
-                if (return_ti && return_ti.members) {
-                    for (const [name, member] of return_ti.members) {
+                if (return_ti) {
+                    const all_members = this._dts.getAllMembers(return_ti);
+                    for (const [name, member] of all_members) {
                         if (!ctx.prefix || name.startsWith(ctx.prefix)) {
                             seen.add(name);
                             items.push(_dts_member_to_item(member, range, monacoKind));

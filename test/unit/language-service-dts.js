@@ -458,6 +458,119 @@ function make_tests(parse_dts, DtsRegistry, TypeInfo) {
             },
         },
 
+        // ── Interface extends ─────────────────────────────────────────────
+
+        {
+            name: "parse_interface_extends",
+            description: "interface extends clause is parsed into extends_names",
+            run: function () {
+                var src = [
+                    "interface Animal {",
+                    "    name: string;",
+                    "}",
+                    "interface Dog extends Animal {",
+                    "    breed: string;",
+                    "}",
+                ].join("\n");
+                var types = parse_dts(src);
+                assert.strictEqual(types.length, 2);
+                var dog = types[1];
+                assert.strictEqual(dog.name, "Dog");
+                assert.ok(dog.extends_names, "should have extends_names");
+                assert.deepStrictEqual(dog.extends_names, ["Animal"]);
+                // Animal should have no extends_names
+                assert.strictEqual(types[0].extends_names, null);
+            },
+        },
+
+        {
+            name: "parse_interface_extends_multiple",
+            description: "interface extends multiple parents parsed correctly",
+            run: function () {
+                var src = [
+                    "interface A { a: number; }",
+                    "interface B { b: string; }",
+                    "interface C extends A, B {",
+                    "    c: boolean;",
+                    "}",
+                ].join("\n");
+                var types = parse_dts(src);
+                var c = types.find(function (t) { return t.name === "C"; });
+                assert.ok(c, "should find C");
+                assert.deepStrictEqual(c.extends_names, ["A", "B"]);
+            },
+        },
+
+        {
+            name: "registry_getAllMembers_inherits",
+            description: "getAllMembers includes inherited members",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("test", [
+                    "interface Person {",
+                    "    name: string;",
+                    "    age: number;",
+                    "}",
+                    "interface Player extends Person {",
+                    "    score: number;",
+                    "}",
+                ].join("\n"));
+                var player = reg.getGlobal("Player");
+                var all = reg.getAllMembers(player);
+                assert.ok(all.has("score"), "should have own member score");
+                assert.ok(all.has("name"),  "should have inherited member name");
+                assert.ok(all.has("age"),   "should have inherited member age");
+                assert.strictEqual(all.size, 3);
+            },
+        },
+
+        {
+            name: "registry_getAllMembers_override",
+            description: "child members shadow parent members",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("test", [
+                    "interface Base {",
+                    "    value: string;",
+                    "    info(): string;",
+                    "}",
+                    "interface Child extends Base {",
+                    "    value: number;",
+                    "}",
+                ].join("\n"));
+                var child = reg.getGlobal("Child");
+                var all = reg.getAllMembers(child);
+                assert.strictEqual(all.get("value").return_type, "number",
+                    "child value should override parent");
+                assert.ok(all.has("info"), "should inherit info");
+            },
+        },
+
+        {
+            name: "registry_getMemberInfo_inherits",
+            description: "getMemberInfo finds inherited members",
+            run: function () {
+                var reg = new DtsRegistry();
+                reg.addDts("test", [
+                    "interface Person {",
+                    "    city: string;",
+                    "}",
+                    "interface Player extends Person {",
+                    "    score: number;",
+                    "}",
+                    "declare var player: Player;",
+                ].join("\n"));
+                // Direct member
+                var score = reg.getMemberInfo("player", "score");
+                assert.ok(score, "should find direct member score");
+                assert.strictEqual(score.return_type, "number");
+                // Inherited member
+                var city = reg.getMemberInfo("player", "city");
+                assert.ok(city, "should find inherited member city");
+                assert.strictEqual(city.return_type, "string");
+            },
+        },
+
     ];
 
     return TESTS;
