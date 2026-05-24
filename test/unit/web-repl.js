@@ -1379,7 +1379,7 @@ var TESTS = [
             var js = bundle_compile(repl, [
                 "msg = 'hello'",
                 "nums = [1, 2, 3]",
-                "assrt.equal(f'{msg=!r}', 'msg=\"hello\"')",
+                "assrt.equal(f'{msg=!r}', \"msg='hello'\")",
                 "assrt.equal(f'{nums=!r}', 'nums=[1, 2, 3]')",
             ].join("\n"));
             run_js(js);
@@ -4016,14 +4016,14 @@ var TESTS = [
                 "assrt.equal(pformat(None), 'None')",
                 "assrt.equal(pformat(True), 'True')",
                 "assrt.equal(pformat(42), '42')",
-                "assrt.equal(pformat('hi'), '\"hi\"')",
+                "assrt.equal(pformat('hi'), \"'hi'\")",
                 // empty containers
                 "assrt.equal(pformat([]), '[]')",
                 "assrt.equal(pformat({}), '{}')",
                 "assrt.equal(pformat(set()), 'set()')",
                 // short containers fit on one line
                 "assrt.equal(pformat([1, 2, 3]), '[1, 2, 3]')",
-                "assrt.equal(pformat({'a': 1, 'b': 2}), '{\"a\": 1, \"b\": 2}')",
+                "assrt.equal(pformat({'a': 1, 'b': 2}), \"{'a': 1, 'b': 2}\")",
                 "assrt.equal(pformat(frozenset([1])), 'frozenset({1})')",
             ].join("\n"));
             run_js(js);
@@ -4040,7 +4040,7 @@ var TESTS = [
                 // wide list breaks one element per line
                 "assrt.equal(pformat([1, 2, 3], width=5), '[1,\\n 2,\\n 3]')",
                 // wide dict breaks, keys sorted by default
-                "assrt.equal(pformat({'name': 'Al', 'age': 3}, width=12), '{\"age\": 3,\\n \"name\": \"Al\"}')",
+                "assrt.equal(pformat({'name': 'Al', 'age': 3}, width=12), \"{'age': 3,\\n 'name': 'Al'}\")",
                 // indent parameter widens inner indentation
                 "assrt.equal(pformat([1, 2, 3], width=5, indent=4), '[   1,\\n    2,\\n    3]')",
                 // single-element containers never break
@@ -4064,8 +4064,8 @@ var TESTS = [
                 "d = dict()",
                 "d.set('c', 1)",
                 "d.set('a', 2)",
-                "assrt.equal(pformat(d, sort_dicts=False), '{\"c\": 1, \"a\": 2}')",
-                "assrt.equal(pformat(d, sort_dicts=True), '{\"a\": 2, \"c\": 1}')",
+                "assrt.equal(pformat(d, sort_dicts=False), \"{'c': 1, 'a': 2}\")",
+                "assrt.equal(pformat(d, sort_dicts=True), \"{'a': 2, 'c': 1}\")",
                 // compact packs multiple items per line
                 "compact_out = pformat([1, 2, 3, 4, 5, 6, 7, 8], compact=True, width=15)",
                 "assrt.equal(compact_out, '[1, 2, 3, 4, 5,\\n 6, 7, 8]')",
@@ -4077,7 +4077,7 @@ var TESTS = [
                 "        self.parts.push(s)",
                 "col = _C()",
                 "pp(d, stream=col)",
-                "assrt.equal(col.parts.join(''), '{\"c\": 1, \"a\": 2}\\n')",
+                "assrt.equal(col.parts.join(''), \"{'c': 1, 'a': 2}\\n\")",
             ].join("\n"));
             run_js(js);
         },
@@ -4092,7 +4092,7 @@ var TESTS = [
                 "from pprint import saferepr, isreadable, isrecursive, PrettyPrinter",
                 // saferepr of normal structures == single-line repr
                 "assrt.equal(saferepr([1, 2, 3]), '[1, 2, 3]')",
-                "assrt.equal(saferepr({'a': 1}), '{\"a\": 1}')",
+                "assrt.equal(saferepr({'a': 1}), \"{'a': 1}\")",
                 // isreadable / isrecursive on plain structures
                 "assrt.ok(isreadable([1, 2, 3]))",
                 "assrt.ok(not isrecursive([1, 2, 3]))",
