@@ -4710,6 +4710,42 @@ var TESTS = [
     },
 
     {
+        name: "bundle_fractions",
+        description: "fractions stdlib: Fraction arithmetic and limit_denominator in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from fractions import Fraction",
+                // construction
+                "half = Fraction(1, 2)",
+                "third = Fraction(1, 3)",
+                "assrt.equal(half.numerator, 1)",
+                "assrt.equal(half.denominator, 2)",
+                // arithmetic
+                "s = half + third",
+                "assrt.equal(s.numerator, 5)",
+                "assrt.equal(s.denominator, 6)",
+                "p = half * third",
+                "assrt.equal(p.numerator, 1)",
+                "assrt.equal(p.denominator, 6)",
+                // float and string forms
+                "assrt.equal(float(half), 0.5)",
+                "assrt.equal(str(Fraction(3, 4)), '3/4')",
+                "assrt.equal(repr(Fraction(3, 4)), 'Fraction(3, 4)')",
+                // string construction
+                "f = Fraction('-5/8')",
+                "assrt.equal(f.numerator, -5)",
+                "assrt.equal(f.denominator, 8)",
+                // limit_denominator: best π/10 approximation
+                "approx = Fraction(3.141592653589793).limit_denominator(10)",
+                "assrt.equal(approx.numerator, 22)",
+                "assrt.equal(approx.denominator, 7)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_tuple_distinct",
         description: "tuple is a distinct type with .count() and .index() in the web-repl bundle",
         run: function () {

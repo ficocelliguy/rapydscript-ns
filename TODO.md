@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [`tuple` as a distinct type with `.count()` / `.index() ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [the python fractions module ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 ## Example: Set operators
@@ -105,4 +105,37 @@ assert isinstance(joined, tuple) and isinstance(repeated, tuple)
 assert str(()) == '()'
 assert str((42,)) == '(42,)'
 assert str((1, 2, 3)) == '(1, 2, 3)'
+```
+
+## Example: Fractions (exact rational arithmetic)
+
+```python
+from fractions import Fraction
+
+# Construction: int/int, single int, float, string
+half  = Fraction(1, 2)
+third = Fraction('1/3')
+quart = Fraction(0.25)
+assert quart == Fraction(1, 4)
+
+# Exact arithmetic — no float drift
+assert half + third == Fraction(5, 6)
+assert half - third == Fraction(1, 6)
+assert half * third == Fraction(1, 6)
+assert half / third == Fraction(3, 2)
+
+# Always stored reduced, denominator positive
+f = Fraction(6, -8)
+assert f.numerator == -3 and f.denominator == 4
+
+# Best rational approximation under a denominator cap
+pi = Fraction(3.141592653589793)
+assert pi.limit_denominator(10)  == Fraction(22, 7)
+assert pi.limit_denominator(100) == Fraction(311, 99)
+
+# Mixed-type comparison with int / float; banker's rounding
+assert Fraction(3, 2) > 1 and Fraction(3, 2) < 1.6
+assert round(Fraction(5, 2)) == 2          # half rounds to even
+assert float(Fraction(3, 4)) == 0.75
+assert str(Fraction(3, 4)) == '3/4'
 ```

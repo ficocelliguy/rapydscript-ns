@@ -217,21 +217,14 @@ for non-cryptographic hashes would be valuable.
 
 ---
 
-### 3.3 `fractions` — Rational Arithmetic
-
-`Fraction(numerator, denominator)` with full arithmetic. Useful for music theory apps,
-math tutoring tools, and any domain requiring exact rational computation.
-
----
-
-### 3.4 `difflib` — Sequence Comparison
+### 3.3 `difflib` — Sequence Comparison
 
 `difflib.unified_diff`, `difflib.SequenceMatcher`, `difflib.get_close_matches`. Useful
 for browser-based code editors, version comparison tools, and fuzzy matching UIs.
 
 ---
 
-### 3.5 `decimal` — Decimal Arithmetic
+### 3.4 `decimal` — Decimal Arithmetic
 
 `Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
 calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
@@ -362,7 +355,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
 | Medium | `@` matmul + `__matmul__` dunder | Medium | DSL hospitality (graphics, math libraries) |
 | Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
-| Medium | `fractions` module | Medium | Exact rational arithmetic |
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
 | Low | `oct()` builtin | Trivial | Symmetry with `hex()` / `bin()` |
 | Low | `asynccontextmanager` + `async with` | Medium | Async resource management |

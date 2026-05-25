@@ -31,6 +31,8 @@ def ρσ_print(*args, **kwargs):
 def ρσ_int(val, base):
     if jstype(val) is "number":
         ans = val | 0
+    elif val is not None and jstype(val.__int__) is 'function' and (base is None or base is undefined):
+        return val.__int__()
     else:
         ans = parseInt(val, base or 10)
     if isNaN(ans):
@@ -41,6 +43,8 @@ def ρσ_int(val, base):
 def ρσ_float(val):
     if jstype(val) is "number":
         ans = val
+    elif val is not None and jstype(val.__float__) is 'function':
+        return val.__float__()
     else:
         ans = parseFloat(val)
     if isNaN(ans):
@@ -145,6 +149,8 @@ def ρσ_callable_call(fn):
 
 
 def ρσ_round(x, ndigits):
+    if x is not None and jstype(x.__round__) is 'function':
+        return x.__round__(ndigits if ndigits is not undefined else None)
     if ndigits is undefined or ndigits is 0:
         return Math.round(x)
     factor = Math.pow(10, ndigits)

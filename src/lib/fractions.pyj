@@ -1,0 +1,576 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Python-compatible 'fractions' module — exact rational arithmetic.
+#
+# Usage:
+#   from fractions import Fraction
+#   half  = Fraction(1, 2)
+#   third = Fraction('1/3')
+#   approx_pi = Fraction(3.14).limit_denominator(100)   # 22/7
+#
+#   total = half + third                                 # 5/6
+#   assert half + 1 == Fraction(3, 2)                    # int promotes
+#   assert float(Fraction(3, 4)) == 0.75
+#
+# Supported:
+#   - Construction:
+#         Fraction()                       # 0
+#         Fraction(int)                    # int/1
+#         Fraction(int, int)               # reduced; ZeroDivisionError if d == 0
+#         Fraction(float)                  # via JS Number → string ("0.5" → 1/2)
+#         Fraction(Fraction)               # copy
+#         Fraction(Fraction, Fraction)     # rational division
+#         Fraction(str)                    # '3/4', '0.25', '-1', '+1/2', '1e-2'
+#   - Class methods: Fraction.from_float(f), Fraction.from_number(x)
+#   - Properties:    .numerator, .denominator (always reduced; denominator > 0)
+#   - Arithmetic:    +, -, *, /, //, %, ** (with reflected forms; mixed with int/float)
+#   - Unary:         +x, -x, abs(x)
+#   - Comparison:    ==, !=, <, <=, >, >= (against Fraction, int, or float)
+#   - Conversion:    float(x), int(x), bool(x), round(x[, n])
+#   - Methods:       .limit_denominator(max_denominator=10**6),
+#                    .as_integer_ratio(), .__copy__(), .__deepcopy__(memo)
+#   - String forms:  str(x) → 'n/d' or 'n'; repr(x) → 'Fraction(n, d)'
+#
+# Internals — and limitations:
+#   - Numerator and denominator are stored as ordinary JS Numbers and reduced
+#     via Euclid's GCD after every operation. Values are exact as long as
+#     numerator and denominator stay within ±2^53.
+#   - Fraction(float) uses JS's default Number → string conversion, so
+#     Fraction(0.1) → Fraction(1, 10) rather than CPython's exact IEEE-754
+#     decomposition. Pass an explicit pair (Fraction(1, 10)) if you depend
+#     on the exact rational; use .from_float() for IEEE-754-faithful decoding.
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _gcd(a, b):
+    # Euclidean GCD on non-negative integers; returns 1 when both are 0.
+    a = Math.abs(a)
+    b = Math.abs(b)
+    if a == 0 and b == 0:
+        return 1
+    while b != 0:
+        v"var _t = b; b = a % b; a = _t;"
+    return a
+
+
+def _is_int_number(x):
+    # True for finite JS Numbers (or booleans) that represent an integer.
+    if jstype(x) is 'boolean':
+        return True
+    if jstype(x) is not 'number':
+        return False
+    if not isFinite(x):
+        return False
+    return Math.floor(x) == x
+
+
+def _parse_string(s):
+    # Parse '3/4', '0.25', '-1', '+1/2', '1e-2', '  -1.5  '. Returns [num, den].
+    s = String(s).trim()
+    if s.length == 0:
+        raise ValueError("Invalid literal for Fraction: " + repr(s))
+    slash = s.indexOf('/')
+    if slash != -1:
+        left = s.slice(0, slash).trim()
+        right = s.slice(slash + 1).trim()
+        if left.length == 0 or right.length == 0:
+            raise ValueError("Invalid literal for Fraction: " + repr(s))
+        ln, ld = _parse_string(left)
+        rn, rd = _parse_string(right)
+        if rn == 0:
+            raise ZeroDivisionError('Fraction(' + repr(s) + ')')
+        return [ln * rd, ld * rn]
+    # Strip sign
+    sign = 1
+    if s.charAt(0) == '+':
+        s = s.slice(1)
+    elif s.charAt(0) == '-':
+        sign = -1
+        s = s.slice(1)
+    if s.length == 0 or not v'/^[0-9eE.+\-_]+$/'.test(s):
+        raise ValueError("Invalid literal for Fraction: " + repr(s))
+    # Allow Python-style _ separators
+    s = v"s.replace(/_/g, '')"
+    # Exponent
+    exp = 0
+    ei = -1
+    for v'var ρσ_i = 0; ρσ_i < s.length; ρσ_i++':
+        ch = s.charAt(ρσ_i)
+        if ch == 'e' or ch == 'E':
+            ei = ρσ_i
+            break
+    if ei != -1:
+        exp = parseInt(s.slice(ei + 1), 10)
+        if v'isNaN(exp)':
+            raise ValueError("Invalid literal for Fraction: " + repr(s))
+        s = s.slice(0, ei)
+    # Decimal point
+    dot = s.indexOf('.')
+    if dot == -1:
+        n = parseInt(s, 10)
+        if v'isNaN(n)':
+            raise ValueError("Invalid literal for Fraction: " + repr(s))
+        d = 1
+    else:
+        ipart = s.slice(0, dot)
+        fpart = s.slice(dot + 1)
+        if ipart.length == 0 and fpart.length == 0:
+            raise ValueError("Invalid literal for Fraction: " + repr(s))
+        if ipart.length == 0:
+            ipart = '0'
+        if fpart.length == 0:
+            fpart = '0'
+        if v'!/^[0-9]+$/.test(ipart) || !/^[0-9]+$/.test(fpart)':
+            raise ValueError("Invalid literal for Fraction: " + repr(s))
+        n = parseInt(ipart + fpart, 10)
+        d = Math.pow(10, fpart.length)
+    if exp > 0:
+        n = n * Math.pow(10, exp)
+    elif exp < 0:
+        d = d * Math.pow(10, -exp)
+    return [sign * n, d]
+
+
+def _from_float_via_string(f):
+    # Decode a finite JS Number using its default string representation, so
+    # Fraction(0.5) → 1/2 and Fraction(0.1) → 1/10. NaN/Infinity are caller's
+    # problem.
+    if f == 0:
+        return [0, 1]
+    return _parse_string(String(f))
+
+
+# ---------------------------------------------------------------------------
+# Fraction class
+# ---------------------------------------------------------------------------
+
+class Fraction:
+    """A rational number stored as an exactly reduced (numerator, denominator)
+    pair. Denominator is always positive; sign lives on the numerator."""
+
+    def __init__(self, numerator=0, denominator=None):
+        if denominator is None:
+            # Single-argument forms.
+            if isinstance(numerator, Fraction):
+                n = numerator.numerator
+                d = numerator.denominator
+            elif jstype(numerator) is 'string' or v'numerator instanceof String':
+                n, d = _parse_string(numerator)
+            elif jstype(numerator) is 'boolean':
+                n = 1 if numerator else 0
+                d = 1
+            elif jstype(numerator) is 'number':
+                if not isFinite(numerator):
+                    if v'isNaN(numerator)':
+                        raise ValueError('cannot convert NaN to Fraction')
+                    raise OverflowError('cannot convert Infinity to Fraction')
+                if Math.floor(numerator) == numerator:
+                    n = numerator
+                    d = 1
+                else:
+                    n, d = _from_float_via_string(numerator)
+            elif numerator is None:
+                raise TypeError('Fraction() argument must be a number or string, not None')
+            else:
+                raise TypeError(
+                    'Fraction() argument must be int, float, str, or Fraction'
+                )
+        else:
+            # Two-argument forms: any combination of int / Fraction.
+            num_pair = _coerce_to_pair(numerator)
+            den_pair = _coerce_to_pair(denominator)
+            # (a/b) / (c/d) = (a*d) / (b*c)
+            n = num_pair[0] * den_pair[1]
+            d = num_pair[1] * den_pair[0]
+        if d == 0:
+            raise ZeroDivisionError('Fraction(' + str(n) + ', 0)')
+        if d < 0:
+            n = -n
+            d = -d
+        g = _gcd(n, d)
+        if g > 1:
+            n = n / g
+            d = d / g
+        # Normalize -0 → 0
+        if n == 0:
+            n = 0
+        self.numerator = n
+        self.denominator = d
+
+    # — Class methods —
+
+    @classmethod
+    def from_float(cls, f):
+        if isinstance(f, Fraction):
+            raise TypeError('from_float() only takes floats, not Fractions')
+        if jstype(f) is 'number':
+            if v'isNaN(f)':
+                raise ValueError('cannot convert NaN to Fraction')
+            if not isFinite(f):
+                raise OverflowError('cannot convert Infinity to Fraction')
+            if Math.floor(f) == f:
+                return cls(f, 1)
+            n, d = _from_float_via_string(f)
+            return cls(n, d)
+        raise TypeError('from_float() requires a number')
+
+    @classmethod
+    def from_number(cls, x):
+        return cls(x)
+
+    # — Pair extraction —
+
+    def as_integer_ratio(self):
+        return (self.numerator, self.denominator)
+
+    # — Unary —
+
+    def __neg__(self):
+        return _make(-self.numerator, self.denominator)
+
+    def __pos__(self):
+        return _make(self.numerator, self.denominator)
+
+    def __abs__(self):
+        n = self.numerator
+        if n < 0:
+            n = -n
+        return _make(n, self.denominator)
+
+    def __bool__(self):
+        return self.numerator != 0
+
+    # — Binary arithmetic —
+
+    def __add__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        n = self.numerator * op[1] + op[0] * self.denominator
+        d = self.denominator * op[1]
+        return _make(n, d)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __sub__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        n = self.numerator * op[1] - op[0] * self.denominator
+        d = self.denominator * op[1]
+        return _make(n, d)
+
+    def __rsub__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        n = op[0] * self.denominator - self.numerator * op[1]
+        d = self.denominator * op[1]
+        return _make(n, d)
+
+    def __mul__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        return _make(self.numerator * op[0], self.denominator * op[1])
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        if op[0] == 0:
+            raise ZeroDivisionError('Fraction(%s, 0)' % str(self.numerator * op[1]))
+        return _make(self.numerator * op[1], self.denominator * op[0])
+
+    def __rtruediv__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        if self.numerator == 0:
+            raise ZeroDivisionError('Fraction(%s, 0)' % str(op[0] * self.denominator))
+        return _make(op[0] * self.denominator, op[1] * self.numerator)
+
+    def __floordiv__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        if op[0] == 0:
+            raise ZeroDivisionError('division by zero')
+        # (a/b) // (c/d) = floor((a*d) / (b*c))
+        num = self.numerator * op[1]
+        den = self.denominator * op[0]
+        return Math.floor(num / den)
+
+    def __rfloordiv__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        if self.numerator == 0:
+            raise ZeroDivisionError('division by zero')
+        num = op[0] * self.denominator
+        den = op[1] * self.numerator
+        return Math.floor(num / den)
+
+    def __mod__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        if op[0] == 0:
+            raise ZeroDivisionError('Fraction modulo by zero')
+        # self - (self // other) * other
+        div = self.__floordiv__(other)
+        return self.__sub__(_make(div * op[0], op[1]))
+
+    def __rmod__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        if self.numerator == 0:
+            raise ZeroDivisionError('Fraction modulo by zero')
+        # other - (other // self) * self
+        other_frac = _make(op[0], op[1])
+        return other_frac.__sub__(other_frac.__floordiv__(self) * self)
+
+    def __pow__(self, other):
+        # Integer exponent → exact Fraction. Non-integer → float.
+        if isinstance(other, Fraction):
+            if other.denominator == 1:
+                return self.__pow__(other.numerator)
+            return Math.pow(self.numerator / self.denominator,
+                            other.numerator / other.denominator)
+        if _is_int_number(other):
+            e = Number(other)
+            if e == 0:
+                return _make(1, 1)
+            if e > 0:
+                return _make(Math.pow(self.numerator, e),
+                             Math.pow(self.denominator, e))
+            # negative exponent → swap numerator and denominator, take |e|
+            if self.numerator == 0:
+                raise ZeroDivisionError('Fraction(0, 1) cannot be raised to a negative power')
+            e = -e
+            # Math.pow preserves the sign of the base through odd exponents,
+            # which is exactly what we want. _make then normalises so the
+            # denominator stays positive.
+            return _make(Math.pow(self.denominator, e), Math.pow(self.numerator, e))
+        if jstype(other) is 'number':
+            return Math.pow(self.numerator / self.denominator, other)
+        return NotImplemented
+
+    def __rpow__(self, other):
+        if self.denominator == 1:
+            if _is_int_number(other) and self.numerator >= 0:
+                return Math.pow(other, self.numerator)
+            if jstype(other) is 'number':
+                return Math.pow(other, self.numerator)
+        return Math.pow(other, self.numerator / self.denominator)
+
+    # — Comparison —
+
+    def __eq__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return False
+        return self.numerator * op[1] == op[0] * self.denominator
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        return self.numerator * op[1] < op[0] * self.denominator
+
+    def __le__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        return self.numerator * op[1] <= op[0] * self.denominator
+
+    def __gt__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        return self.numerator * op[1] > op[0] * self.denominator
+
+    def __ge__(self, other):
+        op = _coerce_or_passthrough(other)
+        if op is None:
+            return NotImplemented
+        return self.numerator * op[1] >= op[0] * self.denominator
+
+    # — Hashing & string forms —
+
+    def __hash__(self):
+        # Mimic Python: when the Fraction is an integer, hash matches int.
+        if self.denominator == 1:
+            return self.numerator | 0
+        # Mix numerator and denominator. Fractions equal under reduction
+        # produce the same hash because they share the same canonical form.
+        n = self.numerator | 0
+        d = self.denominator | 0
+        return (n * 1000003 ^ d) | 0
+
+    def __repr__(self):
+        return 'Fraction(' + String(self.numerator) + ', ' + String(self.denominator) + ')'
+
+    def __str__(self):
+        if self.denominator == 1:
+            return String(self.numerator)
+        return String(self.numerator) + '/' + String(self.denominator)
+
+    def __int__(self):
+        # Truncate toward zero, matching Python.
+        n = self.numerator / self.denominator
+        if n >= 0:
+            return Math.floor(n)
+        return -Math.floor(-n)
+
+    def __float__(self):
+        return self.numerator / self.denominator
+
+    def __copy__(self):
+        return _make(self.numerator, self.denominator)
+
+    def __deepcopy__(self, memo):
+        return _make(self.numerator, self.denominator)
+
+    def __round__(self, ndigits=None):
+        if ndigits is None:
+            return _round_half_even(self.numerator, self.denominator)
+        # Round to ndigits decimal places: returns a Fraction.
+        shift = Math.pow(10, ndigits)
+        if ndigits >= 0:
+            shifted_num = self.numerator * shift
+            shifted_den = self.denominator
+        else:
+            shifted_num = self.numerator
+            shifted_den = self.denominator * shift
+        rounded = _round_half_even(shifted_num, shifted_den)
+        if ndigits >= 0:
+            return _make(rounded, shift)
+        return _make(rounded * shift, 1)
+
+    # — limit_denominator: continued-fraction algorithm from CPython —
+
+    def limit_denominator(self, max_denominator=1000000):
+        if max_denominator < 1:
+            raise ValueError('max_denominator should be at least 1')
+        if self.denominator <= max_denominator:
+            return _make(self.numerator, self.denominator)
+        p0 = 0
+        q0 = 1
+        p1 = 1
+        q1 = 0
+        n = self.numerator
+        d = self.denominator
+        while True:
+            a = Math.floor(n / d)
+            q2 = q0 + a * q1
+            if q2 > max_denominator:
+                break
+            v"var _p1 = p1; p1 = p0 + a * p1; p0 = _p1;"
+            v"var _q1 = q1; q1 = q2;            q0 = _q1;"
+            v"var _n = n;   n = d; d = _n - a * d;"
+            if d == 0:
+                break
+        k = Math.floor((max_denominator - q0) / q1)
+        bound1_num = p0 + k * p1
+        bound1_den = q0 + k * q1
+        bound2_num = p1
+        bound2_den = q1
+        # Pick whichever bound is closer to self. |b1 - self| vs |b2 - self|
+        # → compare 2*|b1 - self| with denominator differences cleared:
+        diff1 = Math.abs(bound1_num * self.denominator - self.numerator * bound1_den) * bound2_den
+        diff2 = Math.abs(bound2_num * self.denominator - self.numerator * bound2_den) * bound1_den
+        if diff2 <= diff1:
+            return _make(bound2_num, bound2_den)
+        return _make(bound1_num, bound1_den)
+
+
+# ---------------------------------------------------------------------------
+# Helpers that need Fraction in scope
+# ---------------------------------------------------------------------------
+
+def _make(n, d):
+    # Bypass __init__ argument shuffling for already-validated integer pairs.
+    f = Object.create(Fraction.prototype)
+    if d == 0:
+        raise ZeroDivisionError('Fraction(' + str(n) + ', 0)')
+    if d < 0:
+        n = -n
+        d = -d
+    g = _gcd(n, d)
+    if g > 1:
+        n = n / g
+        d = d / g
+    if n == 0:
+        n = 0
+    f.numerator = n
+    f.denominator = d
+    return f
+
+
+def _coerce_to_pair(x):
+    # Convert x to [num, den] integer pair, or raise TypeError.
+    if isinstance(x, Fraction):
+        return [x.numerator, x.denominator]
+    if _is_int_number(x):
+        return [Number(x), 1]
+    if jstype(x) is 'number':
+        # Non-integer JS number → use string parsing
+        if not isFinite(x):
+            if v'isNaN(x)':
+                raise ValueError('cannot convert NaN to Fraction')
+            raise OverflowError('cannot convert Infinity to Fraction')
+        return _from_float_via_string(x)
+    if jstype(x) is 'string' or v'x instanceof String':
+        return _parse_string(x)
+    raise TypeError('expected int, float, str, or Fraction')
+
+
+def _coerce_or_passthrough(x):
+    # Like _coerce_to_pair but returns None instead of raising — lets
+    # operator overloads return NotImplemented.
+    if isinstance(x, Fraction):
+        return [x.numerator, x.denominator]
+    if _is_int_number(x):
+        return [Number(x), 1]
+    if jstype(x) is 'number':
+        if not isFinite(x):
+            return None
+        return _from_float_via_string(x)
+    if jstype(x) is 'string' or v'x instanceof String':
+        try:
+            return _parse_string(x)
+        except:
+            return None
+    return None
+
+
+def _round_half_even(num, den):
+    # Banker's rounding: half rounds to even. num/den expressed as integers.
+    q = Math.floor(num / den)
+    r2 = (num - q * den) * 2
+    if r2 < den:
+        return q
+    if r2 > den:
+        return q + 1
+    # Exact half → round to even
+    if q % 2 == 0:
+        return q
+    return q + 1

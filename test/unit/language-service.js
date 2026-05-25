@@ -985,6 +985,34 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "stdlib_fractions_no_errors",
+            description: "from fractions import Fraction and typical usage produces no errors",
+            run: function () {
+                var markers = d().check([
+                    "from fractions import Fraction",
+                    "half = Fraction(1, 2)",
+                    "third = Fraction(1, 3)",
+                    "total = half + third",
+                    "diff = half - third",
+                    "prod = half * third",
+                    "quot = half / third",
+                    "smaller = half < third",
+                    "pi_approx = Fraction(3.14).limit_denominator(100)",
+                    "as_ratio = Fraction(3, 4).as_integer_ratio()",
+                    "print(total.numerator, diff.denominator, prod, quot)",
+                    "print(smaller, pi_approx, as_ratio)",
+                    "print(float(half), int(half), str(half), repr(half))",
+                ].join("\n"),
+                    { virtualFiles: { sentinel: "x = 1" } }
+                );
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for fractions imports and usage, got: " +
+                    JSON.stringify(errors.map(function (m) { return m.message; })));
+            },
+        },
+
+        {
             name: "copy_no_bad_import",
             description: "from copy import copy, deepcopy produces no bad-import error",
             run: function () {

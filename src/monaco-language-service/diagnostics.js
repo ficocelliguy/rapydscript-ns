@@ -32,7 +32,7 @@ const MESSAGES = {
 // errors regardless of what virtualFiles or stdlibFiles are configured.
 export const STDLIB_MODULES = [
     'abc', 'aes', 'asyncio', 'base64', 'bisect', 'collections', 'contextlib', 'copy', 'csv', 'dataclasses', 'datetime', 'elementmaker', 'encodings', 'enum',
-    'functools', 'gettext', 'heapq', 'html', 'http', 'io', 'itertools', 'json', 'logging', 'math', 'numpy', 'operator',
+    'fractions', 'functools', 'gettext', 'heapq', 'html', 'http', 'io', 'itertools', 'json', 'logging', 'math', 'numpy', 'operator',
     'pprint', 'pythonize', 'random', 're', 'react', 'statistics', 'string', 'textwrap', 'traceback', 'typing', 'urllib', 'uuid',
     // Pseudo-modules for language feature flags (from __python__ import ...)
     '__python__', '__builtins__',
