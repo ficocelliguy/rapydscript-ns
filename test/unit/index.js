@@ -6470,6 +6470,184 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── Python `%` string formatting ──────────────────────────────────────
+
+    {
+        name: "pct_format_string_basic",
+        description: "%s with a single string value and with a tuple",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('%s world' % 'hello', 'hello world')",
+            "assrt.equal('%s %s' % ('a', 'b'), 'a b')",
+            "assrt.equal('%s' % 42, '42')",
+            "assrt.equal('%s' % None, 'None')",
+            "assrt.equal('%s' % True, 'True')",
+            "assrt.equal('no specs here' % (), 'no specs here')",
+        ].join("\n"),
+        js_checks: ["ρσ_op_mod_ns("],
+    },
+
+    {
+        name: "pct_format_integers",
+        description: "%d, %i, %u, %o, %x, %X integer conversions",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('%d' % 42, '42')",
+            "assrt.equal('%d' % -42, '-42')",
+            "assrt.equal('%i' % 42, '42')",
+            "assrt.equal('%u' % 42, '42')",
+            "assrt.equal('%d' % 3.7, '3')",
+            "assrt.equal('%o' % 8, '10')",
+            "assrt.equal('%#o' % 8, '0o10')",
+            "assrt.equal('%x' % 255, 'ff')",
+            "assrt.equal('%X' % 255, 'FF')",
+            "assrt.equal('%#x' % 255, '0xff')",
+            "assrt.equal('%#X' % 255, '0XFF')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_floats",
+        description: "%f, %F, %e, %E, %g, %G with default and explicit precision",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('%f' % 3.14, '3.140000')",
+            "assrt.equal('%.3f' % 3.14159, '3.142')",
+            "assrt.equal('%.0f' % 3.7, '4')",
+            "assrt.equal('%e' % 12345.6789, '1.234568e+04')",
+            "assrt.equal('%E' % 12345.6789, '1.234568E+04')",
+            "assrt.equal('%.2e' % 12345.6789, '1.23e+04')",
+            "assrt.equal('%g' % 1234567.89, '1.23457e+06')",
+            "assrt.equal('%g' % 0.0001, '0.0001')",
+            "assrt.equal('%g' % 0.00001, '1e-05')",
+            "assrt.equal('%g' % 100, '100')",
+            "assrt.equal('%G' % 0.00001, '1E-05')",
+            "assrt.equal('%#g' % 100, '100.000')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_flags_width_precision",
+        description: "flag, width, precision combinations on numerics and strings",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('%5d' % 42, '   42')",
+            "assrt.equal('%-5d|' % 42, '42   |')",
+            "assrt.equal('%05d' % 42, '00042')",
+            "assrt.equal('%+d' % 5, '+5')",
+            "assrt.equal('%+d' % -5, '-5')",
+            "assrt.equal('% d' % 5, ' 5')",
+            "assrt.equal('% d' % -5, '-5')",
+            "assrt.equal('%10.3f' % 3.14159, '     3.142')",
+            "assrt.equal('%-10.3f|' % 3.14159, '3.142     |')",
+            "assrt.equal('%010.3f' % 3.14159, '000003.142')",
+            "assrt.equal('%.3s' % 'hello', 'hel')",
+            "assrt.equal('%10s' % 'hi', '        hi')",
+            "assrt.equal('%-10s|' % 'hi', 'hi        |')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_char_and_repr",
+        description: "%c char conversion and %r/%a repr conversion",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('%c' % 65, 'A')",
+            "assrt.equal('%c' % 'Q', 'Q')",
+            "assrt.equal('%r' % 'x', \"'x'\")",
+            "assrt.equal('%a' % 'x', \"'x'\")",
+            "assrt.equal('%r' % 42, '42')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_percent_literal",
+        description: "%% in the template produces a literal % sign",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('100%%' % (), '100%')",
+            "assrt.equal('%d%%' % 50, '50%')",
+            "assrt.equal('%s%%done' % '95', '95%done')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_mapping",
+        description: "%(name)s mapping syntax with plain object and dict()",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('%(name)s is %(age)d' % {'name': 'Bob', 'age': 30}, 'Bob is 30')",
+            "d = dict(x=1, y=2)",
+            "assrt.equal('%(x)d-%(y)d' % d, '1-2')",
+            "# repeated keys",
+            "assrt.equal('%(a)s %(a)s' % {'a': 'hi'}, 'hi hi')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_star_width_precision",
+        description: "* for width/precision consumes positional args",
+        src: [
+            "# globals: assrt",
+            "assrt.equal('%*d' % (5, 42), '   42')",
+            "assrt.equal('%.*f' % (3, 3.14159), '3.142')",
+            "assrt.equal('%*.*f' % (10, 2, 3.14159), '      3.14')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_errors",
+        description: "TypeError / ValueError / KeyError on malformed input",
+        src: [
+            "# globals: assrt",
+            "assrt.throws(def(): '%d' % (1, 2);, TypeError)",
+            "assrt.throws(def(): '%s %s' % 'one';, TypeError)",
+            "assrt.throws(def(): '%(missing)s' % {};, KeyError)",
+            "assrt.throws(def(): '%(name)s' % 42;, TypeError)",
+            "assrt.throws(def(): '%q' % 1;, ValueError)",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_compound",
+        description: "a real-world style format string round-trips",
+        src: [
+            "# globals: assrt",
+            "msg = 'user=%s id=%05d score=%.2f' % ('alice', 7, 99.5)",
+            "assrt.equal(msg, 'user=alice id=00007 score=99.50')",
+            "# logging-style with mapping",
+            "ev = '%(level)s [%(name)s] %(msg)s' % {'level': 'INFO', 'name': 'app', 'msg': 'started'}",
+            "assrt.equal(ev, 'INFO [app] started')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_augmented",
+        description: "%= mutates string variable in place via reassignment",
+        src: [
+            "# globals: assrt",
+            "s = 'hello %s'",
+            "s %= 'world'",
+            "assrt.equal(s, 'hello world')",
+            "t = '%d-%d'",
+            "t %= (3, 4)",
+            "assrt.equal(t, '3-4')",
+        ].join("\n"),
+    },
+
+    {
+        name: "pct_format_overload_operators_flag",
+        description: "% string formatting works with overload_operators flag",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "assrt.equal('%s' % 'hi', 'hi')",
+            "assrt.equal('%d' % 5, '5')",
+            "assrt.equal('%.2f' % 1.5, '1.50')",
+        ].join("\n"),
+        js_checks: ["ρσ_op_mod("],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

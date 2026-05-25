@@ -442,6 +442,303 @@ define_str_func('format', def ():
 )
 # }}}
 
+# Python printf-style string formatting (the % operator on strings).  {{{
+# Supports the full Python conversion-spec syntax:
+#   %[(name)][flags][width][.precision][length]type
+# Types: d i u o x X e E f F g G c r s a %
+# Flags: # 0 - <space> +
+# Width / precision may be '*' to consume the next positional argument.
+# Right-hand operand semantics match Python:
+#   tuple/array  → positional spread
+#   dict / plain object → mapping (when any %(name) spec is present), else single value
+#   anything else → single positional value
+
+def ρσ_normalize_exp(s):
+    return s.replace(/([eE])([+-])(\d)$/, def(m, e, sign, digit):
+        return e + sign + '0' + digit
+    )
+
+def ρσ_format_percent(template, values):
+    template_str = '' + template
+    is_tuple = Array.isArray(values)
+    if is_tuple:
+        pos_args = values
+    else:
+        pos_args = v'[values]'
+
+    has_named = False
+    pos_idx = 0
+    ans = ''
+    i = 0
+    n = template_str.length
+
+    def take_pos():
+        nonlocal pos_idx
+        if pos_idx >= pos_args.length:
+            raise TypeError('not enough arguments for format string')
+        val = pos_args[pos_idx]
+        pos_idx += 1
+        return val
+
+    def lookup_mapping(key):
+        if values is None or values is undefined or Array.isArray(values):
+            raise TypeError('format requires a mapping')
+        if jstype(values) is not 'object':
+            raise TypeError('format requires a mapping')
+        if jstype(values.__getitem__) is 'function':
+            return values.__getitem__(key)
+        if Object.prototype.hasOwnProperty.call(values, key):
+            return values[key]
+        raise KeyError(key)
+
+    while i < n:
+        ch = template_str[i]
+        if ch is not '%':
+            ans += ch
+            i += 1
+            continue
+        i += 1
+        if i >= n:
+            raise ValueError("incomplete format")
+
+        name = None
+        if template_str[i] is '(':
+            close_idx = template_str.indexOf(')', i)
+            if close_idx is -1:
+                raise ValueError("incomplete format key")
+            name = template_str[i+1:close_idx]
+            i = close_idx + 1
+
+        flags = ''
+        while i < n and v"'-+ 0#'.indexOf(template_str.charAt(i)) !== -1":
+            flags += template_str[i]
+            i += 1
+
+        width = -1
+        if i < n and template_str[i] is '*':
+            i += 1
+            w = take_pos()
+            width = parseInt(w, 10)
+            if isNaN(width):
+                raise TypeError("* wants int")
+        else:
+            while i < n and template_str[i] >= '0' and template_str[i] <= '9':
+                if width is -1: width = 0
+                width = width * 10 + (template_str.charCodeAt(i) - 48)
+                i += 1
+
+        precision = -1
+        if i < n and template_str[i] is '.':
+            i += 1
+            if i < n and template_str[i] is '*':
+                i += 1
+                p = take_pos()
+                precision = parseInt(p, 10)
+                if isNaN(precision):
+                    raise TypeError("* wants int")
+            else:
+                precision = 0
+                while i < n and template_str[i] >= '0' and template_str[i] <= '9':
+                    precision = precision * 10 + (template_str.charCodeAt(i) - 48)
+                    i += 1
+
+        # Length modifier — ignored (matches Python)
+        while i < n and (template_str[i] is 'h' or template_str[i] is 'l' or template_str[i] is 'L'):
+            i += 1
+
+        if i >= n:
+            raise ValueError("incomplete format")
+        conv = template_str[i]
+        i += 1
+
+        if conv is '%':
+            if name is not None or flags or width >= 0 or precision >= 0:
+                raise ValueError("unsupported format character '%'")
+            ans += '%'
+            continue
+
+        if name is not None:
+            has_named = True
+            value = lookup_mapping(name)
+        else:
+            value = take_pos()
+
+        ans += ρσ_format_percent_one(value, flags, width, precision, conv)
+
+    if not has_named:
+        if pos_idx < pos_args.length:
+            raise TypeError('not all arguments converted during string formatting')
+
+    return ans
+
+def ρσ_format_percent_one(value, flags, width, precision, conv):
+    left_align = flags.indexOf('-') is not -1
+    show_sign = flags.indexOf('+') is not -1
+    leading_space = flags.indexOf(' ') is not -1 and not show_sign
+    alt_form = flags.indexOf('#') is not -1
+    zero_pad = flags.indexOf('0') is not -1 and not left_align
+
+    is_numeric = False
+    is_negative = False
+    sign = ''
+    body = ''
+    prefix = ''
+
+    if conv is 's':
+        body = ρσ_str(value)
+        if precision >= 0:
+            body = body.slice(0, precision)
+    elif conv is 'r' or conv is 'a':
+        body = ρσ_repr(value)
+        if precision >= 0:
+            body = body.slice(0, precision)
+    elif conv is 'c':
+        if jstype(value) is 'number':
+            ci = parseInt(value, 10)
+            if isNaN(ci):
+                raise TypeError("%c requires int or char")
+            if ci < 0 or ci > 0x10FFFF:
+                raise OverflowError("%c arg not in range(0x110000)")
+            if ci > 0xFFFF:
+                code = ci - 0x10000
+                body = String.fromCharCode(0xD800 + (code >> 10), 0xDC00 + (code & 0x3FF))
+            else:
+                body = String.fromCharCode(ci)
+        elif (jstype(value) is 'string' or v'value instanceof String') and value.length is 1:
+            body = '' + value
+        else:
+            raise TypeError("%c requires int or char")
+    elif conv is 'd' or conv is 'i' or conv is 'u':
+        is_numeric = True
+        if jstype(value) is 'bigint':
+            bn = value
+            is_negative = v'bn < 0n'
+            body = (v'-bn' if is_negative else bn).toString()
+        else:
+            num = ρσ_coerce_to_number(value, conv)
+            n2 = Math.trunc(num)
+            is_negative = n2 < 0 or v'(n2 === 0 && 1/n2 === -Infinity)'
+            body = Math.abs(n2).toString(10)
+    elif conv is 'o':
+        is_numeric = True
+        if jstype(value) is 'bigint':
+            bn = value
+            is_negative = v'bn < 0n'
+            body = (v'-bn' if is_negative else bn).toString(8)
+        else:
+            num = ρσ_coerce_to_number(value, conv)
+            n2 = Math.trunc(num)
+            is_negative = n2 < 0
+            body = Math.abs(n2).toString(8)
+        if alt_form:
+            prefix = '0o'
+    elif conv is 'x' or conv is 'X':
+        is_numeric = True
+        if jstype(value) is 'bigint':
+            bn = value
+            is_negative = v'bn < 0n'
+            body = (v'-bn' if is_negative else bn).toString(16)
+        else:
+            num = ρσ_coerce_to_number(value, conv)
+            n2 = Math.trunc(num)
+            is_negative = n2 < 0
+            body = Math.abs(n2).toString(16)
+        if conv is 'X':
+            body = body.toUpperCase()
+        if alt_form:
+            prefix = '0X' if conv is 'X' else '0x'
+    elif conv is 'e' or conv is 'E' or conv is 'f' or conv is 'F' or conv is 'g' or conv is 'G':
+        is_numeric = True
+        num = parseFloat(value)
+        if isNaN(num):
+            if value is None or value is undefined:
+                raise TypeError("float argument required, not " + ('NoneType' if value is None else 'undefined'))
+            # NaN literal: pass through
+            body = 'nan'
+            if conv is 'E' or conv is 'F' or conv is 'G':
+                body = 'NAN'
+            sign = ''
+        elif not isFinite(num):
+            is_negative = num < 0
+            body = 'inf'
+            if conv is 'E' or conv is 'F' or conv is 'G':
+                body = 'INF'
+            zero_pad = False
+        else:
+            is_negative = num < 0 or v'(num === 0 && 1/num === -Infinity)'
+            abs_val = Math.abs(num)
+            prec = 6 if precision < 0 else precision
+            if conv is 'e' or conv is 'E':
+                body = abs_val.toExponential(prec)
+                body = ρσ_normalize_exp(body)
+                if conv is 'E':
+                    body = body.toUpperCase()
+            elif conv is 'f' or conv is 'F':
+                body = abs_val.toFixed(prec)
+                if conv is 'F':
+                    body = body.toUpperCase()
+            else:
+                # g / G
+                if prec < 1:
+                    prec = 1
+                exp_str = abs_val.toExponential(prec - 1)
+                exp_val = parseInt(exp_str.split('e')[1], 10)
+                if -4 <= exp_val and exp_val < prec:
+                    body = abs_val.toFixed(prec - 1 - exp_val)
+                else:
+                    body = abs_val.toExponential(prec - 1)
+                if not alt_form:
+                    # Strip trailing zeros (and decimal if no fractional digits left)
+                    if 'e' in body or 'E' in body:
+                        parts = body.split(/[eE]/)
+                        mant = parts[0]
+                        rest = body.slice(mant.length)
+                        if mant.indexOf('.') is not -1:
+                            mant = mant.replace(/0+$/, '')
+                            if mant.charAt(mant.length - 1) is '.':
+                                mant = mant.slice(0, -1)
+                        body = mant + rest
+                    else:
+                        if body.indexOf('.') is not -1:
+                            body = body.replace(/0+$/, '')
+                            if body.charAt(body.length - 1) is '.':
+                                body = body.slice(0, -1)
+                if 'e' in body or 'E' in body:
+                    body = ρσ_normalize_exp(body)
+                if conv is 'G':
+                    body = body.toUpperCase()
+    else:
+        raise ValueError("unsupported format character '" + conv + "'")
+
+    if is_numeric:
+        if is_negative:
+            sign = '-'
+        elif show_sign:
+            sign = '+'
+        elif leading_space:
+            sign = ' '
+
+    full_len = sign.length + prefix.length + body.length
+    if width > 0 and full_len < width:
+        pad = width - full_len
+        if left_align:
+            return sign + prefix + body + ' '.repeat(pad)
+        if zero_pad and is_numeric:
+            return sign + prefix + '0'.repeat(pad) + body
+        return ' '.repeat(pad) + sign + prefix + body
+    return sign + prefix + body
+
+def ρσ_coerce_to_number(value, conv):
+    if jstype(value) is 'number' or jstype(value) is 'boolean':
+        return v'+value'
+    if jstype(value) is 'string':
+        n = parseFloat(value)
+        if isNaN(n):
+            raise TypeError("%" + conv + " format: a number is required, not str")
+        return n
+    raise TypeError("%" + conv + " format: a number is required")
+# }}}
+
 define_str_func('capitalize', def ():
     string = this
     if string:

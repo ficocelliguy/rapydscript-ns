@@ -1463,6 +1463,45 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── Python `%` string formatting ─────────────────────────────────
+
+        {
+            name: "pct_format_no_errors",
+            description: "`%` string formatting on literals and variables yields no errors",
+            run: function () {
+                var markers = d().check([
+                    "name = 'Bob'",
+                    "age = 30",
+                    "a = '%s is %d' % (name, age)",
+                    "b = '%(name)s/%(age)d' % {'name': name, 'age': age}",
+                    "c = '%5.2f' % 3.14159",
+                    "d = '%-10s|%05d' % (name, age)",
+                    "msg = '%s'",
+                    "msg %= name",
+                    "print(a, b, c, d, msg)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "pct_format_logging_idiom_no_errors",
+            description: "logging-style format strings produce no errors",
+            run: function () {
+                var markers = d().check([
+                    "n = 7",
+                    "ratio = 0.42",
+                    "label = 'count=%d ratio=%.3f' % (n, ratio)",
+                    "print(label)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
         // ── str.expandtabs language-service tests ─────────────────────────
 
         {

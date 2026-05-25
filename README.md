@@ -1942,6 +1942,22 @@ f'{m:.2f}'                # '42.00'
 The `!r`, `!s`, and `!a` conversion flags apply `repr()`/`str()`/`repr()` to the
 value before formatting, bypassing `__format__` (same as Python).
 
+Python printf-style `%` string formatting is also supported on string left-operands:
+
+```py
+'%s world' % 'hello'                  # 'hello world'
+'%d items, %.2f each' % (5, 1.25)     # '5 items, 1.25 each'
+'%(name)s=%(age)d' % {'name': 'Bob', 'age': 30}  # 'Bob=30'
+'%05d' % 42                           # '00042'
+'%#x' % 255                           # '0xff'
+```
+
+All Python conversion types (`s`, `r`, `a`, `c`, `d`, `i`, `u`, `o`, `x`, `X`,
+`e`, `E`, `f`, `F`, `g`, `G`, `%`), flag characters (`#`, `0`, `-`, ` `, `+`),
+width / precision (including `*` to consume positional args), and the mapping
+syntax (`%(name)s` with a `dict` or plain object) are accepted. Augmented form
+`s %= ...` also works.
+
 String predicate methods are also available:
 
 ```py
@@ -3791,7 +3807,7 @@ with no flags enabled, pass ``--legacy-rapydscript`` on the command line.
 | `overload_getitem` | `obj[key]` dispatches to `__getitem__` / `__setitem__` / `__delitem__` on objects that define them. On by default. |
 | `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `<<`, `>>`) dispatch to dunder methods (`__add__`, `__sub__`, etc.) and their reflected variants. Unary `-`/`+`/`~` dispatch to `__neg__`/`__pos__`/`__invert__`. On by default. |
 | `strict_arithmetic` | When `overload_operators` is active, incompatible operand types (e.g. `int + str`) raise `TypeError` instead of silently coercing as JavaScript would. On by default; disable with `from __python__ import no_strict_arithmetic` to revert to JavaScript coercion behaviour. Internal RapydScript library code is unaffected. |
-| `python_modulo` | The `%` operator follows Python semantics: the result takes the sign of the divisor (`-7 % 3 == 2`, `7 % -3 == -2`). On by default. Custom `__mod__` / `__rmod__` are dispatched even without `overload_operators`. Disable with `from __python__ import no_python_modulo` to revert to raw JS remainder. Has no effect when `overload_operators` is active (the operator dispatch path always uses Python semantics). |
+| `python_modulo` | The `%` operator follows Python semantics: the result takes the sign of the divisor (`-7 % 3 == 2`, `7 % -3 == -2`). Also enables Python printf-style `%` string formatting when the left operand is a string (`'%s=%d' % ('x', 1)`, `'%(name)s' % {'name': 'Bob'}`). On by default. Custom `__mod__` / `__rmod__` are dispatched even without `overload_operators`. Disable with `from __python__ import no_python_modulo` to revert to raw JS remainder. Has no effect when `overload_operators` is active (the operator dispatch path always uses Python semantics). |
 | `truthiness` | Boolean tests and `bool()` dispatch to `__bool__` and treat empty containers as falsy, matching Python semantics. On by default. |
 | `bound_methods` | Method references (`obj.method`) are automatically bound to their object, so they can be passed as callbacks without losing `self`. On by default. |
 | `hash_literals` | `{k: v}` creates a Python `dict` (alias for `dict_literals`; kept for backward compatibility). On by default. |

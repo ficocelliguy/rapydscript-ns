@@ -149,33 +149,7 @@ Python's `Ellipsis` singleton object. Code that stores `...` in containers or ch
 
 ---
 
-### 2.7 `%` String Formatting (`"%s" % val`)
-
-Legacy printf-style string formatting raises `TypeError`. `ρσ_op_mod` treats `%` as
-numeric modulo only — using it with a string left operand fails regardless of the
-`overload_operators` flag.
-
-```python
-"%s world" % "hello"            # TypeError
-"%d items" % 5                  # TypeError
-"%(name)s" % {"name": "Bob"}    # TypeError
-```
-
-**Workaround:** Use f-strings or `.format()`, both of which are fully supported:
-
-```python
-f"{x} world"
-"{} world".format("hello")
-"{name}".format(name="Bob")
-```
-
-**Impact:** Mainly porting friction. Modern Python style prefers f-strings, but `%`
-formatting is still common in older codebases and in logging idioms
-(`logger.info("count=%d", n)`).
-
----
-
-### 2.8 `@` Matrix Multiplication Operator (`__matmul__`)
+### 2.7 `@` Matrix Multiplication Operator (`__matmul__`)
 
 Python 3.5+ uses `@` for matrix multiplication and dispatches to `__matmul__` /
 `__rmatmul__` / `__imatmul__`. The RapydScript parser does not accept `@` as a binary
@@ -188,7 +162,7 @@ network demos, computational geometry).
 
 ---
 
-### 2.9 `oct()` Builtin
+### 2.8 `oct()` Builtin
 
 `hex()` and `bin()` are provided, but `oct()` is not. Octal literals (`0o755`) parse and
 evaluate correctly; only the conversion function is missing.
@@ -203,7 +177,7 @@ oct(8)     # ReferenceError: oct is not defined
 
 ---
 
-### 2.10 `tuple` Is Not a Distinct Type at Runtime
+### 2.9 `tuple` Is Not a Distinct Type at Runtime
 
 `tuple(iterable)` returns a plain JS array — there is no wrapping constructor with
 tuple-specific methods. Consequences:
@@ -224,7 +198,7 @@ from Python.
 
 ---
 
-### 2.11 `memoryview`
+### 2.10 `memoryview`
 
 `memoryview` does not exist. `bytes` and `bytearray` are supported, but the zero-copy
 buffer-protocol view that `memoryview` provides over them has no RapydScript equivalent —
@@ -407,7 +381,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
-| Medium | `%` string formatting | Low | Porting friction; logging idioms |
 | Medium | `@` matmul + `__matmul__` dunder | Medium | DSL hospitality (graphics, math libraries) |
 | Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | `fractions` module | Medium | Exact rational arithmetic |

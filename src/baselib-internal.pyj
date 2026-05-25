@@ -374,6 +374,8 @@ def ρσ_op_mod(a, b):
     if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
     ta = jstype(a)
     tb = jstype(b)
+    if ta is 'string' or v'a instanceof String':
+        return ρσ_format_percent(a, b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;'
     if ta is 'bigint' and tb is 'bigint':
@@ -648,6 +650,8 @@ def ρσ_op_mod_ns(a, b):
     if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
     ta = jstype(a)
     tb = jstype(b)
+    if ta is 'string' or v'a instanceof String':
+        return ρσ_format_percent(a, b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;'
     if ta is 'bigint' and tb is 'bigint':

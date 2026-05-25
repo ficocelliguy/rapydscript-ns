@@ -4663,6 +4663,27 @@ var TESTS = [
         },
     },
 
+    // ── Python `%` string formatting ───────────────────────────────────────
+    {
+        name: "pct_format_basic",
+        description: "% string formatting works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.equal('%s world' % 'hello', 'hello world')",
+                "assrt.equal('%d items' % 5, '5 items')",
+                "assrt.equal('%.3f' % 3.14159, '3.142')",
+                "assrt.equal('%05d' % 42, '00042')",
+                "assrt.equal('%(name)s/%(n)d' % {'name': 'a', 'n': 7}, 'a/7')",
+                "assrt.equal('%x' % 255, 'ff')",
+                "msg = 'count=%d'",
+                "msg %= 9",
+                "assrt.equal(msg, 'count=9')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     // ── __slots__ ──────────────────────────────────────────────────────────
     {
         name: "slots_basic",

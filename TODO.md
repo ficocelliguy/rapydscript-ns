@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python `bytes` / `bytearray` shim over `Uint8Array ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [python `%` string formatting ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 ## Example: Set operators
@@ -52,4 +52,28 @@ buf[0] = 0x7F
 buf.append(0xFF)
 buf.extend([1, 2, 3])
 assert len(buf) == 8
+```
+
+## Example: `%` string formatting
+
+```python
+# Positional
+assert '%s world' % 'hello' == 'hello world'
+assert '%d items, %.2f each' % (5, 1.25) == '5 items, 1.25 each'
+
+# Padding, sign, alt form
+assert '%05d' % 42 == '00042'
+assert '%+d / %+d' % (5, -5) == '+5 / -5'
+assert '%#x' % 255 == '0xff'
+
+# Mapping
+ev = '%(level)s [%(name)s] %(msg)s' % {
+    'level': 'INFO', 'name': 'app', 'msg': 'started',
+}
+assert ev == 'INFO [app] started'
+
+# Augmented form
+log = 'count=%d'
+log %= 9
+assert log == 'count=9'
 ```
