@@ -52,6 +52,12 @@ def ρσ_repr(x):
     elif jstype(x) is 'string':
         ans = "'" + x.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "'"
     elif Array.isArray(x):
+        if x.ρσ_is_tuple:
+            if x.length is 0: return '()'
+            inner = v'[]'
+            for v'var ti = 0; ti < x.length; ti++':
+                inner.push(ρσ_repr(x[ti]))
+            return '(' + inner[0] + ',)' if x.length is 1 else '(' + inner.join(', ') + ')'
         ans = ρσ_repr_js_builtin(x, True)
     elif jstype(x) is 'function':
         ans = x.toString()
@@ -90,6 +96,12 @@ def ρσ_str(x):
     elif x is True or x is False:
         ans = 'True' if x else 'False'
     elif Array.isArray(x):
+        if x.ρσ_is_tuple:
+            if x.length is 0: return '()'
+            inner = v'[]'
+            for v'var ti = 0; ti < x.length; ti++':
+                inner.push(ρσ_repr(x[ti]))
+            return '(' + inner[0] + ',)' if x.length is 1 else '(' + inner.join(', ') + ')'
         ans = ρσ_repr_js_builtin(x, True)
     elif v'typeof x.toString === "function"':
         name = Object.prototype.toString.call(x).slice(8, -1)

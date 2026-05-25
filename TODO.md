@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python `%` string formatting ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [`tuple` as a distinct type with `.count()` / `.index() ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 ## Example: Set operators
@@ -76,4 +76,33 @@ assert ev == 'INFO [app] started'
 log = 'count=%d'
 log %= 9
 assert log == 'count=9'
+```
+
+## Example: tuple as a distinct type
+
+```python
+# Tuple literal — distinct from a list, with .count() and .index()
+colors = ('red', 'green', 'blue', 'red')
+assert isinstance(colors, tuple)
+assert not isinstance(colors, list)
+assert colors.count('red') == 2
+assert colors.index('green') == 1
+
+# Empty, single, and the tuple() constructor
+empty   = ()
+single  = (42,)                # trailing comma required
+built   = tuple([1, 2, 3])
+assert isinstance(empty, tuple) and len(empty) == 0
+assert single[0] == 42 and isinstance(single, tuple)
+assert built.index(2) == 1
+
+# Concatenation and repetition stay as tuples
+joined   = (1, 2) + (3, 4)     # (1, 2, 3, 4)
+repeated = (0,) * 3            # (0, 0, 0)
+assert isinstance(joined, tuple) and isinstance(repeated, tuple)
+
+# Python-style repr
+assert str(()) == '()'
+assert str((42,)) == '(42,)'
+assert str((1, 2, 3)) == '(1, 2, 3)'
 ```

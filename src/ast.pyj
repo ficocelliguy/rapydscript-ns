@@ -1104,7 +1104,8 @@ class AST_Starred(AST_Node):
 class AST_Array(AST_Node):
     "An array literal"
     properties = {
-        'elements': "[AST_Node*] array of elements"
+        'elements': "[AST_Node*] array of elements",
+        'is_tuple_literal': "[bool] True if this array came from a parenthesised tuple literal (a, b, ...)",
     }
 
     def _walk(self, visitor):

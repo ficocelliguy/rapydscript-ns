@@ -177,28 +177,7 @@ oct(8)     # ReferenceError: oct is not defined
 
 ---
 
-### 2.9 `tuple` Is Not a Distinct Type at Runtime
-
-`tuple(iterable)` returns a plain JS array — there is no wrapping constructor with
-tuple-specific methods. Consequences:
-
-- `tuple` instances have **no `.count()` or `.index()` methods** (the JS `.indexOf()` is
-  a partial substitute for `.index()`).
-- Tuples and lists are indistinguishable at runtime because both are arrays. Code that
-  branches on `isinstance(x, tuple)` vs `isinstance(x, list)` cannot meaningfully
-  discriminate between the two.
-- Tuples are mutable in practice — `t = tuple([1, 2]); t.push(3)` succeeds — even though
-  Python guarantees immutability.
-- Tuple literal syntax `(1, 2, 3)` is not supported (parses as a parenthesised
-  expression); must use `[1, 2, 3]` or `tuple([1, 2, 3])`.
-
-**Impact:** Tuples in RapydScript are essentially "list, but spelled differently."
-Hashability, immutability, distinct-type dispatch, and dict-key behavior all differ
-from Python.
-
----
-
-### 2.10 `memoryview`
+### 2.9 `memoryview`
 
 `memoryview` does not exist. `bytes` and `bytearray` are supported, but the zero-copy
 buffer-protocol view that `memoryview` provides over them has no RapydScript equivalent —
@@ -385,7 +364,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | `fractions` module | Medium | Exact rational arithmetic |
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
-| Low | `tuple` as a distinct type with `.count()` / `.index()` | Medium | `isinstance` dispatch, immutability guarantees |
 | Low | `oct()` builtin | Trivial | Symmetry with `hex()` / `bin()` |
 | Low | `asynccontextmanager` + `async with` | Medium | Async resource management |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |

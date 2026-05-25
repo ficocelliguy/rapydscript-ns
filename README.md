@@ -694,7 +694,7 @@ b = tmp[1]
 c = tmp[2]
 ```
 
-Since JavaScript doesn't have tuples, RapydScript uses arrays for tuple packing/unpacking behind the scenes, but the functionality stays the same. Note that unpacking only occurs when you're assigning to multiple arguments:
+RapydScript represents tuples as decorated JavaScript arrays (similar to how `list` is represented). Implicit tuple packing/unpacking through commas produces plain arrays, while explicit `(...)` tuple literals and the `tuple()` constructor produce a distinct tuple type — see [Explicit tuple literals](#explicit-tuple-literals) below. Note that unpacking only occurs when you're assigning to multiple arguments:
 
 ```py
 a, b, c = fun()		# gets unpacked
@@ -733,19 +733,34 @@ head, *mid, tail = [1, 2, 3, 4, 5] # head=1, mid=[2, 3, 4], tail=5
 
 Starred assignment works with any iterable, including generators and strings (which are unpacked character by character). The starred variable always receives a list, even if it captures zero elements.
 
-**Explicit tuple literals** using parentheses work the same as in Python and compile to JavaScript arrays:
+### Explicit tuple literals
+
+**Explicit tuple literals** using parentheses, and the `tuple()` constructor, produce a distinct `tuple` type — distinguishable from `list` via `isinstance` and equipped with Python's `.count()` and `.index()` methods:
 
 ```py
-empty   = ()            # []
-single  = (42,)         # [42]  — trailing comma required for single-element tuple
-pair    = (1, 2)        # [1, 2]
-triple  = ('a', 'b', 'c')  # ['a', 'b', 'c']
-nested  = ((1, 2), (3, 4))  # [[1, 2], [3, 4]]
+empty   = ()                  # empty tuple
+single  = (42,)               # trailing comma required for single-element tuple
+pair    = (1, 2)
+triple  = ('a', 'b', 'c')
+nested  = ((1, 2), (3, 4))
+built   = tuple([10, 20, 30]) # tuple() from any iterable
+
+assert isinstance(pair, tuple)
+assert not isinstance(pair, list)
+assert isinstance([1, 2], list) and not isinstance([1, 2], tuple)
+
+t = (1, 2, 3, 2, 4, 2)
+assert t.count(2) == 3
+assert t.index(3) == 2
+
+print((1, 2, 3))   # (1, 2, 3)
+print((42,))       # (42,)
+print(())          # ()
 ```
 
 A parenthesised expression without a trailing comma is **not** a tuple — `(x)` is just `x`.  Add a comma to make it one: `(x,)`.
 
-Tuple literals work naturally everywhere arrays do: as return values, function arguments, in `isinstance` checks, and in destructuring assignments:
+`+` between two tuples returns a tuple; `*` with an integer (with `overload_operators` enabled, which is the default Python-mode behaviour) repeats and returns a tuple. Tuple literals also work naturally everywhere arrays do: as return values, function arguments, in `isinstance` checks, and in destructuring assignments:
 
 ```py
 def bounding_box(points):
@@ -754,7 +769,12 @@ def bounding_box(points):
 ok  = isinstance(value, (int, str))   # tuple of types
 
 (a, b), c = (1, 2), 3
+
+joined  = (1, 2) + (3, 4)             # (1, 2, 3, 4) — tuple
+repeated = (0,) * 3                   # (0, 0, 0)   — tuple
 ```
+
+> RapydScript does not enforce Python's tuple immutability — pushing onto a tuple via JS's `.push()` will still succeed — but `.append()` / `.pop()` / `.sort()` / etc. are not exposed on tuples.
 
 Operators and keywords
 ------------------------

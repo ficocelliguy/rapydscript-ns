@@ -1420,6 +1420,22 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        {
+            name: "tuple_methods_no_errors",
+            description: "tuple .count() and .index() method calls produce no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "t = (1, 2, 3, 2)",
+                    "n = t.count(2)",
+                    "i = t.index(3)",
+                    "u = tuple([10, 20, 30]).count(20)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
         // ── Set operators ────────────────────────────────────────────────────
 
         {

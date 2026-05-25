@@ -4709,6 +4709,28 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_tuple_distinct",
+        description: "tuple is a distinct type with .count() and .index() in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "t = (1, 2, 3, 2, 4, 2)",
+                "assrt.ok(isinstance(t, tuple))",
+                "assrt.ok(not isinstance(t, list))",
+                "assrt.equal(t.count(2), 3)",
+                "assrt.equal(t.index(3), 2)",
+                "assrt.equal(t.index(2, 2), 3)",
+                "assrt.equal(str((1, 2)), '(1, 2)')",
+                "assrt.equal(str((42,)), '(42,)')",
+                "u = tuple([10, 20, 30])",
+                "assrt.ok(isinstance(u, tuple))",
+                "assrt.equal(u.count(20), 1)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

@@ -2347,7 +2347,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 next()
                 if is_('punc', ')'):
                     next()
-                    return new AST_Array({'elements':[]})
+                    return new AST_Array({'elements':[], 'is_tuple_literal': True})
                 ex = expression(False)
                 if is_('keyword', 'for'):
                     ret = read_comprehension(new AST_GeneratorComprehension({'statement': ex}), ')')
@@ -2362,7 +2362,7 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                             break  # trailing comma is OK
                         elements.push(expression(False))
                     expect(')')
-                    arr = new AST_Array({'elements': elements, 'start': start, 'end': prev()})
+                    arr = new AST_Array({'elements': elements, 'start': start, 'end': prev(), 'is_tuple_literal': True})
                     S.in_parenthesized_expr = False
                     return subscripts(arr, allow_calls)
                 ex.start = start

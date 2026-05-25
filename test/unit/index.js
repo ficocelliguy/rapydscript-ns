@@ -4908,7 +4908,7 @@ assrt.equal(fib(15), 610)
             "assrt.equal(coords[0], 10)",
             "assrt.equal(coords[1], 20)",
         ].join("\n"),
-        js_checks: [/coords\s*=\s*ρσ_list_decorate\(\s*\[\s*10,\s*20\s*\]/],
+        js_checks: [/coords\s*=\s*ρσ_tuple_decorate\(\s*\[\s*10,\s*20\s*\]/],
     },
 
     {
@@ -4932,6 +4932,164 @@ assrt.equal(fib(15), 610)
             "for v in t:",
             "    total += v",
             "assrt.equal(total, 60)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_literal_is_distinct",
+        description: "(a, b, c) literal is a distinct type from a list",
+        src: [
+            "# globals: assrt",
+            "t = (1, 2, 3)",
+            "assrt.ok(isinstance(t, tuple))",
+            "assrt.ok(not isinstance(t, list))",
+            "lst = [1, 2, 3]",
+            "assrt.ok(isinstance(lst, list))",
+            "assrt.ok(not isinstance(lst, tuple))",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_constructor_is_distinct",
+        description: "tuple() constructor produces a distinct tuple",
+        src: [
+            "# globals: assrt",
+            "t = tuple([1, 2, 3])",
+            "assrt.ok(isinstance(t, tuple))",
+            "assrt.ok(not isinstance(t, list))",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_count_method",
+        description: "tuple .count() returns the number of occurrences",
+        src: [
+            "# globals: assrt",
+            "t = (1, 2, 3, 2, 4, 2)",
+            "assrt.equal(t.count(2), 3)",
+            "assrt.equal(t.count(1), 1)",
+            "assrt.equal(t.count(99), 0)",
+            "t2 = tuple(['a', 'b', 'a', 'c', 'a'])",
+            "assrt.equal(t2.count('a'), 3)",
+            "assrt.equal(t2.count('b'), 1)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_index_method",
+        description: "tuple .index() returns first index of value",
+        src: [
+            "# globals: assrt",
+            "t = (10, 20, 30, 20, 40)",
+            "assrt.equal(t.index(10), 0)",
+            "assrt.equal(t.index(20), 1)",
+            "assrt.equal(t.index(40), 4)",
+            "assrt.equal(t.index(20, 2), 3)",
+            "raised = False",
+            "try:",
+            "    t.index(999)",
+            "except ValueError:",
+            "    raised = True",
+            "assrt.ok(raised)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_empty_literal",
+        description: "empty () literal is an empty tuple",
+        src: [
+            "# globals: assrt",
+            "t = ()",
+            "assrt.equal(len(t), 0)",
+            "assrt.ok(isinstance(t, tuple))",
+            "assrt.ok(not isinstance(t, list))",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_single_element_literal",
+        description: "single-element tuple via trailing comma",
+        src: [
+            "# globals: assrt",
+            "t = (42,)",
+            "assrt.equal(len(t), 1)",
+            "assrt.equal(t[0], 42)",
+            "assrt.ok(isinstance(t, tuple))",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_repr",
+        description: "str(tuple) uses parenthesised repr",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(str(()), '()')",
+            "assrt.equal(str((42,)), '(42,)')",
+            "assrt.equal(str((1, 2, 3)), '(1, 2, 3)')",
+            "assrt.equal(str(('a', 'b')), \"('a', 'b')\")",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_concat",
+        description: "tuple + tuple returns a tuple",
+        src: [
+            "# globals: assrt",
+            "a = (1, 2)",
+            "b = (3, 4)",
+            "c = a + b",
+            "assrt.equal(len(c), 4)",
+            "assrt.equal(c[3], 4)",
+            "assrt.ok(isinstance(c, tuple))",
+            "assrt.ok(not isinstance(c, list))",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_repeat",
+        description: "tuple * n returns a tuple (with overload_operators)",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "t = (1, 2) * 3",
+            "assrt.equal(len(t), 6)",
+            "assrt.equal(t[5], 2)",
+            "assrt.ok(isinstance(t, tuple))",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_membership",
+        description: "in operator works on tuples",
+        src: [
+            "# globals: assrt",
+            "t = (1, 2, 3)",
+            "assrt.ok(2 in t)",
+            "assrt.ok(not (99 in t))",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_unpacking_in_for",
+        description: "for x, y in tuples works as expected",
+        src: [
+            "# globals: assrt",
+            "pairs = [(1, 2), (3, 4), (5, 6)]",
+            "total = 0",
+            "for a, b in pairs:",
+            "    total += a + b",
+            "assrt.equal(total, 21)",
+        ].join("\n"),
+    },
+
+    {
+        name: "tuple_equality",
+        description: "tuples compare equal element-wise",
+        src: [
+            "# globals: assrt",
+            "assrt.ok((1, 2, 3) == (1, 2, 3))",
+            "assrt.ok(not ((1, 2, 3) == (1, 2, 4)))",
+            "assrt.ok(not ((1, 2) == (1, 2, 3)))",
         ].join("\n"),
     },
 

@@ -269,11 +269,64 @@ def sorted(iterable, key=None, reverse=False):
 # }}}
 
 # tuple {{{
+
+def ρσ_tuple_count(value):
+    return this.reduce(def(n, val): return n + (val is value);, 0)
+
+def ρσ_tuple_index(val, start, stop):
+    start = start or 0
+    if start < 0:
+        start = this.length + start
+    if start < 0:
+        raise ValueError(val + ' is not in tuple')
+    if stop is undefined:
+        stop = this.length
+    if stop < 0:
+        stop = this.length + stop
+    for v'var i = start; i < stop; i++':
+        if this[i] == val:
+            return i  # noqa:undef
+    raise ValueError(val + ' is not in tuple')
+
+def ρσ_tuple_to_string():
+    if this.length is 0:
+        return '()'
+    ans = v'[]'
+    for v'var i = 0; i < this.length; i++':
+        ans.push(ρσ_repr(this[i]))
+    if this.length is 1:
+        return '(' + ans[0] + ',)'
+    return '(' + ans.join(', ') + ')'
+
+def ρσ_tuple_eq(other):
+    if not ρσ_arraylike(other):
+        return False
+    if this.length != other.length:
+        return False
+    for v'var i = 0; i < this.length; i++':
+        if not (this[i] == other[i]):
+            return False
+    return True
+
+def ρσ_tuple_decorate(ans):
+    Object.defineProperty(ans, 'ρσ_is_tuple', {'value': True})
+    ans.count = ρσ_tuple_count
+    ans.index = ρσ_tuple_index
+    ans.toString = ρσ_tuple_to_string
+    ans.inspect = ρσ_tuple_to_string
+    ans.__len__ = ρσ_list_len
+    ans.__contains__ = ρσ_list_contains
+    ans.__eq__ = ρσ_tuple_eq
+    ans.constructor = ρσ_tuple_constructor
+    if jstype(ans[ρσ_iterator_symbol]) is not 'function':
+        ans[ρσ_iterator_symbol] = ρσ_list_iterator
+    return ans
+
 def ρσ_tuple_constructor(iterable):
     if iterable is undefined:
-        return v'[]'
+        return ρσ_tuple_decorate(v'[]')
     if ρσ_arraylike(iterable):
-        return Array.prototype.slice.call(iterable)
+        return ρσ_tuple_decorate(Array.prototype.slice.call(iterable))
     if jstype(iterable[ρσ_iterator_symbol]) is 'function':
         iterator = iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
         ans = []
@@ -281,11 +334,11 @@ def ρσ_tuple_constructor(iterable):
         while not result.done:
             ans.push(result.value)
             result = iterator.next()
-        return ans
-    return Object.keys(iterable)
+        return ρσ_tuple_decorate(ans)
+    return ρσ_tuple_decorate(Object.keys(iterable))
 
 ρσ_tuple_constructor.__name__ = 'tuple'
-v'var tuple = ρσ_tuple_constructor'
+v'var tuple = ρσ_tuple_constructor, tuple_wrap = ρσ_tuple_decorate'
 # }}}
 
 # set {{{

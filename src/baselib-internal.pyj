@@ -311,7 +311,10 @@ def ρσ_arith_type_name(v):
 def ρσ_op_add(a, b):
     if a is not None and jstype(a.__add__) is 'function': return a.__add__(b)
     if b is not None and jstype(b.__radd__) is 'function': return b.__radd__(a)
-    if Array.isArray(a) and Array.isArray(b): return ρσ_list_constructor(a.concat(b))
+    if Array.isArray(a) and Array.isArray(b):
+        if a.ρσ_is_tuple and b.ρσ_is_tuple:
+            return ρσ_tuple_constructor(a.concat(b))
+        return ρσ_list_constructor(a.concat(b))
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a + b'
@@ -339,12 +342,12 @@ def ρσ_op_mul(a, b):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++':
             result = result.concat(a)  # noqa:undef
-        return ρσ_list_constructor(result)
+        return ρσ_tuple_constructor(result) if a.ρσ_is_tuple else ρσ_list_constructor(result)
     if Array.isArray(b) and (ta is 'number' or ta is 'boolean'):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < a; ρσ_mi++':
             result = result.concat(b)  # noqa:undef
-        return ρσ_list_constructor(result)
+        return ρσ_tuple_constructor(result) if b.ρσ_is_tuple else ρσ_list_constructor(result)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a * b
     if ta is 'bigint' and tb is 'bigint': return v'a * b'
     raise TypeError("unsupported operand type(s) for *: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
@@ -508,6 +511,8 @@ def ρσ_op_ge(a, b):
 # NOTE: the fallback uses v'a + b' (verbatim JS) to avoid recursive self-compilation.
 def ρσ_list_add(a, b):
     if Array.isArray(a) and Array.isArray(b):
+        if a.ρσ_is_tuple and b.ρσ_is_tuple:
+            return ρσ_tuple_constructor(a.concat(b))
         return ρσ_list_constructor(a.concat(b))
     if a is not None and a is not undefined and jstype(a.__add__) is 'function':
         return a.__add__(b)
@@ -518,6 +523,8 @@ def ρσ_list_add(a, b):
 # ρσ_list_iadd: used for +=; extends a in-place when both sides are arrays (Python semantics).
 def ρσ_list_iadd(a, b):
     if Array.isArray(a) and Array.isArray(b):
+        if a.ρσ_is_tuple and b.ρσ_is_tuple:
+            return ρσ_tuple_constructor(a.concat(b))
         v'Array.prototype.push.apply(a, b)'
         return a
     if a is not None and a is not undefined and jstype(a.__iadd__) is 'function':
@@ -606,7 +613,10 @@ def ρσ_op_irshift(a, b):
 def ρσ_op_add_ns(a, b):
     if a is not None and jstype(a.__add__) is 'function': return a.__add__(b)
     if b is not None and jstype(b.__radd__) is 'function': return b.__radd__(a)
-    if Array.isArray(a) and Array.isArray(b): return ρσ_list_constructor(a.concat(b))
+    if Array.isArray(a) and Array.isArray(b):
+        if a.ρσ_is_tuple and b.ρσ_is_tuple:
+            return ρσ_tuple_constructor(a.concat(b))
+        return ρσ_list_constructor(a.concat(b))
     return v'a + b'
 
 def ρσ_op_sub_ns(a, b):
@@ -625,12 +635,12 @@ def ρσ_op_mul_ns(a, b):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++':
             result = result.concat(a)  # noqa:undef
-        return ρσ_list_constructor(result)
+        return ρσ_tuple_constructor(result) if a.ρσ_is_tuple else ρσ_list_constructor(result)
     if Array.isArray(b) and (ta is 'number' or ta is 'boolean'):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < a; ρσ_mi++':
             result = result.concat(b)  # noqa:undef
-        return ρσ_list_constructor(result)
+        return ρσ_tuple_constructor(result) if b.ρσ_is_tuple else ρσ_list_constructor(result)
     return v'a * b'
 
 def ρσ_op_truediv_ns(a, b):
@@ -740,9 +750,9 @@ def ρσ_instanceof():
         q = arguments[i]
         if v'obj instanceof q':
             return True
-        if (q is Array or q is ρσ_list_constructor) and Array.isArray(obj):
+        if (q is Array or q is ρσ_list_constructor) and Array.isArray(obj) and obj.ρσ_is_tuple is not True:
             return True
-        if q is ρσ_tuple_constructor and Array.isArray(obj):
+        if q is ρσ_tuple_constructor and Array.isArray(obj) and obj.ρσ_is_tuple is True:
             return True
         if q is ρσ_str and (jstype(obj) is 'string' or v'obj instanceof String'):
             return True
