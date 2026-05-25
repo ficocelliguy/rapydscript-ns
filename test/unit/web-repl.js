@@ -4640,6 +4640,29 @@ var TESTS = [
         },
     },
 
+    // ── Set operators ──────────────────────────────────────────────────────
+    {
+        name: "set_operators_basic",
+        description: "set operators |, &, -, ^, <=, >= work in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "a = {1, 2, 3}",
+                "b = {3, 4, 5}",
+                "assrt.equal(len(a | b), 5)",
+                "assrt.equal(len(a & b), 1)",
+                "assrt.equal(len(a - b), 2)",
+                "assrt.equal(len(a ^ b), 4)",
+                "assrt.equal({1, 2} <= {1, 2, 3}, True)",
+                "assrt.equal({1, 2, 3} >= {1, 2}, True)",
+                "c = {1, 2}",
+                "c |= {3}",
+                "assrt.equal(len(c), 3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     // ── __slots__ ──────────────────────────────────────────────────────────
     {
         name: "slots_basic",

@@ -867,6 +867,30 @@ store any object in a set. For primitive types (strings, numbers) the value is
 used for equality; for class instances, object identity (``is``) is used by
 default unless the class defines a ``__hash__`` method.
 
+Python-style set algebra is supported via the standard operators (with
+`overload_operators`, on by default):
+
+```py
+a = {1, 2, 3}
+b = {2, 3, 4}
+
+a | b   # {1, 2, 3, 4}  union
+a & b   # {2, 3}        intersection
+a - b   # {1}           difference
+a ^ b   # {1, 4}        symmetric difference
+
+a <= b  # False — subset
+a >= b  # False — superset
+a < b   # False — proper subset
+a > b   # False — proper superset
+
+a |= {5}   # in-place mutation (set only; frozenset rebinds to a new value)
+```
+
+Both operands must be a `set` or `frozenset`; mixing a set with a list or other
+type raises `TypeError`, matching CPython. Use the method forms
+(`a.union(iterable)`, etc.) when you want to accept any iterable.
+
 Note that sets are not a subclass of the ES 6 JavaScript Set object, however,
 they do use this object as a backend, when available. You can create a set from
 any enumerable container, like you would in python
@@ -4081,6 +4105,7 @@ Python Feature Coverage
 | `list.sort()` / `sorted()` — `key`, `reverse`, comparators, `__lt__`                                                                                                                                                                                          | `key` and `reverse` keyword arguments both work; a positional **two-argument** function is auto-detected as a comparator (JS-style `.sort((a, b) => …)` / `functools.cmp_to_key` semantics) while a one-argument function is treated as a `key`; custom objects are ordered through their `__lt__` method (with a reflected `__gt__` fallback); the sort is stable, so equal elements keep their original order even under `reverse=True` |
 | `zip(strict=True)`                                                                                                                                                                                                                                            | Raises `ValueError` when iterables have different lengths; equal-length iterables work normally |
 | `set` with full union/intersection/difference API                                                                                                                                                                                                             | Fully supported |
+| Set operators `\|`, `&`, `-`, `^`, `<=`, `>=`, `<`, `>` (and `\|=`, `&=`, `-=`, `^=`)                                                                                                                                                                          | Python-style algebra on `set` / `frozenset`: union (`\|`), intersection (`&`), difference (`-`), symmetric difference (`^`), subset (`<=`), superset (`>=`), proper subset (`<`), proper superset (`>`); in-place forms mutate `set` (frozenset's augmented form creates a new frozenset). Each operator dispatches via the matching dunder (`__or__`, `__and__`, `__sub__`, `__xor__`, `__le__`, `__ge__`, `__lt__`, `__gt__`, plus `__ior__`/`__iand__`/`__isub__`/`__ixor__` on `set`). Both operands must be `set`/`frozenset`; mixed types raise `TypeError` to match CPython. Chained comparisons (`a <= b <= c`) supported. Active via `overload_operators` (on by default). |
 | `isinstance()`, `hasattr()`, `getattr()`, `setattr()`, `dir()`                                                                                                                                                                                                | All work |
 | `bin()`, `hex()`, `oct()`, `chr()`, `ord()`                                                                                                                                                                                                                   | All work |
 | `int(x, base)`, `float(x)` with ValueError on bad input                                                                                                                                                                                                       | Works |

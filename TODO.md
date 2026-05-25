@@ -5,6 +5,23 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [python style string repeat "abc" * 3 ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [python style Set operators `\|`, `&`, `-`, `^`, `<=`, `>=` ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this, and the PYTHON_FEATURE_COVERAGE report. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
+## Example: Set operators
+
+```python
+admins = {'alice', 'bob'}
+editors = {'bob', 'carol', 'dave'}
+
+everyone   = admins | editors           # {'alice', 'bob', 'carol', 'dave'}
+both_roles = admins & editors           # {'bob'}
+admin_only = admins - editors           # {'alice'}
+one_role   = admins ^ editors           # {'alice', 'carol', 'dave'}
+
+assert {'alice'} <= admins              # subset
+assert admins >= {'bob'}                # superset
+
+active = {'alice', 'bob'}
+active |= {'carol'}                     # in-place union
+```

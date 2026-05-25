@@ -537,6 +537,73 @@ Object.defineProperties(ρσ_set.prototype, {
         r = iterator.next()
     return True
 
+# Python set operator dunders. Both operands must be a set or frozenset
+# (recognised by the presence of a `.jsset` backing store); otherwise raise
+# TypeError to match CPython semantics for `|`, `&`, `-`, `^`, `<=`, `>=`.
+ρσ_set.prototype.__or__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for |: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.union(other)
+
+ρσ_set.prototype.__and__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for &: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.intersection(other)
+
+ρσ_set.prototype.__sub__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for -: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.difference(other)
+
+ρσ_set.prototype.__xor__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for ^: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.symmetric_difference(other)
+
+ρσ_set.prototype.__le__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'<=' not supported between instances of 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.issubset(other)
+
+ρσ_set.prototype.__ge__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'>=' not supported between instances of 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.issuperset(other)
+
+ρσ_set.prototype.__lt__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'<' not supported between instances of 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.size < other.size and this.issubset(other)
+
+ρσ_set.prototype.__gt__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'>' not supported between instances of 'set' and '" + ρσ_arith_type_name(other) + "'")
+    return this.size > other.size and this.issuperset(other)
+
+ρσ_set.prototype.__ior__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for |=: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    this.update(other)
+    return this
+
+ρσ_set.prototype.__iand__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for &=: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    this.intersection_update(other)
+    return this
+
+ρσ_set.prototype.__isub__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for -=: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    this.difference_update(other)
+    return this
+
+ρσ_set.prototype.__ixor__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for ^=: 'set' and '" + ρσ_arith_type_name(other) + "'")
+    this.symmetric_difference_update(other)
+    return this
+
 def ρσ_set_wrap(x):
     ans = new ρσ_set()
     ans.jsset = x
@@ -684,6 +751,49 @@ Object.defineProperties(ρσ_frozenset.prototype, {
             return False
         r = iterator.next()
     return True
+
+# Frozenset is immutable, so only the binary operators are supplied; augmented
+# forms (`|=` etc.) fall back through `ρσ_op_i*` to the binary helpers and
+# produce a new frozenset bound to the variable.
+ρσ_frozenset.prototype.__or__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for |: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.union(other)
+
+ρσ_frozenset.prototype.__and__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for &: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.intersection(other)
+
+ρσ_frozenset.prototype.__sub__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for -: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.difference(other)
+
+ρσ_frozenset.prototype.__xor__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("unsupported operand type(s) for ^: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.symmetric_difference(other)
+
+ρσ_frozenset.prototype.__le__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'<=' not supported between instances of 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.issubset(other)
+
+ρσ_frozenset.prototype.__ge__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'>=' not supported between instances of 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.issuperset(other)
+
+ρσ_frozenset.prototype.__lt__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'<' not supported between instances of 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.size < other.size and this.issubset(other)
+
+ρσ_frozenset.prototype.__gt__ = def(other):
+    if v'!other || other.jsset === undefined':
+        raise TypeError("'>' not supported between instances of 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+    return this.size > other.size and this.issuperset(other)
 
 v'var frozenset = ρσ_frozenset'
 # }}}

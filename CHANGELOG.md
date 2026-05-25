@@ -1,5 +1,6 @@
 version 0.9.6
 =======================
+* Added support for Python-style set operators on `set` and `frozenset`: `|` (union), `&` (intersection), `-` (difference), `^` (symmetric difference), `<=` (subset), `>=` (superset), `<` (proper subset), `>` (proper superset); in-place forms `|=`, `&=`, `-=`, `^=` mutate `set` in place. Both operands must be a set/frozenset, otherwise `TypeError` is raised, matching CPython.
 * Added support for string repeat with `*` operator (e.g. `'ab' * 3`, `5 * '-'`), negative counts return empty string
 * Added broader JavaScript library type hints in the language service (completions, hover, and diagnostics for browser/DOM globals via `.d.ts` parsing)
 * Fix: Invalid dictionary iteration now raises `ValueError` when tuple-unpacking string keys (e.g. `for k, v in d:` without `.items()`)

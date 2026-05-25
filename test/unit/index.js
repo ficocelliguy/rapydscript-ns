@@ -5748,6 +5748,284 @@ assrt.equal(fib(15), 610)
         ].join("\n"),
     },
 
+    // ── Set operators ─────────────────────────────────────────────────────────
+
+    {
+        name: "set_op_union",
+        description: "| on two sets compiles to ρσ_op_or and returns the union",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3}",
+            "b = {3, 4, 5}",
+            "c = a | b",
+            "assrt.ok(isinstance(c, set))",
+            "assrt.equal(len(c), 5)",
+            "for x in [1, 2, 3, 4, 5]:",
+            "    assrt.ok(c.has(x))",
+            "# originals not mutated",
+            "assrt.equal(len(a), 3)",
+            "assrt.equal(len(b), 3)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_or("],
+    },
+
+    {
+        name: "set_op_intersection",
+        description: "& on two sets compiles to ρσ_op_and and returns the intersection",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3, 4}",
+            "b = {3, 4, 5}",
+            "c = a & b",
+            "assrt.ok(isinstance(c, set))",
+            "assrt.equal(len(c), 2)",
+            "assrt.ok(c.has(3))",
+            "assrt.ok(c.has(4))",
+            "assrt.ok(not c.has(1))",
+        ].join("\n"),
+        js_checks: ["ρσ_op_and("],
+    },
+
+    {
+        name: "set_op_difference",
+        description: "- on two sets compiles to ρσ_op_sub and returns the difference",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3, 4}",
+            "b = {3, 4, 5}",
+            "c = a - b",
+            "assrt.ok(isinstance(c, set))",
+            "assrt.equal(len(c), 2)",
+            "assrt.ok(c.has(1))",
+            "assrt.ok(c.has(2))",
+            "assrt.ok(not c.has(3))",
+        ].join("\n"),
+        js_checks: ["ρσ_op_sub("],
+    },
+
+    {
+        name: "set_op_symmetric_difference",
+        description: "^ on two sets compiles to ρσ_op_xor and returns the symmetric difference",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3}",
+            "b = {3, 4, 5}",
+            "c = a ^ b",
+            "assrt.ok(isinstance(c, set))",
+            "assrt.equal(len(c), 4)",
+            "for x in [1, 2, 4, 5]:",
+            "    assrt.ok(c.has(x))",
+            "assrt.ok(not c.has(3))",
+        ].join("\n"),
+        js_checks: ["ρσ_op_xor("],
+    },
+
+    {
+        name: "set_op_subset",
+        description: "<= on two sets tests subset",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2}",
+            "b = {1, 2, 3}",
+            "assrt.equal(a <= b, True)",
+            "assrt.equal(b <= a, False)",
+            "assrt.equal(a <= a, True)  # reflexive",
+            "empty = set()",
+            "assrt.equal(empty <= b, True)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_le("],
+    },
+
+    {
+        name: "set_op_superset",
+        description: ">= on two sets tests superset",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3}",
+            "b = {1, 2}",
+            "assrt.equal(a >= b, True)",
+            "assrt.equal(b >= a, False)",
+            "assrt.equal(a >= a, True)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_ge("],
+    },
+
+    {
+        name: "set_op_proper_subset",
+        description: "< on two sets tests proper subset",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2}",
+            "b = {1, 2, 3}",
+            "assrt.equal(a < b, True)",
+            "assrt.equal(b < a, False)",
+            "# reflexive case is False for proper subset",
+            "assrt.equal(a < a, False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "set_op_proper_superset",
+        description: "> on two sets tests proper superset",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3}",
+            "b = {1, 2}",
+            "assrt.equal(a > b, True)",
+            "assrt.equal(b > a, False)",
+            "assrt.equal(a > a, False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "set_op_ior_mutates",
+        description: "|= on a set mutates it in place",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2}",
+            "ref = a",
+            "a |= {3, 4}",
+            "assrt.equal(len(a), 4)",
+            "# in-place mutation: ref still points at the same set",
+            "assrt.ok(a is ref)",
+            "assrt.equal(len(ref), 4)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_ior("],
+    },
+
+    {
+        name: "set_op_iand_mutates",
+        description: "&= on a set keeps only common elements",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3, 4}",
+            "ref = a",
+            "a &= {3, 4, 5}",
+            "assrt.equal(len(a), 2)",
+            "assrt.ok(a.has(3))",
+            "assrt.ok(a.has(4))",
+            "assrt.ok(a is ref)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_iand("],
+    },
+
+    {
+        name: "set_op_isub_mutates",
+        description: "-= on a set removes elements from it",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3, 4}",
+            "ref = a",
+            "a -= {2, 3}",
+            "assrt.equal(len(a), 2)",
+            "assrt.ok(a.has(1))",
+            "assrt.ok(a.has(4))",
+            "assrt.ok(a is ref)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_isub("],
+    },
+
+    {
+        name: "set_op_ixor_mutates",
+        description: "^= on a set keeps only elements in exactly one operand",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3}",
+            "ref = a",
+            "a ^= {3, 4, 5}",
+            "assrt.equal(len(a), 4)",
+            "for x in [1, 2, 4, 5]:",
+            "    assrt.ok(a.has(x))",
+            "assrt.ok(not a.has(3))",
+            "assrt.ok(a is ref)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_ixor("],
+    },
+
+    {
+        name: "set_op_chained_subset",
+        description: "chained subset comparison: a <= b <= c",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1}",
+            "b = {1, 2}",
+            "c = {1, 2, 3}",
+            "assrt.equal(a <= b <= c, True)",
+            "assrt.equal(c <= b <= a, False)",
+        ].join("\n"),
+    },
+
+    {
+        name: "set_op_frozenset_union",
+        description: "| on two frozensets returns a frozenset",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = frozenset([1, 2, 3])",
+            "b = frozenset([3, 4])",
+            "c = a | b",
+            "assrt.ok(isinstance(c, frozenset))",
+            "assrt.equal(len(c), 4)",
+        ].join("\n"),
+    },
+
+    {
+        name: "set_op_frozenset_subset_comparisons",
+        description: "<=, >=, <, > work on frozensets",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = frozenset([1, 2])",
+            "b = frozenset([1, 2, 3])",
+            "assrt.equal(a <= b, True)",
+            "assrt.equal(b >= a, True)",
+            "assrt.equal(a < b, True)",
+            "assrt.equal(b > a, True)",
+        ].join("\n"),
+    },
+
+    {
+        name: "set_op_typeerror_on_nonset",
+        description: "set operators against a non-set raise TypeError",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "a = {1, 2, 3}",
+            "assrt.throws(def(): a | [1, 2];, /unsupported operand/)",
+            "assrt.throws(def(): a & [1, 2];, /unsupported operand/)",
+            "assrt.throws(def(): a - [1, 2];, /unsupported operand/)",
+            "assrt.throws(def(): a ^ [1, 2];, /unsupported operand/)",
+        ].join("\n"),
+    },
+
+    {
+        name: "set_op_bitwise_numbers_still_work",
+        description: "bitwise |, &, ^ on numbers continue to work alongside set ops",
+        src: [
+            "from __python__ import overload_operators",
+            "# globals: assrt",
+            "assrt.equal(5 | 3, 7)",
+            "assrt.equal(5 & 3, 1)",
+            "assrt.equal(5 ^ 3, 6)",
+            "assrt.equal(5 - 3, 2)",
+            "assrt.equal(2 <= 3, True)",
+            "assrt.equal(3 >= 2, True)",
+        ].join("\n"),
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

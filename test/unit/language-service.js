@@ -1420,6 +1420,49 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── Set operators ────────────────────────────────────────────────────
+
+        {
+            name: "set_operators_no_errors",
+            description: "binary set operators |, &, -, ^, <=, >=, <, > on set literals produce no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "a = {1, 2, 3}",
+                    "b = {2, 3, 4}",
+                    "u = a | b",
+                    "i = a & b",
+                    "d = a - b",
+                    "s = a ^ b",
+                    "le = a <= b",
+                    "ge = a >= b",
+                    "lt = a < b",
+                    "gt = a > b",
+                    "print(u, i, d, s, le, ge, lt, gt)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "set_augmented_operators_no_errors",
+            description: "augmented set operators |=, &=, -=, ^= produce no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "a = {1, 2, 3}",
+                    "a |= {4, 5}",
+                    "a &= {1, 4}",
+                    "a -= {1}",
+                    "a ^= {7, 8}",
+                    "print(a)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
         // ── str.expandtabs language-service tests ─────────────────────────
 
         {

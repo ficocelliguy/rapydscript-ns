@@ -149,40 +149,7 @@ Python's `Ellipsis` singleton object. Code that stores `...` in containers or ch
 
 ---
 
-### 2.7 Set Operators (`|`, `&`, `-`, `^`) Not Supported
-
-The four core set algebra operators raise `TypeError` at runtime when applied to sets.
-The compiler routes them through `ρσ_op_or` / `ρσ_op_and` / `ρσ_op_sub` / `ρσ_op_xor`,
-but those helpers do not recognize `ρσ_set` instances. The same is true of the subset /
-superset comparison operators `<=`, `>=`, `<`, `>`.
-
-```python
-a, b = {1, 2, 3}, {2, 3, 4}
-a | b          # TypeError: unsupported operand type(s) for |: 'set' and 'set'
-a & b          # TypeError
-a - b          # TypeError
-a ^ b          # TypeError
-a <= b         # does not test subset
-```
-
-**Workaround:** Use the method forms, which work correctly:
-
-```python
-a.union(b)                  # for |
-a.intersection(b)           # for &
-a.difference(b)             # for -
-a.symmetric_difference(b)   # for ^
-a.issubset(b)               # for <=
-a.issuperset(b)             # for >=
-```
-
-**Impact:** This is the most jarring single-operator gap — the Python idiom
-`combined = set_a | set_b` is pervasive and reads naturally to anyone who knows the
-language. Fix would be to extend the `ρσ_op_*` helpers to dispatch on `ρσ_set`.
-
----
-
-### 2.8 `%` String Formatting (`"%s" % val`)
+### 2.7 `%` String Formatting (`"%s" % val`)
 
 Legacy printf-style string formatting raises `TypeError`. `ρσ_op_mod` treats `%` as
 numeric modulo only — using it with a string left operand fails regardless of the
@@ -208,7 +175,7 @@ formatting is still common in older codebases and in logging idioms
 
 ---
 
-### 2.9 `@` Matrix Multiplication Operator (`__matmul__`)
+### 2.8 `@` Matrix Multiplication Operator (`__matmul__`)
 
 Python 3.5+ uses `@` for matrix multiplication and dispatches to `__matmul__` /
 `__rmatmul__` / `__imatmul__`. The RapydScript parser does not accept `@` as a binary
@@ -221,7 +188,7 @@ network demos, computational geometry).
 
 ---
 
-### 2.10 `oct()` Builtin
+### 2.9 `oct()` Builtin
 
 `hex()` and `bin()` are provided, but `oct()` is not. Octal literals (`0o755`) parse and
 evaluate correctly; only the conversion function is missing.
@@ -236,7 +203,7 @@ oct(8)     # ReferenceError: oct is not defined
 
 ---
 
-### 2.11 `tuple` Is Not a Distinct Type at Runtime
+### 2.10 `tuple` Is Not a Distinct Type at Runtime
 
 `tuple(iterable)` returns a plain JS array — there is no wrapping constructor with
 tuple-specific methods. Consequences:
@@ -257,7 +224,7 @@ from Python.
 
 ---
 
-### 2.12 `bytes`, `bytearray`, `memoryview`
+### 2.11 `bytes`, `bytearray`, `memoryview`
 
 None of `bytes`, `bytearray`, or `memoryview` exist. Bytes literals (`b'abc'`) are not
 parsed. The closest browser-native equivalents — `Uint8Array`, `ArrayBuffer`, `DataView` —
@@ -453,7 +420,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| High | Set operators `\|`, `&`, `-`, `^`, `<=`, `>=` | Low | Pervasive Python idiom; affects every set-using program |
 | High | `bytes` / `bytearray` shim over `Uint8Array` | Medium | All binary browser APIs (fetch, WebGL, WebRTC, crypto) |
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
 | Medium | `%` string formatting | Low | Porting friction; logging idioms |
