@@ -195,6 +195,52 @@ function _builtin_to_item(stub, range, monacoKind) {
 }
 
 /**
+ * Build a Monaco CompletionItem from a DTS TypeInfo global (var/function/class/interface/namespace).
+ * Used for identifier completion of names that come from a .d.ts file rather than
+ * from BASE_BUILTINS or BuiltinsRegistry — surfaces the declared type / signature
+ * so users see e.g. `(var) navigator: Navigator` instead of a bare variable.
+ *
+ * @param {import('./dts.js').TypeInfo} ti
+ * @param {object} range
+ * @param {object} monacoKind
+ * @returns {object}
+ */
+function _dts_global_to_item(ti, range, monacoKind) {
+    let kind;
+    switch (ti.kind) {
+        case 'function':  kind = monacoKind.Function; break;
+        case 'class':     kind = monacoKind.Class;    break;
+        case 'interface': kind = monacoKind.Interface !== undefined ? monacoKind.Interface : monacoKind.Class; break;
+        case 'namespace': kind = monacoKind.Module    !== undefined ? monacoKind.Module    : monacoKind.Variable; break;
+        default:          kind = monacoKind.Variable;
+    }
+    let detail = ti.kind;
+    if (ti.kind === 'function' && ti.params) {
+        const ps = ti.params.map(function (p) {
+            let s = p.rest ? '...' : '';
+            s += p.name;
+            if (p.optional) s += '?';
+            return s;
+        }).join(', ');
+        detail = '(' + ps + ')';
+        if (ti.return_type && ti.return_type !== 'void') {
+            detail += ': ' + ti.return_type;
+        }
+    } else if (ti.kind === 'var' && ti.return_type) {
+        detail = ti.return_type;
+    }
+    return {
+        label:         ti.name,
+        kind,
+        detail,
+        documentation: ti.doc || undefined,
+        sortText:      '2_' + ti.name,
+        insertText:    ti.name,
+        range,
+    };
+}
+
+/**
  * Build a Monaco CompletionItem from a DTS TypeInfo member (method or property).
  * @param {import('./dts.js').TypeInfo} member
  * @param {object} range
@@ -326,15 +372,24 @@ export class CompletionEngine {
             }
         }
 
-        // Builtins (lower priority) — use rich stub item when available
+        // Builtins (lower priority) — use rich stub item when available, then
+        // fall back to a DTS-aware item (so DTS-declared globals like
+        // `declare var navigator: Navigator` show as `(var) navigator: Navigator`
+        // rather than as a bare variable). Plain name items are the last resort.
         for (const name of this._builtinNames) {
             if (!seen.has(name) && (!ctx.prefix || name.startsWith(ctx.prefix))) {
                 seen.add(name);
                 const stub = this._builtins ? this._builtins.get(name) : null;
-                items.push(stub
-                    ? _builtin_to_item(stub, range, monacoKind)
-                    : name_to_item(name, range, monacoKind)
-                );
+                if (stub) {
+                    items.push(_builtin_to_item(stub, range, monacoKind));
+                    continue;
+                }
+                const dts_ti = this._dts ? this._dts.getGlobal(name) : null;
+                if (dts_ti) {
+                    items.push(_dts_global_to_item(dts_ti, range, monacoKind));
+                    continue;
+                }
+                items.push(name_to_item(name, range, monacoKind));
             }
         }
 

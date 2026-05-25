@@ -22,6 +22,7 @@ import { SignatureHelpEngine }        from './signature.js';
 import { HoverEngine }               from './hover.js';
 import { DtsRegistry }               from './dts.js';
 import { BuiltinsRegistry }          from './builtins.js';
+import { JS_GLOBALS_DTS }            from './js-globals-dts.js';
 
 const LANGUAGE_ID = 'rapydscript';
 
@@ -115,8 +116,13 @@ class RapydScriptLanguageService {
         this._extraBuiltinNames = options.extraBuiltins || [];
         this._stdlibFiles = Object.assign({}, options.stdlibFiles || {});
 
-        // DTS registry — load any files supplied at construction time
+        // DTS registry — preload the built-in JS / browser globals first so
+        // user-supplied dtsFiles can override any of them, then load whatever
+        // the caller supplied at construction time.
         this._dts = new DtsRegistry();
+        if (!options.disableJsGlobals) {
+            this._dts.addDts('js-globals', JS_GLOBALS_DTS);
+        }
         if (options.dtsFiles) {
             options.dtsFiles.forEach(f => this._dts.addDts(f.name, f.content));
         }
@@ -400,6 +406,7 @@ class RapydScriptLanguageService {
  * @param {number} [options.parseDelay=300]  - debounce ms
  * @param {string[]} [options.extraBuiltins] - extra global names to suppress undef warnings
  * @param {string} [options.pythonFlags]     - comma-separated python flags (e.g. "dict_literals,overload_getitem")
+ * @param {boolean} [options.disableJsGlobals=false] - skip the built-in d.ts for browser/JS globals (navigator, window, document, console, Math, JSON, …)
  * @returns {RapydScriptLanguageService}
  */
 export function registerRapydScript(monaco, options) {

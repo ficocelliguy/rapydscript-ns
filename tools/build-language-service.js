@@ -36,6 +36,7 @@ var FILES = [
     "signature.js",    // no internal deps
     "dts.js",          // no internal deps
     "builtins.js",     // no internal deps
+    "js-globals-dts.js", // no internal deps (exports a d.ts string constant)
     "hover.js",        // imports from dts.js, builtins.js (type refs only)
     "index.js",        // imports from all above
 ];
@@ -137,8 +138,8 @@ FILES.forEach(function (file) {
         // 1. Remove import lines (all resolved by concatenation order).
         //    Handles both single-line imports, including those with extra whitespace.
         .replace(/^import\s+\{[^}]*\}\s+from\s+['"][^'"]+['"]\s*;?\r?\n/gm, "")
-        // 2. Strip the `export` keyword from inline class/function declarations.
-        .replace(/^export\s+((?:class|function)\s)/gm, "$1")
+        // 2. Strip the `export` keyword from inline class/function/const/let/var declarations.
+        .replace(/^export\s+((?:class|function|const|let|var)\s)/gm, "$1")
         // 3. Remove any bare `export { ... };` blocks left over.
         .replace(/^export\s+\{[^}]*\}\s*;?\r?\n/gm, "")
         // 4. In index.js: make options.compiler optional — fall back to the
