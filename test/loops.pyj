@@ -83,3 +83,45 @@ dest = []
 for al in 'a', 'b', 'c':
     dest.push(al)
 assrt.equal(dest.join(''), 'abc')
+
+# Tuple-unpacking iteration over a dict (forgot .items()) must raise
+# instead of silently iterating per character of each key.
+def bad_dict_unpack():
+    d = {'apple': 1, 'banana': 2}
+    for k, v in d:
+        pass
+
+assrt.throws(bad_dict_unpack, ValueError)
+
+# Tuple-unpacking iteration over a string must also raise.
+def bad_string_unpack():
+    for a, b in 'hello':
+        pass
+
+assrt.throws(bad_string_unpack, ValueError)
+
+# Plain key iteration over a dict still works.
+d = {'apple': 1, 'banana': 2}
+keys_out = []
+for k in d:
+    keys_out.push(k)
+keys_out.sort()
+assrt.deepEqual(keys_out, ['apple', 'banana'])
+
+# List comprehension with tuple unpack over a dict should also raise.
+def bad_dict_unpack_comp():
+    d = {'apple': 1}
+    return [k for k, v in d]
+
+assrt.throws(bad_dict_unpack_comp, ValueError)
+
+# Iterating over a list of pairs still works (regression check).
+pairs = [['a', 1], ['b', 2]]
+out = []
+for k, v in pairs:
+    out.push(k + ':' + v)
+assrt.deepEqual(out, ['a:1', 'b:2'])
+
+# List comprehension over list of pairs still works.
+comp = [k + ':' + v for k, v in pairs]
+assrt.deepEqual(comp, ['a:1', 'b:2'])

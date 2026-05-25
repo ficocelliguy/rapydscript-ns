@@ -68,6 +68,16 @@ def ρσ_unpack_asarray(num, iterable):
             result = iterator.next()
     return ans
 
+def ρσ_unpack_iter_check(value):
+    # Raised when a for-loop tuple-unpacks a value that is a string. In Python,
+    # iterating a dict yields its keys (strings); writing `for k, v in d:`
+    # then tries to unpack each key character-by-character and raises
+    # ValueError. JS strings are array-like, so without this check the
+    # unpack silently succeeds with `k`/`v` set to individual characters.
+    if jstype(value) is 'string' or v'value instanceof String':
+        raise ValueError("cannot unpack string '" + value + "' into multiple values (did you mean to call .items() on a dict?)")
+    return value
+
 def ρσ_unpack_starred_asarray(iterable):
     if jstype(iterable) is 'string' or v'iterable instanceof String':
         return iterable.split('')

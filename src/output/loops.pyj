@@ -130,9 +130,9 @@ def print_for_loop_body(output):
                 flat = self.init.flatten()
                 output.assign("ρσ_unpack")
                 if flat.length > self.init.elements.length:
-                    output.print('ρσ_flatten(' + itervar + ')')
+                    output.print('ρσ_flatten(ρσ_unpack_iter_check(' + itervar + '))')
                 else:
-                    output.print(itervar)
+                    output.print('ρσ_unpack_iter_check(' + itervar + ')')
                 output.end_statement()
                 unpack_tuple(flat, output)
             else:
@@ -414,9 +414,9 @@ def print_list_comprehension(self, output):
                 flat = init_node.flatten()
                 body_out.assign("ρσ_unpack")
                 if flat.length > init_node.elements.length:
-                    body_out.print('ρσ_flatten(' + itervar_expr + ')')
+                    body_out.print('ρσ_flatten(ρσ_unpack_iter_check(' + itervar_expr + '))')
                 else:
-                    body_out.print(itervar_expr)
+                    body_out.print('ρσ_unpack_iter_check(' + itervar_expr + ')')
                 body_out.end_statement()
                 unpack_tuple(flat, body_out)
             else:

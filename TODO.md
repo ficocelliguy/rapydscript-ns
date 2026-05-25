@@ -1,4 +1,6 @@
 
+navigator type hints
+
 - remove repl_mode and make repl make a new context for each "run" press
 
 - vscode plugin based on language service?
