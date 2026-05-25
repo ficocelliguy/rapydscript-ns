@@ -1790,6 +1790,78 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── bytes / bytearray ─────────────────────────────────────────────
+        {
+            name: "bytes_no_errors",
+            description: "bytes() constructor and methods produce no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "b = bytes([72, 101, 108, 108, 111])",
+                    "n = len(b)",
+                    "first = b[0]",
+                    "s = b[1:4]",
+                    "h = b.hex()",
+                    "d = b.decode('utf-8')",
+                    "ok = isinstance(b, bytes)",
+                    "b2 = bytes.fromhex('48656c6c6f')",
+                    "print(n, first, s, h, d, ok, b2)",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for bytes usage, got: " + JSON.stringify(markers));
+            },
+        },
+        {
+            name: "bytearray_no_errors",
+            description: "bytearray() constructor and mutation methods produce no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "ba = bytearray([1, 2, 3])",
+                    "ba.append(4)",
+                    "ba.extend([5, 6])",
+                    "ba.insert(0, 0)",
+                    "v = ba.pop()",
+                    "ba.reverse()",
+                    "ok = isinstance(ba, bytearray)",
+                    "print(ba, v, ok)",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for bytearray usage, got: " + JSON.stringify(markers));
+            },
+        },
+        {
+            name: "bytes_literal_no_errors",
+            description: "b'...' literal syntax produces no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "b1 = b'Hello'",
+                    "b2 = b'\\x00\\xff'",
+                    "b3 = b'foo' b'bar'",
+                    "b4 = B'ABC'",
+                    "b5 = rb'\\n\\t'",
+                    "print(b1, b2, b3, b4, b5)",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for bytes literal usage, got: " + JSON.stringify(markers));
+            },
+        },
+        {
+            name: "bytes_annotation_no_undef",
+            description: "bytes/bytearray used as type annotations are not flagged as undefined",
+            run: function () {
+                var markers = d().check([
+                    "def encode(data: bytes) -> bytes:",
+                    "    return data",
+                    "def mutate(ba: bytearray) -> bytearray:",
+                    "    return ba",
+                    "x: bytes = bytes([1, 2, 3])",
+                    "y: bytearray = bytearray([1, 2])",
+                    "print(encode(x), mutate(y))",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for bytes annotations, got: " + JSON.stringify(markers));
+            },
+        },
+
     ];
 
     return TESTS;

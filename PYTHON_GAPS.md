@@ -224,28 +224,14 @@ from Python.
 
 ---
 
-### 2.11 `bytes`, `bytearray`, `memoryview`
+### 2.11 `memoryview`
 
-None of `bytes`, `bytearray`, or `memoryview` exist. Bytes literals (`b'abc'`) are not
-parsed. The closest browser-native equivalents — `Uint8Array`, `ArrayBuffer`, `DataView` —
-must be used directly via JS interop with non-Pythonic ergonomics.
+`memoryview` does not exist. `bytes` and `bytearray` are supported, but the zero-copy
+buffer-protocol view that `memoryview` provides over them has no RapydScript equivalent —
+slicing a `bytes` always allocates a new object.
 
-```python
-data = b'\x00\x01\x02'        # syntax error
-buf = bytearray(10)           # NameError
-buf.hex()                     # — no .hex() method on Uint8Array
-"hello".encode()              # NameError on str
-b'data'.decode('utf-8')       # no such literal
-```
-
-**Browser relevance:** **High.** Binary data is everywhere in modern browser APIs:
-Web Audio buffers, WebGL textures, WebRTC datachannels, `fetch().arrayBuffer()`,
-`FileReader.readAsArrayBuffer`, IndexedDB blobs, Web Crypto inputs/outputs, WebSocket
-binary frames. Anyone porting a Python protocol parser or binary-format library to the
-browser hits this gap immediately.
-
-A `bytes`/`bytearray` shim over `Uint8Array` with Python-style `.hex()`, `.decode()`,
-`.fromhex()`, and slice semantics would close a significant gap with modest effort.
+**Browser relevance:** Low–medium. The common pattern of "share a byte range without
+copying" can usually be expressed with `Uint8Array` subarrays via JS interop.
 
 ---
 
@@ -420,7 +406,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| High | `bytes` / `bytearray` shim over `Uint8Array` | Medium | All binary browser APIs (fetch, WebGL, WebRTC, crypto) |
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
 | Medium | `%` string formatting | Low | Porting friction; logging idioms |
 | Medium | `@` matmul + `__matmul__` dunder | Medium | DSL hospitality (graphics, math libraries) |
