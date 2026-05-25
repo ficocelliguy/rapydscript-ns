@@ -364,7 +364,11 @@ def print_binary_op(self, output):
         self.right.print(output)
         output.print(')')
     elif self.operator is '*' and is_node_type(self.left, AST_String):
-        self.left.print(output), output.print('.repeat('), self.right.print(output), output.print(')')
+        # Python-style string repetition: clamp negative counts to 0 (Python returns '' for negatives;
+        # JS String.prototype.repeat throws RangeError).
+        self.left.print(output), output.print('.repeat(Math.max(0,'), self.right.print(output), output.print('))')
+    elif self.operator is '*' and is_node_type(self.right, AST_String):
+        self.right.print(output), output.print('.repeat(Math.max(0,'), self.left.print(output), output.print('))')
     elif self.operator is '===' or self.operator is '!==':
         nan_check = None
         if is_node_type(self.right, AST_Symbol) and self.right.name is 'NaN':

@@ -2868,6 +2868,48 @@ var TESTS = [
     },
 
     {
+        name: "bundle_string_repeat",
+        description: "Python-style string repetition with * operator works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                // Literal × int (compile-time fast-path)
+                "assrt.equal('abc' * 3, 'abcabcabc')",
+                "assrt.equal('ab' * 0, '')",
+                "assrt.equal('ab' * -5, '')",
+                // int × literal (compile-time fast-path)
+                "assrt.equal(3 * 'abc', 'abcabcabc')",
+                "assrt.equal(0 * 'abc', '')",
+                "assrt.equal(-2 * 'abc', '')",
+                // Variable × int (runtime ρσ_op_mul dispatch)
+                "s = 'ha'",
+                "assrt.equal(s * 3, 'hahaha')",
+                "assrt.equal(s * 0, '')",
+                "assrt.equal(s * -1, '')",
+                // int × variable
+                "n = 4",
+                "assrt.equal(n * 'z', 'zzzz')",
+                "assrt.equal('z' * n, 'zzzz')",
+                // Bool treated as int
+                "assrt.equal('x' * True, 'x')",
+                "assrt.equal('x' * False, '')",
+                // Augmented assignment
+                "t = 'go'",
+                "t *= 3",
+                "assrt.equal(t, 'gogogo')",
+                "u = 'y'",
+                "u *= -5",
+                "assrt.equal(u, '')",
+                // Inside expressions
+                "assrt.equal('-' * 5 + '+', '-----+')",
+                // Unicode
+                "assrt.equal('π' * 3, 'πππ')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "repl_exists_persistence",
         description: "ρσ_exists accessible after baselib init — existential operator on non-SymbolRef in web-repl context",
         run: function () {

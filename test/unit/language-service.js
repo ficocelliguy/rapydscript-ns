@@ -116,6 +116,29 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        {
+            name: "string_repeat_clean",
+            description: "Python-style string repetition (str * n) parses cleanly in the language service",
+            run: function () {
+                var markers = d().check([
+                    "a = 'abc' * 3",
+                    "b = 3 * 'abc'",
+                    "c = 'x' * 0",
+                    "d = 'x' * -2",
+                    "s = 'ha'",
+                    "e = s * 3",
+                    "n = 4",
+                    "f = 'z' * n",
+                    "g = n * 'z'",
+                    "t = 'go'",
+                    "t *= 3",
+                    "print(a, b, c, d, e, f, g, t)",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers but got: " + JSON.stringify(markers));
+            },
+        },
+
         // ── Syntax errors ─────────────────────────────────────────────────
 
         {

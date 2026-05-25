@@ -1,0 +1,117 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# string_repeat.pyj
+# Tests for Python-style string repetition: "abc" * 3 → "abcabcabc"
+#
+# Top-level tests use string-literal operands so the compile-time fast-path
+# (.repeat(Math.max(0, n))) is exercised without overload_operators.
+# Variable-operand tests run inside a function that enables overload_operators
+# so the runtime ρσ_op_mul helper is exercised.
+
+ae = assrt.equal
+ok = assrt.ok
+
+# ── 1. Basic literal × positive int ───────────────────────────────────────────
+
+ae("abc" * 3,   "abcabcabc")
+ae("ab" * 5,    "ababababab")
+ae("x" * 10,    "xxxxxxxxxx")
+ae("" * 100,    "")
+
+# ── 2. Reversed direction: int × string literal ───────────────────────────────
+
+ae(3 * "abc",   "abcabcabc")
+ae(5 * "ab",    "ababababab")
+ae(0 * "abc",   "")
+
+# ── 3. Zero and negative counts (Python semantics → empty string) ─────────────
+
+ae("abc" * 0,   "")
+ae("abc" * -1,  "")
+ae("abc" * -100, "")
+ae(-3 * "abc",  "")
+
+# ── 4. Multiplier of 1 returns the original ───────────────────────────────────
+
+ae("abc" * 1, "abc")
+ae(1 * "abc", "abc")
+
+# ── 5. Bool treated as int (True → 1, False → 0) ──────────────────────────────
+
+ae("x" * True,  "x")
+ae("x" * False, "")
+ae(True * "ha", "ha")
+ae(False * "ha", "")
+
+# ── 6. Result type is string ──────────────────────────────────────────────────
+
+ok(jstype("abc" * 3) is "string")
+ok(jstype(3 * "abc") is "string")
+
+# ── 7. Special characters / unicode ───────────────────────────────────────────
+
+ae("=*" * 3, "=*=*=*")
+ae("\n" * 4, "\n\n\n\n")
+ae("π" * 3, "πππ")
+
+# ── 8. Inside expressions ─────────────────────────────────────────────────────
+
+ae("-" * 5 + "+", "-----+")
+ae("[" + "ab" * 2 + "]", "[abab]")
+ae(("a" * 2) + ("b" * 3), "aabbb")
+
+# ── 9. Variable operands (require overload_operators) ─────────────────────────
+
+def _test_variable_operands():
+    from __python__ import overload_operators
+
+    s = "ab"
+    ae(s * 3, "ababab")
+    ae(s * 0, "")
+    ae(s * -2, "")
+
+    n = 4
+    ae("z" * n, "zzzz")
+    ae(n * "z", "zzzz")
+
+    # Both operands as variables
+    a = "go"
+    k = 3
+    ae(a * k, "gogogo")
+    ae(k * a, "gogogo")
+
+    # Augmented assignment
+    t = "go"
+    t *= 3
+    ae(t, "gogogo")
+
+    u = "x"
+    u *= 0
+    ae(u, "")
+
+    v = "y"
+    v *= -5
+    ae(v, "")
+
+_test_variable_operands()
+
+# ── 10. With expression operands (overload_operators needed for non-literal LHS) ─
+
+def get_count():
+    return 3
+
+# LHS is literal → compile-time fast-path; RHS is a call expression.
+ae("ab" * get_count(), "ababab")
+ae(get_count() * "ab", "ababab")
+
+def _test_expression_operands():
+    from __python__ import overload_operators
+
+    def get_str():
+        return "xy"
+
+    ae(get_str() * 2, "xyxy")
+    ae(2 * get_str(), "xyxy")
+
+_test_expression_operands()

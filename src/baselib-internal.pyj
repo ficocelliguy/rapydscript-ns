@@ -323,8 +323,8 @@ def ρσ_op_mul(a, b):
     if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
     ta = jstype(a)
     tb = jstype(b)
-    if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(b)
-    if (tb is 'string' or v'b instanceof String') and (ta is 'number' or ta is 'boolean'): return b.repeat(a)
+    if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(Math.max(0, b))
+    if (tb is 'string' or v'b instanceof String') and (ta is 'number' or ta is 'boolean'): return b.repeat(Math.max(0, a))
     if Array.isArray(a) and (tb is 'number' or tb is 'boolean'):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++':
@@ -607,8 +607,8 @@ def ρσ_op_mul_ns(a, b):
     if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
     ta = jstype(a)
     tb = jstype(b)
-    if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(b)
-    if (tb is 'string' or v'b instanceof String') and (ta is 'number' or ta is 'boolean'): return b.repeat(a)
+    if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(Math.max(0, b))
+    if (tb is 'string' or v'b instanceof String') and (ta is 'number' or ta is 'boolean'): return b.repeat(Math.max(0, a))
     if Array.isArray(a) and (tb is 'number' or tb is 'boolean'):
         result = v'[]'
         for v'var ρσ_mi = 0; ρσ_mi < b; ρσ_mi++':

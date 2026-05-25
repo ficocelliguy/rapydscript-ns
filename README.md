@@ -1121,14 +1121,22 @@ When ``overload_operators`` is
 disabled (``from __python__ import no_overload_operators``) the operators
 compile directly to JavaScript and no type checking is performed.
 
-When `overload_operators` is active, string and list repetition with `*` works just like Python:
+String and list repetition with `*` works just like Python:
 
 ```py
 'ha' * 3      # 'hahaha'
 3 * 'ha'      # 'hahaha'
+'ab' * 0      # ''
+'ab' * -2     # ''      (negative counts clamp to 0, matching Python)
 [0] * 4       # [0, 0, 0, 0]
 [1, 2] * 2    # [1, 2, 1, 2]
 ```
+
+When either operand is a string literal, the compiler emits a direct
+`s.repeat(Math.max(0, n))` and string repetition works regardless of
+`overload_operators`.  Variable-operand cases such as `s * 3` (where
+`s` is bound at runtime) and list repetition require `overload_operators`
+(on by default) to dispatch through `ρσ_op_mul`.
 
 Because the dispatch adds one or two property lookups per operation, you can
 disable it in scopes where it is not needed with
@@ -4041,7 +4049,7 @@ Python Feature Coverage
 | `str.removeprefix(prefix)`                                                                                                                                                                                                                                    | Returns unchanged string if prefix not found |
 | `str.removesuffix(suffix)`                                                                                                                                                                                                                                    | Returns unchanged string if suffix not found |
 | `str.expandtabs(tabsize=8)`                                                                                                                                                                                                                                   | Replaces `\t` with spaces to the next tab stop; `\n`/`\r` reset the column counter; `tabsize=0` removes all tabs; available as an instance method on any string (via the default `pythonize_strings` patch) |
-| `str * n` string repetition                                                                                                                                                                                                                                   | Works (via `overload_operators`, on by default) |
+| `str * n` / `n * str` string repetition                                                                                                                                                                                                                       | Works. Literal-string operands compile directly to `s.repeat(Math.max(0, n))` regardless of flags; variable operands dispatch through `ρσ_op_mul` (via `overload_operators`, on by default). Negative `n` returns `''` (Python semantics — clamped to 0). `True`/`False` count as `1`/`0`. |
 | `list * n` / `n * list`                                                                                                                                                                                                                                       | Works (via `overload_operators`); returns a proper RapydScript list |
 | `list + list` concatenation                                                                                                                                                                                                                                   | `[1,2] + [3,4]` returns `[1, 2, 3, 4]`; `+=` extends in-place. No flag required. |
 | `match / case`                                                                                                                                                                                                                                                | Structural pattern matching (Python 3.10) fully supported |
@@ -4158,7 +4166,7 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | `overload_getitem` | `obj[key]` dispatches to `obj.__getitem__(key)` when defined; `obj[a:b:c]` passes a `slice` object; dict `[]` access raises `KeyError` on missing key. | `[]` compiles to plain JS property access; no `__getitem__` dispatch; no slice dispatch. |
 | `bound_methods` | Class methods are automatically bound to `self`, so they retain their `self` binding when stored in a variable or passed as a callback. | Detached method references lose `self` (JS default behavior). |
 | `hash_literals` | When `dict_literals` is off, `{}` creates `Object.create(null)` rather than `{}`, preventing prototype-chain pollution from keys like `toString`. Has no visible effect while `dict_literals` is on. | `{}` becomes a plain `{}` (inherits from `Object.prototype`). Only relevant when `dict_literals` is also disabled. |
-| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `~`, `<<`, `>>`) and ordered-comparison operators (`<`, `>`, `<=`, `>=`) dispatch to dunder methods (`__add__`, `__lt__`, etc.) when defined on the left operand. Also enables `str * n` string repetition, `list * n` / `n * list` list repetition, `dict \| dict` / `dict \|= dict` merge, and Python-style lexicographic list comparison. | All operators compile directly to JS; no dunder dispatch. `str * n` produces `NaN`; list repetition, dict merge, and Python-style list ordering are unavailable. |
+| `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `~`, `<<`, `>>`) and ordered-comparison operators (`<`, `>`, `<=`, `>=`) dispatch to dunder methods (`__add__`, `__lt__`, etc.) when defined on the left operand. Also enables variable-operand `str * n` string repetition, `list * n` / `n * list` list repetition, `dict \| dict` / `dict \|= dict` merge, and Python-style lexicographic list comparison. | All operators compile directly to JS; no dunder dispatch. Literal `'abc' * n` / `n * 'abc'` still works (compile-time fast-path emits `.repeat(Math.max(0, n))`), but `s * n` for a variable `s` produces `NaN`. List repetition, dict merge, and Python-style list ordering are unavailable. |
 | `truthiness` | Python truthiness semantics: `[]`, `{}`, `set()`, `''`, `0`, `None` are falsy; objects with `__bool__` are dispatched; `and`/`or` return the deciding operand value (not `True`/`False`); `not`, `if`, `while`, `assert`, and ternary all route through `ρσ_bool()`. Also enables `__call__` dispatch: `obj(args)` invokes `obj.__call__(args)` for callable objects. | Truthiness is JS-native (all objects truthy); `__bool__` is never called; `and`/`or` return booleans; `__call__` is not dispatched. |
 | `jsx` | JSX syntax (`<Tag attr={expr}>children</Tag>` and `<>...</>` fragments) is recognised as expression syntax and compiled to `React.createElement` calls (or equivalent). | `<` is always a less-than operator; angle-bracket tokens are never parsed as JSX. |
 | `pythonize_strings` *(output-level option, not a `from __python__` flag)* | `String.prototype` is patched at startup with Python string methods (`strip`, `lstrip`, `rstrip`, `join`, `format`, `capitalize`, `lower`, `upper`, `find`, `rfind`, `index`, `rindex`, `count`, `startswith`, `endswith`, `center`, `ljust`, `rjust`, `zfill`, `partition`, `rpartition`, `splitlines`, `expandtabs`, `swapcase`, `title`, `isspace`, `islower`, `isupper`). Equivalent to calling `from pythonize import strings; strings()` manually. Note: `split()` and `replace()` are intentionally kept as their JS versions. | Python string methods are not available on string instances; call `str.strip(s)` etc., or import and call `strings()` from `pythonize` manually. Disable globally with `--legacy-rapydscript`. |
