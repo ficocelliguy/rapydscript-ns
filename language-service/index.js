@@ -5875,4 +5875,4 @@ function registerRapydScript(monaco, options) {
 /** Returns a web_repl compiler instance (same as RapydScript.web_repl()). */
 function web_repl() { return _RS_COMPILER.web_repl(); }
 
-export { registerRapydScript, web_repl };
+export { registerRapydScript, web_repl, STDLIB_MODULES };

@@ -149,6 +149,139 @@ Python's `Ellipsis` singleton object. Code that stores `...` in containers or ch
 
 ---
 
+### 2.7 Set Operators (`|`, `&`, `-`, `^`) Not Supported
+
+The four core set algebra operators raise `TypeError` at runtime when applied to sets.
+The compiler routes them through `ρσ_op_or` / `ρσ_op_and` / `ρσ_op_sub` / `ρσ_op_xor`,
+but those helpers do not recognize `ρσ_set` instances. The same is true of the subset /
+superset comparison operators `<=`, `>=`, `<`, `>`.
+
+```python
+a, b = {1, 2, 3}, {2, 3, 4}
+a | b          # TypeError: unsupported operand type(s) for |: 'set' and 'set'
+a & b          # TypeError
+a - b          # TypeError
+a ^ b          # TypeError
+a <= b         # does not test subset
+```
+
+**Workaround:** Use the method forms, which work correctly:
+
+```python
+a.union(b)                  # for |
+a.intersection(b)           # for &
+a.difference(b)             # for -
+a.symmetric_difference(b)   # for ^
+a.issubset(b)               # for <=
+a.issuperset(b)             # for >=
+```
+
+**Impact:** This is the most jarring single-operator gap — the Python idiom
+`combined = set_a | set_b` is pervasive and reads naturally to anyone who knows the
+language. Fix would be to extend the `ρσ_op_*` helpers to dispatch on `ρσ_set`.
+
+---
+
+### 2.8 `%` String Formatting (`"%s" % val`)
+
+Legacy printf-style string formatting raises `TypeError`. `ρσ_op_mod` treats `%` as
+numeric modulo only — using it with a string left operand fails regardless of the
+`overload_operators` flag.
+
+```python
+"%s world" % "hello"            # TypeError
+"%d items" % 5                  # TypeError
+"%(name)s" % {"name": "Bob"}    # TypeError
+```
+
+**Workaround:** Use f-strings or `.format()`, both of which are fully supported:
+
+```python
+f"{x} world"
+"{} world".format("hello")
+"{name}".format(name="Bob")
+```
+
+**Impact:** Mainly porting friction. Modern Python style prefers f-strings, but `%`
+formatting is still common in older codebases and in logging idioms
+(`logger.info("count=%d", n)`).
+
+---
+
+### 2.9 `@` Matrix Multiplication Operator (`__matmul__`)
+
+Python 3.5+ uses `@` for matrix multiplication and dispatches to `__matmul__` /
+`__rmatmul__` / `__imatmul__`. The RapydScript parser does not accept `@` as a binary
+operator — the token is reserved exclusively for decorators — so `a @ b` is a compile
+error and no `__matmul__` dunder dispatch exists.
+
+**Browser relevance:** Low. No NumPy in the browser, but it forecloses building any
+matrix-style DSL that wants the Python-idiomatic operator (graphics libraries, neural
+network demos, computational geometry).
+
+---
+
+### 2.10 `oct()` Builtin
+
+`hex()` and `bin()` are provided, but `oct()` is not. Octal literals (`0o755`) parse and
+evaluate correctly; only the conversion function is missing.
+
+```python
+hex(255)   # "0xff"     — works
+bin(10)    # "0b1010"   — works
+oct(8)     # ReferenceError: oct is not defined
+```
+
+**Workaround:** `"0o" + (n).toString(8)`.
+
+---
+
+### 2.11 `tuple` Is Not a Distinct Type at Runtime
+
+`tuple(iterable)` returns a plain JS array — there is no wrapping constructor with
+tuple-specific methods. Consequences:
+
+- `tuple` instances have **no `.count()` or `.index()` methods** (the JS `.indexOf()` is
+  a partial substitute for `.index()`).
+- Tuples and lists are indistinguishable at runtime because both are arrays. Code that
+  branches on `isinstance(x, tuple)` vs `isinstance(x, list)` cannot meaningfully
+  discriminate between the two.
+- Tuples are mutable in practice — `t = tuple([1, 2]); t.push(3)` succeeds — even though
+  Python guarantees immutability.
+- Tuple literal syntax `(1, 2, 3)` is not supported (parses as a parenthesised
+  expression); must use `[1, 2, 3]` or `tuple([1, 2, 3])`.
+
+**Impact:** Tuples in RapydScript are essentially "list, but spelled differently."
+Hashability, immutability, distinct-type dispatch, and dict-key behavior all differ
+from Python.
+
+---
+
+### 2.12 `bytes`, `bytearray`, `memoryview`
+
+None of `bytes`, `bytearray`, or `memoryview` exist. Bytes literals (`b'abc'`) are not
+parsed. The closest browser-native equivalents — `Uint8Array`, `ArrayBuffer`, `DataView` —
+must be used directly via JS interop with non-Pythonic ergonomics.
+
+```python
+data = b'\x00\x01\x02'        # syntax error
+buf = bytearray(10)           # NameError
+buf.hex()                     # — no .hex() method on Uint8Array
+"hello".encode()              # NameError on str
+b'data'.decode('utf-8')       # no such literal
+```
+
+**Browser relevance:** **High.** Binary data is everywhere in modern browser APIs:
+Web Audio buffers, WebGL textures, WebRTC datachannels, `fetch().arrayBuffer()`,
+`FileReader.readAsArrayBuffer`, IndexedDB blobs, Web Crypto inputs/outputs, WebSocket
+binary frames. Anyone porting a Python protocol parser or binary-format library to the
+browser hits this gap immediately.
+
+A `bytes`/`bytearray` shim over `Uint8Array` with Python-style `.hex()`, `.decode()`,
+`.fromhex()`, and slice semantics would close a significant gap with modest effort.
+
+---
+
 ## 3. Missing Standard Library Modules (Browser-Relevant)
 
 These are absent from `src/lib/` and have no substitute.
@@ -320,10 +453,16 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
+| High | Set operators `\|`, `&`, `-`, `^`, `<=`, `>=` | Low | Pervasive Python idiom; affects every set-using program |
+| High | `bytes` / `bytearray` shim over `Uint8Array` | Medium | All binary browser APIs (fetch, WebGL, WebRTC, crypto) |
 | High | `enum.IntEnum`, `IntFlag`, `Flag` | Medium | Protocol and permission modeling; bitfield enums |
+| Medium | `%` string formatting | Low | Porting friction; logging idioms |
+| Medium | `@` matmul + `__matmul__` dunder | Medium | DSL hospitality (graphics, math libraries) |
 | Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | `fractions` module | Medium | Exact rational arithmetic |
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
+| Low | `tuple` as a distinct type with `.count()` / `.index()` | Medium | `isinstance` dispatch, immutability guarantees |
+| Low | `oct()` builtin | Trivial | Symmetry with `hex()` / `bin()` |
 | Low | `asynccontextmanager` + `async with` | Medium | Async resource management |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |
 | Low | `difflib` module | High | Text diff, fuzzy matching |

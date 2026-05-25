@@ -45,8 +45,10 @@ var FILES = [
 // Only registerRapydScript is part of the public API.
 // Internal classes (ScopeMap, SourceAnalyzer, Diagnostics, …) remain accessible
 // via the returned service object but are not re-exported.
+// STDLIB_MODULES is re-exported so consumers (and the bundle integration test)
+// can introspect which bundled stdlib modules the language service recognises.
 
-var PUBLIC_EXPORTS = ["registerRapydScript", "web_repl"];
+var PUBLIC_EXPORTS = ["registerRapydScript", "web_repl", "STDLIB_MODULES"];
 
 // ── Embed the RapydScript compiler ────────────────────────────────────────────
 // rapydscript.js uses (function(external_namespace){...})(this) to attach to
