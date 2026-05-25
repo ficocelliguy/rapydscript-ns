@@ -110,12 +110,17 @@ function bundle_compile(repl, src) {
 
 // Run compiled JS in a fresh Node vm context with assrt available
 function run_js(js) {
-    return vm.runInNewContext(js, {
+    var sandbox = {
         __name__          : "<test>",
         console           : console,
         assrt             : assert,
         ρσ_last_exception : undefined,
-    });
+        // Async tests assign their entry-point Promise to globalThis.__done__
+        // (via verbatim JS), and the runner awaits it; sync tests ignore this.
+        __done__          : null,
+    };
+    vm.runInNewContext(js, sandbox);
+    return sandbox.__done__;
 }
 
 // Minimal React stub — mirrors the one in web-repl/env.js so that compiled
@@ -2153,6 +2158,39 @@ var TESTS = [
                 "assrt.equal(after, True)",
             ].join("\n"));
             run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_contextlib_asynccontextmanager",
+        description: "contextlib.asynccontextmanager + async-with run correctly in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from contextlib import asynccontextmanager",
+                "log = []",
+                "@asynccontextmanager",
+                "async def _trace(name):",
+                "    log.append('enter:' + name)",
+                "    try:",
+                "        yield name",
+                "    finally:",
+                "        log.append('exit:' + name)",
+                "async def _main():",
+                "    async with _trace('a') as v:",
+                "        log.append('body:' + v)",
+                "    # exception propagates",
+                "    caught = False",
+                "    try:",
+                "        async with _trace('b'):",
+                "            raise ValueError('boom')",
+                "    except ValueError:",
+                "        caught = True",
+                "    assrt.deepEqual(log, ['enter:a', 'body:a', 'exit:a', 'enter:b', 'exit:b'])",
+                "    assrt.equal(caught, True)",
+                "v'globalThis.__done__ = _main();'",
+            ].join("\n"));
+            return run_js(js);
         },
     },
 
@@ -4773,7 +4811,7 @@ var TESTS = [
 // Runner
 // ---------------------------------------------------------------------------
 
-function run_tests(filter) {
+async function run_tests(filter) {
     var tests = filter
         ? TESTS.filter(function (t) { return t.name === filter; })
         : TESTS;
@@ -4784,15 +4822,17 @@ function run_tests(filter) {
     }
 
     var failures = [];
-    tests.forEach(function (test) {
+    for (var ti = 0; ti < tests.length; ti++) {
+        var test = tests[ti];
         try {
-            test.run();
+            var ret = test.run();
+            if (ret && typeof ret.then === "function") await ret;
             console.log(colored("PASS  " + test.name, "green") + "  –  " + test.description);
         } catch (e) {
             failures.push(test.name);
             console.log(colored("FAIL  " + test.name, "red") + "\n      " + (e.stack || String(e)) + "\n");
         }
-    });
+    }
 
     var passed = tests.length - failures.length;
     console.log("");
@@ -4811,4 +4851,7 @@ function run_tests(filter) {
     process.exit(failures.length ? 1 : 0);
 }
 
-run_tests(process.argv[2] || null);
+run_tests(process.argv[2] || null).catch(function (e) {
+    console.error(colored("Test runner crashed: " + (e.stack || e), "red"));
+    process.exit(2);
+});

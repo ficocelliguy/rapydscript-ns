@@ -8,7 +8,7 @@ ade = assrt.deepEqual
 ok  = assrt.ok
 
 from contextlib import (
-    AbstractContextManager, contextmanager, closing,
+    AbstractContextManager, contextmanager, asynccontextmanager, closing,
     nullcontext, suppress, ExitStack
 )
 
@@ -360,3 +360,129 @@ with _cm_multi('p') as p, _cm_multi('q') as q:
     ae(q, 'q')
 
 ade(_multi_log, ['enter:p', 'enter:q', 'exit:q', 'exit:p'])
+
+# ── 8. asynccontextmanager ────────────────────────────────────────────────────
+#
+# The synchronous test runner cannot await Promises directly, so each test
+# below uses a Promise.then() chain and accumulates observable state into a
+# shared list.  The final .then() in the chain runs assertions; if any
+# assertion throws, Node treats it as an unhandled rejection and exits non-zero.
+# We also assert synchronously-visible properties (e.g. that __aenter__ /
+# __aexit__ return Promises).
+
+# Sanity check: the decorator exists and returns a callable.
+ok(jstype(asynccontextmanager) is 'function')
+
+# 8a. Basic async context manager: yield value is the `as` target.
+@asynccontextmanager
+async def _acm_basic(val):
+    yield val
+
+_acm_log_a = []
+
+async def _run_basic():
+    async with _acm_basic(42) as v:
+        _acm_log_a.push(v)
+
+def _assert_basic():
+    ade(_acm_log_a, [42])
+
+_p_basic = _run_basic()
+ok(jstype(_p_basic.then) is 'function')
+_p_basic.then(_assert_basic)
+
+# 8b. enter / body / exit ordering — including value transformation.
+_acm_log_b = []
+
+@asynccontextmanager
+async def _acm_trace(name):
+    _acm_log_b.push('enter:' + name)
+    try:
+        yield name.upper()
+    finally:
+        _acm_log_b.push('exit:' + name)
+
+async def _run_trace():
+    async with _acm_trace('x') as v:
+        _acm_log_b.push('body:' + v)
+
+def _assert_trace():
+    ade(_acm_log_b, ['enter:x', 'body:X', 'exit:x'])
+
+_run_trace().then(_assert_trace)
+
+# 8c. Exceptions raised inside the body are thrown into the generator and
+# propagate when not suppressed.
+_acm_teardown_ran = False
+_acm_body_exc_caught = False
+
+@asynccontextmanager
+async def _acm_reraise():
+    global _acm_teardown_ran
+    try:
+        yield 'val'
+    finally:
+        _acm_teardown_ran = True
+
+async def _run_reraise():
+    global _acm_body_exc_caught
+    try:
+        async with _acm_reraise():
+            raise ValueError('oops')
+    except ValueError:
+        _acm_body_exc_caught = True
+
+def _assert_reraise():
+    ok(_acm_teardown_ran)
+    ok(_acm_body_exc_caught)
+
+_run_reraise().then(_assert_reraise)
+
+# 8d. Generator catches the exception → __aexit__ returns truthy → suppressed.
+_acm_suppress_log = []
+_acm_after_suppress = False
+
+@asynccontextmanager
+async def _acm_swallow():
+    try:
+        yield
+    except ValueError:
+        _acm_suppress_log.push('caught ValueError')
+
+async def _run_swallow():
+    global _acm_after_suppress
+    async with _acm_swallow():
+        raise ValueError('caught by generator')
+    _acm_after_suppress = True
+
+def _assert_swallow():
+    ade(_acm_suppress_log, ['caught ValueError'])
+    ok(_acm_after_suppress)
+
+_run_swallow().then(_assert_swallow)
+
+# 8e. Multiple async-with clauses in one statement (LIFO __aexit__ order).
+_acm_multi_log = []
+
+@asynccontextmanager
+async def _acm_multi(label):
+    _acm_multi_log.push('enter:' + label)
+    yield label
+    _acm_multi_log.push('exit:' + label)
+
+async def _run_multi():
+    async with _acm_multi('p') as p, _acm_multi('q') as q:
+        ae(p, 'p')
+        ae(q, 'q')
+
+def _assert_multi():
+    ade(_acm_multi_log, ['enter:p', 'enter:q', 'exit:q', 'exit:p'])
+
+_run_multi().then(_assert_multi)
+
+# 8f. __aenter__ / __aexit__ return Promises (observable synchronously).
+_acm_inst = _acm_basic('probe')
+_p_enter = _acm_inst.__aenter__()
+ok(jstype(_p_enter.then) is 'function')
+# Drain the generator so the inner async generator finishes cleanly.
+_p_enter.then(def(_v): _acm_inst.__aexit__();)

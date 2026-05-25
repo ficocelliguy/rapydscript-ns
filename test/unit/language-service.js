@@ -1945,6 +1945,74 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── async with / asynccontextmanager ──────────────────────────────
+
+        {
+            name: "async_with_no_errors",
+            description: "`async with` parses cleanly and binds the `as` alias",
+            run: function () {
+                var markers = d().check([
+                    "class _ACM:",
+                    "    async def __aenter__(self):",
+                    "        return self",
+                    "    async def __aexit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+                    "        return False",
+                    "",
+                    "async def run():",
+                    "    async with _ACM() as resource:",
+                    "        print(resource)",
+                ].join("\n"));
+                var errs = markers.filter(function (m) { return m.severity === 1 || m.severity === 8; });
+                assert.deepStrictEqual(errs, [],
+                    "Expected no syntax/undefined errors for async with, got: " + JSON.stringify(errs));
+            },
+        },
+
+        {
+            name: "asynccontextmanager_no_errors",
+            description: "asynccontextmanager imported from contextlib and used as a decorator parses cleanly",
+            run: function () {
+                var markers = d().check([
+                    "from contextlib import asynccontextmanager",
+                    "",
+                    "@asynccontextmanager",
+                    "async def session(name):",
+                    "    try:",
+                    "        yield name",
+                    "    finally:",
+                    "        pass",
+                    "",
+                    "async def run():",
+                    "    async with session('s') as s:",
+                    "        print(s)",
+                ].join("\n"));
+                var errs = markers.filter(function (m) { return m.severity === 1 || m.severity === 8; });
+                assert.deepStrictEqual(errs, [],
+                    "Expected no errors for asynccontextmanager usage, got: " + JSON.stringify(errs));
+            },
+        },
+
+        {
+            name: "async_with_multi_clause_no_errors",
+            description: "`async with cm1 as a, cm2 as b:` binds both aliases without errors",
+            run: function () {
+                var markers = d().check([
+                    "from contextlib import asynccontextmanager",
+                    "",
+                    "@asynccontextmanager",
+                    "async def cm(label):",
+                    "    yield label",
+                    "",
+                    "async def run():",
+                    "    async with cm('p') as p, cm('q') as q:",
+                    "        print(p, q)",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.message.indexOf("Undefined symbol") !== -1; });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no 'Undefined symbol' errors for multi-clause async with, got: " + JSON.stringify(undef));
+            },
+        },
+
     ];
 
     return TESTS;

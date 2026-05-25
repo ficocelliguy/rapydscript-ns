@@ -322,7 +322,8 @@ class AST_GeneratorComprehension(AST_ListComprehension):
 class AST_With(AST_StatementWithBody):
     "A `with` statement"
     properties = {
-        'clauses': "[AST_WithClause*] the `with` clauses (comma separated)"
+        'clauses': "[AST_WithClause*] the `with` clauses (comma separated)",
+        'is_async': "[bool*] True iff this is an `async with` (awaits __aenter__/__aexit__)"
     }
 
     def _walk(self, visitor):

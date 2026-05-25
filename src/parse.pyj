@@ -627,8 +627,15 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                     forstmt.is_async = True
                     forstmt.start = start
                     return forstmt
+                if is_("keyword", "with"):
+                    # async with: like `with` but awaits __aenter__ / __aexit__
+                    next()
+                    withstmt = with_()
+                    withstmt.is_async = True
+                    withstmt.start = start
+                    return withstmt
                 if not is_("keyword", "def"):
-                    croak("Expected 'def' or 'for' after 'async'")
+                    croak("Expected 'def', 'for', or 'with' after 'async'")
                 next()
                 func = function_(S.in_class[-1], False, True)
                 func.start = start

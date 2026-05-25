@@ -5,6 +5,7 @@
 # Supported:
 #   AbstractContextManager — base class with default __enter__ (returns self)
 #   @contextmanager        — turn a generator function into a context manager
+#   @asynccontextmanager   — turn an async generator function into an async CM
 #   closing(thing)         — calls thing.close() on exit
 #   nullcontext(val)       — no-op context manager; __enter__ returns val
 #   suppress(*excs)        — silently swallow specified exception types
@@ -32,6 +33,20 @@
 #   stack = ExitStack()
 #   with stack:
 #       f = stack.enter_context(some_cm())
+#
+#   from contextlib import asynccontextmanager
+#
+#   @asynccontextmanager
+#   async def fetch(url):
+#       resource = await acquire(url)
+#       try:
+#           yield resource
+#       finally:
+#           await resource.close()
+#
+#   async def main():
+#       async with fetch('/data') as r:
+#           ...
 #
 # Implementation notes:
 #   - contextmanager uses the JS generator protocol (.next() / .throw()).
@@ -244,6 +259,85 @@ def contextmanager(func):
         return _GeneratorContextManager()
 
     return _make_cm
+
+
+def asynccontextmanager(func):
+    """
+    Decorator that turns an async generator function into an async context
+    manager.
+
+    The decorated function must be ``async def`` and contain exactly one
+    ``yield`` expression.  Everything before the yield is the __aenter__
+    body; everything after is the __aexit__ body.  The yielded value is
+    bound to the ``as`` target of ``async with``.
+
+    Exception handling mirrors Python: if an exception is raised inside the
+    ``async with`` block it is thrown into the generator at the yield point.
+    The generator may catch and suppress it (by not re-raising) or let it
+    propagate.
+
+    Example::
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def session():
+            conn = await open_conn()
+            try:
+                yield conn
+            finally:
+                await conn.close()
+
+        async def main():
+            async with session() as conn:
+                await conn.send(data)
+    """
+
+    def _make_acm(*args, **kwargs):
+        gen = func(*args, **kwargs)
+
+        class _AsyncGeneratorContextManager:
+
+            async def __aenter__(self):
+                r = await gen.next()
+                if r.done:
+                    raise RuntimeError('generator did not yield')
+                return r.value
+
+            async def __aexit__(self, exc_type=None, exc_val=None, exc_tb=None):
+                if exc_type is None:
+                    # No-exception path: advance the generator to completion.
+                    r = await gen.next()
+                    if not r.done:
+                        raise RuntimeError('generator did not stop after yield')
+                    return False
+                # Exception path: throw exc_val into the generator.  'throw' is
+                # a reserved JS keyword so we use verbatim JS to call it; the
+                # call returns a Promise which we await.
+                v"""
+                var ρσ_acm_result;
+                try {
+                    ρσ_acm_result = await gen.throw(exc_val);
+                } catch (ρσ_acm_err) {
+                    // Generator did not catch the exception (re-raised or threw
+                    // a different one).  If it's the same object, return false
+                    // so the with-machinery re-raises it.  Otherwise let the
+                    // new exception propagate from __aexit__.
+                    if (ρσ_acm_err === exc_val) {
+                        return false;
+                    }
+                    throw ρσ_acm_err;
+                }
+                // Generator caught the exception and returned normally.
+                if (!ρσ_acm_result.done) {
+                    throw new RuntimeError('generator did not stop after throw()');
+                }
+                return true;
+                """
+
+        return _AsyncGeneratorContextManager()
+
+    return _make_acm
 
 
 class ExitStack:

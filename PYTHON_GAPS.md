@@ -122,15 +122,7 @@ who rely on them (e.g., `from math import *`) must enumerate imports explicitly.
 
 ---
 
-### 2.4 `asynccontextmanager` Not Available
-
-`contextlib.asynccontextmanager` is absent. Only synchronous `@contextmanager` is implemented.
-`async with` itself is also not supported — async context managers need `.acquire()`/`.release()`
-calls instead.
-
----
-
-### 2.5 f-string Debugging Format `f'{x=}'` Not Supported
+### 2.4 f-string Debugging Format `f'{x=}'` Not Supported
 
 Python 3.8+ supports `f'{x=}'` which expands to `f'x={repr(x)}'`. This is not implemented.
 
@@ -141,7 +133,7 @@ print(f'{x=}')   # Python: "x=42". RapydScript: syntax error or wrong output
 
 ---
 
-### 2.6 Ellipsis Evaluates to `undefined`
+### 2.5 Ellipsis Evaluates to `undefined`
 
 `...` (Ellipsis) parses as a valid expression but evaluates to JS `undefined` rather than
 Python's `Ellipsis` singleton object. Code that stores `...` in containers or checks
@@ -149,7 +141,7 @@ Python's `Ellipsis` singleton object. Code that stores `...` in containers or ch
 
 ---
 
-### 2.7 `@` Matrix Multiplication Operator (`__matmul__`)
+### 2.6 `@` Matrix Multiplication Operator (`__matmul__`)
 
 Python 3.5+ uses `@` for matrix multiplication and dispatches to `__matmul__` /
 `__rmatmul__` / `__imatmul__`. The RapydScript parser does not accept `@` as a binary
@@ -162,7 +154,7 @@ network demos, computational geometry).
 
 ---
 
-### 2.8 `oct()` Builtin
+### 2.7 `oct()` Builtin
 
 `hex()` and `bin()` are provided, but `oct()` is not. Octal literals (`0o755`) parse and
 evaluate correctly; only the conversion function is missing.
@@ -177,7 +169,7 @@ oct(8)     # ReferenceError: oct is not defined
 
 ---
 
-### 2.9 `memoryview`
+### 2.8 `memoryview`
 
 `memoryview` does not exist. `bytes` and `bytearray` are supported, but the zero-copy
 buffer-protocol view that `memoryview` provides over them has no RapydScript equivalent —
@@ -357,7 +349,6 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | Medium | `hashlib` shim over Web Crypto | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
 | Low | `oct()` builtin | Trivial | Symmetry with `hex()` / `bin()` |
-| Low | `asynccontextmanager` + `async with` | Medium | Async resource management |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |
 | Low | `difflib` module | High | Text diff, fuzzy matching |
 | Low | `decimal` module | High | Financial calculations |

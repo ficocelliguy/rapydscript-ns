@@ -132,13 +132,18 @@ function compile_virtual(src, virtual_files) {
 }
 
 function run_js(js) {
-    return vm.runInNewContext(js, {
+    var sandbox = {
         __name__           : "<unit-test>",
         console            : console,
         assrt              : assert,
         // ρσ_last_exception must be in the global scope for try/except to work
         ρσ_last_exception  : undefined,
-    }, {filename: "<unit-test>"});
+        // Async tests assign their entry-point Promise to globalThis.__done__
+        // (via verbatim JS), and the runner awaits it; sync tests ignore this.
+        __done__           : null,
+    };
+    vm.runInNewContext(js, sandbox, {filename: "<unit-test>"});
+    return sandbox.__done__;
 }
 
 // Verify every pattern in `checks` appears in `js`.
@@ -7071,11 +7076,244 @@ assrt.equal(fib(15), 610)
         js_checks: [],
     },
 
+    // ── async with / asynccontextmanager ──────────────────────────────────
+
+    {
+        name: "async_with_compiles",
+        description: "`async with` compiles to await __aenter__/__aexit__ on the context manager",
+        src: [
+            "# globals: assrt",
+            "class _ACM:",
+            "    async def __aenter__(self):",
+            "        return 'value'",
+            "    async def __aexit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+            "        return False",
+            "async def _main():",
+            "    async with _ACM() as v:",
+            "        assrt.equal(v, 'value')",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [
+            "await ρσ_with_clause_1.__aenter__()",
+            "await ρσ_with_clause_1.__aexit__()",
+            "await ρσ_with_clause_1.__aexit__(ρσ_with_exception.constructor",
+        ],
+    },
+
+    {
+        name: "async_with_runtime_enter_exit_order",
+        description: "async with calls __aenter__ before body and __aexit__ after — observable via shared log",
+        src: [
+            "# globals: assrt",
+            "_log = []",
+            "class _ACM:",
+            "    async def __aenter__(self):",
+            "        _log.push('enter')",
+            "        return 'val'",
+            "    async def __aexit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+            "        _log.push('exit')",
+            "        return False",
+            "async def _main():",
+            "    async with _ACM() as v:",
+            "        _log.push('body:' + v)",
+            "    assrt.deepEqual(_log, ['enter', 'body:val', 'exit'])",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "async_with_exception_propagates",
+        description: "Exception inside `async with` is passed to __aexit__ and re-raised",
+        src: [
+            "# globals: assrt",
+            "_log = []",
+            "class _ACM:",
+            "    async def __aenter__(self):",
+            "        return self",
+            "    async def __aexit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+            "        _log.push('exit:' + (exc_type and exc_type.name or 'none'))",
+            "        return False  # don't suppress",
+            "async def _main():",
+            "    caught = False",
+            "    try:",
+            "        async with _ACM():",
+            "            raise ValueError('boom')",
+            "    except ValueError:",
+            "        caught = True",
+            "    assrt.equal(caught, True)",
+            "    assrt.deepEqual(_log, ['exit:ValueError'])",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "async_with_exception_suppressed",
+        description: "__aexit__ returning truthy suppresses the exception (no re-raise)",
+        src: [
+            "# globals: assrt",
+            "class _SuppressACM:",
+            "    async def __aenter__(self):",
+            "        return self",
+            "    async def __aexit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+            "        return True  # suppress",
+            "async def _main():",
+            "    reached_after = False",
+            "    async with _SuppressACM():",
+            "        raise ValueError('suppressed')",
+            "    reached_after = True",
+            "    assrt.equal(reached_after, True)",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "asynccontextmanager_basic",
+        description: "@asynccontextmanager creates an async CM whose yield value is the `as` target",
+        src: [
+            "# globals: assrt",
+            "from contextlib import asynccontextmanager",
+            "@asynccontextmanager",
+            "async def _session(val):",
+            "    yield val * 2",
+            "async def _main():",
+            "    async with _session(21) as v:",
+            "        assrt.equal(v, 42)",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [
+            "await ρσ_with_clause_1.__aenter__()",
+            "await ρσ_with_clause_1.__aexit__()",
+        ],
+    },
+
+    {
+        name: "asynccontextmanager_setup_teardown",
+        description: "asynccontextmanager runs setup before yield and teardown after — visible via shared log",
+        src: [
+            "# globals: assrt",
+            "from contextlib import asynccontextmanager",
+            "log = []",
+            "@asynccontextmanager",
+            "async def _trace(name):",
+            "    log.push('enter:' + name)",
+            "    try:",
+            "        yield name",
+            "    finally:",
+            "        log.push('exit:' + name)",
+            "async def _main():",
+            "    async with _trace('a') as v:",
+            "        log.push('body:' + v)",
+            "    assrt.deepEqual(log, ['enter:a', 'body:a', 'exit:a'])",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "asynccontextmanager_exception_propagates",
+        description: "Exception in async-with body propagates through asynccontextmanager finally",
+        src: [
+            "# globals: assrt",
+            "from contextlib import asynccontextmanager",
+            "teardown_ran = [False]",
+            "@asynccontextmanager",
+            "async def _cm():",
+            "    try:",
+            "        yield",
+            "    finally:",
+            "        teardown_ran[0] = True",
+            "async def _main():",
+            "    caught = False",
+            "    try:",
+            "        async with _cm():",
+            "            raise ValueError('boom')",
+            "    except ValueError:",
+            "        caught = True",
+            "    assrt.equal(caught, True)",
+            "    assrt.equal(teardown_ran[0], True)",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "asynccontextmanager_exception_suppressed_by_generator",
+        description: "Generator catching the exception suppresses it (no re-raise outside async-with)",
+        src: [
+            "# globals: assrt",
+            "from contextlib import asynccontextmanager",
+            "log = []",
+            "@asynccontextmanager",
+            "async def _swallow():",
+            "    try:",
+            "        yield",
+            "    except ValueError:",
+            "        log.push('caught')",
+            "async def _main():",
+            "    reached_after = False",
+            "    async with _swallow():",
+            "        raise ValueError('caught by generator')",
+            "    reached_after = True",
+            "    assrt.equal(reached_after, True)",
+            "    assrt.deepEqual(log, ['caught'])",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "asynccontextmanager_multi_clause_lifo",
+        description: "Multiple async-with clauses on one statement exit in LIFO order",
+        src: [
+            "# globals: assrt",
+            "from contextlib import asynccontextmanager",
+            "log = []",
+            "@asynccontextmanager",
+            "async def _cm(label):",
+            "    log.push('enter:' + label)",
+            "    yield label",
+            "    log.push('exit:' + label)",
+            "async def _main():",
+            "    async with _cm('p') as p, _cm('q') as q:",
+            "        assrt.equal(p, 'p')",
+            "        assrt.equal(q, 'q')",
+            "    assrt.deepEqual(log, ['enter:p', 'enter:q', 'exit:q', 'exit:p'])",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "asynccontextmanager_no_yield_raises",
+        description: "Generator that yields zero times raises RuntimeError",
+        src: [
+            "# globals: assrt",
+            "from contextlib import asynccontextmanager",
+            "@asynccontextmanager",
+            "async def _no_yield():",
+            "    return",
+            "    v\"yield;\"   # unreachable; here only to keep this an async generator",
+            "async def _main():",
+            "    caught = False",
+            "    try:",
+            "        async with _no_yield():",
+            "            pass",
+            "    except Exception:",
+            "        caught = True",
+            "    assrt.equal(caught, True)",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: [],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────
 
-function run_tests(filter) {
+async function run_tests(filter) {
     var tests = filter
         ? TESTS.filter(function (t) { return t.name === filter; })
         : TESTS;
@@ -7087,22 +7325,25 @@ function run_tests(filter) {
 
     var failures = [];
 
-    tests.forEach(function (test) {
+    for (var ti = 0; ti < tests.length; ti++) {
+        var test = tests[ti];
 
-        // Custom run function (for tests that need direct JS-level control)
+        // Custom run function (for tests that need direct JS-level control;
+        // may be async — its return value is awaited if it's a Promise)
         if (typeof test.run === "function") {
             try {
-                test.run();
+                var ret = test.run();
+                if (ret && typeof ret.then === "function") await ret;
             } catch (e) {
                 failures.push(test.name);
                 var msg = e.stack || String(e);
                 console.log(colored("FAIL  " + test.name, "red") +
                             " [run]\n      " + msg + "\n");
-                return;
+                continue;
             }
             console.log(colored("PASS  " + test.name, "green") +
                         "  –  " + test.description);
-            return;
+            continue;
         }
 
         var js;
@@ -7114,7 +7355,7 @@ function run_tests(filter) {
             failures.push(test.name);
             console.log(colored("FAIL  " + test.name, "red") +
                         " [compile error]\n      " + e + "\n");
-            return;
+            continue;
         }
 
         // 2 – verify expected patterns appear in the JS output
@@ -7133,26 +7374,27 @@ function run_tests(filter) {
             console.debug("Emitted JS:\n" + js + "\n");
             console.log(colored("FAIL  " + test.name, "red") +
                         " [JS pattern mismatch]\n      " + e.message + "\n");
-            return;
+            continue;
         }
 
         // 3 – run the JS; assertions embedded in src catch wrong values
         // (skipped for tests that produce JSX or other non-executable output)
         if (!test.skip_run) {
             try {
-                run_js(js);
+                var ret = run_js(js);
+                if (ret && typeof ret.then === "function") await ret;
             } catch (e) {
                 failures.push(test.name);
                 var msg = e.stack || String(e);
                 console.log(colored("FAIL  " + test.name, "red") +
                             " [runtime]\n      " + msg + "\n");
-                return;
+                continue;
             }
         }
 
         console.log(colored("PASS  " + test.name, "green") +
                     "  –  " + test.description);
-    });
+    }
 
     var passed = tests.length - failures.length;
     console.log("");
@@ -7172,4 +7414,7 @@ function run_tests(filter) {
 }
 
 var filter = process.argv[2] || null;
-run_tests(filter);
+run_tests(filter).catch(function (e) {
+    console.error(colored("Test runner crashed: " + (e.stack || e), "red"));
+    process.exit(2);
+});
