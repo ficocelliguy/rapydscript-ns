@@ -1620,6 +1620,26 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "typing_isinstance_no_errors",
+            description: "isinstance() against typing generics (Optional/Union/List/Any) produces no errors",
+            run: function () {
+                var markers = d().check([
+                    "from typing import Optional, Union, List, Dict, Any, Literal",
+                    "x = isinstance(5, Optional[int])",
+                    "y = isinstance('hi', Union[int, str])",
+                    "z = isinstance([1, 2, 3], List[int])",
+                    "w = isinstance({'a': 1}, Dict[str, int])",
+                    "a = isinstance(5, Any)",
+                    "L = isinstance('r', Literal['r', 'w'])",
+                    "print(x, y, z, w, a, L)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors for isinstance/typing generics but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
             name: "enum_isinstance_no_errors",
             description: "isinstance(member, EnumClass) and isinstance(member, Enum) produce no errors",
             run: function () {

@@ -5187,6 +5187,89 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_typing_isinstance_optional_union",
+        description: "isinstance() recognises Optional[X] and Union[X, Y] from typing",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from typing import Optional, Union",
+                "assrt.ok(isinstance(5, Optional[int]))",
+                "assrt.ok(isinstance(None, Optional[int]))",
+                "assrt.ok(not isinstance('hi', Optional[int]))",
+                "assrt.ok(isinstance(5, Union[int, str]))",
+                "assrt.ok(isinstance('hi', Union[int, str]))",
+                "assrt.ok(not isinstance([], Union[int, str]))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_typing_isinstance_list_dict",
+        description: "isinstance() handles List[X] and Dict[K, V] typing aliases",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from typing import List, Dict",
+                "assrt.ok(isinstance([1, 2, 3], List[int]))",
+                "assrt.ok(not isinstance({'a': 1}, List[int]))",
+                "assrt.ok(isinstance({'a': 1}, Dict[str, int]))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_typing_isinstance_any_literal",
+        description: "isinstance() with typing.Any and typing.Literal",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from typing import Any, Literal",
+                "assrt.ok(isinstance(5, Any))",
+                "assrt.ok(isinstance(None, Any))",
+                "assrt.ok(isinstance({'a': 1}, Any))",
+                "Mode = Literal['r', 'w', 'a']",
+                "assrt.ok(isinstance('r', Mode))",
+                "assrt.ok(not isinstance('x', Mode))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_typing_isinstance_annotated_function",
+        description: "function with Optional[int]/List[int] annotation enforces at call time",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from typing import Optional, List",
+                "def f(x: Optional[int] = None):",
+                "    return x",
+                "assrt.equal(f(5), 5)",
+                "assrt.equal(f(None), None)",
+                "assrt.equal(f(), None)",
+                "threw = False",
+                "try:",
+                "    f('not an int')",
+                "except TypeError:",
+                "    threw = True",
+                "assrt.ok(threw)",
+                "def g(xs: List[int]):",
+                "    return len(xs)",
+                "assrt.equal(g([1, 2, 3]), 3)",
+                "threw = False",
+                "try:",
+                "    g(42)",
+                "except TypeError:",
+                "    threw = True",
+                "assrt.ok(threw)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

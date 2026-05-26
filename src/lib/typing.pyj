@@ -77,6 +77,10 @@ class Any:
     def __repr__(self):
         return 'typing.Any'
 
+# Marker read by the runtime ρσ_instanceof helper so that `isinstance(x, Any)`
+# returns True for every value, matching CPython's typing.Any semantics.
+Any.__is_typing_any__ = True
+
 
 class Union:
     """Union[X, Y] means either type X or type Y.

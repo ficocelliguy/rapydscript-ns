@@ -748,6 +748,55 @@ def ρσ_instanceof():
         bases = obj.constructor.prototype.__bases__ or ''
     for v'var i = 1; i < arguments.length; i++':
         q = arguments[i]
+        # ── typing.Any (special form) — matches every value ────────────────
+        if q and q.__is_typing_any__ is True:
+            return True
+        # ── Parameterised typing generic (Optional[…], List[…], Union[…], …) ──
+        # Detected by duck-typing on the _GenericAlias contract: a non-class
+        # object that exposes an `__args__` Array.
+        if q and Array.isArray(q.__args__):
+            args = q.__args__
+            name = q._name or ''
+            if name is 'Union' or name is 'Optional':
+                for v'var j = 0; j < args.length; j++':
+                    a = args[j]
+                    if a is None:
+                        if obj is None:
+                            return True
+                    elif ρσ_instanceof(obj, a):
+                        return True
+                continue
+            if name is 'Literal':
+                for v'var j = 0; j < args.length; j++':
+                    if obj is args[j]:
+                        return True
+                continue
+            if name is 'ClassVar' or name is 'Final':
+                if args.length > 0:
+                    a = args[0]
+                    if a is None:
+                        if obj is None:
+                            return True
+                    elif ρσ_instanceof(obj, a):
+                        return True
+                continue
+            if name is 'Callable':
+                if jstype(obj) is 'function':
+                    return True
+                continue
+            if name is 'Type':
+                for v'var j = 0; j < args.length; j++':
+                    if obj is args[j]:
+                        return True
+                continue
+            if q.__origin__:
+                if ρσ_instanceof(obj, q.__origin__):
+                    return True
+                continue
+            # Abstract typing forms with no concrete origin (Iterator,
+            # Iterable, Sequence, Mapping, IO, Pattern, Match, …) accept any
+            # value — there is no runtime predicate to apply.
+            return True
         if v'obj instanceof q':
             return True
         if (q is Array or q is ρσ_list_constructor) and Array.isArray(obj) and obj.ρσ_is_tuple is not True:

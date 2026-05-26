@@ -5,31 +5,25 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [ python decimal module ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [ python Runtime `isinstance` on `typing` generics] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 
-## Example: `asynccontextmanager` + `async with`
+Example: runtime `isinstance` on `typing` generics
+--------------------------------------------------
 
 ```python
-from contextlib import asynccontextmanager
+from typing import Optional, Union, List, Any
 
-@asynccontextmanager
-async def session(url):
-    resource = await acquire(url)
-    try:
-        yield resource
-    finally:
-        await resource.close()
+def first_int(values: List[Union[int, str]]) -> Optional[int]:
+    for v in values:
+        if isinstance(v, int):
+            return v
+    return None
 
-async def main():
-    async with session('/data') as r:
-        data = await r.read()
-        return data
-
-main()
+print(first_int([1, "x", 2]))                    # 1
+print(isinstance(None, Optional[int]))           # True
+print(isinstance("hi", Union[int, str]))         # True
+print(isinstance([1, 2, 3], List[int]))          # True
+print(isinstance({"k": 1}, Any))                 # True
 ```
-
-ReferenceError: Exception is not defined
-
-

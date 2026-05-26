@@ -1,0 +1,162 @@
+# globals: assrt
+# Runtime isinstance() checks against typing-module generic forms.
+
+from __python__ import type_enforcement
+from typing import (
+    Any, Union, Optional, Literal, List, Dict, Set, Tuple, Type,
+    Callable, ClassVar, Final, Iterator, Iterable, Sequence
+)
+
+
+# ── Optional[X] ────────────────────────────────────────────────────────────────
+
+def _test_optional():
+    assrt.ok(isinstance(5, Optional[int]))
+    assrt.ok(isinstance(None, Optional[int]))
+    assrt.ok(not isinstance('hi', Optional[int]))
+    assrt.ok(isinstance('hi', Optional[str]))
+_test_optional()
+
+
+# ── Union[X, Y] ────────────────────────────────────────────────────────────────
+
+def _test_union():
+    assrt.ok(isinstance(5, Union[int, str]))
+    assrt.ok(isinstance('hi', Union[int, str]))
+    assrt.ok(not isinstance([], Union[int, str]))
+    # Nested
+    assrt.ok(isinstance(None, Union[int, Optional[str]]))
+    assrt.ok(isinstance(5, Union[int, Optional[str]]))
+    assrt.ok(isinstance('x', Union[int, Optional[str]]))
+    assrt.ok(not isinstance([], Union[int, Optional[str]]))
+_test_union()
+
+
+# ── Literal[v, …] ──────────────────────────────────────────────────────────────
+
+def _test_literal():
+    Mode = Literal['r', 'w', 'a']
+    assrt.ok(isinstance('r', Mode))
+    assrt.ok(isinstance('w', Mode))
+    assrt.ok(not isinstance('x', Mode))
+    assrt.ok(not isinstance(0, Mode))
+_test_literal()
+
+
+# ── Any ────────────────────────────────────────────────────────────────────────
+
+def _test_any():
+    assrt.ok(isinstance(5, Any))
+    assrt.ok(isinstance('x', Any))
+    assrt.ok(isinstance(None, Any))
+    assrt.ok(isinstance([1, 2], Any))
+    assrt.ok(isinstance({'a': 1}, Any))
+_test_any()
+
+
+# ── List[X] / Dict[X, Y] / Set[X] / Tuple[X, …] ────────────────────────────────
+
+def _test_list_dict_set():
+    assrt.ok(isinstance([1, 2, 3], List[int]))
+    assrt.ok(isinstance([], List[str]))
+    # A real ρσ_dict instance matches Dict[…]; plain-object dicts are tested
+    # separately under web-repl which enables `dict_literals`.
+    d = dict()
+    d['a'] = 1
+    assrt.ok(isinstance(d, Dict[str, int]))
+    assrt.ok(not isinstance(d, List[int]))
+    assrt.ok(isinstance(set([1, 2, 3]), Set[int]))
+_test_list_dict_set()
+
+
+def _test_tuple():
+    t = v'Object.assign([1, 2], { ρσ_is_tuple: true })'
+    assrt.ok(isinstance(t, Tuple[int, int]))
+    assrt.ok(not isinstance([1, 2], Tuple[int, int]))
+_test_tuple()
+
+
+# ── Callable ───────────────────────────────────────────────────────────────────
+
+def _test_callable():
+    def f(x): return x + 1
+    assrt.ok(isinstance(f, Callable[[int], int]))
+    assrt.ok(not isinstance(5, Callable[[int], int]))
+_test_callable()
+
+
+# ── Type[X] ────────────────────────────────────────────────────────────────────
+
+class Animal:
+    pass
+
+class Dog(Animal):
+    pass
+
+def _test_type():
+    assrt.ok(isinstance(Animal, Type[Animal]))
+    assrt.ok(not isinstance(Dog, Type[Animal]))   # Type[X] checks identity, not subclass
+    a = Animal()
+    assrt.ok(not isinstance(a, Type[Animal]))     # an instance is not the class itself
+_test_type()
+
+
+# ── ClassVar / Final wrappers ──────────────────────────────────────────────────
+
+def _test_classvar_final():
+    assrt.ok(isinstance(5, ClassVar[int]))
+    assrt.ok(not isinstance('x', ClassVar[int]))
+    assrt.ok(isinstance(5, Final[int]))
+    assrt.ok(not isinstance('x', Final[int]))
+_test_classvar_final()
+
+
+# ── Abstract typing forms (Iterator, Iterable, Sequence, …) accept anything ────
+
+def _test_abstract_forms():
+    assrt.ok(isinstance([1, 2, 3], Iterable[int]))
+    assrt.ok(isinstance('hi', Iterable[str]))
+    assrt.ok(isinstance([1, 2, 3], Sequence[int]))
+    assrt.ok(isinstance(iter([1, 2]), Iterator[int]))
+_test_abstract_forms()
+
+
+# ── Runtime check on annotated parameter ──────────────────────────────────────
+
+def _test_annotated_param():
+    # Function with Optional[int] annotation should accept int, None, and reject other types.
+    def f(x: Optional[int] = None) -> None:
+        return x
+    assrt.equal(f(5), 5)
+    assrt.equal(f(None), None)
+    assrt.equal(f(), None)
+    threw = False
+    try:
+        f('not an int')
+    except TypeError:
+        threw = True
+    assrt.ok(threw)
+
+    # Function with List[int] annotation should accept lists.
+    def g(xs: List[int]) -> int:
+        return len(xs)
+    assrt.equal(g([1, 2, 3]), 3)
+    threw = False
+    try:
+        g(42)
+    except TypeError:
+        threw = True
+    assrt.ok(threw)
+
+    # Function with Union annotation.
+    def h(v: Union[int, str]) -> str:
+        return str(v)
+    assrt.equal(h(5), '5')
+    assrt.equal(h('x'), 'x')
+    threw = False
+    try:
+        h([])
+    except TypeError:
+        threw = True
+    assrt.ok(threw)
+_test_annotated_param()

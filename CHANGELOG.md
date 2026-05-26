@@ -1,5 +1,6 @@
 version 0.9.6 (unreleased)
 =======================
+* Added support for runtime `isinstance()` checks against `typing` generic forms — `Optional[X]`, `Union[X, Y]`, `List[X]`, `Dict[K, V]`, `Set[X]`, `Tuple[...]`, `Type[X]`, `Literal[...]`, `Callable`, `ClassVar[X]`, `Final[X]`, `Any`, and abstract aliases (`Iterator`, `Iterable`, `Sequence`, `Mapping`, etc.). Function parameter annotations like `def f(x: Optional[int])` now enforce correctly at call time under `type_enforcement` instead of raising `TypeError: Right-hand side of 'instanceof' is not callable`.
 * Added the `decimal` standard library module (`Decimal`, `Context`, `getcontext`, `setcontext`, `localcontext`, rounding modes `ROUND_HALF_EVEN` etc., exceptions `InvalidOperation`, `DivisionByZero`, `ConversionSyntax`). Arbitrary-precision arithmetic backed by JS `BigInt`; full dunder arithmetic / comparison / conversion with reflected forms; `quantize()`, `sqrt()`, `normalize()`, `fma()`, `as_tuple()`, `to_eng_string()`; supports NaN / sNaN / +/-Infinity.
 * Added the `difflib` standard library module.
 * Added the `fractions` standard library module.

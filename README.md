@@ -665,6 +665,24 @@ add(1, 2)       # 3
 add("x", 2)    # TypeError: argument 'a' must be int
 ```
 
+Annotations referring to ``typing`` generic forms — ``Optional[X]``,
+``Union[X, Y]``, ``List[X]``, ``Dict[K, V]``, ``Tuple[...]``, ``Type[X]``,
+``Literal[...]``, ``Callable``, ``Any``, etc. — are also enforced at runtime
+under ``type_enforcement`` and can be tested directly with ``isinstance``:
+
+```py
+from typing import Optional, Union, List
+
+def lookup(key: str, default: Optional[int] = None) -> Union[int, str]:
+    ...
+
+isinstance(5, Optional[int])      # True
+isinstance(None, Optional[int])   # True
+isinstance("x", Union[int, str])  # True
+isinstance([1, 2], List[int])     # True
+isinstance(5, Any)                # True (Any matches every value)
+```
+
 The flag applies to the function definitions that follow it in scope — it does
 not retroactively affect imported functions or functions defined before the
 import.  It can be combined with any other ``from __python__ import`` flag.
