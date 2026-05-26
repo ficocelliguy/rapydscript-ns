@@ -257,19 +257,7 @@ def configure(default=None):   # 'default' is reserved — compile error
 
 ---
 
-### 4.3 Class Named `Error` Shadows JS `Error`
-
-Defining a class named `Error` (e.g., `class Error(Exception)`) compiles to a JS function
-that shadows the global `JS Error` constructor. If that class is then imported in another
-module context (e.g., the web REPL), the import line `var Error = ρσ_modules.mymod.Error`
-shadows the native `Error`, causing infinite recursion in `Exception.__init__`.
-
-**Workaround:** Never name a RapydScript class `Error`. Use `MyError`, `AppError`,
-`ValueError` (which is already defined in baselib), etc.
-
----
-
-### 4.4 `Cls.method(arg)` vs `@Cls.method`
+### 4.3 `Cls.method(arg)` vs `@Cls.method`
 
 `Cls.method(arg)` compiles to `Cls.prototype.method.call(arg)` (unbound Python 2 style).
 `@Cls.method` as a decorator stores the constructor property and calls it differently.
@@ -278,7 +266,7 @@ direct class call needs to be installed on both `cls.property` and `cls.prototyp
 
 ---
 
-### 4.5 `range` Cannot Be Shadowed as a Parameter Name
+### 4.4 `range` Cannot Be Shadowed as a Parameter Name
 
 ```python
 def histogram(data, range):   # compile/runtime error — range shadows builtin
@@ -291,7 +279,7 @@ matches a builtin name.
 
 ---
 
-### 4.6 Verbatim Blocks Are Truly Verbatim — No Escape Processing
+### 4.5 Verbatim Blocks Are Truly Verbatim — No Escape Processing
 
 Inside `v'...'` blocks, Python escape sequences are NOT processed. `\n` in a v-block
 becomes a literal backslash-n in the JS output, not a newline.
@@ -308,7 +296,7 @@ in JS (two characters), not a newline.
 
 ---
 
-### 4.7 `jstype(x) is 'number'` for `typeof` Checks
+### 4.6 `jstype(x) is 'number'` for `typeof` Checks
 
 Python's `type(x)` does not return a string. For JS-style `typeof` checks:
 

@@ -1,0 +1,60 @@
+# globals: assrt
+#
+# Verify that a user-defined `class Error(Exception)` does not shadow the native
+# JS `Error` constructor that baselib relies on internally.  Previously this
+# bug caused `var _ρσ_NativeError = Error` in baselib to capture the user's
+# hoisted Error function, which produced a prototype cycle in `ρσ_extends`
+# and infinite recursion in `Exception.__init__`.
+
+class Error(Exception):
+    """A user-defined exception class that happens to be named `Error`."""
+
+    def __init__(self, msg, code):
+        Exception.__init__(self, msg)
+        self.code = code
+
+
+class SubError(Error):
+    pass
+
+
+# Construction and instance fields
+e = Error("boom", 42)
+assrt.equal(e.message, "boom")
+assrt.equal(e.code, 42)
+
+# Inheritance chain — both the immediate class and Exception
+assrt.ok(isinstance(e, Error))
+assrt.ok(isinstance(e, Exception))
+assrt.ok(isinstance(SubError("x", 1), Error))
+assrt.ok(isinstance(SubError("x", 1), Exception))
+
+# `e.stack` should exist and look like a real native Error stack — proves
+# baselib still has the native Error captured for stack capture.
+assrt.ok(e.stack)
+assrt.equal(jstype(e.stack), 'string')
+
+# Raise + catch via the user-defined Error class
+caught = None
+try:
+    raise Error("thrown", 7)
+except Error as err:
+    caught = err
+assrt.ok(caught is not None)
+assrt.equal(caught.message, "thrown")
+assrt.equal(caught.code, 7)
+
+# A subclass can be caught via its base
+caught2 = None
+try:
+    raise SubError("sub", 99)
+except Error as err:
+    caught2 = err
+assrt.ok(isinstance(caught2, SubError))
+assrt.equal(caught2.code, 99)
+
+# Other builtin error classes still work (baselib's own machinery is intact)
+try:
+    raise ValueError("vv")
+except ValueError as err:
+    assrt.equal(err.message, "vv")

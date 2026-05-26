@@ -1,19 +1,15 @@
-version 0.9.7 (unreleased)
+version 0.9.6 (unreleased)
 =======================
-* Added support for `async with` statements (single- and multi-clause); awaits `__aenter__()` before the body and `__aexit__()` on exit, with LIFO ordering and exception forwarding/suppression matching CPython semantics.
-* Added `contextlib.asynccontextmanager` decorator: turns an async generator function into an async context manager, with code before the `yield` running in `__aenter__` and code after it in `__aexit__`; exceptions raised in the `async with` body are thrown into the generator at the yield point.
-* Documented and locked in (with unit, language-service and web-repl tests) support for multi-line anonymous `def(...)` bodies as call arguments, including alongside positional / keyword arguments and inside list / dict literals — Python's `lambda` is limited to single expressions, so this is a RapydScript convenience extension.
-
-version 0.9.6
-=======================
-* Added the `fractions` standard library module (`Fraction` class with full arithmetic, comparison and hashing; constructors accept int/int pairs, single ints, floats, strings and other Fractions; `from_float`, `from_number`, `limit_denominator`, `as_integer_ratio`; `int()` / `float()` / `round()` dispatch via new `__int__` / `__float__` / `__round__` builtin hooks).
+* Added `contextlib.asynccontextmanager` decorator.
+* Added the `fractions` standard library module.
 * Added support for `tuple` as a distinct runtime type.
 * Added support for Python printf-style `%` string formatting when the left operand is a string.
 * Added support for Python `bytes` and `bytearray` builtins.
-* Added support for Python-style set operators on `set` and `frozenset`: `|` (union), `&` (intersection), `-` (difference), `^` (symmetric difference), `<=` (subset), `>=` (superset), `<` (proper subset), `>` (proper superset); in-place forms `|=`, `&=`, `-=`, `^=` mutate `set` in place. Both operands must be a set/frozenset, otherwise `TypeError` is raised, matching CPython.
+* Added support for Python-style set operators on `set` and `frozenset`: `|`, `&`, `-`, `^`, `<=`, `>=`, `<`, `>`, `|=`, `&=`, `-=`, `^=`.
 * Added support for string repeat with `*` operator (e.g. `'ab' * 3`, `5 * '-'`), negative counts return empty string
 * Added broader JavaScript library type hints in the language service (completions, hover, and diagnostics for browser/DOM globals via `.d.ts` parsing)
 * Fix: Invalid dictionary iteration now raises `ValueError` when tuple-unpacking string keys (e.g. `for k, v in d:` without `.items()`)
+* Fix: A user-defined `class Error(Exception)` no longer shadows the native JS `Error` constructor that baselib relies on for stack capture and exception inheritance. Class definitions are now emitted as `var Name = function Name() {...}` instead of a hoisted `function Name() {...}` declaration, preventing the prototype cycle and infinite recursion that previously occurred when baselib and user code shared a scope (e.g. in the web-repl bundle).
 
 version 0.9.5
 =======================

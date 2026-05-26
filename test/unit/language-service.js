@@ -1834,6 +1834,25 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
                     "Expected no markers for custom exception .args, got: " + JSON.stringify(markers));
             },
         },
+        {
+            name: "class_named_error_no_errors",
+            description: "User-defined class Error(Exception) produces no diagnostics (Error shadows the JS builtin name, but rebinding is allowed)",
+            run: function () {
+                var markers = d().check([
+                    "class Error(Exception):",
+                    "    def __init__(self, msg, code):",
+                    "        Exception.__init__(self, msg)",
+                    "        self.code = code",
+                    "e = Error('boom', 42)",
+                    "try:",
+                    "    raise Error('thrown', 7)",
+                    "except Error as err:",
+                    "    x = err.code",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for class named Error, got: " + JSON.stringify(markers));
+            },
+        },
 
         // ── __slots__ ──────────────────────────────────────────────────────
         {

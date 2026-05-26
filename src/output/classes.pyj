@@ -154,13 +154,17 @@ def print_class(output):
         )
 
     decorators = self.decorators or v'[]'
-    if decorators.length:
-        output.print('var ')
-        output.assign(self.name)
-        write_constructor()
-        output.semicolon()
-    else:
-        write_constructor()
+    # Emit class as `var Name = function Name() {...}` rather than a function
+    # declaration so that the binding is not hoisted to the top of its scope.
+    # A hoisted `function Error() {...}` would shadow the native JS `Error`
+    # constructor for any same-scope code that runs earlier (notably baselib
+    # when private_scope is off, e.g. the web-repl bundle), causing
+    # `var _ρσ_NativeError = Error` to capture the user's class and a
+    # subsequent prototype cycle in `ρσ_extends(Exception, Error)`.
+    output.print('var ')
+    output.assign(self.name)
+    write_constructor()
+    output.semicolon()
     output.newline()
     if decorators.length:
         output.indent()

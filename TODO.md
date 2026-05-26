@@ -1,7 +1,4 @@
 
-python dict methods for keys and values are returning "Map Iterator" which, if that's supposed to be the view object, is correct but the script editor mouse hover/autofill says the return type is "list" which is not correct and painful for those of us who didn't remember the nuanced distinction
-
-
 - remove repl_mode and make repl make a new context for each "run" press
 
 - vscode plugin based on language service?
@@ -118,4 +115,30 @@ ops = {'square': def(x):
 }
 assert ops['square'](4) == 16
 assert ops['cube'](3) == 27
+```
+
+## Example: Defining a class named `Error`
+
+```python
+# `class Error(Exception)` no longer shadows the native JS Error constructor
+# that baselib uses internally for stack capture and exception inheritance.
+class Error(Exception):
+    def __init__(self, msg, code):
+        Exception.__init__(self, msg)
+        self.code = code
+
+class SubError(Error):
+    pass
+
+e = Error('boom', 42)
+assert e.message == 'boom'
+assert e.code == 42
+assert isinstance(e, Error) and isinstance(e, Exception)
+assert e.stack            # native Error.stack still captured by baselib
+
+try:
+    raise SubError('sub', 7)
+except Error as err:      # subclass caught via its base
+    assert isinstance(err, SubError)
+    assert err.code == 7
 ```

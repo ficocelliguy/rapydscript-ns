@@ -433,9 +433,9 @@ const TYPE_MEMBERS = {
 
     dict: new Map([
         // Python-compat methods
-        ['keys',       m('keys',       'method', [],                             'list', 'Return a view of the dictionary keys.')],
-        ['values',     m('values',     'method', [],                             'list', 'Return a view of the dictionary values.')],
-        ['items',      m('items',      'method', [],                             'list', 'Return a view of the (key, value) pairs.')],
+        ['keys',       m('keys',       'method', [],                             'iterator', 'Return an iterator over the dictionary keys (a Map iterator, not a list — wrap with `list(...)` for a list).')],
+        ['values',     m('values',     'method', [],                             'iterator', 'Return an iterator over the dictionary values (a Map iterator, not a list — wrap with `list(...)` for a list).')],
+        ['items',      m('items',      'method', [],                             'iterator', 'Return an iterator over the (key, value) pairs (a Map iterator, not a list — wrap with `list(...)` for a list).')],
         ['get',        m('get',        'method', [mp('key', 'any'), mp('default', 'any')], 'any', 'Return value for key, or default if not found.')],
         ['update',     m('update',     'method', [mp('other', 'dict')],          'None', 'Update the dictionary with key-value pairs from other.')],
         ['pop',        m('pop',        'method', [mp('key', 'any'), mp('default', 'any')], 'any', 'Remove and return value for key.')],

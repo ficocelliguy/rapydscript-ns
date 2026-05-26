@@ -255,6 +255,18 @@ function make_tests(BuiltinsRegistry, BuiltinInfo, HoverEngine, SignatureHelpEng
         },
 
         {
+            name: "getTypeMembers_dict_view_methods_return_iterator",
+            description: "dict.keys/values/items return 'iterator' (Map iterator), not 'list'",
+            run: function () {
+                var reg = new BuiltinsRegistry();
+                var members = reg.getTypeMembers('dict');
+                assert.strictEqual(members.get('keys').return_type,   'iterator');
+                assert.strictEqual(members.get('values').return_type, 'iterator');
+                assert.strictEqual(members.get('items').return_type,  'iterator');
+            },
+        },
+
+        {
             name: "getTypeMembers_number_returns_map",
             description: "getTypeMembers('number') returns a Map with number members",
             run: function () {

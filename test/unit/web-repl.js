@@ -2589,8 +2589,9 @@ var TESTS = [
             var js = bundle_compile(repl, [
                 "from base64 import encodebytes, decodebytes, b64decode",
                 // Note: catch ValueError (base64.Error subclasses ValueError).
-                // Importing 'Error' from base64 in the web-repl context would
-                // shadow the native JS Error constructor, causing issues.
+                // (Importing 'Error' is also fine since class compilation
+                // emits a `var` binding rather than a hoisted function, but
+                // catching the parent class is still the more idiomatic form.)
                 // encodebytes wraps at 76 chars per line
                 "data = bytes(list(range(57)))",
                 "enc = encodebytes(data)",
@@ -2608,6 +2609,88 @@ var TESTS = [
                 // validate=True passes on good input
                 "good = b64decode('aGVsbG8=', validate=True)",
                 "assrt.equal(good[0], 104)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    // ── class named `Error` ─────────────────────────────────────────────────
+    // Verify that a user-defined `class Error(Exception)` does not shadow the
+    // native JS `Error` constructor that baselib uses for stack capture and
+    // exception inheritance.  Previously, a hoisted `function Error() {...}`
+    // declaration would clobber baselib's capture and produce a prototype
+    // cycle when run together with baselib in a single script (web-repl bundle).
+    {
+        name: "bundle_class_named_error_basic",
+        description: "user-defined class Error(Exception) constructs and inherits correctly in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Error(Exception):",
+                "    def __init__(self, msg, code):",
+                "        Exception.__init__(self, msg)",
+                "        self.code = code",
+                "",
+                "e = Error('boom', 42)",
+                "assrt.equal(e.message, 'boom')",
+                "assrt.equal(e.code, 42)",
+                "assrt.ok(isinstance(e, Error))",
+                "assrt.ok(isinstance(e, Exception))",
+                "assrt.ok(e.stack, 'native stack capture still works')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_class_named_error_raise_catch",
+        description: "raise/except with a user-defined Error class works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Error(Exception):",
+                "    def __init__(self, msg):",
+                "        Exception.__init__(self, msg)",
+                "        self.tag = 'MINE'",
+                "",
+                "caught = None",
+                "try:",
+                "    raise Error('thrown')",
+                "except Error as err:",
+                "    caught = err",
+                "assrt.ok(caught is not None)",
+                "assrt.equal(caught.message, 'thrown')",
+                "assrt.equal(caught.tag, 'MINE')",
+                // Other baselib exception classes still work alongside the user Error
+                "try:",
+                "    raise ValueError('vv')",
+                "except ValueError as v:",
+                "    assrt.equal(v.message, 'vv')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_class_named_error_subclass",
+        description: "subclassing a user-defined Error class still resolves via the Exception chain",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Error(Exception):",
+                "    pass",
+                "",
+                "class SubError(Error):",
+                "    pass",
+                "",
+                "caught = None",
+                "try:",
+                "    raise SubError('sub')",
+                "except Error as e:",
+                "    caught = e",
+                "assrt.ok(isinstance(caught, SubError))",
+                "assrt.ok(isinstance(caught, Error))",
+                "assrt.ok(isinstance(caught, Exception))",
             ].join("\n"));
             run_js(js);
         },
