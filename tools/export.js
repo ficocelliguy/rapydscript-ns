@@ -227,6 +227,26 @@ function compile(code, filename, options) {
     }
 }
 
+// Async wrapper around compile() that first awaits the host environment
+// being far enough along to support the compiler bundle. In browsers this
+// waits for `document.body` to exist (bounded by options.bootstrap_timeout,
+// default 2000ms); in Workers / non-DOM hosts it resolves immediately.
+//
+// Use this entry point from code that may run during early page boot, when
+// the DOM isn't guaranteed to be ready. After the wait it calls the
+// synchronous compile() — any sandbox failure surfaces as a
+// RapydScriptSandboxError with a .hint describing the likely cause.
+function compile_async(code, filename, options) {
+    options = options || {};
+    var timeout = (typeof options.bootstrap_timeout === 'number') ? options.bootstrap_timeout : 2000;
+    var await_ready = namespace._rs_await_tools_ready ||
+        (typeof _rs_await_tools_ready === 'function' ? _rs_await_tools_ready : null);
+    var pre = await_ready ? await_ready(timeout) : Promise.resolve();
+    return pre.then(function () {
+        return compile(code, filename, options);
+    });
+}
+
 function create_embedded_compiler(runjs) {
     var c = vrequire('tools/embedded_compiler.js');
     if (!RapydScript) RapydScript = create_compiler();
@@ -271,6 +291,7 @@ function completer(compiler, options) {
 
 if (typeof exports === 'object') {
     exports.compile = compile;
+    exports.compile_async = compile_async;
     exports.create_embedded_compiler = create_embedded_compiler;
     exports.web_repl = web_repl;
     exports.init_repl = init_repl;
@@ -280,5 +301,8 @@ if (typeof exports === 'object') {
     exports.rs_version = rs_version;
     exports.file_data = data;
     exports.completer = completer;
+    if (namespace && namespace.RapydScriptSandboxError) {
+        exports.RapydScriptSandboxError = namespace.RapydScriptSandboxError;
+    }
     if (typeof rs_commit_sha === 'string') exports.rs_commit_sha = rs_commit_sha;
 }
