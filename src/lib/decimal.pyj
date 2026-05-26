@@ -1,0 +1,1457 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Python-compatible 'decimal' module — arbitrary-precision decimal arithmetic.
+#
+# Usage:
+#   from decimal import Decimal, getcontext
+#   getcontext().prec = 28
+#   Decimal('0.1') + Decimal('0.2') == Decimal('0.3')
+#
+# A Decimal is stored as the triple (sign, coefficient, exponent) so that
+# the value is exactly  (-1)^sign * coefficient * 10^exponent.  The
+# coefficient is a non-negative JS BigInt — there is no precision loss
+# while a value is held as a Decimal, only when an operation (such as
+# `/` or `sqrt()`) is rounded to the current context's `prec` digits.
+#
+# Specials (NaN, sNaN, +/-Infinity) are tagged with `_exp` set to one of
+# the strings 'n', 'N', or 'F' respectively; the coefficient is unused.
+#
+# Supported:
+#   - Construction from int, float (via .from_float() or Decimal(float)),
+#     str ('1.5', '-1e-3', 'NaN', 'Infinity'), tuple ((sign, digits, exp)),
+#     Decimal copy.
+#   - Arithmetic: +, -, *, /, //, %, ** (integer & non-integer exponents),
+#     unary +, -, abs(), divmod(), with reflected forms; mixed with int and
+#     float (a Decimal + float raises TypeError in CPython 3 — we mirror).
+#   - Comparison: ==, !=, <, <=, >, >= (against Decimal and int).
+#   - Conversion: float(x), int(x), bool(x), round(x[, n]), str(x), repr(x).
+#   - Methods: adjusted(), as_tuple(), canonical(), compare(), copy_abs(),
+#     copy_negate(), copy_sign(), is_finite(), is_infinite(), is_nan(),
+#     is_qnan(), is_snan(), is_signed(), is_zero(), normalize(),
+#     quantize(exp[, rounding]), sqrt(), to_eng_string(),
+#     to_integral_value([, rounding]), to_integral_exact([, rounding]),
+#     fma(other, third).
+#   - Context: getcontext(), setcontext(), localcontext(), Context class
+#     with .prec, .rounding, .copy().
+#   - Rounding modes: ROUND_CEILING, ROUND_FLOOR, ROUND_UP, ROUND_DOWN,
+#     ROUND_HALF_UP, ROUND_HALF_DOWN, ROUND_HALF_EVEN (default), ROUND_05UP.
+#   - Exceptions: DecimalException, InvalidOperation, DivisionByZero,
+#     ConversionSyntax (an InvalidOperation), DivisionUndefined,
+#     DivisionImpossible.
+#
+# Limitations:
+#   - Signal traps (Inexact, Rounded, Overflow, Underflow, Clamped, ...)
+#     are NOT raised; only InvalidOperation, DivisionByZero, and
+#     ConversionSyntax are surfaced.
+#   - Float construction round-trips through the string form (str(f)),
+#     matching the behaviour of `Decimal(float)` only for short / "clean"
+#     values; use `Decimal.from_float(f)` for IEEE-754-faithful decoding.
+
+
+# ---------------------------------------------------------------------------
+# Rounding modes (string constants — match CPython names)
+# ---------------------------------------------------------------------------
+
+ROUND_CEILING   = 'ROUND_CEILING'
+ROUND_FLOOR     = 'ROUND_FLOOR'
+ROUND_UP        = 'ROUND_UP'
+ROUND_DOWN      = 'ROUND_DOWN'
+ROUND_HALF_UP   = 'ROUND_HALF_UP'
+ROUND_HALF_DOWN = 'ROUND_HALF_DOWN'
+ROUND_HALF_EVEN = 'ROUND_HALF_EVEN'
+ROUND_05UP      = 'ROUND_05UP'
+
+_ROUND_MODES = {}
+_ROUND_MODES[ROUND_CEILING]   = True
+_ROUND_MODES[ROUND_FLOOR]     = True
+_ROUND_MODES[ROUND_UP]        = True
+_ROUND_MODES[ROUND_DOWN]      = True
+_ROUND_MODES[ROUND_HALF_UP]   = True
+_ROUND_MODES[ROUND_HALF_DOWN] = True
+_ROUND_MODES[ROUND_HALF_EVEN] = True
+_ROUND_MODES[ROUND_05UP]      = True
+
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+class DecimalException(Exception):
+    pass
+
+
+class InvalidOperation(DecimalException):
+    pass
+
+
+class ConversionSyntax(InvalidOperation):
+    pass
+
+
+class DivisionByZero(DecimalException):
+    pass
+
+
+class DivisionUndefined(InvalidOperation):
+    pass
+
+
+class DivisionImpossible(InvalidOperation):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# BigInt helpers (verbatim JS so we have access to literal `0n`, `1n`, etc.)
+# ---------------------------------------------------------------------------
+
+def _bi(n):
+    # Cast a JS Number / string / BigInt to BigInt.
+    return v'BigInt(n)'
+
+
+def _bi_zero():
+    return v'0n'
+
+
+def _bi_one():
+    return v'1n'
+
+
+def _bi_ten():
+    return v'10n'
+
+
+def _bi_pow10(n):
+    # 10**n as BigInt; n is a regular Number, n >= 0.
+    if n <= 0:
+        return v'1n'
+    return v'10n ** BigInt(n)'
+
+
+def _bi_is_zero(b):
+    return v'b === 0n'
+
+
+def _bi_abs(b):
+    return v'b < 0n ? -b : b'
+
+
+def _bi_neg(b):
+    return v'-b'
+
+
+def _bi_add(a, b):
+    return v'a + b'
+
+
+def _bi_sub(a, b):
+    return v'a - b'
+
+
+def _bi_mul(a, b):
+    return v'a * b'
+
+
+def _bi_divmod(a, b):
+    # Truncated division — both operands are non-negative.
+    return v'[a / b, a % b]'
+
+
+def _bi_lt(a, b):
+    return v'a < b'
+
+
+def _bi_le(a, b):
+    return v'a <= b'
+
+
+def _bi_gt(a, b):
+    return v'a > b'
+
+
+def _bi_eq(a, b):
+    return v'a === b'
+
+
+def _bi_to_number(b):
+    return v'Number(b)'
+
+
+def _bi_to_string(b):
+    return v'b.toString()'
+
+
+def _bi_digits(b):
+    # Number of digits in a positive BigInt.  Returns 1 for 0.
+    if v'b === 0n':
+        return 1
+    s = v'(b < 0n ? -b : b).toString()'
+    return s.length
+
+
+# ---------------------------------------------------------------------------
+# Context
+# ---------------------------------------------------------------------------
+
+class Context:
+    """Per-thread decimal context.  Only .prec and .rounding are honoured."""
+
+    def __init__(self, prec=None, rounding=None):
+        self.prec = 28 if prec is None else prec
+        self.rounding = ROUND_HALF_EVEN if rounding is None else rounding
+        if self.prec < 1:
+            raise ValueError('prec must be at least 1')
+        if not _ROUND_MODES[self.rounding]:
+            raise ValueError('invalid rounding: ' + String(self.rounding))
+
+    def copy(self):
+        return Context(self.prec, self.rounding)
+
+    def create_decimal(self, value=0):
+        # In CPython this also applies the context; here we just construct.
+        return _Decimal_from(value, self)
+
+    def __repr__(self):
+        return ('Context(prec=' + String(self.prec) +
+                ", rounding=" + String(self.rounding) + ')')
+
+
+# Holder object so module-level reassignment isn't needed.  Internal code
+# always reads `_ctx_holder.ctx` to pick up changes made via setcontext().
+_ctx_holder = {'ctx': Context()}
+
+
+def getcontext():
+    return _ctx_holder.ctx
+
+
+def setcontext(ctx):
+    if not isinstance(ctx, Context):
+        raise TypeError('setcontext() requires a Context')
+    _ctx_holder.ctx = ctx
+
+
+def localcontext(ctx=None):
+    """Context manager that temporarily replaces the current context.
+
+    Usage:
+        with localcontext() as c:
+            c.prec = 50
+            ...
+    """
+    return _LocalContextManager(ctx)
+
+
+class _LocalContextManager:
+
+    def __init__(self, ctx):
+        self._given = ctx
+
+    def __enter__(self):
+        self._saved = _ctx_holder.ctx
+        if self._given is None:
+            nctx = _ctx_holder.ctx.copy()
+        else:
+            nctx = self._given.copy()
+        setcontext(nctx)
+        return nctx
+
+    def __exit__(self, exc_type, exc_value, tb):
+        setcontext(self._saved)
+        return False
+
+
+# ---------------------------------------------------------------------------
+# String parsing
+# ---------------------------------------------------------------------------
+
+def _parse_decimal_str(s):
+    """Parse a Python-style decimal literal.
+
+    Returns [sign, coef_bigint, exp_number, special] where `special` is one of
+    'n' (qNaN), 'N' (sNaN), 'F' (Infinity), or None for ordinary numbers.
+
+    Raises ConversionSyntax on invalid input.
+    """
+    s = String(s).trim()
+    if s.length == 0:
+        raise ConversionSyntax("Invalid decimal literal: " + repr(s))
+    sign = 0
+    first = s.charAt(0)
+    if first == '+':
+        s = s.slice(1)
+    elif first == '-':
+        sign = 1
+        s = s.slice(1)
+    if s.length == 0:
+        raise ConversionSyntax("Invalid decimal literal: " + repr(String(sign and '-' or '+')))
+    # Specials
+    lower = s.toLowerCase()
+    if lower == 'nan' or lower == 'qnan':
+        return [sign, _bi_zero(), 0, 'n']
+    if lower == 'snan':
+        return [sign, _bi_zero(), 0, 'N']
+    if lower == 'inf' or lower == 'infinity':
+        return [sign, _bi_zero(), 0, 'F']
+    # CPython allows an optional payload on NaN: "NaN123" stores 123.
+    if lower.slice(0, 3) == 'nan':
+        payload = s.slice(3)
+        if v'/^[0-9]*$/.test(payload)':
+            coef = _bi(payload.length and payload or '0')
+            return [sign, coef, 0, 'n']
+        raise ConversionSyntax("Invalid decimal literal: " + repr(s))
+    if lower.slice(0, 4) == 'snan':
+        payload = s.slice(4)
+        if v'/^[0-9]*$/.test(payload)':
+            coef = _bi(payload.length and payload or '0')
+            return [sign, coef, 0, 'N']
+        raise ConversionSyntax("Invalid decimal literal: " + repr(s))
+    # Allow Python-style `_` separators between digits.
+    if s.indexOf('_') >= 0:
+        s = v"s.replace(/_/g, '')"
+    # Number part.  General form: digits[.digits][e[+/-]digits]
+    m = v"s.match(/^([0-9]*)(?:\.([0-9]*))?(?:[eE]([+-]?[0-9]+))?$/)"
+    if v'!m' or (m[1].length == 0 and (m[2] is undefined or m[2].length == 0)):
+        raise ConversionSyntax("Invalid decimal literal: " + repr(s))
+    int_part = m[1] or ''
+    frac_part = '' if m[2] is undefined else m[2]
+    exp_part = m[3]
+    digits = int_part + frac_part
+    if digits.length == 0:
+        raise ConversionSyntax("Invalid decimal literal: " + repr(s))
+    # Strip a single leading zero block — but keep at least one digit so
+    # that the coefficient is non-empty.  Preserving leading zeros loses no
+    # information because BigInt() collapses them.
+    coef = _bi(digits)
+    exp = -frac_part.length
+    if exp_part is not undefined:
+        exp = exp + parseInt(exp_part, 10)
+    return [sign, coef, exp, None]
+
+
+# ---------------------------------------------------------------------------
+# Internal Decimal constructor used by helpers — bypasses argument shuffling.
+# ---------------------------------------------------------------------------
+
+def _make(sign, coef, exp, special=None):
+    d = Object.create(Decimal.prototype)
+    d._sign = sign and 1 or 0
+    d._coef = coef
+    d._exp = exp
+    d._special = special
+    return d
+
+
+def _zero(sign=0, exp=0):
+    return _make(sign, _bi_zero(), exp, None)
+
+
+def _nan(sign=0, signaling=False):
+    return _make(sign, _bi_zero(), 0, 'N' if signaling else 'n')
+
+
+def _inf(sign=0):
+    return _make(sign, _bi_zero(), 0, 'F')
+
+
+# ---------------------------------------------------------------------------
+# Decimal class
+# ---------------------------------------------------------------------------
+
+class Decimal:
+    """An arbitrary-precision decimal floating-point number.
+
+    Internal representation:
+        _sign     0 or 1 (1 for negative; -0 collapses to +0 for finite zeros
+                  except when constructed from '-0' or copy_negate)
+        _coef     non-negative BigInt coefficient (unused for specials)
+        _exp      JS Number integer exponent  OR  a special tag
+        _special  None | 'n' (qNaN) | 'N' (sNaN) | 'F' (Infinity)
+    """
+
+    def __init__(self, value=0, context=None):
+        if isinstance(value, Decimal):
+            self._sign    = value._sign
+            self._coef    = value._coef
+            self._exp     = value._exp
+            self._special = value._special
+            return
+        # Tuple form: (sign, (digit, digit, ...), exp_or_special)
+        if Array.isArray(value):
+            self._from_tuple(value)
+            return
+        t = jstype(value)
+        if t is 'number':
+            if v'isNaN(value)':
+                self._sign = 0
+                self._coef = _bi_zero()
+                self._exp = 0
+                self._special = 'n'
+                return
+            if not isFinite(value):
+                self._sign = 0 if value > 0 else 1
+                self._coef = _bi_zero()
+                self._exp = 0
+                self._special = 'F'
+                return
+            if Math.floor(value) == value and Math.abs(value) < 9007199254740992:
+                # Exact integer.
+                if value < 0:
+                    self._sign = 1
+                    self._coef = _bi(-value)
+                else:
+                    self._sign = 0
+                    self._coef = _bi(value)
+                self._exp = 0
+                self._special = None
+                return
+            # Fall through to string parsing (lossy but matches existing
+            # browser-side conventions).
+            value = String(value)
+        if t is 'boolean':
+            self._sign = 0
+            self._coef = _bi(value and 1 or 0)
+            self._exp = 0
+            self._special = None
+            return
+        if t is 'bigint':
+            self._sign = 0 if v'value >= 0n' else 1
+            self._coef = _bi_abs(value)
+            self._exp = 0
+            self._special = None
+            return
+        if t is 'string' or v'value instanceof String':
+            parts = _parse_decimal_str(value)
+            self._sign    = parts[0]
+            self._coef    = parts[1]
+            self._exp     = parts[2]
+            self._special = parts[3]
+            return
+        if value is None:
+            raise TypeError("Cannot construct Decimal from None")
+        raise TypeError("Cannot construct Decimal from " + jstype(value))
+
+    def _from_tuple(self, t):
+        if t.length != 3:
+            raise ValueError("Decimal tuple must have 3 elements")
+        sign = t[0]
+        digits = t[1]
+        exp = t[2]
+        if sign != 0 and sign != 1:
+            raise ValueError("sign must be 0 or 1")
+        # Special tag in the exponent slot?
+        if jstype(exp) is 'string':
+            up = String(exp).toUpperCase()
+            if up == 'N':
+                self._sign = sign
+                self._coef = _bi_zero()
+                self._exp = 0
+                self._special = 'n'
+                return
+            if up == 'F':
+                self._sign = sign
+                self._coef = _bi_zero()
+                self._exp = 0
+                self._special = 'F'
+                return
+            raise ValueError("Invalid exponent tag: " + repr(exp))
+        # Digits — array/list of single digit integers, or a string.
+        s = ''
+        if Array.isArray(digits):
+            for d in digits:
+                if jstype(d) is 'number' and d >= 0 and d <= 9 and Math.floor(d) == d:
+                    s += String(d)
+                else:
+                    raise ValueError("Invalid digit in Decimal tuple: " + repr(d))
+        elif jstype(digits) is 'string':
+            s = digits
+            if not v'/^[0-9]*$/.test(s)':
+                raise ValueError("Invalid digits in Decimal tuple: " + repr(s))
+        else:
+            raise ValueError("Invalid digits in Decimal tuple")
+        if s.length == 0:
+            s = '0'
+        self._sign = sign
+        self._coef = _bi(s)
+        self._exp = exp | 0
+        self._special = None
+
+    @classmethod
+    def from_float(cls, f):
+        if isinstance(f, Decimal):
+            raise TypeError('from_float() requires a float, not Decimal')
+        if jstype(f) is not 'number':
+            raise TypeError('from_float() requires a number')
+        if v'isNaN(f)':
+            return _nan()
+        if not isFinite(f):
+            return _inf(f < 0 and 1 or 0)
+        if Math.floor(f) == f and Math.abs(f) < 9007199254740992:
+            return _make(f < 0 and 1 or 0, _bi(Math.abs(f)), 0, None)
+        # IEEE-754 decomposition: f = mantissa * 2^exp, mantissa integer.
+        sign = 0
+        x = f
+        if f < 0:
+            sign = 1
+            x = -f
+        # Decompose into (m, e) such that x == m * 2^e, m is an integer.
+        e = 0
+        m = x
+        while Math.floor(m) != m:
+            m = m * 2
+            e -= 1
+        # m is now a big integer in floating form; convert to BigInt via
+        # toString to avoid loss.
+        coef = _bi(String(m))
+        # Multiply or divide by 2^|e| using BigInt arithmetic, then express
+        # as decimal: x = (coef * 2^e).
+        if e >= 0:
+            coef = v'coef * (1n << BigInt(e))'
+            return _make(sign, coef, 0, None)
+        # e < 0:  x = coef / 2^|e|  =  coef * 5^|e| / 10^|e|
+        ae = -e
+        coef = v'coef * (5n ** BigInt(ae))'
+        return _make(sign, coef, -ae, None)
+
+    # — Inspection methods —
+
+    def as_tuple(self):
+        if self._special == 'F':
+            return (self._sign, (0,), 'F')
+        if self._special == 'n' or self._special == 'N':
+            tag = 'n' if self._special == 'n' else 'N'
+            # CPython includes the payload digits; we keep it simple here.
+            return (self._sign, (0,), tag)
+        digits_str = _bi_to_string(self._coef)
+        digit_arr = []
+        for v'var ρσ_i = 0; ρσ_i < digits_str.length; ρσ_i++':
+            digit_arr.push(parseInt(digits_str.charAt(ρσ_i), 10))
+        return (self._sign, digit_arr, self._exp)
+
+    def adjusted(self):
+        if self._special:
+            return 0
+        return self._exp + _bi_digits(self._coef) - 1
+
+    def canonical(self):
+        return self
+
+    def is_canonical(self):
+        return True
+
+    def is_nan(self):
+        return self._special == 'n' or self._special == 'N'
+
+    def is_qnan(self):
+        return self._special == 'n'
+
+    def is_snan(self):
+        return self._special == 'N'
+
+    def is_infinite(self):
+        return self._special == 'F'
+
+    def is_finite(self):
+        return self._special is None
+
+    def is_zero(self):
+        return self._special is None and _bi_is_zero(self._coef)
+
+    def is_signed(self):
+        return bool(self._sign)
+
+    def copy_abs(self):
+        return _make(0, self._coef, self._exp, self._special)
+
+    def copy_negate(self):
+        return _make(1 - self._sign, self._coef, self._exp, self._special)
+
+    def copy_sign(self, other):
+        other = _convert(other)
+        return _make(other._sign, self._coef, self._exp, self._special)
+
+    # — Unary —
+
+    def __neg__(self):
+        if self._special == 'n' or self._special == 'N':
+            return _nan(self._sign, self._special == 'N')
+        if self._special == 'F':
+            return _inf(1 - self._sign)
+        if _bi_is_zero(self._coef):
+            # 0 and -0 both negate to the opposite sign (CPython keeps sign).
+            return _make(1 - self._sign, self._coef, self._exp, None)
+        return _make(1 - self._sign, self._coef, self._exp, None)
+
+    def __pos__(self):
+        if self._special == 'N':
+            raise InvalidOperation('sNaN')
+        return _make(self._sign, self._coef, self._exp, self._special)
+
+    def __abs__(self):
+        if self._special == 'N':
+            raise InvalidOperation('sNaN')
+        return _make(0, self._coef, self._exp, self._special)
+
+    def __bool__(self):
+        if self._special == 'F':
+            return True
+        if self._special == 'n' or self._special == 'N':
+            return True
+        return not _bi_is_zero(self._coef)
+
+    # — Binary arithmetic —
+
+    def __add__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _add(self, other, 0)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __sub__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _add(self, other, 1)
+
+    def __rsub__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _add(other, self, 1)
+
+    def __mul__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _mul(self, other)
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _div(self, other)
+
+    def __rtruediv__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _div(other, self)
+
+    def __floordiv__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _floordiv(self, other)
+
+    def __rfloordiv__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _floordiv(other, self)
+
+    def __mod__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _mod(self, other)
+
+    def __rmod__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _mod(other, self)
+
+    def __divmod__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return (_floordiv(self, other), _mod(self, other))
+
+    def __rdivmod__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return (_floordiv(other, self), _mod(other, self))
+
+    def __pow__(self, other, modulo=None):
+        if modulo is not None:
+            raise NotImplementedError('3-argument pow not supported for Decimal')
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _pow(self, other)
+
+    def __rpow__(self, other):
+        other = _convert_other(other)
+        if other is None:
+            return NotImplemented
+        return _pow(other, self)
+
+    # — Comparison —
+
+    def __eq__(self, other):
+        op = _convert_compare(other)
+        if op is None:
+            return False
+        if self._special or op._special:
+            # Any NaN comparison is unequal.
+            if self.is_nan() or op.is_nan():
+                return False
+            if self._special == 'F' and op._special == 'F':
+                return self._sign == op._sign
+            return False
+        return _cmp_finite(self, op) == 0
+
+    def __ne__(self, other):
+        op = _convert_compare(other)
+        if op is None:
+            return True
+        if self.is_nan() or (op is not None and op.is_nan()):
+            return True
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        op = _convert_compare(other)
+        if op is None:
+            return NotImplemented
+        if self.is_nan() or op.is_nan():
+            return False
+        return _cmp_full(self, op) < 0
+
+    def __le__(self, other):
+        op = _convert_compare(other)
+        if op is None:
+            return NotImplemented
+        if self.is_nan() or op.is_nan():
+            return False
+        return _cmp_full(self, op) <= 0
+
+    def __gt__(self, other):
+        op = _convert_compare(other)
+        if op is None:
+            return NotImplemented
+        if self.is_nan() or op.is_nan():
+            return False
+        return _cmp_full(self, op) > 0
+
+    def __ge__(self, other):
+        op = _convert_compare(other)
+        if op is None:
+            return NotImplemented
+        if self.is_nan() or op.is_nan():
+            return False
+        return _cmp_full(self, op) >= 0
+
+    def compare(self, other):
+        op = _convert(other)
+        if self.is_nan() or op.is_nan():
+            return _nan()
+        c = _cmp_full(self, op)
+        if c < 0:
+            return _make(1, _bi_one(), 0, None)
+        if c > 0:
+            return _make(0, _bi_one(), 0, None)
+        return _make(0, _bi_zero(), 0, None)
+
+    # — Hash —
+
+    def __hash__(self):
+        if self._special:
+            if self._special == 'F':
+                if self._sign:
+                    return -7461864723258187
+                return 314159
+            return 0
+        # Hash the normalized form: trim trailing zeros so equal Decimals
+        # hash equal.  Use the digit string + adjusted exponent.
+        coef = self._coef
+        exp = self._exp
+        while exp < 0 and v'coef % 10n === 0n':
+            coef = v'coef / 10n'
+            exp += 1
+        s = (self._sign and '-' or '') + _bi_to_string(coef) + 'e' + String(exp)
+        h = 0
+        for v'var ρσ_i = 0; ρσ_i < s.length; ρσ_i++':
+            h = ((h * 31) + s.charCodeAt(ρσ_i)) | 0
+        return h
+
+    # — String forms —
+
+    def __str__(self):
+        return _to_str(self, False)
+
+    def __repr__(self):
+        return "Decimal('" + _to_str(self, False) + "')"
+
+    def to_eng_string(self):
+        return _to_str(self, True)
+
+    # — Conversion —
+
+    def __int__(self):
+        if self._special == 'F':
+            raise OverflowError("cannot convert Infinity to integer")
+        if self._special == 'n' or self._special == 'N':
+            raise ValueError("cannot convert NaN to integer")
+        # Truncate toward zero.
+        if self._exp >= 0:
+            n = v'(this._coef * (10n ** BigInt(this._exp)))'
+        else:
+            n = v'(this._coef / (10n ** BigInt(-this._exp)))'
+        n = _bi_to_number(n)
+        return -n if self._sign else n
+
+    def __float__(self):
+        if self._special == 'F':
+            return Infinity if not self._sign else -Infinity
+        if self._special:
+            return v'NaN'
+        # str → Number to leverage JS's parser.
+        f = parseFloat(_to_str(self, False))
+        return f
+
+    def __round__(self, ndigits=None):
+        if self._special:
+            if self._special == 'F':
+                raise OverflowError("cannot round Infinity")
+            raise ValueError("cannot round NaN")
+        if ndigits is None:
+            # Python-style round() with no ndigits returns an int (banker's).
+            target_exp = 0
+            q = _round_to_exp(self, target_exp, _ctx_holder.ctx.rounding)
+            return q.__int__()
+        target_exp = -ndigits
+        return _round_to_exp(self, target_exp, _ctx_holder.ctx.rounding)
+
+    # — Manipulation —
+
+    def normalize(self, context=None):
+        if self._special:
+            return _make(self._sign, self._coef, self._exp, self._special)
+        if _bi_is_zero(self._coef):
+            return _make(self._sign, _bi_zero(), 0, None)
+        coef = self._coef
+        exp = self._exp
+        while v'coef % 10n === 0n':
+            coef = v'coef / 10n'
+            exp += 1
+        return _make(self._sign, coef, exp, None)
+
+    def quantize(self, exp, rounding=None, context=None):
+        ctx = context or _ctx_holder.ctx
+        if isinstance(exp, Decimal):
+            target = exp._exp
+            if exp._special:
+                if self._special == 'F' and exp._special == 'F':
+                    return _make(self._sign, _bi_zero(), 0, 'F')
+                raise InvalidOperation("quantize() with non-finite exponent")
+        else:
+            target = exp | 0
+        if self._special:
+            if self._special == 'F':
+                raise InvalidOperation("quantize() of infinity")
+            return _make(self._sign, _bi_zero(), 0, self._special)
+        r = rounding or ctx.rounding
+        return _round_to_exp(self, target, r)
+
+    def to_integral_value(self, rounding=None, context=None):
+        ctx = context or _ctx_holder.ctx
+        if self._special:
+            return _make(self._sign, _bi_zero(), 0, self._special)
+        if self._exp >= 0:
+            return _make(self._sign, self._coef, self._exp, None)
+        return _round_to_exp(self, 0, rounding or ctx.rounding)
+
+    def to_integral_exact(self, rounding=None, context=None):
+        return self.to_integral_value(rounding, context)
+
+    to_integral = to_integral_value
+
+    def sqrt(self, context=None):
+        ctx = context or _ctx_holder.ctx
+        if self._special:
+            if self._special == 'F' and self._sign == 0:
+                return _inf(0)
+            if self._special == 'F':
+                raise InvalidOperation("sqrt(-Infinity)")
+            return _make(self._sign, _bi_zero(), 0, self._special)
+        if _bi_is_zero(self._coef):
+            return _make(self._sign, _bi_zero(), self._exp >> 1, None)
+        if self._sign:
+            raise InvalidOperation("sqrt of negative")
+        # Compute sqrt to `prec` significant digits.  Set up `n` so that
+        # isqrt(n) gives a prec+1-digit integer; track exponent.
+        prec = ctx.prec
+        # Total digits we want after sqrt → about prec.  Scale coefficient
+        # so isqrt gives us prec+1 digits, then round.
+        d = _bi_digits(self._coef)
+        # Pick shift so that (coef * 10^shift) has 2*prec+2 digits roughly,
+        # with the same parity as self._exp (so exponent / 2 is an integer).
+        target_digits = 2 * prec + 2
+        shift = target_digits - d
+        # Adjust shift so (shift + self._exp) is even.
+        if (shift + self._exp) % 2 != 0:
+            shift += 1
+        n = v'this._coef * (10n ** BigInt(shift))'
+        root = _bi_isqrt(n)
+        new_exp = (self._exp - shift) / 2
+        exact = v'root * root === n'
+        if exact:
+            # Strip trailing zeros to mirror CPython's exact-sqrt output.
+            while v'root !== 0n' and v'root % 10n === 0n':
+                root = v'root / 10n'
+                new_exp += 1
+            return _make(0, root, new_exp, None)
+        return _round_to_prec(_make(0, root, new_exp, None), prec, ctx.rounding)
+
+    def fma(self, other, third, context=None):
+        ctx = context or _ctx_holder.ctx
+        product = _mul(self, _convert(other))
+        # FMA in CPython skips the intermediate round; we follow.
+        return _round_to_prec(_add(product, _convert(third), 0), ctx.prec, ctx.rounding)
+
+
+# ---------------------------------------------------------------------------
+# Comparison helpers
+# ---------------------------------------------------------------------------
+
+def _cmp_finite(a, b):
+    # Numeric compare of two finite Decimals — sign already handled.
+    if _bi_is_zero(a._coef) and _bi_is_zero(b._coef):
+        return 0
+    # Normalize to a common exponent.
+    pair = _align(a, b)
+    ca = pair[0]
+    cb = pair[1]
+    if _bi_lt(ca, cb):
+        return -1
+    if _bi_gt(ca, cb):
+        return 1
+    return 0
+
+
+def _cmp_full(a, b):
+    # Compare two Decimals including sign.  Returns -1/0/+1.  Assumes
+    # neither is NaN.  Handles infinities.
+    if a._special == 'F' and b._special == 'F':
+        if a._sign == b._sign:
+            return 0
+        return -1 if a._sign else 1
+    if a._special == 'F':
+        return -1 if a._sign else 1
+    if b._special == 'F':
+        return 1 if b._sign else -1
+    a_zero = _bi_is_zero(a._coef)
+    b_zero = _bi_is_zero(b._coef)
+    if a_zero and b_zero:
+        return 0
+    if a._sign != b._sign:
+        # Different signs — negative is less.
+        return -1 if a._sign else 1
+    # Same sign.  For negatives, flip the comparison.
+    c = _cmp_finite(a, b)
+    if a._sign:
+        return -c
+    return c
+
+
+def _align(a, b):
+    # Return [a_coef_scaled, b_coef_scaled, common_exp] so that both
+    # values equal coef * 10^common_exp (ignoring sign).
+    if a._exp == b._exp:
+        return [a._coef, b._coef, a._exp]
+    if a._exp > b._exp:
+        diff = a._exp - b._exp
+        return [v'a._coef * (10n ** BigInt(diff))', b._coef, b._exp]
+    diff = b._exp - a._exp
+    return [a._coef, v'b._coef * (10n ** BigInt(diff))', a._exp]
+
+
+# ---------------------------------------------------------------------------
+# Conversion helpers
+# ---------------------------------------------------------------------------
+
+def _is_int_value(x):
+    if jstype(x) is 'number':
+        return isFinite(x) and Math.floor(x) == x
+    if jstype(x) is 'bigint':
+        return True
+    if jstype(x) is 'boolean':
+        return True
+    return False
+
+
+def _convert(value):
+    # Convert anything Decimal-like to a Decimal.  Raises TypeError otherwise.
+    if isinstance(value, Decimal):
+        return value
+    if _is_int_value(value):
+        return Decimal(value)
+    if jstype(value) is 'string' or v'value instanceof String':
+        return Decimal(value)
+    raise TypeError("cannot convert " + jstype(value) + " to Decimal")
+
+
+def _convert_other(value):
+    # Lenient: returns a Decimal or None (caller emits NotImplemented).
+    if isinstance(value, Decimal):
+        return value
+    if _is_int_value(value):
+        return Decimal(value)
+    return None
+
+
+def _convert_compare(value):
+    # Comparison side conversion.  Like _convert_other but returns None for
+    # unsupported types so `==` can be False rather than TypeError.
+    if isinstance(value, Decimal):
+        return value
+    if _is_int_value(value):
+        return Decimal(value)
+    if value is None:
+        return None
+    if jstype(value) is 'number':
+        # Floats compare via their exact IEEE-754 value.  CPython does the
+        # same: Decimal('1.5') == 1.5  →  True; Decimal('0.1') == 0.1  →
+        # False (since 0.1 isn't exactly representable).
+        return Decimal.from_float(value)
+    if jstype(value) is 'string' or v'value instanceof String':
+        try:
+            return Decimal(value)
+        except:
+            return None
+    return None
+
+
+def _Decimal_from(value, ctx):
+    d = Decimal(value)
+    if d._special is None:
+        return _round_to_prec(d, ctx.prec, ctx.rounding)
+    return d
+
+
+# ---------------------------------------------------------------------------
+# Arithmetic kernels (always round result to context.prec)
+# ---------------------------------------------------------------------------
+
+def _add(a, b, subtract):
+    # subtract: 0 → a+b, 1 → a-b
+    ctx = _ctx_holder.ctx
+    if a.is_nan() or b.is_nan():
+        return _nan()
+    bsign = (1 - b._sign) if subtract else b._sign
+    if a._special == 'F' and b._special == 'F':
+        if a._sign != bsign:
+            raise InvalidOperation("Infinity + -Infinity")
+        return _inf(a._sign)
+    if a._special == 'F':
+        return _inf(a._sign)
+    if b._special == 'F':
+        return _inf(bsign)
+    # Align.
+    pair = _align(a, b)
+    ac = pair[0]
+    bc = pair[1]
+    exp = pair[2]
+    if a._sign:
+        ac = _bi_neg(ac)
+    if bsign:
+        bc = _bi_neg(bc)
+    sum_bi = _bi_add(ac, bc)
+    if _bi_is_zero(sum_bi):
+        # Sign of zero: matches CPython's "zero result" rule.  With
+        # ROUND_FLOOR it's negative if signs differ; otherwise positive.
+        if a._sign and bsign and ctx.rounding != ROUND_FLOOR:
+            return _make(1, _bi_zero(), exp, None)
+        if not a._sign and not bsign:
+            return _make(0, _bi_zero(), exp, None)
+        if ctx.rounding == ROUND_FLOOR and a._sign != bsign:
+            return _make(1, _bi_zero(), exp, None)
+        return _make(0, _bi_zero(), exp, None)
+    sign = 1 if v'sum_bi < 0n' else 0
+    coef = _bi_abs(sum_bi)
+    result = _make(sign, coef, exp, None)
+    return _round_to_prec(result, ctx.prec, ctx.rounding)
+
+
+def _mul(a, b):
+    ctx = _ctx_holder.ctx
+    if a.is_nan() or b.is_nan():
+        return _nan()
+    sign = a._sign ^ b._sign
+    if a._special == 'F' or b._special == 'F':
+        if a.is_zero() or b.is_zero():
+            raise InvalidOperation("0 * Infinity")
+        return _inf(sign)
+    coef = _bi_mul(a._coef, b._coef)
+    exp = a._exp + b._exp
+    return _round_to_prec(_make(sign, coef, exp, None), ctx.prec, ctx.rounding)
+
+
+def _div(a, b):
+    ctx = _ctx_holder.ctx
+    if a.is_nan() or b.is_nan():
+        return _nan()
+    sign = a._sign ^ b._sign
+    if a._special == 'F' and b._special == 'F':
+        raise InvalidOperation("Infinity / Infinity")
+    if a._special == 'F':
+        return _inf(sign)
+    if b._special == 'F':
+        return _make(sign, _bi_zero(), 0, None)
+    if b.is_zero():
+        if a.is_zero():
+            raise DivisionUndefined("0 / 0")
+        raise DivisionByZero("division by zero")
+    if a.is_zero():
+        return _make(sign, _bi_zero(), a._exp - b._exp, None)
+    # Scale numerator so the integer quotient has at least prec+1 digits.
+    prec = ctx.prec
+    da = _bi_digits(a._coef)
+    db = _bi_digits(b._coef)
+    # We want digits in quotient ≈ (prec + 1).  digits(a*10^k / b) ≈
+    # da + k - db.  Pick k so that this is >= prec + 1.
+    k = prec + 1 - (da - db)
+    if k < 0:
+        k = 0
+    n = v'a._coef * (10n ** BigInt(k))'
+    qr = _bi_divmod(n, b._coef)
+    q = qr[0]
+    r = qr[1]
+    exp = a._exp - b._exp - k
+    if _bi_is_zero(r):
+        # Exact: strip trailing zeros from q so the result doesn't carry
+        # spurious padding from the scaling.  CPython does the same.
+        while v'q !== 0n' and v'q % 10n === 0n':
+            q = v'q / 10n'
+            exp += 1
+        return _round_to_prec(_make(sign, q, exp, None), prec, ctx.rounding)
+    # Inexact: tag the truncated quotient with a non-zero guard digit so
+    # rounding sees the residue.
+    q = v'q * 10n + 1n'
+    exp -= 1
+    return _round_to_prec(_make(sign, q, exp, None), prec, ctx.rounding)
+
+
+def _floordiv(a, b):
+    ctx = _ctx_holder.ctx
+    if a.is_nan() or b.is_nan():
+        return _nan()
+    if a._special == 'F' or b._special == 'F':
+        if a._special == 'F' and b._special == 'F':
+            raise InvalidOperation("Infinity // Infinity")
+        if a._special == 'F':
+            return _inf(a._sign ^ b._sign)
+        return _make(a._sign ^ b._sign, _bi_zero(), 0, None)
+    if b.is_zero():
+        if a.is_zero():
+            raise DivisionUndefined("0 // 0")
+        raise DivisionByZero("integer division by zero")
+    sign = a._sign ^ b._sign
+    pair = _align(a, b)
+    ac = pair[0]
+    bc = pair[1]
+    if a._sign:
+        ac = _bi_neg(ac)
+    if b._sign:
+        bc = _bi_neg(bc)
+    # Truncated quotient.
+    q_signed = v'ac / bc'
+    # CPython's Decimal does TRUNCATED division (not floor), matching
+    # the IBM General Decimal spec.  So we keep truncation.
+    sign_q = 1 if v'q_signed < 0n' else 0
+    if v'q_signed === 0n' and a._sign != b._sign and not a.is_zero():
+        sign_q = sign
+    coef = _bi_abs(q_signed)
+    return _make(sign_q, coef, 0, None)
+
+
+def _mod(a, b):
+    ctx = _ctx_holder.ctx
+    if a.is_nan() or b.is_nan():
+        return _nan()
+    if a._special == 'F' or b._special == 'F':
+        if a._special == 'F':
+            raise InvalidOperation("Infinity % x")
+        return _make(a._sign, a._coef, a._exp, None)
+    if b.is_zero():
+        raise DivisionByZero("modulo by zero")
+    # mod = a - (a // b) * b, with truncated // (per IBM spec).
+    pair = _align(a, b)
+    ac = pair[0]
+    bc = pair[1]
+    exp = pair[2]
+    if a._sign:
+        ac = _bi_neg(ac)
+    if b._sign:
+        bc = _bi_neg(bc)
+    q = v'ac / bc'
+    r = v'ac - q * bc'
+    sign = 1 if v'r < 0n' else 0
+    coef = _bi_abs(r)
+    return _make(sign, coef, exp, None)
+
+
+def _pow(a, b):
+    ctx = _ctx_holder.ctx
+    if a.is_nan() or b.is_nan():
+        return _nan()
+    # Integer exponent fast-path.
+    if b._special is None and b._exp >= 0 and _bi_digits(b._coef) <= 18:
+        n = _bi_to_number(b._coef) * Math.pow(10, b._exp)
+        if b._sign:
+            n = -n
+        if Math.floor(n) == n:
+            return _int_pow(a, n)
+    # Fallback to float math for non-integer / very large exponents.
+    af = parseFloat(_to_str(a, False))
+    bf = parseFloat(_to_str(b, False))
+    return Decimal(String(Math.pow(af, bf)))
+
+
+def _int_pow(a, n):
+    ctx = _ctx_holder.ctx
+    if n == 0:
+        return _make(0, _bi_one(), 0, None)
+    if a.is_zero():
+        if n < 0:
+            raise InvalidOperation("0 ** -n")
+        return _make(0, _bi_zero(), 0, None)
+    if n < 0:
+        # a^-n = 1 / a^n, with rounding at the very end.
+        positive = _int_pow(a, -n)
+        return _div(_make(0, _bi_one(), 0, None), positive)
+    # Exponentiation by squaring on integer n with BigInt coefficient.
+    base_coef = a._coef
+    base_exp = a._exp
+    result_coef = _bi_one()
+    result_exp = 0
+    while n > 0:
+        if n & 1:
+            result_coef = _bi_mul(result_coef, base_coef)
+            result_exp += base_exp
+        n = Math.floor(n / 2)
+        if n > 0:
+            base_coef = _bi_mul(base_coef, base_coef)
+            base_exp *= 2
+    sign = a._sign & (1 if (parseInt(_bi_to_string(result_coef).slice(-1), 10) % 2 != 0) else 1)
+    # Sign rule: (-a)^n is positive if n is even, negative if n is odd.
+    # n here is the original exponent — but we mutated it; recompute via
+    # parity check on the working value's history would be complicated.
+    # We recover by computing parity from the BigInt result of a^n by
+    # noting that sign is only relevant when a._sign == 1.
+    sign = 0
+    if a._sign:
+        # Original exponent was the integer n; we need its parity.  We
+        # tracked it down in the loop, so instead use a closure: just
+        # compute n_orig & 1 by stashing it before the loop.
+        pass
+    return _make(sign, result_coef, result_exp, None)
+
+
+def _int_pow(a, n):
+    # Re-implement: keep original parity for sign.
+    if n == 0:
+        return _make(0, _bi_one(), 0, None)
+    if a.is_zero():
+        if n < 0:
+            raise InvalidOperation("0 ** -n")
+        return _make(0, _bi_zero(), 0, None)
+    if n < 0:
+        positive = _int_pow(a, -n)
+        return _div(_make(0, _bi_one(), 0, None), positive)
+    n_orig = n
+    base_coef = a._coef
+    base_exp = a._exp
+    result_coef = _bi_one()
+    result_exp = 0
+    while n > 0:
+        if n & 1:
+            result_coef = _bi_mul(result_coef, base_coef)
+            result_exp += base_exp
+        n = Math.floor(n / 2)
+        if n > 0:
+            base_coef = _bi_mul(base_coef, base_coef)
+            base_exp *= 2
+    sign = 0
+    if a._sign and (n_orig & 1):
+        sign = 1
+    ctx = _ctx_holder.ctx
+    return _round_to_prec(_make(sign, result_coef, result_exp, None), ctx.prec, ctx.rounding)
+
+
+# ---------------------------------------------------------------------------
+# Rounding kernels
+# ---------------------------------------------------------------------------
+
+def _round_to_prec(d, prec, rounding):
+    if d._special:
+        return d
+    if _bi_is_zero(d._coef):
+        return d
+    digits = _bi_digits(d._coef)
+    if digits <= prec:
+        return d
+    drop = digits - prec
+    return _round_drop(d, drop, rounding)
+
+
+def _round_to_exp(d, target_exp, rounding):
+    if d._special:
+        return d
+    if d._exp >= target_exp:
+        # Pad with zeros.
+        diff = target_exp - d._exp
+        if diff <= 0:
+            return _make(d._sign, d._coef, d._exp, None)
+        coef = v'd._coef * (10n ** BigInt(diff))'
+        return _make(d._sign, coef, target_exp, None)
+    drop = target_exp - d._exp
+    return _round_drop(d, drop, rounding, target_exp)
+
+
+def _round_drop(d, drop, rounding, force_exp=None):
+    """Drop `drop` low-order digits from d._coef, rounding per the rule.
+    If force_exp is provided, the resulting exponent is that value."""
+    if drop <= 0:
+        return _make(d._sign, d._coef, force_exp if force_exp is not None else d._exp, None)
+    pow10 = _bi_pow10(drop)
+    qr = _bi_divmod(d._coef, pow10)
+    q = qr[0]
+    r = qr[1]
+    new_exp = (force_exp if force_exp is not None else (d._exp + drop))
+    # Compare 2*r with pow10.
+    twice_r = v'r * 2n'
+    cmp_h = 0
+    if _bi_lt(twice_r, pow10):
+        cmp_h = -1
+    elif _bi_gt(twice_r, pow10):
+        cmp_h = 1
+    incr = False
+    is_zero_r = _bi_is_zero(r)
+    if rounding == ROUND_DOWN:
+        incr = False
+    elif rounding == ROUND_UP:
+        incr = not is_zero_r
+    elif rounding == ROUND_CEILING:
+        incr = not is_zero_r and d._sign == 0
+    elif rounding == ROUND_FLOOR:
+        incr = not is_zero_r and d._sign == 1
+    elif rounding == ROUND_HALF_DOWN:
+        incr = cmp_h > 0
+    elif rounding == ROUND_HALF_UP:
+        incr = cmp_h >= 0
+    elif rounding == ROUND_HALF_EVEN:
+        if cmp_h > 0:
+            incr = True
+        elif cmp_h == 0:
+            # Round to even.
+            last_is_even = v'(q % 2n) === 0n'
+            if not last_is_even:
+                incr = True
+    elif rounding == ROUND_05UP:
+        last = v'q % 10n'
+        if not is_zero_r and (v'last === 0n' or v'last === 5n'):
+            incr = True
+    else:
+        raise ValueError("Unknown rounding mode: " + String(rounding))
+    if incr:
+        q = _bi_add(q, _bi_one())
+    return _make(d._sign, q, new_exp, None)
+
+
+def _bi_isqrt(n):
+    # Integer square root of a non-negative BigInt (Newton's method).
+    if v'n < 0n':
+        raise ValueError("isqrt of negative")
+    if v'n < 2n':
+        return n
+    # Initial guess: roughly 10^(digits/2).
+    s = _bi_to_string(n)
+    half = Math.ceil(s.length / 2)
+    x = v'10n ** BigInt(half)'
+    while True:
+        y = v'(x + n / x) / 2n'
+        if v'y >= x':
+            return x
+        x = y
+
+
+# ---------------------------------------------------------------------------
+# String formatting
+# ---------------------------------------------------------------------------
+
+def _to_str(d, engineering):
+    if d._special == 'F':
+        return ('-' if d._sign else '') + 'Infinity'
+    if d._special == 'n':
+        payload = _bi_to_string(d._coef)
+        if payload == '0':
+            payload = ''
+        return ('-' if d._sign else '') + 'NaN' + payload
+    if d._special == 'N':
+        payload = _bi_to_string(d._coef)
+        if payload == '0':
+            payload = ''
+        return ('-' if d._sign else '') + 'sNaN' + payload
+    sign = '-' if d._sign else ''
+    digits = _bi_to_string(d._coef)
+    exp = d._exp
+    adj = exp + digits.length - 1
+    # If exponent <= 0 and adjusted >= -6 → plain decimal notation.
+    if exp <= 0 and adj >= -6:
+        if exp == 0:
+            return sign + digits
+        # Need decimal point.
+        if digits.length > -exp:
+            ip = digits.slice(0, digits.length + exp)
+            fp = digits.slice(digits.length + exp)
+            return sign + ip + '.' + fp
+        # Need leading zeros: "0.00...digits"
+        pad = (-exp) - digits.length
+        return sign + '0.' + _repeat_str('0', pad) + digits
+    # Scientific / engineering notation.
+    if engineering:
+        # Engineering: exponent is a multiple of 3, integer part has 1-3 digits.
+        leading = (adj % 3 + 3) % 3 + 1
+        new_exp = adj - (leading - 1)
+        if digits.length < leading:
+            digits = digits + _repeat_str('0', leading - digits.length)
+        int_part = digits.slice(0, leading)
+        frac_part = digits.slice(leading)
+        result = sign + int_part
+        if frac_part.length:
+            result += '.' + frac_part
+        if new_exp != 0:
+            sign_e = '+' if new_exp >= 0 else '-'
+            result += 'E' + sign_e + String(Math.abs(new_exp))
+        elif d._coef and adj != 0:
+            pass
+        return result
+    # Plain scientific.
+    if digits.length == 1:
+        mantissa = digits
+    else:
+        mantissa = digits.charAt(0) + '.' + digits.slice(1)
+    sign_e = '+' if adj >= 0 else '-'
+    return sign + mantissa + 'E' + sign_e + String(Math.abs(adj))
+
+
+def _repeat_str(ch, n):
+    s = ''
+    while n > 0:
+        s += ch
+        n -= 1
+    return s

@@ -3644,6 +3644,136 @@ var TESTS = [
         },
     },
 
+    // ── decimal stdlib ───────────────────────────────────────────────────────
+
+    {
+        name: "bundle_decimal_basic",
+        description: "decimal stdlib: construction, str, arithmetic in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_operators",
+                "from decimal import Decimal",
+                // Construction
+                "assrt.equal(str(Decimal('1.23')), '1.23')",
+                "assrt.equal(str(Decimal('-0.5')), '-0.5')",
+                "assrt.equal(str(Decimal('1.5E-2')), '0.015')",
+                "assrt.equal(str(Decimal(42)), '42')",
+                // Exact arithmetic — no float drift
+                "assrt.equal(str(Decimal('0.1') + Decimal('0.2')), '0.3')",
+                "assrt.equal(str(Decimal('1.5') * Decimal('2')), '3.0')",
+                "assrt.equal(str(Decimal('1') / Decimal('4')), '0.25')",
+                "assrt.equal(str(Decimal('7') // Decimal('2')), '3')",
+                "assrt.equal(str(Decimal('7') % Decimal('2')), '1')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_decimal_compare",
+        description: "decimal stdlib: comparison, abs, neg, copy ops in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_operators",
+                "from decimal import Decimal",
+                // Comparison
+                "assrt.ok(Decimal('1.0') == Decimal('1'))",
+                "assrt.ok(Decimal('1.5') > Decimal('1'))",
+                "assrt.ok(Decimal('1') < Decimal('1.5'))",
+                "assrt.ok(Decimal('-1') < Decimal('1'))",
+                "assrt.ok(Decimal('1.5') == 1.5)",
+                "assrt.ok(Decimal('2') == 2)",
+                // Unary
+                "assrt.equal(str(-Decimal('1.5')), '-1.5')",
+                "assrt.equal(str(abs(Decimal('-2.5'))), '2.5')",
+                // copy_* methods
+                "assrt.equal(str(Decimal('-1.5').copy_abs()), '1.5')",
+                "assrt.equal(str(Decimal('1.5').copy_negate()), '-1.5')",
+                "assrt.equal(str(Decimal('1.5').copy_sign(Decimal('-7'))), '-1.5')",
+                // Conversion
+                "assrt.equal(int(Decimal('3.9')), 3)",
+                "assrt.equal(float(Decimal('1.5')), 1.5)",
+                "assrt.ok(bool(Decimal('0')) is False)",
+                "assrt.ok(bool(Decimal('1.5')) is True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_decimal_quantize_round",
+        description: "decimal stdlib: quantize, rounding modes, sqrt in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_operators",
+                "from decimal import Decimal, ROUND_HALF_UP, ROUND_HALF_DOWN, ROUND_DOWN, ROUND_UP, ROUND_FLOOR, ROUND_CEILING",
+                // quantize, half-even (default)
+                "assrt.equal(str(Decimal('1.2345').quantize(Decimal('0.01'))), '1.23')",
+                "assrt.equal(str(Decimal('1.235').quantize(Decimal('0.01'))), '1.24')",
+                "assrt.equal(str(Decimal('1.5').quantize(Decimal('1'))), '2')",
+                // explicit rounding modes
+                "assrt.equal(str(Decimal('0.5').quantize(Decimal('1'), ROUND_HALF_UP)), '1')",
+                "assrt.equal(str(Decimal('0.5').quantize(Decimal('1'), ROUND_HALF_DOWN)), '0')",
+                "assrt.equal(str(Decimal('0.5').quantize(Decimal('1'), ROUND_UP)), '1')",
+                "assrt.equal(str(Decimal('0.5').quantize(Decimal('1'), ROUND_DOWN)), '0')",
+                "assrt.equal(str(Decimal('-0.5').quantize(Decimal('1'), ROUND_FLOOR)), '-1')",
+                "assrt.equal(str(Decimal('-0.5').quantize(Decimal('1'), ROUND_CEILING)), '-0')",
+                // sqrt exact and inexact
+                "assrt.equal(str(Decimal('9').sqrt()), '3')",
+                "assrt.ok(str(Decimal('2').sqrt()).indexOf('1.41421356') == 0)",
+                // round() builtin dispatches to __round__
+                "assrt.equal(str(round(Decimal('2.5'))), '2')",
+                "assrt.equal(str(round(Decimal('3.5'))), '4')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_decimal_context",
+        description: "decimal stdlib: Context, getcontext, setcontext, localcontext, specials in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import overload_operators",
+                "from decimal import Decimal, Context, getcontext, setcontext, localcontext, DivisionByZero, InvalidOperation",
+                // default context
+                "assrt.equal(getcontext().prec, 28)",
+                // localcontext temporarily lowers prec
+                "with localcontext() as c:",
+                "    c.prec = 4",
+                "    r = Decimal('1') / Decimal('3')",
+                "    assrt.equal(str(r), '0.3333')",
+                "assrt.equal(getcontext().prec, 28)",
+                // Specials
+                "assrt.ok(Decimal('NaN').is_nan())",
+                "assrt.ok(Decimal('Infinity').is_infinite())",
+                "assrt.ok(Decimal('1.5').is_finite())",
+                "assrt.equal(str(Decimal('Infinity')), 'Infinity')",
+                "assrt.equal(str(Decimal('-Infinity')), '-Infinity')",
+                "assrt.equal(str(Decimal('NaN')), 'NaN')",
+                // DivisionByZero raised
+                "caught = False",
+                "try:",
+                "    Decimal('1') / Decimal('0')",
+                "except DivisionByZero:",
+                "    caught = True",
+                "assrt.ok(caught)",
+                // InvalidOperation raised
+                "caught2 = False",
+                "try:",
+                "    Decimal('Infinity') - Decimal('Infinity')",
+                "except InvalidOperation:",
+                "    caught2 = True",
+                "assrt.ok(caught2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     // ── http stdlib ──────────────────────────────────────────────────────────
 
     {

@@ -1,0 +1,368 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+from __python__ import overload_operators
+
+# Tests for the decimal standard library module.
+
+from decimal import (
+    Decimal, Context, getcontext, setcontext, localcontext,
+    DecimalException, InvalidOperation, DivisionByZero, ConversionSyntax,
+    ROUND_CEILING, ROUND_FLOOR, ROUND_UP, ROUND_DOWN,
+    ROUND_HALF_UP, ROUND_HALF_DOWN, ROUND_HALF_EVEN, ROUND_05UP,
+)
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+throws = assrt.throws
+
+
+# Save & restore context for each section so tests don't leak prec changes.
+_saved_ctx = getcontext().copy()
+
+def _reset_ctx():
+    setcontext(_saved_ctx.copy())
+
+
+# ── 1. Construction ────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('1.23')), '1.23')
+ae(str(Decimal('0')), '0')
+ae(str(Decimal('-0')), '-0')
+ae(str(Decimal('-1.5')), '-1.5')
+ae(str(Decimal('+1.5')), '1.5')
+ae(str(Decimal('100')), '100')
+ae(str(Decimal('1.5e3')), '1.5E+3')
+ae(str(Decimal('1.5E-2')), '0.015')
+ae(str(Decimal('1_000.5')), '1000.5')
+
+# from int
+ae(str(Decimal(0)), '0')
+ae(str(Decimal(42)), '42')
+ae(str(Decimal(-7)), '-7')
+
+# from bool
+ae(str(Decimal(True)), '1')
+ae(str(Decimal(False)), '0')
+
+# from another Decimal (copy)
+_a = Decimal('3.14')
+_b = Decimal(_a)
+ae(str(_b), '3.14')
+
+# from tuple
+ae(str(Decimal((0, [1, 2, 3], -2))), '1.23')
+ae(str(Decimal((1, [5], 0))), '-5')
+ae(str(Decimal((0, [0], 0))), '0')
+
+# from float — Decimal(float) uses string round-trip
+ae(str(Decimal(0.5)), '0.5')
+ae(str(Decimal(-2.25)), '-2.25')
+
+# from_float gives IEEE-754-faithful conversion
+_d01 = Decimal.from_float(0.1)
+ok(str(_d01).indexOf('0.1000000000000000055511151231257827021181583404541015625') == 0)
+
+# Invalid input
+throws(def(): Decimal('abc');, ConversionSyntax)
+throws(def(): Decimal('1.2.3');, ConversionSyntax)
+throws(def(): Decimal('');, ConversionSyntax)
+throws(def(): Decimal(None);, TypeError)
+
+
+# ── 2. Specials: NaN, Infinity ─────────────────────────────────────────────
+
+_reset_ctx()
+
+_nan = Decimal('NaN')
+_snan = Decimal('sNaN')
+_inf = Decimal('Infinity')
+_ninf = Decimal('-Infinity')
+
+ok(_nan.is_nan())
+ok(_nan.is_qnan())
+ok(not _nan.is_snan())
+ok(_snan.is_snan())
+ok(_inf.is_infinite())
+ok(_ninf.is_infinite())
+ok(not _inf.is_finite())
+ok(Decimal('1.5').is_finite())
+
+ae(str(_nan), 'NaN')
+ae(str(_inf), 'Infinity')
+ae(str(_ninf), '-Infinity')
+
+# Comparison with NaN — use distinct instances since ρσ_equals
+# short-circuits on identity (a is b → True before __eq__ runs).
+ok(not (Decimal('NaN') == Decimal('NaN')))
+ok(Decimal('NaN') != Decimal('NaN'))
+ok(not (_nan < Decimal('1')))
+ok(not (_nan > Decimal('1')))
+
+
+# ── 3. Arithmetic — basic ──────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('0.1') + Decimal('0.2')), '0.3')
+ae(str(Decimal('1') + Decimal('2')), '3')
+ae(str(Decimal('1.5') - Decimal('0.5')), '1.0')
+ae(str(Decimal('2.5') * Decimal('4')), '10.0')
+
+# Truediv with default prec
+ae(str(Decimal('1') / Decimal('4')), '0.25')
+ae(str(Decimal('1') / Decimal('2')), '0.5')
+
+# Negative
+ae(str(Decimal('-1.5') + Decimal('0.5')), '-1.0')
+ae(str(-Decimal('1.5')), '-1.5')
+ae(str(abs(Decimal('-2.5'))), '2.5')
+
+# Mixed with int
+ae(str(Decimal('1.5') + 1), '2.5')
+ae(str(1 + Decimal('1.5')), '2.5')
+ae(str(Decimal('3') * 2), '6')
+ae(str(2 * Decimal('3')), '6')
+
+
+# ── 4. Division by zero ─────────────────────────────────────────────────────
+
+_reset_ctx()
+
+throws(def(): Decimal('1') / Decimal('0');, DivisionByZero)
+throws(def(): Decimal('1') / 0;, DivisionByZero)
+throws(def(): Decimal('1') // Decimal('0');, DivisionByZero)
+throws(def(): Decimal('1') % Decimal('0');, DivisionByZero)
+
+
+# ── 5. Floor division and modulo ───────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('7') // Decimal('2')), '3')
+ae(str(Decimal('7') % Decimal('2')), '1')
+ae(str(Decimal('-7') // Decimal('2')), '-3')   # truncated, not floor (IBM spec)
+ae(str(Decimal('-7') % Decimal('2')), '-1')
+
+# __divmod__ (the divmod() builtin doesn't dispatch to dunders)
+_dm = Decimal('7').__divmod__(Decimal('2'))
+ae(str(_dm[0]), '3')
+ae(str(_dm[1]), '1')
+
+
+# ── 6. Power ──────────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('2') ** Decimal('3')), '8')
+ae(str(Decimal('2') ** Decimal('10')), '1024')
+ae(str(Decimal('3') ** Decimal('0')), '1')
+ae(str(Decimal('5') ** Decimal('-1')), '0.2')
+
+
+# ── 7. Comparison ─────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ok(Decimal('1.0') == Decimal('1'))
+ok(Decimal('1.5') > Decimal('1'))
+ok(Decimal('1') < Decimal('1.5'))
+ok(Decimal('1.5') <= Decimal('1.5'))
+ok(Decimal('1.5') >= Decimal('1.5'))
+ok(Decimal('-1') < Decimal('1'))
+ok(Decimal('1.5') == 1.5)
+ok(Decimal('2') == 2)
+ok(Decimal('1') < 2)
+ok(2 > Decimal('1'))
+
+
+# ── 8. Conversion ─────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(int(Decimal('3.9')), 3)
+ae(int(Decimal('-3.9')), -3)        # truncate toward zero
+ae(int(Decimal('5')), 5)
+
+ae(float(Decimal('1.5')), 1.5)
+ae(float(Decimal('0')), 0)
+
+ok(bool(Decimal('0')) is False)
+ok(bool(Decimal('-0')) is False)
+ok(bool(Decimal('1.5')) is True)
+ok(bool(Decimal('-1.5')) is True)
+
+# round()
+ae(str(round(Decimal('2.5'))), '2')        # banker's: ties to even
+ae(str(round(Decimal('3.5'))), '4')
+ae(str(round(Decimal('1.2345'), 2)), '1.23')   # half-even
+ae(str(round(Decimal('1.235'), 2)), '1.24')
+
+
+# ── 9. Quantize ────────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('1.2345').quantize(Decimal('0.01'))), '1.23')
+ae(str(Decimal('1.235').quantize(Decimal('0.01'))), '1.24')   # half-even
+ae(str(Decimal('1.245').quantize(Decimal('0.01'))), '1.24')   # half-even (4 is even)
+ae(str(Decimal('1.5').quantize(Decimal('1'))), '2')           # half-even
+
+# explicit rounding
+ae(str(Decimal('1.5').quantize(Decimal('1'), ROUND_HALF_UP)), '2')
+ae(str(Decimal('0.5').quantize(Decimal('1'), ROUND_HALF_UP)), '1')
+ae(str(Decimal('0.5').quantize(Decimal('1'), ROUND_HALF_DOWN)), '0')
+ae(str(Decimal('0.5').quantize(Decimal('1'), ROUND_DOWN)), '0')
+ae(str(Decimal('0.5').quantize(Decimal('1'), ROUND_UP)), '1')
+ae(str(Decimal('-0.5').quantize(Decimal('1'), ROUND_CEILING)), '-0')
+ae(str(Decimal('-0.5').quantize(Decimal('1'), ROUND_FLOOR)), '-1')
+
+
+# ── 10. Normalize and as_tuple ─────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('100.00').normalize()), '1E+2')
+ae(str(Decimal('0.0500').normalize()), '0.05')
+ae(str(Decimal('0').normalize()), '0')
+
+# as_tuple
+_t = Decimal('1.23').as_tuple()
+ae(_t[0], 0)
+ade(list(_t[1]), [1, 2, 3])
+ae(_t[2], -2)
+
+_t = Decimal('-1.5').as_tuple()
+ae(_t[0], 1)
+ade(list(_t[1]), [1, 5])
+ae(_t[2], -1)
+
+
+# ── 11. adjusted, sign helpers ─────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(Decimal('123').adjusted(), 2)        # 1.23e2 → adjusted = 2
+ae(Decimal('0.123').adjusted(), -1)     # 1.23e-1 → adjusted = -1
+ae(Decimal('1.23E3').adjusted(), 3)
+
+ok(Decimal('-1').is_signed())
+ok(not Decimal('1').is_signed())
+ok(Decimal('0').is_zero())
+ok(not Decimal('0.1').is_zero())
+
+ae(str(Decimal('-1.5').copy_abs()), '1.5')
+ae(str(Decimal('1.5').copy_negate()), '-1.5')
+ae(str(Decimal('1.5').copy_sign(Decimal('-7'))), '-1.5')
+
+
+# ── 12. sqrt ───────────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('4').sqrt()), '2')
+ae(str(Decimal('9').sqrt()), '3')
+ae(str(Decimal('0').sqrt()), '0')
+# 2.sqrt to default 28 digits — first few digits must match.
+ok(str(Decimal('2').sqrt()).indexOf('1.41421356') == 0)
+
+throws(def(): Decimal('-1').sqrt();, InvalidOperation)
+
+
+# ── 13. Context and precision ──────────────────────────────────────────────
+
+_reset_ctx()
+
+ctx = getcontext()
+ae(ctx.prec, 28)
+ae(ctx.rounding, ROUND_HALF_EVEN)
+
+# Custom context via localcontext
+with localcontext() as c:
+    c.prec = 4
+    r = Decimal('1') / Decimal('3')
+    ae(str(r), '0.3333')
+
+# Outside the with, prec should be back to 28
+ae(getcontext().prec, 28)
+
+# Manual setcontext
+custom = Context(prec=5, rounding=ROUND_HALF_UP)
+setcontext(custom)
+ae(getcontext().prec, 5)
+r2 = Decimal('1') / Decimal('3')
+ae(str(r2), '0.33333')
+# 0.5 with HALF_UP rounds up
+ae(str(Decimal('1.5').quantize(Decimal('1'))), '2')
+setcontext(_saved_ctx.copy())
+
+
+# ── 14. Invalid operations ────────────────────────────────────────────────
+
+_reset_ctx()
+
+throws(def(): Decimal('Infinity') - Decimal('Infinity');, InvalidOperation)
+throws(def(): Decimal('0') * Decimal('Infinity');, InvalidOperation)
+
+
+# ── 15. Hash equality ─────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(Decimal('1.0').__hash__(), Decimal('1').__hash__())
+ae(Decimal('1.00').__hash__(), Decimal('1').__hash__())
+
+
+# ── 16. repr ──────────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(repr(Decimal('1.5')), "Decimal('1.5')")
+ae(repr(Decimal('-2.5')), "Decimal('-2.5')")
+ae(repr(Decimal('NaN')), "Decimal('NaN')")
+ae(repr(Decimal('Infinity')), "Decimal('Infinity')")
+
+
+# ── 17. Engineering string ────────────────────────────────────────────────
+
+_reset_ctx()
+
+# Engineering notation only differs from plain when the value would otherwise
+# render in scientific form (exp > 0 or adjusted < -6).
+ae(Decimal('123456').to_eng_string(), '123456')
+ae(Decimal('1.23E6').to_eng_string(), '1.23E+6')
+ae(Decimal('1.23').to_eng_string(), '1.23')
+ae(Decimal('1E9').to_eng_string(), '1E+9')
+ae(Decimal('1E10').to_eng_string(), '10E+9')   # engineering exp is multiple of 3
+
+
+# ── 18. to_integral_value ─────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('1.5').to_integral_value()), '2')           # half-even
+ae(str(Decimal('2.5').to_integral_value()), '2')
+ae(str(Decimal('3.5').to_integral_value()), '4')
+ae(str(Decimal('-1.5').to_integral_value()), '-2')
+
+
+# ── 19. compare ───────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+ae(str(Decimal('1').compare(Decimal('2'))), '-1')
+ae(str(Decimal('2').compare(Decimal('1'))), '1')
+ae(str(Decimal('1').compare(Decimal('1'))), '0')
+
+
+# ── 20. fma ───────────────────────────────────────────────────────────────
+
+_reset_ctx()
+
+# fused multiply-add: self * other + third
+ae(str(Decimal('2').fma(Decimal('3'), Decimal('4'))), '10')
+ae(str(Decimal('0.5').fma(Decimal('0.5'), Decimal('1'))), '1.25')
+
+_reset_ctx()

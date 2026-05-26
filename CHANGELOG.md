@@ -1,5 +1,6 @@
 version 0.9.6 (unreleased)
 =======================
+* Added the `decimal` standard library module (`Decimal`, `Context`, `getcontext`, `setcontext`, `localcontext`, rounding modes `ROUND_HALF_EVEN` etc., exceptions `InvalidOperation`, `DivisionByZero`, `ConversionSyntax`). Arbitrary-precision arithmetic backed by JS `BigInt`; full dunder arithmetic / comparison / conversion with reflected forms; `quantize()`, `sqrt()`, `normalize()`, `fma()`, `as_tuple()`, `to_eng_string()`; supports NaN / sNaN / +/-Infinity.
 * Added the `difflib` standard library module.
 * Added the `fractions` standard library module.
 * Added `contextlib.asynccontextmanager` decorator.

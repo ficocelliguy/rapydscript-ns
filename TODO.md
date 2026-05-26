@@ -170,3 +170,35 @@ assert ud[0] == '--- a.txt\n'
 assert ud[1] == '+++ b.txt\n'
 assert ud[2] == '@@ -2,3 +2,3 @@\n'
 ```
+
+## Example: `decimal` — exact base-10 arithmetic
+
+```python
+from decimal import Decimal, getcontext, localcontext, ROUND_HALF_UP
+
+# No floating-point drift — 0.1 + 0.2 is exactly 0.3
+assert Decimal('0.1') + Decimal('0.2') == Decimal('0.3')
+
+# Construction from int, str, tuple, or another Decimal
+assert Decimal(42)              == Decimal('42')
+assert Decimal((0, [1, 5], -1)) == Decimal('1.5')
+
+# Quantize to a fixed scale (banker's rounding by default)
+price = Decimal('19.985')
+assert price.quantize(Decimal('0.01')) == Decimal('19.98')   # HALF_EVEN
+assert price.quantize(Decimal('0.01'), ROUND_HALF_UP) == Decimal('19.99')
+
+# Adjust precision with a localcontext block — restored on exit
+with localcontext() as c:
+    c.prec = 5
+    assert str(Decimal('1') / Decimal('3')) == '0.33333'
+assert getcontext().prec == 28                   # back to the default
+
+# Exact sqrt strips trailing zeros; inexact sqrt is rounded to context.prec
+assert Decimal('9').sqrt() == Decimal('3')
+assert str(Decimal('2').sqrt()).startswith('1.41421356')
+
+# Specials: NaN, +/-Infinity
+assert Decimal('NaN').is_nan()
+assert Decimal('-Infinity').is_infinite()
+```

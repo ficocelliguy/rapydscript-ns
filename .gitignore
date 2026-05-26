@@ -9,3 +9,5 @@ dev
 self.cpuprofile
 .idea
 .claude
+memory/
+tmp/

@@ -209,14 +209,6 @@ for non-cryptographic hashes would be valuable.
 
 ---
 
-### 3.3 `decimal` — Decimal Arithmetic
-
-`Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
-calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
-equivalent; a pure-JS implementation would need to be compiled in.
-
----
-
 ## 4. Tricky Patterns That Require Workarounds
 
 These are not missing features but patterns that silently work differently or require
@@ -236,39 +228,12 @@ available by default in all contexts. Using string methods requires:
 
 ---
 
-### 4.2 JavaScript Reserved Words as Identifiers
-
-All JavaScript reserved words are also forbidden in RapydScript. Common Python identifiers
-that break: `default`, `delete`, `switch`, `case`, `break`, `var`, `void`, `typeof`,
-`instanceof`. Also cannot be used as keyword argument names in function calls.
-
-```python
-def configure(default=None):   # 'default' is reserved — compile error
-    ...
-# Must rename: def configure(dflt=None):
-```
-
----
-
 ### 4.3 `Cls.method(arg)` vs `@Cls.method`
 
 `Cls.method(arg)` compiles to `Cls.prototype.method.call(arg)` (unbound Python 2 style).
 `@Cls.method` as a decorator stores the constructor property and calls it differently.
 These are different lookup paths. A method that must work both as a decorator and as a
 direct class call needs to be installed on both `cls.property` and `cls.prototype.property`.
-
----
-
-### 4.4 `range` Cannot Be Shadowed as a Parameter Name
-
-```python
-def histogram(data, range):   # compile/runtime error — range shadows builtin
-    ...
-# Must rename: def histogram(data, data_range):
-```
-
-This extends to other builtins: prefer prefixed parameter names when a parameter naturally
-matches a builtin name.
 
 ---
 
@@ -313,4 +278,3 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
 | Low | `oct()` builtin | Trivial | Symmetry with `hex()` / `bin()` |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |
-| Low | `decimal` module | High | Financial calculations |
