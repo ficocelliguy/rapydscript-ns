@@ -1002,12 +1002,17 @@ define_str_func('replace', def(old, repl, count):
 )
 
 define_str_func('split', def(sep, maxsplit):
-    if maxsplit is 0:
-        return [this]
     split = ρσ_orig_split
     if sep is undefined or sep is None:
+        # Python str.split() with no separator: strip leading/trailing whitespace
+        # and split on runs of any whitespace character (space, tab, newline, etc.).
+        trimmed = this.trim()
+        if not trimmed:
+            return ρσ_list_decorate(v'[]')
+        if maxsplit is 0:
+            return ρσ_list_decorate([trimmed])
         if maxsplit > 0:
-            ans = split(this, /(\s+)/)
+            ans = split(trimmed, /(\s+)/)
             extra = ''
             parts = v'[]'
             for v'var i = 0; i < ans.length; i++':
@@ -1018,8 +1023,10 @@ define_str_func('split', def(sep, maxsplit):
             parts[-1] += extra
             ans = parts
         else:
-            ans = split(this, /\s+/)
+            ans = split(trimmed, /\s+/)
     else:
+        if maxsplit is 0:
+            return ρσ_list_decorate([this])
         if sep is '':
             raise ValueError('empty separator')
         ans = split(this, sep)
@@ -1029,11 +1036,13 @@ define_str_func('split', def(sep, maxsplit):
             ans.push(extra)
     return ρσ_list_decorate(ans)
 )
-# Patch String.prototype.split so that no-argument calls (text.split()) use Python
-# semantics (split on whitespace) rather than JS semantics (return [text]).
+# Patch String.prototype.split so that no-argument calls (text.split()) and
+# explicit None separator (text.split(None)) use Python semantics (split on
+# any whitespace, with leading/trailing whitespace stripped) rather than JS
+# semantics (no-arg returns [text]; null is coerced to the literal "null").
 String.prototype.split = def(sep, limit):
-    if sep is undefined:
-        return ρσ_str.prototype.split.call(this)
+    if sep is undefined or sep is None:
+        return ρσ_str.prototype.split.call(this, sep, limit)
     return ρσ_orig_split(this, sep, limit)
 
 define_str_func('rsplit', def(sep, maxsplit):

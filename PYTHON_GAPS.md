@@ -88,24 +88,6 @@ name. Hard to debug because no error is raised.
 
 ---
 
-### 1.7 `str.split()` With No Argument Splits Only On Space
-
-**Python:** `s.split()` (no args) splits on runs of any whitespace (space, tab, newline,
-form feed, etc.) **and** strips leading/trailing whitespace.
-**RapydScript:** `s.split()` splits on the single space character only. Tabs and newlines
-remain attached to neighbouring tokens.
-
-```python
-"hello\nworld\tfoo".split()
-# Python:    ['hello', 'world', 'foo']
-# RapydScript: ['hello\nworld\tfoo']  (one element)
-```
-
-**Impact:** Tokenising multi-line text, log lines, or anything containing tabs produces
-garbage. **Workaround:** `re.split(r'\s+', s.strip())` or `s.split(None)` if supported.
-
----
-
 ### 1.8 `1 / 0` Returns `None` Instead Of Raising `ZeroDivisionError`
 
 **Python:** Division by zero raises `ZeroDivisionError`.
@@ -603,7 +585,6 @@ Entries marked **NEW** were added in the 2026-05-26 coverage audit.
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| **NEW** High | `str.split()` splits only on space (§1.7) | Low | Silent wrong tokenisation of multi-line text |
 | **NEW** High | `1/0` returns `None` instead of `ZeroDivisionError` (§1.8) | Low | Defensive numeric code misbehaves silently |
 | **NEW** High | Python iterator protocol ignored (§2.13) | Medium | Hand-written `__iter__`/`__next__` classes don't work |
 | **NEW** High | Tuples unhashable as dict keys (§1.11) | Medium | Memoisation, sparse grids, graph keys break |

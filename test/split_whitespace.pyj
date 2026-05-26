@@ -1,0 +1,66 @@
+# Tests for Python-style str.split() on any whitespace.
+# vim:fileencoding=utf-8
+# globals: assrt
+
+ade = assrt.deepEqual
+
+# ── No-argument split: splits on runs of any whitespace ─────────────────────
+ade('a b c'.split(),          ['a', 'b', 'c'])
+ade('a  b  c'.split(),        ['a', 'b', 'c'])      # multi-space → one boundary
+ade('a\tb\tc'.split(),        ['a', 'b', 'c'])      # tabs
+ade('a\nb\nc'.split(),        ['a', 'b', 'c'])      # newlines
+ade('a\rb\rc'.split(),        ['a', 'b', 'c'])      # carriage returns
+ade('a\fb\vc'.split(),        ['a', 'b', 'c'])      # form-feed, vertical-tab
+ade('a \t b\nc'.split(),      ['a', 'b', 'c'])      # mixed whitespace
+
+# ── Leading and trailing whitespace stripped ────────────────────────────────
+ade('  hello   world  '.split(),  ['hello', 'world'])
+ade('\thello\n'.split(),          ['hello'])
+ade('hello'.split(),              ['hello'])
+
+# ── All-whitespace and empty strings return [] ──────────────────────────────
+ade(''.split(),       [])
+ade('   '.split(),    [])
+ade('\t\n '.split(),  [])
+
+# ── Explicit None separator behaves the same as no argument ─────────────────
+ade('a  b  c'.split(None),    ['a', 'b', 'c'])
+ade('  a b  '.split(None),    ['a', 'b'])
+
+# ── maxsplit with no separator: trims, then splits at most maxsplit times ──
+ade('a b c d'.split(None, 1),     ['a', 'b c d'])
+ade('a b c d'.split(None, 2),     ['a', 'b', 'c d'])
+ade('a b c d'.split(None, 0),     ['a b c d'])         # 0 splits, trimmed only
+ade('  a b c  '.split(None, 1),   ['a', 'b c'])         # trim + 1 split
+ade('  a b c  '.split(None, 0),   ['a b c'])            # trim, no splits
+ade('a \t b \t c'.split(None, 1), ['a', 'b \t c'])      # whitespace preserved past split point
+ade('a  b  c'.split(None, 5),     ['a', 'b', 'c'])      # maxsplit > actual splits
+
+# ── Explicit separator behaviour unchanged ──────────────────────────────────
+ade('a,b,c'.split(','),       ['a', 'b', 'c'])
+ade('a  b'.split(' '),        ['a', '', 'b'])   # explicit space keeps empties
+# str.split() supports Python maxsplit semantics with explicit separator
+ade(str.split('a,b,c', ',', 1),   ['a', 'b,c'])
+ade(str.split('a,b,c,d', ',', 2), ['a', 'b', 'c,d'])
+
+# ── Empty separator raises ValueError (via str.split) ───────────────────────
+ok = False
+try:
+    str.split('abc', '')
+except ValueError:
+    ok = True
+assrt.equal(ok, True)
+
+# ── str.split() function form still works ───────────────────────────────────
+ade(str.split('  one\ttwo\nthree  '), ['one', 'two', 'three'])
+ade(str.split('a b c', None, 1), ['a', 'b c'])
+
+# ── Variable-typed strings (not just literals) ──────────────────────────────
+s = '\thello\tworld\t'
+ade(s.split(), ['hello', 'world'])
+
+# ── Splitting the result is iterable as a Python list ───────────────────────
+parts = '  one two three  '.split()
+assrt.equal(parts.length, 3)
+assrt.equal(parts[0], 'one')
+assrt.equal(parts[-1], 'three')

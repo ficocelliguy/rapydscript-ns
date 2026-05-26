@@ -2145,6 +2145,24 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        {
+            name: "str_split_no_args_no_errors",
+            description: "str.split() with no args (Python-style whitespace split) parses cleanly with no diagnostics",
+            run: function () {
+                var markers = d().check([
+                    "s = '  hello   world  '",
+                    "parts = s.split()",
+                    "for p in parts:",
+                    "    print(p)",
+                    "more = '  a b c  '.split(None, 1)",
+                    "print(more)",
+                ].join("\n"));
+                var errs = markers.filter(function (m) { return m.severity === 1 || m.severity === 8; });
+                assert.deepStrictEqual(errs, [],
+                    "Expected no errors for str.split() with no args, got: " + JSON.stringify(errs));
+            },
+        },
+
     ];
 
     return TESTS;

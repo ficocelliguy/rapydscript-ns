@@ -2068,14 +2068,18 @@ strings()
 ```
 
 After you call the `strings()` function, all python string methods will be
-available on string objects, just as in python. The only caveat is that two
-methods: `split()` and `replace()` are left as the native JavaScript versions,
-as their behavior is not compatible with that of the python versions. You can
-control which methods are not copied to the JavaScript String object by passing
-their names to the `strings()` function, like this:
+available on string objects, just as in python. `String.prototype.split` is
+always patched (independent of `strings()`) so that `s.split()` with no
+argument — or with `None` as the separator — uses Python whitespace semantics:
+runs of any whitespace are treated as one boundary and leading/trailing
+whitespace is stripped. `s.split(sep, maxsplit)` with an explicit separator
+still uses native JavaScript semantics. `replace()` is left as the native
+JavaScript version, as its behavior is not compatible with the Python version.
+You can control which methods are not copied to the JavaScript String object
+by passing their names to the `strings()` function, like this:
 
 ```py
-strings('split', 'replace', 'find', ...)
+strings('replace', 'find', ...)
 # or
 strings(None)  # no methods are excluded
 ```
@@ -4320,7 +4324,7 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `~`, `<<`, `>>`) and ordered-comparison operators (`<`, `>`, `<=`, `>=`) dispatch to dunder methods (`__add__`, `__lt__`, etc.) when defined on the left operand. Also enables variable-operand `str * n` string repetition, `list * n` / `n * list` list repetition, `dict \| dict` / `dict \|= dict` merge, and Python-style lexicographic list comparison. | All operators compile directly to JS; no dunder dispatch. Literal `'abc' * n` / `n * 'abc'` still works (compile-time fast-path emits `.repeat(Math.max(0, n))`), but `s * n` for a variable `s` produces `NaN`. List repetition, dict merge, and Python-style list ordering are unavailable. |
 | `truthiness` | Python truthiness semantics: `[]`, `{}`, `set()`, `''`, `0`, `None` are falsy; objects with `__bool__` are dispatched; `and`/`or` return the deciding operand value (not `True`/`False`); `not`, `if`, `while`, `assert`, and ternary all route through `ρσ_bool()`. Also enables `__call__` dispatch: `obj(args)` invokes `obj.__call__(args)` for callable objects. | Truthiness is JS-native (all objects truthy); `__bool__` is never called; `and`/`or` return booleans; `__call__` is not dispatched. |
 | `jsx` | JSX syntax (`<Tag attr={expr}>children</Tag>` and `<>...</>` fragments) is recognised as expression syntax and compiled to `React.createElement` calls (or equivalent). | `<` is always a less-than operator; angle-bracket tokens are never parsed as JSX. |
-| `pythonize_strings` *(output-level option, not a `from __python__` flag)* | `String.prototype` is patched at startup with Python string methods (`strip`, `lstrip`, `rstrip`, `join`, `format`, `capitalize`, `lower`, `upper`, `find`, `rfind`, `index`, `rindex`, `count`, `startswith`, `endswith`, `center`, `ljust`, `rjust`, `zfill`, `partition`, `rpartition`, `splitlines`, `expandtabs`, `swapcase`, `title`, `isspace`, `islower`, `isupper`). Equivalent to calling `from pythonize import strings; strings()` manually. Note: `split()` and `replace()` are intentionally kept as their JS versions. | Python string methods are not available on string instances; call `str.strip(s)` etc., or import and call `strings()` from `pythonize` manually. Disable globally with `--legacy-rapydscript`. |
+| `pythonize_strings` *(output-level option, not a `from __python__` flag)* | `String.prototype` is patched at startup with Python string methods (`strip`, `lstrip`, `rstrip`, `join`, `format`, `capitalize`, `lower`, `upper`, `find`, `rfind`, `index`, `rindex`, `count`, `startswith`, `endswith`, `center`, `ljust`, `rjust`, `zfill`, `partition`, `rpartition`, `splitlines`, `expandtabs`, `swapcase`, `title`, `isspace`, `islower`, `isupper`). Equivalent to calling `from pythonize import strings; strings()` manually. Note: `replace()` is intentionally kept as its JS version; `split()` is always Python-style for no-arg/`None`-separator calls (any-whitespace, stripped) but keeps JS semantics for explicit separators. | Python string methods are not available on string instances; call `str.strip(s)` etc., or import and call `strings()` from `pythonize` manually. Disable globally with `--legacy-rapydscript`. |
 
 ---
 

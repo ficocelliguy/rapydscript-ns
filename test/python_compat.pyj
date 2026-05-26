@@ -235,18 +235,20 @@ strings()
 ae('  hello  '.strip(), 'hello')
 ae('hello world'.upper(), 'HELLO WORLD')
 
-# ── 15. strings() patches replace(); split() defaults to ' ' ──────────────────
+# ── 15. strings() patches replace(); split() splits on any whitespace ────────
 # (strings() is active from section 14 above)
 # Python str.split() with no args: splits on any whitespace, strips leading/trailing.
-# RapydScript .split() with no args: transpiles to .split(" ") — splits on single space.
+# RapydScript matches Python: .split() with no args also splits on any whitespace.
 
 # Python semantics via str module:
 ade(str.split('a  b'), ['a', 'b'])    # Python split on any whitespace
 ade(str.split('a  b c'), ['a', 'b', 'c'])
 
-# .split() with no args now defaults to splitting on ' ':
-ade('a  b'.split(), ['a', '', 'b'])   # double space → empty token between
-ade('a b'.split(' '), ['a', 'b'])     # explicit ' ' separator still works
+# .split() with no args splits on any whitespace, runs collapsed, ends stripped:
+ade('a  b'.split(), ['a', 'b'])               # multi-space treated as one
+ade('a\tb\nc'.split(), ['a', 'b', 'c'])       # tabs and newlines included
+ade('  hello   world  '.split(), ['hello', 'world'])  # leading/trailing stripped
+ade('a b'.split(' '), ['a', 'b'])             # explicit ' ' separator still works
 
 # str.replace() and String.prototype.replace() both use Python semantics (replace all).
 ae(str.replace('aaa', 'a', 'b'), 'bbb')     # Python: replaces all

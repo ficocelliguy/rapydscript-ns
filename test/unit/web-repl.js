@@ -5418,6 +5418,64 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_split_no_args_whitespace",
+        description: "str.split() with no args splits on any whitespace (Python semantics)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.deepEqual('a b c'.split(), ['a', 'b', 'c'])",
+                "assrt.deepEqual('a  b  c'.split(), ['a', 'b', 'c'])",
+                "assrt.deepEqual('a\\tb\\nc'.split(), ['a', 'b', 'c'])",
+                "assrt.deepEqual('  hello   world  '.split(), ['hello', 'world'])",
+                "assrt.deepEqual(''.split(), [])",
+                "assrt.deepEqual('   '.split(), [])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_split_none_separator",
+        description: "split(None) is equivalent to no-arg split — strips and splits on whitespace",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.deepEqual('  a b c  '.split(None), ['a', 'b', 'c'])",
+                "assrt.deepEqual('a\\nb\\tc'.split(None), ['a', 'b', 'c'])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_split_maxsplit_whitespace",
+        description: "split(None, maxsplit) honors Python maxsplit semantics",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.deepEqual('a b c d'.split(None, 1), ['a', 'b c d'])",
+                "assrt.deepEqual('a b c d'.split(None, 2), ['a', 'b', 'c d'])",
+                "assrt.deepEqual('  a b c  '.split(None, 1), ['a', 'b c'])",
+                "assrt.deepEqual('  a b c  '.split(None, 0), ['a b c'])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_split_explicit_sep_unchanged",
+        description: "Explicit separator behavior is unchanged (empties preserved)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "assrt.deepEqual('a,b,c'.split(','), ['a', 'b', 'c'])",
+                "assrt.deepEqual('a  b'.split(' '), ['a', '', 'b'])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------
