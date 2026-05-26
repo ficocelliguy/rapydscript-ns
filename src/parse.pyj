@@ -2379,7 +2379,16 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 if is_('punc', ')'):
                     next()
                     return new AST_Array({'elements':[], 'is_tuple_literal': True})
-                ex = expression(False)
+                if is_('operator', '*'):
+                    # Tuple literal starting with spread: (*a, ...) — must be a tuple
+                    spread_start = S.token
+                    next()
+                    spread_expr = expression(False)
+                    ex = new AST_Spread({'start': spread_start, 'expression': spread_expr, 'end': prev()})
+                    if not is_('punc', ','):
+                        croak("can't use starred expression here")
+                else:
+                    ex = expression(False)
                 if is_('keyword', 'for'):
                     ret = read_comprehension(new AST_GeneratorComprehension({'statement': ex}), ')')
                     S.in_parenthesized_expr = False
@@ -2391,7 +2400,13 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                         next()
                         if is_('punc', ')'):
                             break  # trailing comma is OK
-                        elements.push(expression(False))
+                        if is_('operator', '*'):
+                            spread_start = S.token
+                            next()
+                            spread_expr = expression(False)
+                            elements.push(new AST_Spread({'start': spread_start, 'expression': spread_expr, 'end': prev()}))
+                        else:
+                            elements.push(expression(False))
                     expect(')')
                     arr = new AST_Array({'elements': elements, 'start': start, 'end': prev(), 'is_tuple_literal': True})
                     S.in_parenthesized_expr = False

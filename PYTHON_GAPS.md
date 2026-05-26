@@ -293,24 +293,6 @@ Python 3.6+ allows underscores in numeric literals for readability: `1_000_000`,
 
 ---
 
-### 2.10 `*` Unpacking In Collection Literals (PEP 448)
-
-Python 3.5+ supports starred unpacking inside list, tuple, and set literals:
-
-```python
-a = [1, 2, 3]
-b = [0, *a, 4]                # [0, 1, 2, 3, 4]
-t = (0, *a, 4)
-s = {*a, 4, 5}
-```
-
-RapydScript rejects all three with `Unexpected token: operator «*»`. Dict `**` unpacking
-in dict literals (`{**a, **b}`) **does** work — only list/tuple/set unpacking is missing.
-
-**Workaround:** `[0] + a + [4]` or `list(a) + [4]`.
-
----
-
 ### 2.11 PEP 604 Union Type Syntax `X | Y`
 
 Python 3.10+ allows `int | str` in annotations as shorthand for `Union[int, str]`.
@@ -592,7 +574,6 @@ Entries marked **NEW** were added in the 2026-05-26 coverage audit.
 | High | `enum.IntEnum`, `IntFlag`, `Flag` (§3.1) | Medium | Protocol and permission modeling; bitfield enums |
 | **NEW** Medium | PEP 604 `X \| Y` union syntax (§2.11) | Medium | Modern annotations break on definition |
 | **NEW** Medium | `str(exc)` includes class name (§1.9) | Low | Exception-message comparisons fail |
-| **NEW** Medium | `*a` unpacking in list/tuple/set literals (§2.10) | Medium | Common PEP 448 idiom doesn't parse |
 | **NEW** Medium | Numeric underscore literals `1_000_000` (§2.9) | Low | Readable numeric constants fail to parse |
 | **NEW** Medium | `math.gcd`, `math.isclose`, `math.inf`/`nan`, `math.prod` (§3.6) | Low | Common numeric helpers |
 | **NEW** Medium | `operator.itemgetter`, `attrgetter`, `methodcaller` (§3.5) | Low | Idiomatic `key=` for `sorted`/`min`/`max` |

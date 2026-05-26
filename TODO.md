@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [ python style `str.split()` on any whitespace, not just spaces (see python gaps §1.7)] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [ python style `*a` unpacking in list/tuple/set literals (see python gaps §2.10)] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 
@@ -90,4 +90,27 @@ assert body == 'Hello\n\nworld'
 # Empty and all-whitespace inputs yield []
 assert "".split() == []
 assert " \t\n ".split() == []
+```
+
+
+Example: `*a` unpacking in list, tuple, and set literals (PEP 448)
+------------------------------------------------------------------
+
+```python
+head = [1, 2]
+tail = [4, 5]
+
+# Spread anywhere in a list literal
+combined = [0, *head, 3, *tail, 6]
+assert combined == [0, 1, 2, 3, 4, 5, 6]
+
+# Tuple literal — single-element spread needs the trailing comma
+just_head = (*head,)
+mixed_t   = (0, *head, *tail)
+assert just_head == (1, 2)
+assert mixed_t == (0, 1, 2, 4, 5)
+
+# Set literal — duplicates collapse
+unique = {*head, *tail, 1, 5}
+assert len(unique) == 4
 ```

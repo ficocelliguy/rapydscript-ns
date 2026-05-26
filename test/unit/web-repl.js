@@ -623,6 +623,67 @@ var TESTS = [
     },
 
     {
+        name: "bundle_list_spread",
+        description: "List literal spread [1, *a, 2] works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "a = [1, 2, 3]",
+                "b = [0, *a, 4]",
+                "assrt.equal(b.length, 5)",
+                "assrt.equal(b[0], 0)",
+                "assrt.equal(b[4], 4)",
+                "c = [*a]",
+                "assrt.equal(c.length, 3)",
+                "d = [*a, *a]",
+                "assrt.equal(d.length, 6)",
+                "assrt.equal(d[3], 1)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_tuple_spread",
+        description: "Tuple literal spread (1, *a, 2) works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "a = [1, 2, 3]",
+                "t = (0, *a, 4)",
+                "assrt.equal(t.length, 5)",
+                "assrt.equal(t[1], 1)",
+                "t2 = (*a,)",
+                "assrt.equal(t2.length, 3)",
+                "t3 = (*a, *a)",
+                "assrt.equal(t3.length, 6)",
+                "t4 = (1, *[10, 20], *(30, 40), 2)",
+                "assrt.equal(t4.length, 6)",
+                "assrt.equal(t4[3], 30)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_set_spread",
+        description: "Set literal spread {*a, 4, 5} works in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "a = [1, 2, 3]",
+                "s = {*a, 4, 5}",
+                "assrt.equal(s.jsset.size, 5)",
+                "assrt.ok(s.jsset.has(1))",
+                "assrt.ok(s.jsset.has(5))",
+                "s2 = {*a, *a, 10}",
+                "assrt.equal(s2.jsset.size, 4)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "nested_class_web_repl",
         description: "Nested class definitions compile and run correctly via the web-repl bundle",
         run: function () {

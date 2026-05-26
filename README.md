@@ -1066,6 +1066,22 @@ s2 = {*a, 10}               # set([1, 2, 3, 10])
 
 Translates to `ρσ_set([...a, ...b])`.
 
+### Tuple spread literals
+
+The same `*expr` syntax works inside tuple literals `(...)`:
+
+```py
+a = [1, 2, 3]
+
+t1 = (0, *a, 4)             # (0, 1, 2, 3, 4)
+t2 = (*a,)                  # (1, 2, 3) — trailing comma makes it a tuple
+t3 = (*a, *a)               # (1, 2, 3, 1, 2, 3)
+```
+
+Translates to `ρσ_tuple_decorate([...a, ...])`. As in Python, a bare
+`(*a)` without a trailing comma is a syntax error — use `(*a,)` for a
+single starred element.
+
 ### `**expr` in function calls
 
 `**expr` in a function call now accepts any expression, not just a plain
@@ -4219,6 +4235,7 @@ Python Feature Coverage
 | `raise X from Y` exception chaining                                                                                                                                                                                                                           | Sets `__cause__` on the thrown exception; `from None` also supported |
 | Starred assignment `a, *b, c = ...`                                                                                                                                                                                                                           | Works |
 | `[*a, 1, *b]` list spread                                                                                                                                                                                                                                     | Works; any iterable; translates to `[...a, 1, ...b]` |
+| `(*a, 1, *b)` tuple spread                                                                                                                                                                                                                                    | Works; bare `(*a)` requires trailing comma (`(*a,)`) per Python; translates to `ρσ_tuple_decorate([...a, 1, ...b])` |
 | `{*a, 1, *b}` set spread                                                                                                                                                                                                                                      | Works; translates to `ρσ_set([...a, 1, ...b])` |
 | `**expr` in function calls                                                                                                                                                                                                                                    | Works with any expression (variable, attr access, call, dict literal), not just plain names |
 | `@classmethod`, `@staticmethod`, `@property` / `@prop.setter`                                                                                                                                                                                                 | All work |

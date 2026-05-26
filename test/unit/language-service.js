@@ -1447,6 +1447,22 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        {
+            name: "tuple_spread_no_errors",
+            description: "tuple spread (1, *a, 2) and (*a,) produce no linter errors",
+            run: function () {
+                var markers = d().check([
+                    "a = [1, 2, 3]",
+                    "t1 = (0, *a, 4)",
+                    "t2 = (*a,)",
+                    "t3 = (*a, *a)",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
         // ── tuple type ────────────────────────────────────────────────────────
 
         {

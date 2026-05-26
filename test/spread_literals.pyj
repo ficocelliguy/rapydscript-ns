@@ -1,0 +1,112 @@
+# vim:fileencoding=utf-8
+# Tests for PEP 448 spread unpacking in list, tuple, and set literals
+# Examples: [1, *a, 2], (1, *a, 2), {1, *a, 2}
+
+# --- List spread ---
+a = [1, 2, 3]
+
+# Basic: spread in middle
+b = [0, *a, 4]
+assrt.equal(b.length, 5)
+assrt.equal(b[0], 0)
+assrt.equal(b[1], 1)
+assrt.equal(b[4], 4)
+
+# Spread at start
+b2 = [*a, 4]
+assrt.equal(b2.length, 4)
+assrt.equal(b2[0], 1)
+assrt.equal(b2[3], 4)
+
+# Spread at end
+b3 = [0, *a]
+assrt.equal(b3.length, 4)
+assrt.equal(b3[3], 3)
+
+# Spread alone
+b4 = [*a]
+assrt.equal(b4.length, 3)
+assrt.equal(b4[1], 2)
+
+# Multiple spreads
+b5 = [*a, *a]
+assrt.equal(b5.length, 6)
+assrt.equal(b5[3], 1)
+
+# Nested spreads
+b6 = [1, *[10, 20], *(30, 40), 2]
+assrt.equal(b6.length, 6)
+assrt.equal(b6[2], 20)
+assrt.equal(b6[3], 30)
+
+# Spread of generator
+def gen():
+    yield 100
+    yield 200
+b7 = [0, *gen(), 999]
+assrt.equal(b7.length, 4)
+assrt.equal(b7[1], 100)
+assrt.equal(b7[2], 200)
+assrt.equal(b7[3], 999)
+
+# Spread of string (iterable)
+b8 = ['a', *'bc', 'd']
+assrt.equal(b8.length, 4)
+assrt.equal(b8[1], 'b')
+assrt.equal(b8[2], 'c')
+
+# --- Tuple spread ---
+# Basic
+t = (0, *a, 4)
+assrt.equal(t.length, 5)
+assrt.equal(t[0], 0)
+assrt.equal(t[1], 1)
+assrt.equal(t[4], 4)
+
+# Spread at start
+t2 = (*a, 4)
+assrt.equal(t2.length, 4)
+assrt.equal(t2[0], 1)
+
+# Single-element starred tuple (trailing comma)
+t3 = (*a,)
+assrt.equal(t3.length, 3)
+assrt.equal(t3[2], 3)
+
+# Multiple spreads in tuple
+t4 = (*a, *a)
+assrt.equal(t4.length, 6)
+
+# Nested
+t5 = (1, *[10, 20], *(30, 40), 2)
+assrt.equal(t5.length, 6)
+assrt.equal(t5[2], 20)
+assrt.equal(t5[3], 30)
+
+# Spread of generator into tuple
+t6 = (0, *gen(), 999)
+assrt.equal(t6.length, 4)
+assrt.equal(t6[2], 200)
+
+# --- Set spread ---
+s = {*a, 4, 5}
+assrt.equal(s.jsset.size, 5)
+assrt.ok(s.jsset.has(1))
+assrt.ok(s.jsset.has(4))
+assrt.ok(s.jsset.has(5))
+
+# Spread alone in set
+s2 = {*a}
+assrt.equal(s2.jsset.size, 3)
+assrt.ok(s2.jsset.has(2))
+
+# Multiple spreads in set, deduplicated
+s3 = {*a, *a, 10}
+assrt.equal(s3.jsset.size, 4)
+
+# Set with spread of generator
+s4 = {*gen(), 0}
+assrt.equal(s4.jsset.size, 3)
+assrt.ok(s4.jsset.has(100))
+assrt.ok(s4.jsset.has(200))
+assrt.ok(s4.jsset.has(0))
