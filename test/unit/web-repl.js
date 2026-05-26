@@ -204,6 +204,26 @@ var TESTS = [
     },
 
     {
+        name: "bundle_runjs_assertion_error",
+        description: "`assert` in the runjs path throws AssertionError, not ReferenceError",
+        run: function () {
+            // Drive the env.js vm shim through the same path the browser repl
+            // uses: web_repl() bootstraps the baselib via vm.runInContext, then
+            // runjs() evaluates user code that references AssertionError.
+            // Regression for the case where the shim's top-level-decl scan
+            // missed `var X = function X() { ... };` declarations, leaving
+            // error classes undefined after bootstrap.
+            var repl = RS.web_repl();
+            var js = repl.compile("assert 1 is 2", { keep_baselib: false });
+            assert.throws(
+                function () { repl.runjs(js); },
+                function (e) { return e && e.constructor && e.constructor.name === "AssertionError"; },
+                "expected AssertionError, got: " + js
+            );
+        },
+    },
+
+    {
         name: "bundle_dict_from_counter",
         description: "dict(counter) works in the bundled baselib",
         run: function () {

@@ -188,6 +188,11 @@ function _rs_find_top_level_decl_names(src) {
             if (/^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(name)) names[name] = true;
         });
     }
+    // Also capture single-name `var X = ...` where the initializer contains
+    // braces (e.g. `var AssertionError = function AssertionError() { ... };`).
+    // The regex above stops at `{`, so those decls would otherwise be missed.
+    var var_init_re = /^(?:let|var|const)\s+([\p{L}_$][\p{L}\p{N}_$]*)\s*=/gmu;
+    while ((m = var_init_re.exec(normalized)) !== null) names[m[1]] = true;
     return Object.keys(names);
 }
 namespace._rs_find_top_level_decl_names = _rs_find_top_level_decl_names;
