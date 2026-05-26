@@ -2162,6 +2162,50 @@ var TESTS = [
     },
 
     {
+        name: "bundle_multiline_def_call_arg",
+        description: "Multi-line anonymous `def(...)` bodies as call arguments compile and run in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "def apply(fn, value):",
+                "    return fn(value)",
+                // multi-line def followed by trailing positional
+                "r1 = apply(def(x):",
+                "    y = x + 1",
+                "    return y * 2",
+                ", 10)",
+                "assrt.equal(r1, 22)",
+                // two multi-line defs side-by-side
+                "def combine(f, g, value):",
+                "    return f(value) + g(value)",
+                "r2 = combine(def(x):",
+                "    return x * 10",
+                ", def(y):",
+                "    return y + 1",
+                ", 5)",
+                "assrt.equal(r2, 56)",
+                // multi-line def in a list literal
+                "funcs = [def(x):",
+                "    return x * 2",
+                ", def(x):",
+                "    return x * 3",
+                "]",
+                "assrt.equal(funcs[0](5), 10)",
+                "assrt.equal(funcs[1](5), 15)",
+                // multi-line def in a dict literal
+                "d = {'a': def(x):",
+                "    return x + 1",
+                ", 'b': def(x):",
+                "    return x - 1",
+                "}",
+                "assrt.equal(d['a'](10), 11)",
+                "assrt.equal(d['b'](10), 9)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_contextlib_asynccontextmanager",
         description: "contextlib.asynccontextmanager + async-with run correctly in the web-repl bundle",
         run: function () {

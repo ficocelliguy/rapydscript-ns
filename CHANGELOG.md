@@ -2,6 +2,7 @@ version 0.9.7 (unreleased)
 =======================
 * Added support for `async with` statements (single- and multi-clause); awaits `__aenter__()` before the body and `__aexit__()` on exit, with LIFO ordering and exception forwarding/suppression matching CPython semantics.
 * Added `contextlib.asynccontextmanager` decorator: turns an async generator function into an async context manager, with code before the `yield` running in `__aenter__` and code after it in `__aexit__`; exceptions raised in the `async with` body are thrown into the generator at the yield point.
+* Documented and locked in (with unit, language-service and web-repl tests) support for multi-line anonymous `def(...)` bodies as call arguments, including alongside positional / keyword arguments and inside list / dict literals — Python's `lambda` is limited to single expressions, so this is a RapydScript convenience extension.
 
 version 0.9.6
 =======================

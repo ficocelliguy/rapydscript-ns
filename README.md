@@ -361,6 +361,33 @@ line (function inlining). This is a feature of RapydScript that can be used
 to make the code cleaner in cases like the example above. You can also use it 
 in longer functions by chaining statements together using `;`.
 
+A multi-line `def(...)` body may also be passed directly as a call argument,
+including alongside other positional or keyword arguments and inside list /
+dict literals — Python's own `lambda` is restricted to a single expression,
+so this is one place where RapydScript is more flexible:
+
+```py
+items = [3, -1, 4, 1, 5]
+
+# multi-line def as a call argument, followed by more positional args
+result = list(map(def(x):
+    if x < 0:
+        return 0
+    return x * x
+, items))
+
+# multi-line def alongside a keyword argument
+sorted_items = sorted(items, key=def(x):
+    abs_x = x if x >= 0 else -x
+    return abs_x
+)
+```
+
+The body of an inline `def(...)` follows the same indentation rules as a
+top-level function: indent past the `def`, and resume the enclosing call at
+the original indentation level (the closing `)` or a following `,` ends the
+function body).
+
 
 Lambda Expressions
 ------------------

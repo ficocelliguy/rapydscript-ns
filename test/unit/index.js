@@ -7309,6 +7309,165 @@ assrt.equal(fib(15), 610)
         js_checks: [],
     },
 
+    // ── Multi-line anonymous defs as call arguments ───────────────────────
+
+    {
+        name: "multiline_def_call_arg_basic",
+        description: "Multi-line `def(...)` body can be passed as a call argument with trailing args",
+        src: [
+            "# globals: assrt",
+            "def apply(fn, value):",
+            "    return fn(value)",
+            "answer = apply(def(x):",
+            "    y = x + 1",
+            "    z = y * 2",
+            "    return z",
+            ", 10)",
+            "assrt.equal(answer, 22)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_call_arg_only_arg",
+        description: "Multi-line `def(...)` may be the only argument to a call",
+        src: [
+            "# globals: assrt",
+            "def apply(fn):",
+            "    return fn(10)",
+            "answer = apply(def(x):",
+            "    y = x + 1",
+            "    return y * 2",
+            ")",
+            "assrt.equal(answer, 22)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_call_arg_multiple",
+        description: "Two multi-line `def(...)` bodies side-by-side in one call",
+        src: [
+            "# globals: assrt",
+            "def combine(f, g, value):",
+            "    return f(value) + g(value)",
+            "result = combine(def(x):",
+            "    return x * 10",
+            ", def(y):",
+            "    return y + 1",
+            ", 5)",
+            "assrt.equal(result, 56)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_call_arg_as_kwarg",
+        description: "Multi-line `def(...)` can be passed as a keyword argument value",
+        src: [
+            "# globals: assrt",
+            "def apply_kw(fn, factor=1):",
+            "    return fn(10) * factor",
+            "result = apply_kw(def(x):",
+            "    return x * 2",
+            ", factor=3)",
+            "assrt.equal(result, 60)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_in_list_literal",
+        description: "Multi-line `def(...)` bodies can appear as elements of a list literal",
+        src: [
+            "# globals: assrt",
+            "funcs = [def(x):",
+            "    return x * 2",
+            ", def(x):",
+            "    return x * 3",
+            "]",
+            "assrt.equal(funcs[0](5), 10)",
+            "assrt.equal(funcs[1](5), 15)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_in_dict_literal",
+        description: "Multi-line `def(...)` bodies can appear as values in a dict literal",
+        src: [
+            "# globals: assrt",
+            "d = {'doubler': def(x):",
+            "    return x * 2",
+            ", 'tripler': def(x):",
+            "    return x * 3",
+            "}",
+            "assrt.equal(d['doubler'](7), 14)",
+            "assrt.equal(d['tripler'](7), 21)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_call_arg_control_flow",
+        description: "Multi-line `def(...)` body may contain if/elif/else and loops",
+        src: [
+            "# globals: assrt",
+            "def apply(fn, value):",
+            "    return fn(value)",
+            "label = apply(def(x):",
+            "    if x > 0:",
+            "        return 'positive'",
+            "    elif x < 0:",
+            "        return 'negative'",
+            "    else:",
+            "        return 'zero'",
+            ", -3)",
+            "assrt.equal(label, 'negative')",
+            "summed = apply(def(n):",
+            "    total = 0",
+            "    for i in range(n):",
+            "        total += i",
+            "    return total",
+            ", 10)",
+            "assrt.equal(summed, 45)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_nested_in_call_arg",
+        description: "A multi-line `def(...)` body can itself contain a multi-line `def(...)` call argument",
+        src: [
+            "# globals: assrt",
+            "def apply(fn, value):",
+            "    return fn(value)",
+            "outer = apply(def(x):",
+            "    inner = apply(def(y):",
+            "        return y + 100",
+            "    , x)",
+            "    return inner",
+            ", 7)",
+            "assrt.equal(outer, 107)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "multiline_def_with_defaults_in_call_arg",
+        description: "Multi-line `def(arg=default)` works as a call argument",
+        src: [
+            "# globals: assrt",
+            "def call_with_42(fn):",
+            "    return fn(42)",
+            "result = call_with_42(def(x, factor=2):",
+            "    return x * factor",
+            ")",
+            "assrt.equal(result, 84)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

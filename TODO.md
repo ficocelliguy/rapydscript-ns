@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [the python contextlib.asynccontextmanager module ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [ python style Multi-line Anonymous Functions in Call Arguments ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 ## Example: Set operators
@@ -157,4 +157,34 @@ async def main():
     async with session('/data') as r:
         data = await r.read()
         return data
+```
+
+## Example: Multi-line anonymous `def` as a call argument
+
+```python
+items = [3, -1, 4, 1, 5, -9, 2]
+
+# Multi-line def passed directly to map(), followed by another arg
+squared_positives = list(map(def(x):
+    if x < 0:
+        return 0
+    return x * x
+, items))
+assert squared_positives == [9, 0, 16, 1, 25, 0, 4]
+
+# Multi-line def alongside a keyword argument
+by_abs = sorted(items, key=def(x):
+    return x if x >= 0 else -x
+)
+assert by_abs == [-1, 1, 2, 3, 4, 5, -9]
+
+# Multi-line defs inside a dict literal
+ops = {'square': def(x):
+    return x * x
+, 'cube': def(x):
+    y = x * x
+    return y * x
+}
+assert ops['square'](4) == 16
+assert ops['cube'](3) == 27
 ```

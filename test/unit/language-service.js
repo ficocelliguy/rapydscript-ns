@@ -2013,6 +2013,68 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── Multi-line anonymous defs as call arguments ───────────────────
+
+        {
+            name: "multiline_def_call_arg_no_errors",
+            description: "Multi-line `def(...)` body as a call argument parses cleanly (no syntax or undefined-symbol markers)",
+            run: function () {
+                var markers = d().check([
+                    "def apply(fn, value):",
+                    "    return fn(value)",
+                    "",
+                    "answer = apply(def(x):",
+                    "    y = x + 1",
+                    "    z = y * 2",
+                    "    return z",
+                    ", 10)",
+                    "print(answer)",
+                ].join("\n"));
+                assert.deepStrictEqual(markers, [],
+                    "Expected no markers for multi-line anon def in call arg, got: " + JSON.stringify(markers));
+            },
+        },
+
+        {
+            name: "multiline_def_in_list_literal_no_errors",
+            description: "Multi-line `def(...)` bodies as elements of a list literal parse cleanly",
+            run: function () {
+                var markers = d().check([
+                    "funcs = [def(x):",
+                    "    return x * 2",
+                    ", def(x):",
+                    "    return x * 3",
+                    "]",
+                    "print(funcs[0](5))",
+                ].join("\n"));
+                var errs = markers.filter(function (m) { return m.severity === 1 || m.severity === 8; });
+                assert.deepStrictEqual(errs, [],
+                    "Expected no errors for multi-line anon defs in list literal, got: " + JSON.stringify(errs));
+            },
+        },
+
+        {
+            name: "multiline_def_local_vars_no_undef",
+            description: "Local variables defined inside a multi-line anon def in a call arg resolve correctly",
+            run: function () {
+                var markers = d().check([
+                    "def apply(fn, value):",
+                    "    return fn(value)",
+                    "",
+                    "result = apply(def(n):",
+                    "    total = 0",
+                    "    for i in range(n):",
+                    "        total += i",
+                    "    return total",
+                    ", 10)",
+                    "print(result)",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.message.indexOf("Undefined symbol") !== -1; });
+                assert.deepStrictEqual(undef, [],
+                    "Expected no 'Undefined symbol' errors inside multi-line anon def body, got: " + JSON.stringify(undef));
+            },
+        },
+
     ];
 
     return TESTS;

@@ -243,25 +243,7 @@ available by default in all contexts. Using string methods requires:
 
 ---
 
-### 4.2 Multi-line Anonymous Functions in Call Arguments
-
-Multi-line `def` blocks cannot be used as inline arguments to function calls:
-
-```python
-# Does NOT compile correctly:
-result = map(def(x):
-    return x * 2
-, my_list)
-
-# Must use a named helper:
-def double(x):
-    return x * 2
-result = map(double, my_list)
-```
-
----
-
-### 4.3 JavaScript Reserved Words as Identifiers
+### 4.2 JavaScript Reserved Words as Identifiers
 
 All JavaScript reserved words are also forbidden in RapydScript. Common Python identifiers
 that break: `default`, `delete`, `switch`, `case`, `break`, `var`, `void`, `typeof`,
@@ -275,7 +257,7 @@ def configure(default=None):   # 'default' is reserved — compile error
 
 ---
 
-### 4.4 Class Named `Error` Shadows JS `Error`
+### 4.3 Class Named `Error` Shadows JS `Error`
 
 Defining a class named `Error` (e.g., `class Error(Exception)`) compiles to a JS function
 that shadows the global `JS Error` constructor. If that class is then imported in another
@@ -287,7 +269,7 @@ shadows the native `Error`, causing infinite recursion in `Exception.__init__`.
 
 ---
 
-### 4.5 `Cls.method(arg)` vs `@Cls.method`
+### 4.4 `Cls.method(arg)` vs `@Cls.method`
 
 `Cls.method(arg)` compiles to `Cls.prototype.method.call(arg)` (unbound Python 2 style).
 `@Cls.method` as a decorator stores the constructor property and calls it differently.
@@ -296,7 +278,7 @@ direct class call needs to be installed on both `cls.property` and `cls.prototyp
 
 ---
 
-### 4.6 `range` Cannot Be Shadowed as a Parameter Name
+### 4.5 `range` Cannot Be Shadowed as a Parameter Name
 
 ```python
 def histogram(data, range):   # compile/runtime error — range shadows builtin
@@ -309,7 +291,7 @@ matches a builtin name.
 
 ---
 
-### 4.7 Verbatim Blocks Are Truly Verbatim — No Escape Processing
+### 4.6 Verbatim Blocks Are Truly Verbatim — No Escape Processing
 
 Inside `v'...'` blocks, Python escape sequences are NOT processed. `\n` in a v-block
 becomes a literal backslash-n in the JS output, not a newline.
@@ -326,7 +308,7 @@ in JS (two characters), not a newline.
 
 ---
 
-### 4.8 `jstype(x) is 'number'` for `typeof` Checks
+### 4.7 `jstype(x) is 'number'` for `typeof` Checks
 
 Python's `type(x)` does not return a string. For JS-style `typeof` checks:
 
