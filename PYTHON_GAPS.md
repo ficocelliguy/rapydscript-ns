@@ -88,17 +88,6 @@ name. Hard to debug because no error is raised.
 
 ---
 
-### 1.8 `1 / 0` Returns `None` Instead Of Raising `ZeroDivisionError`
-
-**Python:** Division by zero raises `ZeroDivisionError`.
-**RapydScript:** `1 / 0` evaluates to `None`. Code that catches `ZeroDivisionError`
-will never enter the handler, and downstream arithmetic on the `None` result either
-fails later with a confusing type error or silently produces more `None`s.
-
-**Impact:** Numerical code that defensively catches division-by-zero is broken silently.
-
----
-
 ### 1.9 `str(ExceptionInstance)` Includes The Class Name
 
 **Python:** `str(ValueError("bad"))` → `"bad"`.
@@ -541,7 +530,6 @@ Entries marked **NEW** were added in the 2026-05-26 coverage audit.
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| **NEW** High | `1/0` returns `None` instead of `ZeroDivisionError` (§1.8) | Low | Defensive numeric code misbehaves silently |
 | **NEW** High | Tuples unhashable as dict keys (§1.11) | Medium | Memoisation, sparse grids, graph keys break |
 | **NEW** High | `str.encode()` / `bytes.decode()` missing (§3.7) | Low | Common UTF-8 conversion pattern needs v-block |
 | High | `enum.IntEnum`, `IntFlag`, `Flag` (§3.1) | Medium | Protocol and permission modeling; bitfield enums |

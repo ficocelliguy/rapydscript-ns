@@ -178,14 +178,51 @@ var TESTS = [
 
     {
         name: "floor_division",
-        description: "// operator compiles to Math.floor(x / y)",
+        description: "// operator routes through ρσ_op_floordiv_ns (python_division on by default; raises ZeroDivisionError on zero divisor)",
         src: [
             "# globals: assrt",
             "assrt.equal(7 // 2, 3)",
             "assrt.equal(-7 // 2, -4)",
             "assrt.equal(10 // 3, 3)",
         ].join("\n"),
+        js_checks: ["ρσ_op_floordiv_ns(7, 2)", "ρσ_op_floordiv_ns(-7, 2)"],
+    },
+
+    {
+        name: "floor_division_no_python_division",
+        description: "// operator falls back to Math.floor(x / y) with no_python_division",
+        src: [
+            "# globals: assrt",
+            "from __python__ import no_python_division",
+            "assrt.equal(7 // 2, 3)",
+            "assrt.equal(-7 // 2, -4)",
+        ].join("\n"),
         js_checks: ["Math.floor(7 / 2)", "Math.floor(-7 / 2)"],
+    },
+
+    {
+        name: "true_division_python_division",
+        description: "/ operator routes through ρσ_op_truediv_ns when python_division is on (default)",
+        src: [
+            "# globals: assrt",
+            "assrt.equal(6 / 3, 2)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_truediv_ns(6, 3)"],
+    },
+
+    {
+        name: "division_by_zero_raises",
+        description: "1 / 0 raises ZeroDivisionError under python_division (default)",
+        src: [
+            "# globals: assrt",
+            "raised = False",
+            "try:",
+            "    x = 1 / 0",
+            "except ZeroDivisionError:",
+            "    raised = True",
+            "assrt.ok(raised)",
+        ].join("\n"),
+        js_checks: ["ρσ_op_truediv_ns(1, 0)"],
     },
 
     {

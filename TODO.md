@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [ Python iterator protocol (see python gaps §2.13)] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [ Python style `1/0` returns `None` instead of `ZeroDivisionError` (see python gaps §1.8)] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 
@@ -157,4 +157,28 @@ it = iter(Squares(2))
 assert next(it) == 0
 assert next(it) == 1
 assert next(it, 'done') == 'done'
+```
+
+
+Example: Division by zero raises `ZeroDivisionError` (Python semantics)
+----------------------------------------------------------------------
+
+```python
+def safe_ratio(num, denom):
+    try:
+        return num / denom
+    except ZeroDivisionError:
+        return None
+
+assert safe_ratio(10, 4) == 2.5
+assert safe_ratio(10, 0) is None
+
+# // and % raise the same error
+try:
+    x = 5 // 0
+except ZeroDivisionError as e:
+    assert e.message == 'integer division or modulo by zero'
+
+# Opt out per-scope to recover JS Infinity / NaN behaviour:
+#   from __python__ import no_python_division
 ```

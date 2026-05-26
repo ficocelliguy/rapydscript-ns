@@ -328,6 +328,20 @@ def print_binary_op(self, output):
         self.right.print(output)
         output.print(')')
         return
+    if self.operator is '/' and self.python_div:
+        output.print('ρσ_op_truediv_ns(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
+        return
+    if self.operator is '//' and self.python_div:
+        output.print('ρσ_op_floordiv_ns(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
+        return
     if function_ops[self.operator]:
         output.print(function_ops[self.operator])
         output.with_parens(def():
@@ -487,14 +501,29 @@ def print_assign(self, output):
         return
     if self.operator is '//=':
         output.assign(self.left)
-        output.print('Math.floor')
-        output.with_parens(def():
+        if self.python_div:
+            output.print('ρσ_op_floordiv_ns(')
             self.left.print(output)
-            output.space()
-            output.print('/')
-            output.space()
+            output.comma()
             self.right.print(output)
-        )
+            output.print(')')
+        else:
+            output.print('Math.floor')
+            output.with_parens(def():
+                self.left.print(output)
+                output.space()
+                output.print('/')
+                output.space()
+                self.right.print(output)
+            )
+        return
+    if self.operator is '/=' and self.python_div:
+        output.assign(self.left)
+        output.print('ρσ_op_truediv_ns(')
+        self.left.print(output)
+        output.comma()
+        self.right.print(output)
+        output.print(')')
         return
     if self.operator is '%=' and self.python_mod:
         output.assign(self.left)

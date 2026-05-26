@@ -3114,6 +3114,67 @@ var TESTS = [
     },
 
     {
+        name: "bundle_python_division",
+        description: "Division by zero raises ZeroDivisionError in the web-repl bundle (python_division on by default)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "raised = False",
+                "try:",
+                "    x = 1 / 0",
+                "except ZeroDivisionError as e:",
+                "    raised = True",
+                "    assrt.equal(e.message, 'division by zero')",
+                "assrt.ok(raised)",
+                "raised = False",
+                "try:",
+                "    x = 5 // 0",
+                "except ZeroDivisionError as e:",
+                "    raised = True",
+                "    assrt.equal(e.message, 'integer division or modulo by zero')",
+                "assrt.ok(raised)",
+                "raised = False",
+                "try:",
+                "    x = 7 % 0",
+                "except ZeroDivisionError:",
+                "    raised = True",
+                "assrt.ok(raised)",
+                // Augmented forms
+                "x = 10",
+                "raised = False",
+                "try:",
+                "    x /= 0",
+                "except ZeroDivisionError:",
+                "    raised = True",
+                "assrt.ok(raised)",
+                // Normal cases still work
+                "assrt.equal(6 / 3, 2)",
+                "assrt.equal(7 // 2, 3)",
+                "assrt.equal(-7 // 2, -4)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_python_division_off",
+        description: "With from __python__ import no_python_division, web-repl falls back to raw JS division (Infinity/NaN for zero divisor)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import no_python_division, no_overload_operators",
+                "assrt.ok(1 / 0 is Infinity)",
+                "assrt.ok(-1 / 0 is -Infinity)",
+                "assrt.ok(isNaN(0 / 0))",
+                "assrt.ok(5 // 0 is Infinity)",
+                "assrt.equal(6 / 3, 2)",
+                "assrt.equal(7 // 2, 3)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_python_bitwise_precedence",
         description: "Python-style bitwise precedence: (&, |, ^, <<, >>) bind tighter than comparisons in the web-repl bundle (on by default)",
         run: function () {

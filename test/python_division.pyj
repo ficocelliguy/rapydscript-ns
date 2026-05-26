@@ -1,0 +1,126 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# python_division.pyj
+# Tests for Python-style division: dividing by zero raises ZeroDivisionError.
+# python_division defaults to True; no __python__ import needed.
+
+ae = assrt.equal
+ok = assrt.ok
+
+# ── Normal division still works ──────────────────────────────────────────────
+ae(6 / 3, 2)
+ae(7 / 2, 3.5)
+ae(7 // 2, 3)
+ae(-7 // 2, -4)
+ae(-1 / 4, -0.25)
+
+# ── / by zero raises ZeroDivisionError ───────────────────────────────────────
+raised = False
+try:
+    x = 1 / 0
+except ZeroDivisionError as e:
+    raised = True
+    ae(e.message, 'division by zero')
+ok(raised)
+
+raised = False
+try:
+    x = 0 / 0
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+raised = False
+try:
+    x = -3.5 / 0
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+# ── // by zero raises ZeroDivisionError ──────────────────────────────────────
+raised = False
+try:
+    x = 5 // 0
+except ZeroDivisionError as e:
+    raised = True
+    ae(e.message, 'integer division or modulo by zero')
+ok(raised)
+
+# ── % by zero raises ZeroDivisionError ───────────────────────────────────────
+# (modulo-by-zero is part of the same Python rule; piggybacks on python_modulo)
+raised = False
+try:
+    x = 7 % 0
+except ZeroDivisionError as e:
+    raised = True
+    ae(e.message, 'integer division or modulo by zero')
+ok(raised)
+
+# ── Augmented `/=` raises ────────────────────────────────────────────────────
+x = 10
+raised = False
+try:
+    x /= 0
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+# ── Augmented `//=` raises ───────────────────────────────────────────────────
+x = 10
+raised = False
+try:
+    x //= 0
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+# ── Augmented `%=` raises ────────────────────────────────────────────────────
+x = 10
+raised = False
+try:
+    x %= 0
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+# ── False (zero) as divisor still raises ─────────────────────────────────────
+raised = False
+try:
+    x = 1 / False
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+# ── Variables (not just literals) ────────────────────────────────────────────
+a = 7
+b = 0
+raised = False
+try:
+    x = a / b
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+# ── BigInt zero divisor raises ZeroDivisionError ─────────────────────────────
+raised = False
+try:
+    x = BigInt(5) // BigInt(0)
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+raised = False
+try:
+    x = BigInt(5) % BigInt(0)
+except ZeroDivisionError:
+    raised = True
+ok(raised)
+
+# ── ZeroDivisionError is catchable as Exception ──────────────────────────────
+raised = False
+try:
+    x = 1 / 0
+except Exception:
+    raised = True
+ok(raised)

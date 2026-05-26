@@ -994,6 +994,7 @@ class AST_Binary(AST_Node):
         'overloaded': "[bool] Whether to use Python-style operator overloading dispatch",
         'strict_arith': "[bool] Whether incompatible operand types raise TypeError (default True when overloaded; disable with no_strict_arithmetic)",
         'python_mod': "[bool] Whether `%` uses Python-style modulo (sign of divisor); disable with no_python_modulo",
+        'python_div': "[bool] Whether `/`/`//` raise ZeroDivisionError on divide-by-zero; disable with no_python_division",
         'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
     }
 

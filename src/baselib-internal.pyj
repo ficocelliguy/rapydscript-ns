@@ -372,7 +372,9 @@ def ρσ_op_truediv(a, b):
     if b is not None and jstype(b.__rtruediv__) is 'function': return b.__rtruediv__(a)
     ta = jstype(a)
     tb = jstype(b)
-    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a / b
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
+        if v'Number(b) === 0': raise ZeroDivisionError('division by zero')
+        return a / b
     if ta is 'bigint' and tb is 'bigint':
         raise TypeError("unsupported operand type(s) for /: 'long' and 'long' — use // for integer division of long values")
     raise TypeError("unsupported operand type(s) for /: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
@@ -382,8 +384,11 @@ def ρσ_op_floordiv(a, b):
     if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
     ta = jstype(a)
     tb = jstype(b)
-    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return Math.floor(a / b)
+    if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
+        if v'Number(b) === 0': raise ZeroDivisionError('integer division or modulo by zero')
+        return Math.floor(a / b)
     if ta is 'bigint' and tb is 'bigint':
+        if v'b === 0n': raise ZeroDivisionError('integer division or modulo by zero')
         v'var ρσ_bq = a / b, ρσ_br = a % b; if (ρσ_br !== 0n && (ρσ_br < 0n) !== (b < 0n)) { return ρσ_bq - 1n; } return ρσ_bq;'
     raise TypeError("unsupported operand type(s) for //: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
@@ -395,8 +400,10 @@ def ρσ_op_mod(a, b):
     if ta is 'string' or v'a instanceof String':
         return ρσ_format_percent(a, b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
+        if v'Number(b) === 0': raise ZeroDivisionError('integer division or modulo by zero')
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;'
     if ta is 'bigint' and tb is 'bigint':
+        if v'b === 0n': raise ZeroDivisionError('integer division or modulo by zero')
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;'
     raise TypeError("unsupported operand type(s) for %: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
@@ -661,13 +668,18 @@ def ρσ_op_mul_ns(a, b):
 def ρσ_op_truediv_ns(a, b):
     if a is not None and jstype(a.__truediv__) is 'function': return a.__truediv__(b)
     if b is not None and jstype(b.__rtruediv__) is 'function': return b.__rtruediv__(a)
+    if v'Number(b) === 0' and (jstype(a) is 'number' or jstype(a) is 'boolean') and (jstype(b) is 'number' or jstype(b) is 'boolean'):
+        raise ZeroDivisionError('division by zero')
     return v'a / b'
 
 def ρσ_op_floordiv_ns(a, b):
     if a is not None and jstype(a.__floordiv__) is 'function': return a.__floordiv__(b)
     if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
     if jstype(a) is 'bigint' and jstype(b) is 'bigint':
+        if v'b === 0n': raise ZeroDivisionError('integer division or modulo by zero')
         v'var ρσ_bq = a / b, ρσ_br = a % b; if (ρσ_br !== 0n && (ρσ_br < 0n) !== (b < 0n)) { return ρσ_bq - 1n; } return ρσ_bq;'
+    if v'Number(b) === 0' and (jstype(a) is 'number' or jstype(a) is 'boolean') and (jstype(b) is 'number' or jstype(b) is 'boolean'):
+        raise ZeroDivisionError('integer division or modulo by zero')
     return Math.floor(v'a / b')
 
 def ρσ_op_mod_ns(a, b):
@@ -678,8 +690,10 @@ def ρσ_op_mod_ns(a, b):
     if ta is 'string' or v'a instanceof String':
         return ρσ_format_percent(a, b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
+        if v'Number(b) === 0': raise ZeroDivisionError('integer division or modulo by zero')
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0 && (ρσ_mr < 0) !== (b < 0)) { return ρσ_mr + Number(b); } return ρσ_mr;'
     if ta is 'bigint' and tb is 'bigint':
+        if v'b === 0n': raise ZeroDivisionError('integer division or modulo by zero')
         v'var ρσ_mr = a % b; if (ρσ_mr !== 0n && (ρσ_mr < 0n) !== (b < 0n)) { return ρσ_mr + b; } return ρσ_mr;'
     return v'a % b'
 

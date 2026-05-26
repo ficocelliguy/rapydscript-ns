@@ -1,0 +1,34 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# python_division_off.pyj
+# Tests for opting out of Python-style division via no_python_division.
+# With the flag off, `/` and `//` emit raw JS arithmetic which returns
+# Infinity/NaN for zero divisors instead of raising.
+
+from __python__ import no_python_division
+
+ae = assrt.equal
+ok = assrt.ok
+
+# Raw JS semantics: 1/0 → Infinity, -1/0 → -Infinity, 0/0 → NaN
+ok(1 / 0 is Infinity)
+ok(-1 / 0 is -Infinity)
+ok(isNaN(0 / 0))
+
+# Math.floor(Infinity) is still Infinity in JS
+ok(5 // 0 is Infinity)
+ok(-5 // 0 is -Infinity)
+
+# Augmented forms also fall through
+x = 10
+x /= 0
+ok(x is Infinity)
+
+y = 10
+y //= 0
+ok(y is Infinity)
+
+# Normal cases still work
+ae(6 / 3, 2)
+ae(7 // 2, 3)
