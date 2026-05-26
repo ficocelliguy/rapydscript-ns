@@ -1,4 +1,6 @@
 
+python dict methods for keys and values are returning "Map Iterator" which, if that's supposed to be the view object, is correct but the script editor mouse hover/autofill says the return type is "list" which is not correct and painful for those of us who didn't remember the nuanced distinction
+
 
 - remove repl_mode and make repl make a new context for each "run" press
 
