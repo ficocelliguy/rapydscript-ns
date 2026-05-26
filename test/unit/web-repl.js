@@ -4910,6 +4910,111 @@ var TESTS = [
         },
     },
 
+    // ── difflib stdlib ───────────────────────────────────────────────────────
+
+    {
+        name: "bundle_difflib_sequencematcher",
+        description: "difflib stdlib: SequenceMatcher ratio and opcodes in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from difflib import SequenceMatcher",
+                "s = SequenceMatcher(None, 'abcd', 'abcd')",
+                "assrt.equal(s.ratio(), 1.0)",
+                "s = SequenceMatcher(None, 'abcd', 'bcde')",
+                "assrt.equal(s.ratio(), 0.75)",
+                // get_opcodes — Python doc example
+                "s = SequenceMatcher(None, 'qabxcd', 'abycdf')",
+                "ops = s.get_opcodes()",
+                "assrt.equal(ops.length, 5)",
+                "assrt.equal(ops[0][0], 'delete')",
+                "assrt.equal(ops[1][0], 'equal')",
+                "assrt.equal(ops[2][0], 'replace')",
+                "assrt.equal(ops[3][0], 'equal')",
+                "assrt.equal(ops[4][0], 'insert')",
+                // find_longest_match
+                "m = s.find_longest_match(0, 6, 0, 6)",
+                "assrt.equal(m.a, 1)",
+                "assrt.equal(m.b, 0)",
+                "assrt.equal(m.size, 2)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_difflib_get_close_matches",
+        description: "difflib stdlib: get_close_matches in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from difflib import get_close_matches",
+                "r = get_close_matches('appel', ['apple', 'apply', 'banana'])",
+                "assrt.deepEqual(r, ['apple', 'apply'])",
+                "r = get_close_matches('appel', ['apple', 'apply', 'banana'], 1)",
+                "assrt.deepEqual(r, ['apple'])",
+                "r = get_close_matches('xyz', ['apple', 'banana'], 3, 0.9)",
+                "assrt.deepEqual(r, [])",
+                // empty possibilities
+                "assrt.deepEqual(get_close_matches('x', []), [])",
+                // ValueError on bad n
+                "caught = False",
+                "try:",
+                "    get_close_matches('a', ['a'], 0)",
+                "except ValueError:",
+                "    caught = True",
+                "assrt.ok(caught)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_difflib_unified_diff",
+        description: "difflib stdlib: unified_diff in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from difflib import unified_diff",
+                "a = ['1\\n', '2\\n', '3\\n', '4\\n', '5\\n']",
+                "b = ['1\\n', '2\\n', 'X\\n', '4\\n', '5\\n']",
+                "ud = unified_diff(a, b, 'a', 'b', n=1)",
+                "assrt.equal(ud[0], '--- a\\n')",
+                "assrt.equal(ud[1], '+++ b\\n')",
+                "assrt.equal(ud[2], '@@ -2,3 +2,3 @@\\n')",
+                // identical input → empty
+                "assrt.deepEqual(unified_diff(a, a, 'x', 'y'), [])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_difflib_ndiff_restore",
+        description: "difflib stdlib: ndiff + Differ + restore in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from difflib import ndiff, restore, IS_LINE_JUNK, IS_CHARACTER_JUNK",
+                "a = ['one\\n', 'two\\n', 'three\\n']",
+                "b = ['ore\\n', 'tree\\n', 'emu\\n']",
+                "delta = ndiff(a, b)",
+                "assrt.ok(delta.length > 0)",
+                // restore should recover the originals
+                "assrt.deepEqual(restore(delta, 1), a)",
+                "assrt.deepEqual(restore(delta, 2), b)",
+                // junk helpers
+                "assrt.ok(IS_LINE_JUNK(''))",
+                "assrt.ok(IS_LINE_JUNK('  #  \\n'))",
+                "assrt.ok(not IS_LINE_JUNK('abc'))",
+                "assrt.ok(IS_CHARACTER_JUNK(' '))",
+                "assrt.ok(IS_CHARACTER_JUNK('\\t'))",
+                "assrt.ok(not IS_CHARACTER_JUNK('a'))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
     {
         name: "bundle_tuple_distinct",
         description: "tuple is a distinct type with .count() and .index() in the web-repl bundle",

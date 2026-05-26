@@ -1,0 +1,271 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# difflib.pyj
+# Tests for the difflib standard library module.
+
+from difflib import (
+    SequenceMatcher,
+    Differ,
+    get_close_matches,
+    ndiff,
+    unified_diff,
+    context_diff,
+    restore,
+    IS_LINE_JUNK,
+    IS_CHARACTER_JUNK,
+)
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. SequenceMatcher — basic ratio ─────────────────────────────────────────
+
+s = SequenceMatcher(None, 'abcd', 'abcd')
+ae(s.ratio(), 1.0)
+ae(s.quick_ratio(), 1.0)
+ae(s.real_quick_ratio(), 1.0)
+
+s = SequenceMatcher(None, '', '')
+ae(s.ratio(), 1.0)
+
+s = SequenceMatcher(None, 'abcd', '')
+ae(s.ratio(), 0.0)
+
+# CPython's documented example
+s = SequenceMatcher(None, 'abcd', 'bcde')
+# matches: 'bcd' = 3 chars, total len 8 → ratio = 6/8 = 0.75
+ae(s.ratio(), 0.75)
+
+# Classic SequenceMatcher example from Python docs
+s = SequenceMatcher(IS_CHARACTER_JUNK,
+                    ' abcd', 'abcd abcd')
+# Should find a high-quality match
+ok(s.ratio() > 0.5)
+
+# ── 2. find_longest_match ────────────────────────────────────────────────────
+
+s = SequenceMatcher(None, ' abcd', 'abcd abcd')
+m = s.find_longest_match(0, 5, 0, 9)
+ae(m.a, 0)
+ae(m.b, 4)
+ae(m.size, 5)
+# Indexing also works (Match is namedtuple-like)
+ae(m[0], 0)
+ae(m[1], 4)
+ae(m[2], 5)
+
+# ── 3. get_matching_blocks ───────────────────────────────────────────────────
+
+s = SequenceMatcher(None, 'abxcd', 'abcd')
+blocks = s.get_matching_blocks()
+# Final block is always a sentinel (la, lb, 0).
+ae(blocks[blocks.length - 1].size, 0)
+ae(blocks[blocks.length - 1].a, 5)
+ae(blocks[blocks.length - 1].b, 4)
+
+# ── 4. get_opcodes — replace/delete/insert/equal ─────────────────────────────
+
+s = SequenceMatcher(None, 'qabxcd', 'abycdf')
+opcodes = s.get_opcodes()
+
+tag_seq = []
+for op in opcodes:
+    tag_seq.push(op[0])
+# Expect a delete first, then equal/replace/equal/insert per Python docs.
+ok(tag_seq.indexOf('delete') >= 0)
+ok(tag_seq.indexOf('equal')  >= 0)
+ok(tag_seq.indexOf('insert') >= 0)
+
+# Opcodes cover the full ranges with no gaps.
+prev_i = 0
+prev_j = 0
+for op in opcodes:
+    tag = op[0]
+    i1 = op[1]; i2 = op[2]
+    j1 = op[3]; j2 = op[4]
+    ae(i1, prev_i)
+    ae(j1, prev_j)
+    prev_i = i2
+    prev_j = j2
+ae(prev_i, 6)
+ae(prev_j, 6)
+
+# ── 5. quick_ratio / real_quick_ratio bounds ─────────────────────────────────
+
+s = SequenceMatcher(None, 'abcde', 'aBcDe')
+# All three ratios are upper bounds in order: real_quick >= quick >= ratio
+ok(s.real_quick_ratio() >= s.quick_ratio())
+ok(s.quick_ratio() >= s.ratio())
+
+# ── 6. get_close_matches ─────────────────────────────────────────────────────
+
+ade(get_close_matches('appel', ['apple', 'apply', 'banana']),
+    ['apple', 'apply'])
+
+ade(get_close_matches('appel', ['apple', 'apply', 'banana'], 1),
+    ['apple'])
+
+# cutoff too high → no matches
+ade(get_close_matches('xyz', ['apple', 'banana'], 3, 0.9), [])
+
+# n=0 is rejected
+_n_raised = False
+try:
+    get_close_matches('a', ['a', 'b'], 0)
+except ValueError:
+    _n_raised = True
+ok(_n_raised, 'get_close_matches with n=0 should raise ValueError')
+
+# cutoff out of range is rejected
+_co_raised = False
+try:
+    get_close_matches('a', ['a', 'b'], 3, 1.5)
+except ValueError:
+    _co_raised = True
+ok(_co_raised, 'get_close_matches with cutoff=1.5 should raise ValueError')
+
+# Empty possibilities → empty result
+ade(get_close_matches('x', []), [])
+
+# ── 7. IS_LINE_JUNK ──────────────────────────────────────────────────────────
+
+ok(IS_LINE_JUNK(''))
+ok(IS_LINE_JUNK('\n'))
+ok(IS_LINE_JUNK('   \n'))
+ok(IS_LINE_JUNK('#\n'))
+ok(IS_LINE_JUNK('  #  \n'))
+ok(not IS_LINE_JUNK('abc\n'))
+ok(not IS_LINE_JUNK('# comment\n'))
+
+# ── 8. IS_CHARACTER_JUNK ─────────────────────────────────────────────────────
+
+ok(IS_CHARACTER_JUNK(' '))
+ok(IS_CHARACTER_JUNK('\t'))
+ok(not IS_CHARACTER_JUNK('a'))
+ok(not IS_CHARACTER_JUNK('\n'))
+
+# ── 9. ndiff — simple line diff ──────────────────────────────────────────────
+
+a = ['one\n', 'two\n', 'three\n']
+b = ['ore\n',  'tree\n', 'emu\n']
+delta = ndiff(a, b)
+# delta is a list of strings; each starts with one of '  ', '- ', '+ ', '? '.
+ok(delta.length > 0)
+for line in delta:
+    prefix = line.slice(0, 2)
+    ok(prefix == '  ' or prefix == '- ' or prefix == '+ ' or prefix == '? ',
+       'unexpected prefix: ' + prefix)
+
+# Should contain at least one '- one' deletion and one '+ ore' insertion
+_saw_del_one = False
+_saw_add_ore = False
+for line in delta:
+    if line == '- one\n':
+        _saw_del_one = True
+    if line == '+ ore\n':
+        _saw_add_ore = True
+ok(_saw_del_one)
+ok(_saw_add_ore)
+
+# ── 10. Differ class directly ────────────────────────────────────────────────
+
+d = Differ()
+delta2 = d.compare(['abc\n'], ['abd\n'])
+# Joining the delta gives a recognizable diff.
+joined = delta2.join('')
+ok(joined.indexOf('- abc') >= 0)
+ok(joined.indexOf('+ abd') >= 0)
+
+# ── 11. restore ──────────────────────────────────────────────────────────────
+
+restored_a = restore(delta, 1)
+ade(restored_a, ['one\n', 'two\n', 'three\n'])
+
+restored_b = restore(delta, 2)
+ade(restored_b, ['ore\n', 'tree\n', 'emu\n'])
+
+# Invalid 'which' raises
+_which_raised = False
+try:
+    restore(delta, 3)
+except ValueError:
+    _which_raised = True
+ok(_which_raised)
+
+# ── 12. unified_diff ─────────────────────────────────────────────────────────
+
+a_lines = ['one\n', 'two\n', 'three\n']
+b_lines = ['one\n', 'two\n', 'tree\n']
+ud = unified_diff(a_lines, b_lines, 'a.txt', 'b.txt', n=3)
+# Should start with headers
+ae(ud[0], '--- a.txt\n')
+ae(ud[1], '+++ b.txt\n')
+# Should contain @@ hunk marker
+_saw_hunk = False
+for line in ud:
+    if line.slice(0, 2) == '@@':
+        _saw_hunk = True
+ok(_saw_hunk)
+
+# Identical input → empty output
+ade(unified_diff(a_lines, a_lines, 'x', 'y'), [])
+
+# ── 13. unified_diff with file dates ─────────────────────────────────────────
+
+ud2 = unified_diff(['a\n', 'b\n'], ['a\n', 'c\n'],
+                   'old', 'new', '2024', '2025')
+ae(ud2[0], '--- old\t2024\n')
+ae(ud2[1], '+++ new\t2025\n')
+
+# ── 14. context_diff ─────────────────────────────────────────────────────────
+
+cd = context_diff(a_lines, b_lines, 'old', 'new', n=3)
+ae(cd[0], '*** old\n')
+ae(cd[1], '--- new\n')
+ae(cd[2], '***************\n')
+
+# Identical → empty
+ade(context_diff(a_lines, a_lines, 'x', 'y'), [])
+
+# ── 15. SequenceMatcher autojunk behavior ────────────────────────────────────
+
+# Build a long sequence (>=200) where 'x' is the dominant element
+big_a = ''
+big_b = ''
+for _i in range(220):
+    big_a += 'x'
+    big_b += 'x'
+sm = SequenceMatcher(None, big_a, big_b)
+ae(sm.ratio(), 1.0)
+
+# ── 16. set_seq1 / set_seq2 reuse ────────────────────────────────────────────
+
+s = SequenceMatcher()
+s.set_seq2('hello')
+s.set_seq1('hello')
+ae(s.ratio(), 1.0)
+s.set_seq1('hallo')
+ok(s.ratio() < 1.0 and s.ratio() > 0.5)
+
+# ── 17. SequenceMatcher with lists of strings ────────────────────────────────
+
+s = SequenceMatcher(None, ['abc', 'def', 'ghi'], ['abc', 'xyz', 'ghi'])
+ae(s.ratio(), 4.0 / 6.0)
+
+# ── 18. get_grouped_opcodes ──────────────────────────────────────────────────
+
+a_long = []
+b_long = []
+for _i in range(20):
+    a_long.push('line' + _i + '\n')
+    b_long.push('line' + _i + '\n')
+# Make a couple of changes in the middle
+b_long[5] = 'changed5\n'
+b_long[15] = 'changed15\n'
+
+sm = SequenceMatcher(None, a_long, b_long)
+groups = sm.get_grouped_opcodes(3)
+# Two changes far apart → expect 2 groups
+ae(groups.length, 2)

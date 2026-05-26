@@ -4,7 +4,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [ python style Multi-line Anonymous Functions in Call Arguments ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [ python decimal module ] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 ## Example: tuple as a distinct type
 
@@ -141,4 +141,32 @@ try:
 except Error as err:      # subclass caught via its base
     assert isinstance(err, SubError)
     assert err.code == 7
+```
+
+## Example: `difflib` — diffs, fuzzy matches, and unified diffs
+
+```python
+from difflib import (
+    SequenceMatcher, get_close_matches, ndiff, unified_diff,
+)
+
+# Similarity ratio between two strings
+assert SequenceMatcher(None, 'abcd', 'bcde').ratio() == 0.75
+
+# Fuzzy spell-check style matching
+assert get_close_matches('appel', ['apple', 'apply', 'banana']) == ['apple', 'apply']
+
+# Human-readable line-by-line delta
+delta = ndiff(['one\n', 'two\n', 'three\n'],
+              ['ore\n', 'tree\n', 'emu\n'])
+assert any(line == '- one\n' for line in delta)
+assert any(line == '+ ore\n' for line in delta)
+
+# Standard unified diff (drop-in replacement for patch-style output)
+ud = unified_diff(['1\n', '2\n', '3\n', '4\n', '5\n'],
+                  ['1\n', '2\n', 'X\n', '4\n', '5\n'],
+                  'a.txt', 'b.txt', n=1)
+assert ud[0] == '--- a.txt\n'
+assert ud[1] == '+++ b.txt\n'
+assert ud[2] == '@@ -2,3 +2,3 @@\n'
 ```

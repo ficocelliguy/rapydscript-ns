@@ -1,0 +1,747 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License 2.0
+# This library is covered under Apache license, so that
+# you can distribute it with your RapydScript applications.
+###########################################################
+
+
+# Python-compatible difflib module.
+#
+# Provides:
+#   SequenceMatcher       -- flexible class for comparing pairs of sequences
+#   Differ                -- for producing human-readable deltas
+#   get_close_matches(word, possibilities, n=3, cutoff=0.6)
+#   ndiff(a, b, linejunk=None, charjunk=IS_CHARACTER_JUNK)
+#   unified_diff(a, b, fromfile='', tofile='', fromfiledate='', tofiledate='',
+#                n=3, lineterm='\n')
+#   context_diff(a, b, fromfile='', tofile='', fromfiledate='', tofiledate='',
+#                n=3, lineterm='\n')
+#   restore(delta, which)
+#   IS_LINE_JUNK(line)          -- helper that judges whether a line is junk
+#   IS_CHARACTER_JUNK(ch)       -- helper that judges whether a character is junk
+#
+# Algorithms ported from CPython's difflib.py.  Sequences may be strings,
+# lists of strings, or any object with .length and integer indexing.
+
+
+# ---------------------------------------------------------------------------
+# Internal JS helpers (core matching algorithm — runs on plain JS objects for
+# speed and to avoid ρσ_dict overhead).
+# ---------------------------------------------------------------------------
+
+v"""
+// Build b2j: a plain-object dict from element → list of indices in b.
+// Elements appearing >= b.length/100 times (and at least 200 chars or in
+// sequences longer than 200) when autojunk is on are added to bpopular and
+// removed from b2j.  bjunk holds the user-junk set.
+function _dl_chain_b(b, isjunk, autojunk) {
+    var n = b.length;
+    var b2j = Object.create(null);
+    for (var i = 0; i < n; i++) {
+        var elt = b[i];
+        var key = (typeof elt === 'string') ? ('s:' + elt) : ('j:' + JSON.stringify(elt));
+        var lst = b2j[key];
+        if (!lst) { lst = []; b2j[key] = lst; }
+        lst.push(i);
+    }
+    var bjunk_set = Object.create(null);
+    if (isjunk) {
+        var junk_keys = [];
+        for (var k in b2j) {
+            // recover the element from first occurrence
+            var first = b2j[k][0];
+            var elt2 = b[first];
+            if (isjunk(elt2)) junk_keys.push(k);
+        }
+        for (var ji = 0; ji < junk_keys.length; ji++) {
+            bjunk_set[junk_keys[ji]] = true;
+            delete b2j[junk_keys[ji]];
+        }
+    }
+    var bpopular_set = Object.create(null);
+    if (autojunk && n >= 200) {
+        var ntest = Math.floor(n / 100) + 1;
+        var pop_keys = [];
+        for (var k2 in b2j) {
+            if (b2j[k2].length > ntest) pop_keys.push(k2);
+        }
+        for (var pi = 0; pi < pop_keys.length; pi++) {
+            bpopular_set[pop_keys[pi]] = true;
+            delete b2j[pop_keys[pi]];
+        }
+    }
+    return { b2j: b2j, bjunk: bjunk_set, bpopular: bpopular_set };
+}
+
+function _dl_keyfor(elt) {
+    return (typeof elt === 'string') ? ('s:' + elt) : ('j:' + JSON.stringify(elt));
+}
+
+// Port of CPython SequenceMatcher.find_longest_match.
+function _dl_find_longest_match(a, b, b2j, bjunk, alo, ahi, blo, bhi) {
+    var besti = alo, bestj = blo, bestsize = 0;
+    var j2len = Object.create(null);
+    var nothing = [];
+    for (var i = alo; i < ahi; i++) {
+        var key = _dl_keyfor(a[i]);
+        var indices = b2j[key] || nothing;
+        var newj2len = Object.create(null);
+        for (var idx = 0; idx < indices.length; idx++) {
+            var j = indices[idx];
+            if (j < blo) continue;
+            if (j >= bhi) break;
+            var prev = j2len[j - 1] || 0;
+            var k = prev + 1;
+            newj2len[j] = k;
+            if (k > bestsize) {
+                besti = i - k + 1;
+                bestj = j - k + 1;
+                bestsize = k;
+            }
+        }
+        j2len = newj2len;
+    }
+    // Extend best match left/right past any junk
+    while (besti > alo && bestj > blo &&
+           !bjunk[_dl_keyfor(b[bestj - 1])] &&
+           _dl_eq(a[besti - 1], b[bestj - 1])) {
+        besti--; bestj--; bestsize++;
+    }
+    while (besti + bestsize < ahi && bestj + bestsize < bhi &&
+           !bjunk[_dl_keyfor(b[bestj + bestsize])] &&
+           _dl_eq(a[besti + bestsize], b[bestj + bestsize])) {
+        bestsize++;
+    }
+    // Then absorb any junk on the boundaries
+    while (besti > alo && bestj > blo &&
+           bjunk[_dl_keyfor(b[bestj - 1])] &&
+           _dl_eq(a[besti - 1], b[bestj - 1])) {
+        besti--; bestj--; bestsize++;
+    }
+    while (besti + bestsize < ahi && bestj + bestsize < bhi &&
+           bjunk[_dl_keyfor(b[bestj + bestsize])] &&
+           _dl_eq(a[besti + bestsize], b[bestj + bestsize])) {
+        bestsize++;
+    }
+    return [besti, bestj, bestsize];
+}
+
+function _dl_eq(x, y) {
+    // Strict equality is fine for strings/numbers; for objects fall back to
+    // JSON.stringify comparison (sequences of objects are rare in practice).
+    if (x === y) return true;
+    if (typeof x !== typeof y) return false;
+    if (typeof x === 'object' && x !== null && y !== null) {
+        try { return JSON.stringify(x) === JSON.stringify(y); }
+        catch (e) { return false; }
+    }
+    return false;
+}
+
+function _dl_get_matching_blocks(a, b, b2j, bjunk) {
+    var la = a.length, lb = b.length;
+    var queue = [[0, la, 0, lb]];
+    var matching = [];
+    while (queue.length) {
+        var box = queue.pop();
+        var alo = box[0], ahi = box[1], blo = box[2], bhi = box[3];
+        var m = _dl_find_longest_match(a, b, b2j, bjunk, alo, ahi, blo, bhi);
+        var i = m[0], j = m[1], k = m[2];
+        if (k) {
+            matching.push([i, j, k]);
+            if (alo < i && blo < j) queue.push([alo, i, blo, j]);
+            if (i + k < ahi && j + k < bhi) queue.push([i + k, ahi, j + k, bhi]);
+        }
+    }
+    matching.sort(function (x, y) {
+        if (x[0] !== y[0]) return x[0] - y[0];
+        if (x[1] !== y[1]) return x[1] - y[1];
+        return x[2] - y[2];
+    });
+    // Collapse adjacent equal blocks
+    var i1 = 0, j1 = 0, k1 = 0;
+    var non_adj = [];
+    for (var ii = 0; ii < matching.length; ii++) {
+        var i2 = matching[ii][0], j2 = matching[ii][1], k2 = matching[ii][2];
+        if (i1 + k1 === i2 && j1 + k1 === j2) {
+            k1 += k2;
+        } else {
+            if (k1) non_adj.push([i1, j1, k1]);
+            i1 = i2; j1 = j2; k1 = k2;
+        }
+    }
+    if (k1) non_adj.push([i1, j1, k1]);
+    non_adj.push([la, lb, 0]);
+    return non_adj;
+}
+
+// Counts occurrences of every element of a in a plain dict and tallies the
+// shared minimum with the b-element counts (used by quick_ratio).
+function _dl_count_elements(seq) {
+    var c = Object.create(null);
+    for (var i = 0; i < seq.length; i++) {
+        var key = _dl_keyfor(seq[i]);
+        c[key] = (c[key] || 0) + 1;
+    }
+    return c;
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# SequenceMatcher
+# ---------------------------------------------------------------------------
+
+class SequenceMatcher:
+
+    def __init__(self, isjunk=None, a='', b='', autojunk=True):
+        self.isjunk = isjunk
+        self.a = None
+        self.b = None
+        self.autojunk = autojunk
+        self.set_seqs(a, b)
+
+    def set_seqs(self, a, b):
+        self.set_seq1(a)
+        self.set_seq2(b)
+
+    def set_seq1(self, a):
+        if a is self.a:
+            return
+        self.a = a
+        self.matching_blocks = None
+        self.opcodes = None
+
+    def set_seq2(self, b):
+        if b is self.b:
+            return
+        self.b = b
+        self.matching_blocks = None
+        self.opcodes = None
+        self.fullbcount = None
+        self._chain_b()
+
+    def _chain_b(self):
+        b = self.b
+        res = v'_dl_chain_b(b, this.isjunk || null, !!this.autojunk)'
+        self.b2j = res.b2j
+        self.bjunk = res.bjunk
+        self.bpopular = res.bpopular
+
+    def find_longest_match(self, alo=0, ahi=None, blo=0, bhi=None):
+        if ahi is None:
+            ahi = self.a.length
+        if bhi is None:
+            bhi = self.b.length
+        m = v'_dl_find_longest_match(this.a, this.b, this.b2j, this.bjunk, alo, ahi, blo, bhi)'
+        return Match(m[0], m[1], m[2])
+
+    def get_matching_blocks(self):
+        if self.matching_blocks is not None:
+            return self.matching_blocks
+        raw = v'_dl_get_matching_blocks(this.a, this.b, this.b2j, this.bjunk)'
+        result = []
+        for t in raw:
+            result.push(Match(t[0], t[1], t[2]))
+        self.matching_blocks = result
+        return result
+
+    def get_opcodes(self):
+        if self.opcodes is not None:
+            return self.opcodes
+        i = 0
+        j = 0
+        answer = []
+        for blk in self.get_matching_blocks():
+            ai = blk.a
+            bj = blk.b
+            size = blk.size
+            tag = ''
+            if i < ai and j < bj:
+                tag = 'replace'
+            elif i < ai:
+                tag = 'delete'
+            elif j < bj:
+                tag = 'insert'
+            if tag:
+                answer.push([tag, i, ai, j, bj])
+            i = ai + size
+            j = bj + size
+            if size:
+                answer.push(['equal', ai, i, bj, j])
+        self.opcodes = answer
+        return answer
+
+    def get_grouped_opcodes(self, n=3):
+        codes = self.get_opcodes()
+        if not codes.length:
+            codes = [['equal', 0, 1, 0, 1]]
+        # Make a copy so we can mutate the boundary entries
+        codes = codes.slice()
+        # Fixup leading and trailing groups if they show no changes.
+        if codes[0][0] == 'equal':
+            tag = codes[0][0]
+            i1 = codes[0][1]
+            i2 = codes[0][2]
+            j1 = codes[0][3]
+            j2 = codes[0][4]
+            codes[0] = [tag, max(i1, i2 - n), i2, max(j1, j2 - n), j2]
+        if codes[codes.length - 1][0] == 'equal':
+            last = codes[codes.length - 1]
+            tag = last[0]
+            i1 = last[1]
+            i2 = last[2]
+            j1 = last[3]
+            j2 = last[4]
+            codes[codes.length - 1] = [tag, i1, min(i2, i1 + n), j1, min(j2, j1 + n)]
+        nn = n + n
+        groups = []
+        group = []
+        for entry in codes:
+            tag = entry[0]
+            i1 = entry[1]
+            i2 = entry[2]
+            j1 = entry[3]
+            j2 = entry[4]
+            if tag == 'equal' and i2 - i1 > nn:
+                group.push([tag, i1, min(i2, i1 + n), j1, min(j2, j1 + n)])
+                groups.push(group)
+                group = []
+                i1 = max(i1, i2 - n)
+                j1 = max(j1, j2 - n)
+            group.push([tag, i1, i2, j1, j2])
+        if group.length and not (group.length == 1 and group[0][0] == 'equal'):
+            groups.push(group)
+        return groups
+
+    def ratio(self):
+        matches = 0
+        for blk in self.get_matching_blocks():
+            matches += blk.size
+        return _calculate_ratio(matches, self.a.length + self.b.length)
+
+    def quick_ratio(self):
+        if self.fullbcount is None:
+            self.fullbcount = v'_dl_count_elements(this.b)'
+        fullbcount = self.fullbcount
+        # avail keeps a running tally as we walk through a.
+        avail = v'Object.create(null)'
+        matches = 0
+        for i in range(self.a.length):
+            elt = self.a[i]
+            key = v'_dl_keyfor(elt)'
+            if v'Object.prototype.hasOwnProperty.call(avail, key)':
+                numb = avail[key]
+            else:
+                numb = fullbcount[key] or 0
+            avail[key] = numb - 1
+            if numb > 0:
+                matches += 1
+        return _calculate_ratio(matches, self.a.length + self.b.length)
+
+    def real_quick_ratio(self):
+        la = self.a.length
+        lb = self.b.length
+        return _calculate_ratio(min(la, lb), la + lb)
+
+
+# Match named-tuple-ish class — exposes .a, .b, .size and supports indexing
+class Match:
+    def __init__(self, a, b, size):
+        self.a = a
+        self.b = b
+        self.size = size
+        v"this[0] = a; this[1] = b; this[2] = size; this.length = 3"
+
+
+def _calculate_ratio(matches, length):
+    if length:
+        return 2.0 * matches / length
+    return 1.0
+
+
+# ---------------------------------------------------------------------------
+# get_close_matches
+# ---------------------------------------------------------------------------
+
+def _close_matches_cmp(p, q):
+    if q[0] < p[0]:
+        return -1
+    if q[0] > p[0]:
+        return 1
+    return 0
+
+
+def get_close_matches(word, possibilities, n=3, cutoff=0.6):
+    if not (n > 0):
+        raise ValueError('n must be > 0: ' + n)
+    if not (0.0 <= cutoff <= 1.0):
+        raise ValueError('cutoff must be in [0.0, 1.0]: ' + cutoff)
+    result = []
+    s = SequenceMatcher()
+    s.set_seq2(word)
+    for x in possibilities:
+        s.set_seq1(x)
+        if (s.real_quick_ratio() >= cutoff and
+            s.quick_ratio() >= cutoff and
+            s.ratio() >= cutoff):
+            result.push([s.ratio(), x])
+    # Sort descending by score, stable on insertion order
+    result.sort(_close_matches_cmp)
+    out = []
+    for item in result[:n]:
+        out.push(item[1])
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Line/character junk helpers
+# ---------------------------------------------------------------------------
+
+def IS_LINE_JUNK(line, pat=None):
+    # A line is junk if it matches CPython's default regex r"\s*(?:#\s*)?$":
+    # any amount of whitespace, optionally followed by a single '#' and more
+    # whitespace.  Trailing newline counts as whitespace.
+    n = line.length
+    i = 0
+    # Skip leading whitespace
+    while i < n:
+        c = line[i]
+        if c == ' ' or c == '\t' or c == '\n' or c == '\r' or c == '\f' or c == '\v':
+            i += 1
+        else:
+            break
+    if i == n:
+        return True
+    if line[i] != '#':
+        return False
+    i += 1
+    while i < n:
+        c = line[i]
+        if c == ' ' or c == '\t' or c == '\n' or c == '\r' or c == '\f' or c == '\v':
+            i += 1
+        else:
+            return False
+    return True
+
+
+def IS_CHARACTER_JUNK(ch, ws=' \t'):
+    return ws.indexOf(ch) >= 0
+
+
+# ---------------------------------------------------------------------------
+# Differ
+# ---------------------------------------------------------------------------
+
+class Differ:
+
+    def __init__(self, linejunk=None, charjunk=None):
+        self.linejunk = linejunk
+        self.charjunk = charjunk
+
+    def compare(self, a, b):
+        cruncher = SequenceMatcher(self.linejunk, a, b)
+        out = []
+        for op in cruncher.get_opcodes():
+            tag = op[0]
+            alo = op[1]
+            ahi = op[2]
+            blo = op[3]
+            bhi = op[4]
+            g = None
+            if tag == 'replace':
+                g = self._fancy_replace(a, alo, ahi, b, blo, bhi)
+            elif tag == 'delete':
+                g = self._dump('-', a, alo, ahi)
+            elif tag == 'insert':
+                g = self._dump('+', b, blo, bhi)
+            elif tag == 'equal':
+                g = self._dump(' ', a, alo, ahi)
+            else:
+                raise ValueError('unknown tag ' + tag)
+            for line in g:
+                out.push(line)
+        return out
+
+    def _dump(self, tag, x, lo, hi):
+        lines = []
+        for i in range(lo, hi):
+            lines.push(tag + ' ' + x[i])
+        return lines
+
+    def _plain_replace(self, a, alo, ahi, b, blo, bhi):
+        first = None
+        second = None
+        if bhi - blo < ahi - alo:
+            first = self._dump('+', b, blo, bhi)
+            second = self._dump('-', a, alo, ahi)
+        else:
+            first = self._dump('-', a, alo, ahi)
+            second = self._dump('+', b, blo, bhi)
+        out = []
+        for line in first:
+            out.push(line)
+        for line in second:
+            out.push(line)
+        return out
+
+    def _fancy_replace(self, a, alo, ahi, b, blo, bhi):
+        # Find the closest pair to align inside the replace block.
+        best_ratio = 0.74
+        cutoff = 0.75
+        cruncher = SequenceMatcher(self.charjunk)
+        eqi = None  # index of identical pair, if any
+        eqj = None
+        best_i = alo
+        best_j = blo
+        for j in range(blo, bhi):
+            bj = b[j]
+            cruncher.set_seq2(bj)
+            for i in range(alo, ahi):
+                ai = a[i]
+                if ai == bj:
+                    if eqi is None:
+                        eqi = i
+                        eqj = j
+                    continue
+                cruncher.set_seq1(ai)
+                if (cruncher.real_quick_ratio() > best_ratio and
+                    cruncher.quick_ratio() > best_ratio and
+                    cruncher.ratio() > best_ratio):
+                    best_ratio = cruncher.ratio()
+                    best_i = i
+                    best_j = j
+        out = []
+        if best_ratio < cutoff:
+            if eqi is None:
+                # No identical or close pair: dump replacement plainly.
+                for line in self._plain_replace(a, alo, ahi, b, blo, bhi):
+                    out.push(line)
+                return out
+            best_i = eqi
+            best_j = eqj
+            best_ratio = 1.0
+        else:
+            eqi = None
+        # Now use best_i / best_j as the synch point.  Recurse on either side.
+        for line in self._fancy_helper(a, alo, best_i, b, blo, best_j):
+            out.push(line)
+        aelt = a[best_i]
+        belt = b[best_j]
+        if eqi is None:
+            # Pretty-print the synch pair with intraline-diff annotations.
+            atags = ''
+            btags = ''
+            cruncher.set_seqs(aelt, belt)
+            for op in cruncher.get_opcodes():
+                tag = op[0]
+                ai1 = op[1]
+                ai2 = op[2]
+                bj1 = op[3]
+                bj2 = op[4]
+                la = ai2 - ai1
+                lb = bj2 - bj1
+                if tag == 'replace':
+                    atags += _repeat('^', la)
+                    btags += _repeat('^', lb)
+                elif tag == 'delete':
+                    atags += _repeat('-', la)
+                elif tag == 'insert':
+                    btags += _repeat('+', lb)
+                elif tag == 'equal':
+                    atags += _repeat(' ', la)
+                    btags += _repeat(' ', lb)
+                else:
+                    raise ValueError('unknown tag ' + tag)
+            for line in self._qformat(aelt, belt, atags, btags):
+                out.push(line)
+        else:
+            out.push('  ' + aelt)
+        for line in self._fancy_helper(a, best_i + 1, ahi, b, best_j + 1, bhi):
+            out.push(line)
+        return out
+
+    def _fancy_helper(self, a, alo, ahi, b, blo, bhi):
+        out = []
+        g = None
+        if alo < ahi:
+            if blo < bhi:
+                g = self._fancy_replace(a, alo, ahi, b, blo, bhi)
+            else:
+                g = self._dump('-', a, alo, ahi)
+        elif blo < bhi:
+            g = self._dump('+', b, blo, bhi)
+        if g:
+            for line in g:
+                out.push(line)
+        return out
+
+    def _qformat(self, aline, bline, atags, btags):
+        atags = _strip_trailing_ws(atags)
+        btags = _strip_trailing_ws(btags)
+        out = []
+        out.push('- ' + aline)
+        if atags:
+            out.push('? ' + atags + '\n')
+        out.push('+ ' + bline)
+        if btags:
+            out.push('? ' + btags + '\n')
+        return out
+
+
+def _repeat(s, n):
+    out = ''
+    for _ in range(n):
+        out += s
+    return out
+
+
+def _strip_trailing_ws(s):
+    end = s.length
+    while end > 0:
+        c = s[end - 1]
+        if c == ' ' or c == '\t':
+            end -= 1
+        else:
+            break
+    if end == s.length:
+        return s
+    return s.slice(0, end)
+
+
+# ---------------------------------------------------------------------------
+# ndiff / restore
+# ---------------------------------------------------------------------------
+
+def ndiff(a, b, linejunk=None, charjunk=None):
+    if charjunk is None:
+        charjunk = IS_CHARACTER_JUNK
+    return Differ(linejunk, charjunk).compare(a, b)
+
+
+def restore(delta, which):
+    if which not in [1, 2]:
+        raise ValueError('unknown delta choice (must be 1 or 2): ' + which)
+    tag = '- ' if which == 1 else '+ '
+    prefixes = [tag, '  ']
+    out = []
+    for line in delta:
+        ok = False
+        for p in prefixes:
+            if line.slice(0, 2) == p:
+                ok = True
+                break
+        if ok:
+            out.push(line.slice(2))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# unified_diff / context_diff
+# ---------------------------------------------------------------------------
+
+def _format_range_unified(start, stop):
+    beginning = start + 1
+    length = stop - start
+    if length == 1:
+        return '' + beginning
+    if not length:
+        beginning -= 1
+    return beginning + ',' + length
+
+
+def unified_diff(a, b, fromfile='', tofile='', fromfiledate='', tofiledate='', n=3, lineterm='\n'):
+    started = False
+    out = []
+    matcher = SequenceMatcher(None, a, b)
+    for group in matcher.get_grouped_opcodes(n):
+        if not started:
+            started = True
+            fromdate = '\t' + fromfiledate if fromfiledate else ''
+            todate = '\t' + tofiledate if tofiledate else ''
+            out.push('--- ' + fromfile + fromdate + lineterm)
+            out.push('+++ ' + tofile + todate + lineterm)
+        first = group[0]
+        last = group[group.length - 1]
+        file1_range = _format_range_unified(first[1], last[2])
+        file2_range = _format_range_unified(first[3], last[4])
+        out.push('@@ -' + file1_range + ' +' + file2_range + ' @@' + lineterm)
+        for entry in group:
+            tag = entry[0]
+            i1 = entry[1]
+            i2 = entry[2]
+            j1 = entry[3]
+            j2 = entry[4]
+            if tag == 'equal':
+                for i in range(i1, i2):
+                    out.push(' ' + a[i])
+                continue
+            if tag == 'replace' or tag == 'delete':
+                for i in range(i1, i2):
+                    out.push('-' + a[i])
+            if tag == 'replace' or tag == 'insert':
+                for j in range(j1, j2):
+                    out.push('+' + b[j])
+    return out
+
+
+def _format_range_context(start, stop):
+    beginning = start + 1
+    length = stop - start
+    if not length:
+        beginning -= 1
+    if length <= 1:
+        return '' + beginning
+    return beginning + ',' + (beginning + length - 1)
+
+
+def context_diff(a, b, fromfile='', tofile='', fromfiledate='', tofiledate='', n=3, lineterm='\n'):
+    prefix = {
+        'insert': '+ ',
+        'delete': '- ',
+        'replace': '! ',
+        'equal':   '  ',
+    }
+    started = False
+    out = []
+    matcher = SequenceMatcher(None, a, b)
+    for group in matcher.get_grouped_opcodes(n):
+        if not started:
+            started = True
+            fromdate = '\t' + fromfiledate if fromfiledate else ''
+            todate = '\t' + tofiledate if tofiledate else ''
+            out.push('*** ' + fromfile + fromdate + lineterm)
+            out.push('--- ' + tofile + todate + lineterm)
+        first = group[0]
+        last = group[group.length - 1]
+        out.push('***************' + lineterm)
+        out.push('*** ' + _format_range_context(first[1], last[2]) + ' ****' + lineterm)
+        any_change = False
+        for entry in group:
+            if entry[0] != 'equal':
+                any_change = True
+                break
+        if any_change:
+            for entry in group:
+                tag = entry[0]
+                i1 = entry[1]
+                i2 = entry[2]
+                if tag != 'insert':
+                    for i in range(i1, i2):
+                        out.push(prefix[tag] + a[i])
+        out.push('--- ' + _format_range_context(first[3], last[4]) + ' ----' + lineterm)
+        any_change2 = False
+        for entry in group:
+            if entry[0] != 'equal':
+                any_change2 = True
+                break
+        if any_change2:
+            for entry in group:
+                tag = entry[0]
+                j1 = entry[3]
+                j2 = entry[4]
+                if tag != 'delete':
+                    for j in range(j1, j2):
+                        out.push(prefix[tag] + b[j])
+    return out

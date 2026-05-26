@@ -209,14 +209,7 @@ for non-cryptographic hashes would be valuable.
 
 ---
 
-### 3.3 `difflib` — Sequence Comparison
-
-`difflib.unified_diff`, `difflib.SequenceMatcher`, `difflib.get_close_matches`. Useful
-for browser-based code editors, version comparison tools, and fuzzy matching UIs.
-
----
-
-### 3.4 `decimal` — Decimal Arithmetic
+### 3.3 `decimal` — Decimal Arithmetic
 
 `Decimal` arithmetic avoids floating-point rounding errors. Essential for financial
 calculations in browser apps (e-commerce, budgeting tools). JS does not have a built-in
@@ -320,5 +313,4 @@ Priority weighs frequency-of-need, effort-to-implement, and whether a workaround
 | Medium | f-string `f'{x=}'` debugging format | Low | Developer experience |
 | Low | `oct()` builtin | Trivial | Symmetry with `hex()` / `bin()` |
 | Low | `__del__` via `FinalizationRegistry` | Medium | Resource cleanup (best-effort) |
-| Low | `difflib` module | High | Text diff, fuzzy matching |
 | Low | `decimal` module | High | Financial calculations |

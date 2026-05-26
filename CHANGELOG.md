@@ -1,7 +1,8 @@
 version 0.9.6 (unreleased)
 =======================
-* Added `contextlib.asynccontextmanager` decorator.
+* Added the `difflib` standard library module.
 * Added the `fractions` standard library module.
+* Added `contextlib.asynccontextmanager` decorator.
 * Added support for `tuple` as a distinct runtime type.
 * Added support for Python printf-style `%` string formatting when the left operand is a string.
 * Added support for Python `bytes` and `bytearray` builtins.
