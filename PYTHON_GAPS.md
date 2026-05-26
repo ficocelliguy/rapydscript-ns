@@ -152,28 +152,6 @@ gets a different string than Python. Use `e.args[0]` or `e.message` instead.
 
 ---
 
-### 1.10 `__exit__` Called With No Args On Normal Context-Manager Exit
-
-**Python:** When a `with` block exits normally, `__exit__(None, None, None)` is called.
-**RapydScript:** `__exit__()` is called with zero arguments, which combined with
-RapydScript's strict missing-arg checking throws `TypeError: __exit__() missing required
-positional argument: 'exc_type'`.
-
-```python
-class CM:
-    def __enter__(self): return self
-    def __exit__(self, exc_type, exc_val, exc_tb): pass
-
-with CM():     # Throws TypeError on exit
-    pass
-```
-
-**Impact:** Any class-based context manager that declares the standard `__exit__` signature
-crashes on normal exit. **Workaround:** use `*args` or default values:
-`def __exit__(self, exc_type=None, exc_val=None, exc_tb=None)`.
-
----
-
 ### 1.11 Tuples Are Unhashable As Dict Keys
 
 **Python:** Tuples of hashable values are themselves hashable and work as dict keys.
@@ -643,7 +621,6 @@ Entries marked **NEW** were added in the 2026-05-26 coverage audit.
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| **NEW** Critical | `__exit__` called with zero args on normal exit (§1.10) | Low | Breaks every standard class-based context manager |
 | **NEW** High | Bitwise operator precedence (§1.6) | Medium | Silent wrong results in protocol/bitfield code |
 | **NEW** High | `str.split()` splits only on space (§1.7) | Low | Silent wrong tokenisation of multi-line text |
 | **NEW** High | `1/0` returns `None` instead of `ZeroDivisionError` (§1.8) | Low | Defensive numeric code misbehaves silently |

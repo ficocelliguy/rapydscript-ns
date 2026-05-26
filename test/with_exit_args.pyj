@@ -1,0 +1,181 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# with_exit_args.pyj
+# Tests that __exit__ receives (None, None, None) on normal exit and
+# (exc_type, exc_val, exc_tb) on exception, across various signatures.
+
+ae = assrt.equal
+ok = assrt.ok
+
+# ── 1. Standard 3-arg signature ──────────────────────────────────────────────
+# On normal exit, all three args should be None.
+
+class Standard:
+    def __init__(self):
+        self.received = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.received = [exc_type, exc_val, exc_tb]
+        return False
+
+cm = Standard()
+with cm:
+    pass
+ok(cm.received is not None, 'standard __exit__ was called')
+ae(cm.received.length, 3)
+ae(cm.received[0], None)
+ae(cm.received[1], None)
+ae(cm.received[2], None)
+
+# ── 2. Standard 3-arg signature with default values ──────────────────────────
+
+class WithDefaults:
+    def __init__(self):
+        self.received = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        self.received = [exc_type, exc_val, exc_tb]
+
+cm2 = WithDefaults()
+with cm2:
+    pass
+ok(cm2.received is not None)
+ae(cm2.received[0], None)
+ae(cm2.received[1], None)
+ae(cm2.received[2], None)
+
+# ── 3. *args signature ────────────────────────────────────────────────────────
+# A function declared with no explicit positional parameters (which includes
+# `*args` and all-default signatures) keeps the legacy "no-arg" calling
+# convention on normal exit, for backward compatibility with code that
+# pre-dates the (None, None, None) protocol fix.  On exception the
+# exception triple is still passed.
+
+class VarArgs:
+    def __init__(self):
+        self.argc = -1
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.argc = args.length
+
+cm3 = VarArgs()
+with cm3:
+    pass
+ae(cm3.argc, 0, '*args __exit__ called with no args on normal exit (legacy)')
+
+# *args still receives the triple when an exception propagates.
+class VarArgsExc:
+    def __init__(self):
+        self.argv = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.argv = args
+        return True  # suppress
+
+vae = VarArgsExc()
+with vae:
+    raise ValueError('boom')
+ae(vae.argv.length, 3, '*args __exit__ receives 3 args on exception')
+ae(vae.argv[0], ValueError)
+
+# ── 4. 0-arg signature (legacy RapydScript style) ────────────────────────────
+# Extra positional args are silently ignored by JS, so this still works.
+
+class NoArgs:
+    def __init__(self):
+        self.called = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self):
+        self.called = True
+        return None
+
+cm4 = NoArgs()
+with cm4:
+    pass
+ok(cm4.called, '0-arg __exit__ still works on normal exit')
+
+# ── 5. On exception, __exit__ receives exception info ─────────────────────────
+
+class StandardOnError:
+    def __init__(self):
+        self.received = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.received = [exc_type, exc_val, exc_tb]
+        return True  # suppress
+
+cm5 = StandardOnError()
+with cm5:
+    raise ValueError('boom')
+
+ok(cm5.received is not None, '__exit__ was called on error')
+ae(cm5.received[0], ValueError, 'exc_type is the exception constructor')
+ok(cm5.received[1] is not None, 'exc_val is the exception instance')
+ok(isinstance(cm5.received[1], ValueError))
+
+# ── 6. Multi-clause with: each __exit__ gets (None, None, None) on normal exit
+
+_calls = []
+
+class LoggedCM:
+    def __init__(self, name):
+        self.name = name
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        _calls.push([self.name, exc_type, exc_val, exc_tb])
+        return False
+
+with LoggedCM('a') as a, LoggedCM('b') as b:
+    pass
+
+ae(_calls.length, 2)
+# LIFO order
+ae(_calls[0][0], 'b')
+ae(_calls[0][1], None)
+ae(_calls[0][2], None)
+ae(_calls[0][3], None)
+ae(_calls[1][0], 'a')
+ae(_calls[1][1], None)
+ae(_calls[1][2], None)
+ae(_calls[1][3], None)
+
+# ── 7. Parenthesized with: same semantics ────────────────────────────────────
+
+class ParenCM:
+    def __init__(self):
+        self.received = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.received = [exc_type, exc_val, exc_tb]
+
+cm7 = ParenCM()
+with (cm7):
+    pass
+ae(cm7.received[0], None)
+ae(cm7.received[1], None)
+ae(cm7.received[2], None)

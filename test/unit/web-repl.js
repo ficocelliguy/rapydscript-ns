@@ -5270,6 +5270,99 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_with_exit_normal_args",
+        description: "__exit__ receives (None, None, None) on normal context-manager exit in the web-repl bundle",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class CM:",
+                "    def __init__(self):",
+                "        self.received = None",
+                "    def __enter__(self):",
+                "        return self",
+                "    def __exit__(self, exc_type, exc_val, exc_tb):",
+                "        self.received = [exc_type, exc_val, exc_tb]",
+                "        return False",
+                "cm = CM()",
+                "with cm:",
+                "    pass",
+                "assrt.equal(cm.received.length, 3)",
+                "assrt.equal(cm.received[0], None)",
+                "assrt.equal(cm.received[1], None)",
+                "assrt.equal(cm.received[2], None)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_with_exit_signatures",
+        description: "Various __exit__ signatures (3-arg, defaults, *args, 0-arg legacy) all work on normal exit",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                // *args signature: legacy 0-arg call on normal exit (backward compat)
+                "class VA:",
+                "    def __init__(self):",
+                "        self.argc = -1",
+                "    def __enter__(self): return self",
+                "    def __exit__(self, *args):",
+                "        self.argc = args.length",
+                "v = VA()",
+                "with v: pass",
+                "assrt.equal(v.argc, 0)",
+                // 3-arg with defaults
+                "class WD:",
+                "    def __init__(self):",
+                "        self.got = None",
+                "    def __enter__(self): return self",
+                "    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):",
+                "        self.got = [exc_type, exc_val, exc_tb]",
+                "w = WD()",
+                "with w: pass",
+                "assrt.equal(w.got[0], None)",
+                "assrt.equal(w.got[1], None)",
+                "assrt.equal(w.got[2], None)",
+                // 0-arg legacy signature (extra args silently ignored)
+                "class NA:",
+                "    def __init__(self):",
+                "        self.called = False",
+                "    def __enter__(self): return self",
+                "    def __exit__(self):",
+                "        self.called = True",
+                "n = NA()",
+                "with n: pass",
+                "assrt.ok(n.called)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_with_exit_on_exception",
+        description: "__exit__ receives (exc_type, exc_val, exc_tb) when an exception propagates",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class CM:",
+                "    def __init__(self):",
+                "        self.received = None",
+                "    def __enter__(self): return self",
+                "    def __exit__(self, exc_type, exc_val, exc_tb):",
+                "        self.received = [exc_type, exc_val, exc_tb]",
+                "        return True",
+                "cm = CM()",
+                "with cm:",
+                "    raise ValueError('boom')",
+                "assrt.equal(cm.received[0], ValueError)",
+                "assrt.ok(cm.received[1] is not None)",
+                "assrt.ok(isinstance(cm.received[1], ValueError))",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

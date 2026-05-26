@@ -53,10 +53,10 @@
 #     Since 'throw' is a reserved JS keyword it cannot appear as a bare
 #     identifier in RapydScript method-call syntax; the call is made via a
 #     verbatim v"""...""" block.
-#   - The with-statement machinery in RapydScript calls __exit__() (0 args)
-#     when no exception occurred and __exit__(exc_type, exc_val, exc_tb)
-#     (3 args) when one did.  All __exit__ implementations here use default
-#     parameters (=None) so both signatures work transparently.
+#   - The with-statement machinery in RapydScript calls
+#     __exit__(None, None, None) on normal exit and
+#     __exit__(exc_type, exc_val, exc_tb) when an exception propagated,
+#     matching the Python protocol.
 #   - ExitStack.__exit__ may raise a new exception that replaces the original;
 #     the with-statement machinery propagates whatever __exit__ throws.
 

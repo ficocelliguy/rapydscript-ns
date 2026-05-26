@@ -27,3 +27,25 @@ print(isinstance("hi", Union[int, str]))         # True
 print(isinstance([1, 2, 3], List[int]))          # True
 print(isinstance({"k": 1}, Any))                 # True
 ```
+
+
+Example: `__exit__(None, None, None)` on normal context-manager exit
+--------------------------------------------------------------------
+
+```python
+class Timer:
+    def __enter__(self):
+        self.start = Date.now()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        elapsed = Date.now() - self.start
+        if exc_type is None:
+            print('completed in', elapsed, 'ms')
+        else:
+            print('failed after', elapsed, 'ms:', exc_type.__name__)
+        return False
+
+with Timer():
+    do_work()              # prints "completed in N ms"
+```
