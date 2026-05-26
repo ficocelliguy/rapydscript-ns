@@ -31,7 +31,7 @@ TreeWalker
 from tokenizer import tokenizer, is_token, RESERVED_WORDS
 
 COMPILER_VERSION = '__COMPILER_VERSION__'
-PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True, 'jsx':True, 'strict_arithmetic':True, 'python_modulo':True, 'type_enforcement':True}
+PYTHON_FLAGS = {'dict_literals':True, 'overload_getitem':True, 'bound_methods':True, 'hash_literals':True, 'overload_operators':True, 'truthiness':True, 'jsx':True, 'strict_arithmetic':True, 'python_modulo':True, 'python_bitwise_precedence':True, 'type_enforcement':True}
 
 
 def get_compiler_version():
@@ -135,6 +135,30 @@ PRECEDENCE = (def(a, ret):
     [ "&" ],
     [ "==", "===", "!=", "!==" ],
     [ "<", ">", "<=", ">=", "in", "nin", "instanceof" ],
+    [ ">>", "<<", ">>>" ],
+    [ "+", "-" ],
+    [ "*", "/", "//", "%" ],
+    [ "**" ]
+    # highest precedence
+], {})
+
+# Python-style precedence: bitwise operators (&, ^, |, <<, >>) bind tighter than
+# comparison operators. Activated per-scope by `from __python__ import python_bitwise_precedence`.
+PYTHON_PRECEDENCE = (def(a, ret):
+    for i in range(a.length):
+        b = a[i]
+        for j in range(b.length):
+            ret[b[j]] = i+1
+    return ret
+)([
+    # lowest precedence
+    [ "||" ],
+    [ "&&" ],
+    [ "==", "===", "!=", "!==" ],
+    [ "<", ">", "<=", ">=", "in", "nin", "instanceof" ],
+    [ "|" ],
+    [ "^" ],
+    [ "&" ],
     [ ">>", "<<", ">>>" ],
     [ "+", "-" ],
     [ "*", "/", "//", "%" ],
@@ -3328,7 +3352,8 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         if no_in and (op is "in" or op is 'nin'):
             op = None
 
-        prec = PRECEDENCE[op] if op is not None else None
+        prec_table = PYTHON_PRECEDENCE if S.scoped_flags.get('python_bitwise_precedence', True) else PRECEDENCE
+        prec = prec_table[op] if op is not None else None
         # Prevent * from crossing a newline boundary outside of brackets:
         # `*name` at the start of a line is a starred assignment target, not multiplication.
         if prec is not None and op is '*' and S.token.nlb and not S.in_parenthesized_expr and peek().type is 'name':

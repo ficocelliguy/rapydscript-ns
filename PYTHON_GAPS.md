@@ -88,24 +88,6 @@ name. Hard to debug because no error is raised.
 
 ---
 
-### 1.6 Bitwise Operator Precedence Is JS-Style, Not Python-Style
-
-**Python:** `&`, `|`, `^`, `<<`, `>>` bind **tighter** than comparison operators
-(`==`, `<`, `>`, etc.). So `a & b == c` parses as `(a & b) == c`.
-**RapydScript:** Follows JS precedence, where comparisons bind tighter than bitwise.
-`a & b == c` parses as `a & (b == c)`.
-
-```python
-0b1100 & 0b1010 == 0b1000
-# Python: (0b1100 & 0b1010) == 0b1000  →  True
-# RapydScript: 0b1100 & (0b1010 == 0b1000)  →  12 & False  →  0
-```
-
-**Impact:** Bitfield code, protocol parsers, and bit-twiddling tricks ported from Python
-will silently produce wrong values. **Workaround:** always parenthesise: `(a & b) == c`.
-
----
-
 ### 1.7 `str.split()` With No Argument Splits Only On Space
 
 **Python:** `s.split()` (no args) splits on runs of any whitespace (space, tab, newline,
@@ -621,7 +603,6 @@ Entries marked **NEW** were added in the 2026-05-26 coverage audit.
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| **NEW** High | Bitwise operator precedence (§1.6) | Medium | Silent wrong results in protocol/bitfield code |
 | **NEW** High | `str.split()` splits only on space (§1.7) | Low | Silent wrong tokenisation of multi-line text |
 | **NEW** High | `1/0` returns `None` instead of `ZeroDivisionError` (§1.8) | Low | Defensive numeric code misbehaves silently |
 | **NEW** High | Python iterator protocol ignored (§2.13) | Medium | Hand-written `__iter__`/`__next__` classes don't work |

@@ -3053,6 +3053,61 @@ var TESTS = [
     },
 
     {
+        name: "bundle_python_bitwise_precedence",
+        description: "Python-style bitwise precedence: (&, |, ^, <<, >>) bind tighter than comparisons in the web-repl bundle (on by default)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                // & vs ==
+                "assrt.ok(0b1100 & 0b1010 == 0b1000)",
+                "assrt.equal(0b1100 & 0b1010 == 0b1000, True)",
+                // | vs ==
+                "assrt.ok(0b0100 | 0b0010 == 0b0110)",
+                // ^ vs ==
+                "assrt.ok(0b1100 ^ 0b1010 == 0b0110)",
+                // shifts vs ==
+                "assrt.ok(1 << 3 == 8)",
+                "assrt.ok(16 >> 2 == 4)",
+                // & vs < / >
+                "assrt.ok(0b1100 & 0b1010 > 0)",
+                "assrt.ok(0b1100 & 0b0011 < 1)",
+                // Mixed: & > ^ > | preserved
+                "assrt.equal(0b1100 | 0b1010 & 0b0101, 0b1100)",
+                // & vs in
+                "mask = 0b1100",
+                "allowed = [0b1000, 0b0100]",
+                "assrt.ok(mask & 0b1010 in allowed)",
+                // Realistic bitfield
+                "FLAG_R = 0x01",
+                "FLAG_W = 0x02",
+                "FLAG_X = 0x04",
+                "perms = FLAG_R | FLAG_W",
+                "assrt.ok(perms & FLAG_R == FLAG_R)",
+                "assrt.ok(perms & FLAG_X == 0)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_python_bitwise_precedence_off",
+        description: "With from __python__ import no_python_bitwise_precedence, web-repl falls back to JS-style precedence (comparison binds tighter)",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "from __python__ import no_python_bitwise_precedence",
+                // JS-style: a & b == c  parses as  a & (b == c)
+                // 0b1100 & (0b1010 == 0b1000) → 12 & False → 0
+                "assrt.equal(0b1100 & 0b1010 == 0b1000, 0)",
+                "assrt.equal(0b0100 | 0b0010 == 0b0110, 4)",
+                // Parenthesised behaves like Python in both modes
+                "assrt.equal((0b1100 & 0b1010) == 0b1000, True)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_string_repeat",
         description: "Python-style string repetition with * operator works in the web-repl bundle",
         run: function () {

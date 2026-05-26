@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [ python Runtime `isinstance` on `typing` generics] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [ python Bitwise operator precedence (see the python gaps document)] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 
@@ -48,4 +48,27 @@ class Timer:
 
 with Timer():
     do_work()              # prints "completed in N ms"
+```
+
+
+Example: Python-style bitwise operator precedence
+-------------------------------------------------
+
+```python
+from __python__ import python_bitwise_precedence
+
+FLAG_READ  = 0x01
+FLAG_WRITE = 0x02
+FLAG_EXEC  = 0x04
+
+perms = FLAG_READ | FLAG_WRITE
+
+# Bitwise binds tighter than comparison, exactly like CPython.
+if perms & FLAG_READ == FLAG_READ:
+    print('can read')
+
+# Bitfield masking expressions read naturally without parens.
+assert 0b1100 & 0b1010 == 0b1000
+assert 1 << 3 == 8
+assert perms & FLAG_EXEC == 0
 ```

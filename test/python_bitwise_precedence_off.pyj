@@ -1,0 +1,25 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# python_bitwise_precedence_off.pyj
+# Regression test: with `from __python__ import no_python_bitwise_precedence`,
+# RapydScript falls back to JS-style precedence (comparisons bind tighter than bitwise).
+
+from __python__ import no_python_bitwise_precedence
+
+ae = assrt.equal
+ok = assrt.ok
+
+# JS: a & b == c  parses as  a & (b == c)
+# 0b1100 & (0b1010 == 0b1000)  →  12 & False  →  12 & 0  →  0
+ae(0b1100 & 0b1010 == 0b1000, 0)
+
+# 0b0100 | (0b0010 == 0b0110)  →  4 | False  →  4 | 0  →  4
+ae(0b0100 | 0b0010 == 0b0110, 4)
+
+# Parenthesised behaves like Python in both modes
+ae((0b1100 & 0b1010) == 0b1000, True)
+ae((0b0100 | 0b0010) == 0b0110, True)
+
+# Inter-bitwise precedence still consistent with JS (& > ^ > |)
+ae(0b1100 | 0b1010 & 0b0101, 0b1100)

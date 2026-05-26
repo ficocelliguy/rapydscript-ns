@@ -735,6 +735,37 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "python_bitwise_precedence_flag_parses_cleanly",
+            description: "python_bitwise_precedence (default on, or opted out via no_) produces no errors and reparses bitwise/comparison expressions",
+            run: function () {
+                // Default-on path: no flag needed
+                var src_default = [
+                    "ok = 0b1100 & 0b1010 == 0b1000",
+                    "perms = 0x03",
+                    "has_read = perms & 0x01 == 0x01",
+                    "shifted = 1 << 3 == 8",
+                ].join("\n");
+                var d_default = new Diagnostics(RS, null, null);
+                var m_default = d_default.check(src_default);
+                var err_default = m_default.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(err_default, [],
+                    "Default: expected no errors, got: " + JSON.stringify(err_default));
+
+                // Opt-out path: from __python__ import no_python_bitwise_precedence
+                var src_off = [
+                    "from __python__ import no_python_bitwise_precedence",
+                    "ok = 0b1100 & 0b1010 == 0b1000",
+                    "shifted = 1 << 3 == 8",
+                ].join("\n");
+                var d_off = new Diagnostics(RS, null, null);
+                var m_off = d_off.check(src_off);
+                var err_off = m_off.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(err_off, [],
+                    "Opt-out: expected no errors, got: " + JSON.stringify(err_off));
+            },
+        },
+
+        {
             name: "dict_spread_no_errors",
             description: "Dict merge literal {**d1, **d2} produces no error markers",
             run: function () {

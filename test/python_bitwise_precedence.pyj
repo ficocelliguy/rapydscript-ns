@@ -1,0 +1,95 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# python_bitwise_precedence.pyj
+# Tests for Python-style operator precedence: bitwise (&, |, ^, <<, >>) bind
+# tighter than comparison (==, !=, <, >, <=, >=, in).
+# python_bitwise_precedence defaults to True; no __python__ import needed.
+
+ae = assrt.equal
+ok = assrt.ok
+
+# ── & vs == ──────────────────────────────────────────────────────────────────
+# Python: (0b1100 & 0b1010) == 0b1000  →  True
+ok(0b1100 & 0b1010 == 0b1000)
+ok(0xff & 0x0f == 0x0f)
+ok(not (0b1100 & 0b0011 == 0b1000))
+
+# Without precedence: would parse as 0b1100 & (0b1010 == 0b1000)  →  12 & False  →  0
+# With precedence:    (0b1100 & 0b1010) == 0b1000  →  8 == 8  →  True
+ae((0b1100 & 0b1010) == 0b1000, True)
+ae(0b1100 & 0b1010 == 0b1000, True)
+
+# ── | vs == ──────────────────────────────────────────────────────────────────
+ok(0b0100 | 0b0010 == 0b0110)
+ok(0x0f | 0xf0 == 0xff)
+
+# ── ^ vs == ──────────────────────────────────────────────────────────────────
+ok(0b1100 ^ 0b1010 == 0b0110)
+ok(0xff ^ 0x0f == 0xf0)
+
+# ── << vs == ─────────────────────────────────────────────────────────────────
+ok(1 << 3 == 8)
+ok(2 << 4 == 32)
+
+# ── >> vs == ─────────────────────────────────────────────────────────────────
+ok(16 >> 2 == 4)
+ok(64 >> 3 == 8)
+
+# ── & vs != ──────────────────────────────────────────────────────────────────
+ok(0b1100 & 0b0011 != 0b1000)
+ae(0b1100 & 0b1010 != 0b0001, True)
+
+# ── & vs < / > / <= / >= ────────────────────────────────────────────────────
+ok(0b1100 & 0b1010 > 0)
+ok(0b1100 & 0b0011 < 1)
+ok(0xff & 0x0f >= 15)
+ok(0xff & 0x0f <= 15)
+
+# ── Mixed bitwise / shift vs comparison ─────────────────────────────────────
+# Python: (1 << 3) == 8  → True
+ok(1 << 3 == 8)
+# Python: ((a & b) | c) == d
+ok((0b1100 & 0b1010) | 0b0001 == 0b1001)
+ok(0b1100 & 0b1010 | 0b0001 == 0b1001)
+
+# ── Bitwise vs `in` ─────────────────────────────────────────────────────────
+# Python: (mask & flag) in allowed
+mask = 0b1100
+allowed = [0b1000, 0b0100]
+ok(mask & 0b1010 in allowed)
+
+# ── Bitwise vs `is` ─────────────────────────────────────────────────────────
+flag_a = True
+ok((0b1100 & 0b1010 == 0b1000) is True)
+ok(0b1100 & 0b1010 == 0b1000 is True)
+
+# ── Inter-bitwise relative precedence preserved (& > ^ > |) ─────────────────
+# Python: 0b1100 | 0b1010 & 0b0101  →  0b1100 | (0b1010 & 0b0101)  →  0b1100 | 0  →  0b1100
+ae(0b1100 | 0b1010 & 0b0101, 0b1100)
+ae(0b1100 | (0b1010 & 0b0101), 0b1100)
+ae(0b1111 ^ 0b1010 & 0b0101, 0b1111)
+ae(0b1111 ^ (0b1010 & 0b0101), 0b1111)
+
+# ── Shift vs arithmetic ─────────────────────────────────────────────────────
+# Python: 1 << 2 + 1  →  1 << 3  →  8 (arithmetic still binds tighter than shift)
+ae(1 << 2 + 1, 8)
+ae(4 >> 1 + 1, 1)
+
+# ── Realistic bitfield-style protocol parsing ───────────────────────────────
+FLAG_READ = 0x01
+FLAG_WRITE = 0x02
+FLAG_EXEC = 0x04
+perms = FLAG_READ | FLAG_WRITE
+
+ok(perms & FLAG_READ == FLAG_READ)
+ok(perms & FLAG_WRITE != 0)
+ok(perms & FLAG_EXEC == 0)
+ok(not (perms & FLAG_EXEC != 0))
+
+# ── Augmented assignment with bitwise (RHS is full expression) ──────────────
+# x &= y == z still parses RHS as `y == z` since `&=` is an assignment statement.
+# This matches Python: `x &= y == z` means x = x & (y == z).
+x = 0b1111
+x &= (0b1010 == 0b1010)  # RHS = True = 1
+ae(x, 1)
