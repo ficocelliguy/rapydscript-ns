@@ -1,0 +1,173 @@
+# vim:fileencoding=utf-8
+# globals: assrt
+#
+# iter_protocol.pyj
+# Tests for the Python iterator protocol (__iter__ / __next__):
+# a class that defines __iter__ (returning an iterator) and __next__
+# (returning successive values, raising StopIteration to terminate)
+# must be consumable by all of Python's standard iteration mechanisms.
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Single-class iterator (iterable IS the iterator) ──────────────────────
+
+class Squares:
+    def __init__(self, n):
+        self.n = n
+        self.i = 0
+    def __iter__(self):
+        self.i = 0
+        return self
+    def __next__(self):
+        if self.i >= self.n:
+            raise StopIteration()
+        v = self.i * self.i
+        self.i += 1
+        return v
+
+# for-loop
+result = []
+for x in Squares(4):
+    result.push(x)
+ade(result, [0, 1, 4, 9])
+
+# list()
+ade(list(Squares(4)), [0, 1, 4, 9])
+
+# tuple()
+ade(tuple(Squares(3)), [0, 1, 4])
+
+# set() — order-insensitive
+s = set(Squares(4))
+ade(sorted(list(s)), [0, 1, 4, 9])
+
+# sum()
+ae(sum(Squares(5)), 0 + 1 + 4 + 9 + 16)
+
+# max() / min()
+ae(max(Squares(5)), 16)
+ae(min(Squares(5)), 0)
+
+# List comprehension
+ade([x + 1 for x in Squares(3)], [1, 2, 5])
+
+# Generator expression consumed by list()
+ade(list(x * 2 for x in Squares(3)), [0, 2, 8])
+
+# Tuple-unpacking via star expansion
+arr = [*Squares(4)]
+ade(arr, [0, 1, 4, 9])
+
+# iter() + next()
+it = iter(Squares(3))
+ae(next(it), 0)
+ae(next(it), 1)
+ae(next(it), 4)
+# Exhausted iterator raises StopIteration when called via next()
+assrt.throws(def(): next(it);, def(e): return isinstance(e, StopIteration);)
+# With a default, returns default
+ae(next(it, 'done'), 'done')
+
+# ── 2. Two-class pattern (iterable returns a separate iterator) ──────────────
+
+class _RangeIter:
+    def __init__(self, n):
+        self.n = n
+        self.i = 0
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self.i >= self.n:
+            raise StopIteration()
+        v = self.i
+        self.i += 1
+        return v
+
+class _Range:
+    def __init__(self, n):
+        self.n = n
+    def __iter__(self):
+        return _RangeIter(self.n)
+
+ade(list(_Range(3)), [0, 1, 2])
+
+# A fresh iterator each time we iterate _Range — so it can be iterated repeatedly
+r = _Range(3)
+ade(list(r), [0, 1, 2])
+ade(list(r), [0, 1, 2])
+
+# ── 3. StopIteration terminates correctly even with no manual catch ──────────
+
+class _OneShot:
+    def __init__(self):
+        self.done = False
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self.done:
+            raise StopIteration()
+        self.done = True
+        return 'only'
+
+ade(list(_OneShot()), ['only'])
+
+# ── 4. Empty iterator ────────────────────────────────────────────────────────
+
+class _Empty:
+    def __iter__(self):
+        return self
+    def __next__(self):
+        raise StopIteration()
+
+ade(list(_Empty()), [])
+ae(sum(_Empty(), 0), 0)
+for x in _Empty():
+    ok(False, 'empty iterator should not yield')
+
+# ── 5. Inheritance: subclass inherits __next__/__iter__ from parent ──────────
+
+class _CountBase:
+    def __init__(self, start, stop):
+        self.i = start
+        self.stop = stop
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self.i >= self.stop:
+            raise StopIteration()
+        v = self.i
+        self.i += 1
+        return v
+
+class _CountDoubled(_CountBase):
+    def __next__(self):
+        v = _CountBase.prototype.__next__.call(self)
+        return v * 2
+
+ade(list(_CountDoubled(0, 4)), [0, 2, 4, 6])
+
+# ── 6. `raise StopIteration` without parens (Python convention) ─────────────
+
+class _Letters:
+    def __init__(self):
+        self.i = 0
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self.i >= 3:
+            raise StopIteration   # bare class — Python-style
+        v = 'abc'[self.i]
+        self.i += 1
+        return v
+
+ade(list(_Letters()), ['a', 'b', 'c'])
+
+# ── 7. Nested for-loops ──────────────────────────────────────────────────────
+
+result = []
+for a in Squares(3):
+    for b in Squares(2):
+        result.push([a, b])
+ade(result, [[0, 0], [0, 1], [1, 0], [1, 1], [4, 0], [4, 1]])

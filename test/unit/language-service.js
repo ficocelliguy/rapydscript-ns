@@ -2179,6 +2179,34 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        {
+            name: "iter_protocol_class_no_errors",
+            description: "A class defining __iter__/__next__ (Python iterator protocol) parses cleanly with no diagnostics",
+            run: function () {
+                var markers = d().check([
+                    "class Squares:",
+                    "    def __init__(self, n):",
+                    "        self.n = n",
+                    "        self.i = 0",
+                    "    def __iter__(self):",
+                    "        self.i = 0",
+                    "        return self",
+                    "    def __next__(self):",
+                    "        if self.i >= self.n:",
+                    "            raise StopIteration()",
+                    "        v = self.i * self.i",
+                    "        self.i += 1",
+                    "        return v",
+                    "result = list(Squares(4))",
+                    "for x in Squares(3):",
+                    "    print(x)",
+                ].join("\n"));
+                var errs = markers.filter(function (m) { return m.severity === 1 || m.severity === 8; });
+                assert.deepStrictEqual(errs, [],
+                    "Expected no errors for iterator-protocol class, got: " + JSON.stringify(errs));
+            },
+        },
+
     ];
 
     return TESTS;

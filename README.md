@@ -3210,6 +3210,38 @@ two properties: ``done`` and ``value``. ``value`` is the next value and
 ``done`` is ``True`` when the iterator is exhausted. This matches the
 JavaScript iterator protocol and allows interoperability with vanilla JS code.
 
+You can also hand-write iterators in the full Python style: define
+``__iter__`` (returning the iterator object, typically ``self``) and
+``__next__`` (returning the next value, raising ``StopIteration`` to stop).
+RapydScript bridges this to the JS iterator protocol automatically, so the
+resulting class is consumable by ``for``, ``list()``, ``tuple()``, ``set()``,
+``sum()``, ``iter()``/``next()``, ``*`` spread, and any other Python or JS
+iteration mechanism:
+
+```python
+class Squares:
+
+    def __init__(self, n):
+        self.n = n
+        self.i = 0
+
+    def __iter__(self):
+        self.i = 0
+        return self
+
+    def __next__(self):
+        if self.i >= self.n:
+            raise StopIteration()
+        v = self.i * self.i
+        self.i += 1
+        return v
+
+list(Squares(4))        # [0, 1, 4, 9]
+sum(Squares(5))         # 30
+for x in Squares(3):    # 0, 1, 4
+    print(x)
+```
+
 RapydScript also provides the Python-style ``next()`` builtin, which wraps
 this protocol transparently:
 
@@ -4273,6 +4305,7 @@ Python Feature Coverage
 | `__init_subclass__` hook                                                                                                                                                                                                                                      | Called automatically on the parent class whenever a subclass is created (e.g. `class Child(Base):`). Implicit `@classmethod`: `cls` receives the new subclass. Keyword arguments in the class header (`class Child(Base, tag='x'):`) are forwarded to `__init_subclass__` as keyword arguments. `super().__init_subclass__(**kwargs)` propagates up the hierarchy. No explicit call needed — the compiler emits it after inheritance setup and identity properties are assigned. |
 | `next(iterator[, default])`                                                                                                                                                                                                                                   | Advances a JS-protocol iterator (`{done, value}`); returns `default` when exhausted if provided, otherwise raises `StopIteration`. Works with `iter()`, `range()`, `enumerate()`, generators, and any object with a `.next()` or `__next__()` method. |
 | `StopIteration` exception                                                                                                                                                                                                                                     | Defined as a builtin exception class; raised by `next()` when an iterator is exhausted and no default is given. |
+| Python iterator protocol (`__iter__` / `__next__`)                                                                                                                                                                                                            | Hand-written iterator classes work transparently: define `__iter__(self)` (returns the iterator, typically `self`) and `__next__(self)` (returns the next value, raises `StopIteration` to terminate). The compiler emits `Cls.prototype[Symbol.iterator] = Cls.prototype.__iter__` and `Cls.prototype.next = ρσ_next_method` (a runtime adapter that translates `__next__` / `StopIteration` into the JS `{done, value}` protocol). The class is then consumable by `for x in obj`, `list(obj)`, `tuple(obj)`, `set(obj)`, `sum(obj)`, `iter(obj)`, `next(it)`, list/set/dict/generator comprehensions, `[*obj]` / `(*obj,)` / `{*obj}` spread, and native JS `for...of` / `[...obj]` — under both `--js-version 5` and modern targets. Both `raise StopIteration` (bare class) and `raise StopIteration()` are accepted. |
 | `iter(callable, sentinel)`                                                                                                                                                                                                                                    | Two-argument form calls `callable` (no args) repeatedly until the return value equals `sentinel` (strict `===`). Returns a lazy iterator compatible with `for` loops, `next()`, `list()`, and all iterator consumers. Works with plain functions and callable objects (`__call__`). |
 | `dict \| dict` and `dict \|= dict` (Python 3.9+)                                                                                                                                                                                                              | Dict merge via `\|` creates a new merged dict (right-side values win); `\|=` updates in-place. Active via `overload_operators` + `dict_literals` (both on by default). |
 | `__format__` dunder                                                                                                                                                                                                                                           | `format()`, `str.format()`, and f-strings all dispatch to `__format__`; default `__format__` auto-generated for classes (returns `__str__()` for empty spec, raises `TypeError` for non-empty spec); `!r`/`!s`/`!a` transformers bypass `__format__` correctly |

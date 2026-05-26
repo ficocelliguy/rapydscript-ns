@@ -5,7 +5,7 @@
 - vscode plugin based on language service?
 
 
-I would like you to add support for [ python style `*a` unpacking in list/tuple/set literals (see python gaps §2.10)] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
+I would like you to add support for [ Python iterator protocol (see python gaps §2.13)] to rapydscript. It should have the same syntax as the Python implementation, and be transpiled into equivalent javascript. Ensure with unit tests that it transpiles and the output JS runs correctly, and that the language service correctly handles it in parsed code. Make sure it works in the web-repl. Update the README if it has any outdated info about this. Add a simple example to the bottom of the TODO document using this feature (make no other changes to that file). Remove the suggestion from PYTHON_GAPS if it is there. Run the full unit test suite to check for regressions. Add a note in the CHANGELOG under the next unreleased version number.
 
 
 
@@ -113,4 +113,48 @@ assert mixed_t == (0, 1, 2, 4, 5)
 # Set literal — duplicates collapse
 unique = {*head, *tail, 1, 5}
 assert len(unique) == 4
+```
+
+
+Example: Python iterator protocol (`__iter__` / `__next__`)
+-----------------------------------------------------------
+
+```python
+class Squares:
+
+    def __init__(self, n):
+        self.n = n
+        self.i = 0
+
+    def __iter__(self):
+        self.i = 0
+        return self
+
+    def __next__(self):
+        if self.i >= self.n:
+            raise StopIteration
+        v = self.i * self.i
+        self.i += 1
+        return v
+
+# Consumable by every iteration mechanism:
+assert list(Squares(4)) == [0, 1, 4, 9]
+assert sum(Squares(5)) == 0 + 1 + 4 + 9 + 16
+assert tuple(Squares(3)) == (0, 1, 4)
+
+# for-loop
+out = []
+for x in Squares(3):
+    out.push(x)
+assert out == [0, 1, 4]
+
+# Comprehensions and * spread
+assert [x + 1 for x in Squares(3)] == [1, 2, 5]
+assert [*Squares(3)] == [0, 1, 4]
+
+# Manual iter() / next()
+it = iter(Squares(2))
+assert next(it) == 0
+assert next(it) == 1
+assert next(it, 'done') == 'done'
 ```

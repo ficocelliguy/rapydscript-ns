@@ -92,6 +92,21 @@ def ρσ_unpack_starred_asarray(iterable):
             result = iterator.next()
     return ans
 
+def ρσ_next_method():
+    # Bridge Python iterator protocol to JS iterator protocol. Installed as
+    # `Cls.prototype.next` on classes that define `__next__`, so a Python-style
+    # iterator (returning values from __next__, raising StopIteration to stop)
+    # is consumable by everything that calls `.next()`: for...of, spread, list(),
+    # tuple(), set(), iter(), and the ρσ_Iterable bridge.
+    # Accepts both `raise StopIteration` (the class itself thrown) and
+    # `raise StopIteration()` (an instance thrown) for Python compatibility.
+    try:
+        return v'{done: false, value: this.__next__()}'
+    except as ρσ_e:
+        if v'ρσ_e === StopIteration' or isinstance(ρσ_e, StopIteration):
+            return v'{done: true, value: undefined}'
+        raise
+
 def ρσ_extends(child, parent):
     child.prototype = Object.create(parent.prototype)
     child.prototype.constructor = child

@@ -272,6 +272,16 @@ def print_class(output):
                 self.name.print(output)
                 output.print('.prototype.' + stmt.name.name)
                 output.end_statement()
+            if sname is '__next__' and not defined_methods['next']:
+                # Python iterator protocol bridge: ρσ_next_method adapts __next__/
+                # StopIteration to the JS iterator protocol so the class is usable
+                # by for...of, list(), tuple(), set(), iter(), spread, etc. Skipped
+                # when the class also defines its own `next` method directly — that
+                # author is bridging to the JS iterator protocol by hand and the
+                # wrapper would recurse infinitely (next → __next__ → next → …).
+                class_def('next')
+                output.print('ρσ_next_method')
+                output.end_statement()
 
         elif is_node_type(stmt, AST_Class):
             pass  # nested classes are emitted in the statements section below

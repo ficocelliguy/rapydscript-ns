@@ -305,32 +305,6 @@ those also have issues.
 
 ---
 
-### 2.13 Python Iterator Protocol (`__iter__` / `__next__`) Ignored
-
-A class that implements Python's iterator protocol (`__iter__` returning self,
-`__next__` raising `StopIteration`) is **not consumable** by `list(...)`,
-`for ... in`, `sum(...)`, or other Python-style consumers in RapydScript.
-
-```python
-class Squares:
-    def __init__(self, n): self.n = n
-    def __iter__(self): self.i = 0; return self
-    def __next__(self):
-        if self.i >= self.n: raise StopIteration
-        v = self.i * self.i; self.i += 1; return v
-
-list(Squares(4))   # TypeError: iterator.next is not a function
-```
-
-RapydScript expects JS-style iterators with a `.next()` method returning
-`{done, value}`. The Python protocol is not adapted.
-
-**Workaround:** generator functions (`def f(): yield ...`) work correctly — use
-those instead of writing iterator classes by hand. Or implement `[Symbol.iterator]`
-via a v-block.
-
----
-
 ### 2.14 Python Async Iterator Protocol (`__aiter__` / `__anext__`) Ignored
 
 Symmetric to 2.13 for the async case. `async for` compiles to JS `for await ... of`,
@@ -568,7 +542,6 @@ Entries marked **NEW** were added in the 2026-05-26 coverage audit.
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
 | **NEW** High | `1/0` returns `None` instead of `ZeroDivisionError` (§1.8) | Low | Defensive numeric code misbehaves silently |
-| **NEW** High | Python iterator protocol ignored (§2.13) | Medium | Hand-written `__iter__`/`__next__` classes don't work |
 | **NEW** High | Tuples unhashable as dict keys (§1.11) | Medium | Memoisation, sparse grids, graph keys break |
 | **NEW** High | `str.encode()` / `bytes.decode()` missing (§3.7) | Low | Common UTF-8 conversion pattern needs v-block |
 | High | `enum.IntEnum`, `IntFlag`, `Flag` (§3.1) | Medium | Protocol and permission modeling; bitfield enums |

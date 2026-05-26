@@ -5537,6 +5537,120 @@ var TESTS = [
         },
     },
 
+    // ── Python iterator protocol (__iter__ / __next__) ──────────────────────
+
+    {
+        name: "bundle_iter_protocol_basic",
+        description: "User-defined __iter__/__next__ class is consumable by list/for/sum",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class Squares:",
+                "    def __init__(self, n):",
+                "        self.n = n",
+                "        self.i = 0",
+                "    def __iter__(self):",
+                "        self.i = 0",
+                "        return self",
+                "    def __next__(self):",
+                "        if self.i >= self.n:",
+                "            raise StopIteration()",
+                "        v = self.i * self.i",
+                "        self.i += 1",
+                "        return v",
+                "assrt.deepEqual(list(Squares(4)), [0, 1, 4, 9])",
+                "total = 0",
+                "for x in Squares(5):",
+                "    total += x",
+                "assrt.equal(total, 0 + 1 + 4 + 9 + 16)",
+                "assrt.equal(sum(Squares(4)), 14)",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_iter_protocol_two_classes",
+        description: "Two-class pattern: __iter__ returns a separate iterator object",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class _RangeIter:",
+                "    def __init__(self, n):",
+                "        self.n = n",
+                "        self.i = 0",
+                "    def __iter__(self):",
+                "        return self",
+                "    def __next__(self):",
+                "        if self.i >= self.n:",
+                "            raise StopIteration()",
+                "        v = self.i",
+                "        self.i += 1",
+                "        return v",
+                "class _Range:",
+                "    def __init__(self, n):",
+                "        self.n = n",
+                "    def __iter__(self):",
+                "        return _RangeIter(self.n)",
+                "r = _Range(3)",
+                "assrt.deepEqual(list(r), [0, 1, 2])",
+                "assrt.deepEqual(list(r), [0, 1, 2])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_iter_protocol_iter_next",
+        description: "Iterator class works with iter() and next() builtins",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class _Once:",
+                "    def __init__(self):",
+                "        self.i = 0",
+                "    def __iter__(self):",
+                "        return self",
+                "    def __next__(self):",
+                "        if self.i >= 2:",
+                "            raise StopIteration",   // bare class — Python convention
+                "        v = self.i",
+                "        self.i += 1",
+                "        return v",
+                "it = iter(_Once())",
+                "assrt.equal(next(it), 0)",
+                "assrt.equal(next(it), 1)",
+                "assrt.equal(next(it, 'done'), 'done')",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
+    {
+        name: "bundle_iter_protocol_spread",
+        description: "Iterator class works with * spread in list literals",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = bundle_compile(repl, [
+                "class _Three:",
+                "    def __init__(self):",
+                "        self.i = 0",
+                "    def __iter__(self):",
+                "        return self",
+                "    def __next__(self):",
+                "        if self.i >= 3:",
+                "            raise StopIteration()",
+                "        v = self.i",
+                "        self.i += 1",
+                "        return v",
+                "arr = [*_Three()]",
+                "assrt.deepEqual(arr, [0, 1, 2])",
+                "assrt.deepEqual([10, *_Three(), 20], [10, 0, 1, 2, 20])",
+            ].join("\n"));
+            run_js(js);
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------
