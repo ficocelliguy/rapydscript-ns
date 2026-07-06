@@ -2,7 +2,11 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-class SyntaxError(Error):
+# Prefer the host's native SyntaxError so instances also satisfy
+# `instanceof SyntaxError` in host code (browser / Node.js).
+_SyntaxErrorBase = v'(typeof window !== "undefined" && window.SyntaxError) || (typeof globalThis !== "undefined" && globalThis.SyntaxError) || Error'
+
+class SyntaxError(_SyntaxErrorBase):
 
     def __init__(self, message, filename, line, col, pos, is_eof):
         self.stack = Error().stack
@@ -15,6 +19,8 @@ class SyntaxError(Error):
         # The "standard" form for these error attributes
         self.lineNumber = line
         self.fileName = filename
+        # JS-style location info (Babel/Acorn convention)
+        self.loc = {'line': line, 'column': col}
 
     def toString(self):
         ans = self.message + " (line: " + self.line + ", col: " + self.col + ", pos: " + self.pos + ")"
