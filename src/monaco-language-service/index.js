@@ -26,6 +26,25 @@ import { JS_GLOBALS_DTS }            from './js-globals-dts.js';
 
 const LANGUAGE_ID = 'rapydscript';
 
+// Default derivation of the _virtualFiles key from a Monaco model URI.
+// Path-aware: preserves subdirectories so files with the same basename in
+// different directories don't collide in the shared virtualFiles pool.
+// e.g. URI path "/scripts/utils.py"       → module name "scripts/utils"
+//      URI path "/scripts/lib/helpers.pyj" → module name "scripts/lib/helpers"
+//      URI path "/utils.py"               → module name "utils"
+// Callers can supply options.moduleNameFromUri to remap paths (e.g. strip a
+// Bitburner-style "home/" prefix, or key by a script id instead of the URI).
+function defaultModuleNameFromUri(uri) {
+    if (!uri) return null;
+    let p = uri.path || uri.fsPath || '';
+    if (!p) return null;
+    // Normalise Windows-style backslashes and drop the leading separator.
+    p = p.replace(/\\/g, '/').replace(/^\/+/, '');
+    // Strip the RapydScript / Python extension, if any.
+    p = p.replace(/\.(?:pyj?x?)$/, '');
+    return p || null;
+}
+
 // ---------------------------------------------------------------------------
 // Per-model state
 // ---------------------------------------------------------------------------
@@ -39,10 +58,7 @@ class ModelState {
 
         // Derive the module name from the model URI so this model's content can
         // be registered in _virtualFiles for cross-file import resolution.
-        // e.g. URI path "/scripts/utils.py" → module name "utils"
-        const uri_path = (model.uri && (model.uri.path || model.uri.fsPath)) || '';
-        const basename = uri_path.split('/').pop() || '';
-        this._module_name = basename.replace(/\.pyj?x?$/, '') || null;
+        this._module_name = service._moduleNameFromUri(model.uri) || null;
 
         // Run immediately on first attach
         this._schedule(0);
@@ -103,6 +119,7 @@ class RapydScriptLanguageService {
         this._virtualFiles = Object.assign({}, options.virtualFiles || {});
         this._disposables  = [];
         this._modelStates  = new Map();  // model → ModelState
+        this._moduleNameFromUri = options.moduleNameFromUri || defaultModuleNameFromUri;
 
         // Build compiler reference — accept either the raw RapydScript global
         // or a web_repl instance (we only need the parse-level API).
@@ -407,6 +424,10 @@ class RapydScriptLanguageService {
  * @param {string[]} [options.extraBuiltins] - extra global names to suppress undef warnings
  * @param {string} [options.pythonFlags]     - comma-separated python flags (e.g. "dict_literals,overload_getitem")
  * @param {boolean} [options.disableJsGlobals=false] - skip the built-in d.ts for browser/JS globals (navigator, window, document, console, Math, JSON, …)
+ * @param {(uri: object) => (string|null)} [options.moduleNameFromUri] - custom derivation of the
+ *   virtualFiles key from a Monaco model URI.  Default is path-aware: leading slashes and the
+ *   .py/.pyj/.pyjx extension are stripped, so "/scripts/utils/math.pyj" → "scripts/utils/math".
+ *   Return null to skip registering that model in the shared virtualFiles pool.
  * @returns {RapydScriptLanguageService}
  */
 export function registerRapydScript(monaco, options) {

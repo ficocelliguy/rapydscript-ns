@@ -116,20 +116,20 @@ function make_tests(registerRapydScript, RS) {
 
         {
             name: "module_name_from_uri_path",
-            description: "ModelState derives the module name from the URI path (strip dir + .py extension)",
+            description: "ModelState derives a path-aware module name (preserves subdirs, strips extension)",
             run_async: function() {
                 var utils_model = make_model("def foo():\n    return []\n", "/scripts/utils.py");
                 var env = make_service([utils_model]);
                 return flush().then(function() {
                     assert.ok(
-                        Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'utils'),
-                        "Expected 'utils' in _virtualFiles after model _run(); got keys: " +
+                        Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'scripts/utils'),
+                        "Expected 'scripts/utils' in _virtualFiles after model _run(); got keys: " +
                         JSON.stringify(Object.keys(env.svc._virtualFiles))
                     );
                     assert.strictEqual(
-                        env.svc._virtualFiles['utils'],
+                        env.svc._virtualFiles['scripts/utils'],
                         "def foo():\n    return []\n",
-                        "virtualFiles['utils'] should contain the model source"
+                        "virtualFiles['scripts/utils'] should contain the model source"
                     );
                 });
             },
@@ -143,8 +143,84 @@ function make_tests(registerRapydScript, RS) {
                 var env = make_service([model]);
                 return flush().then(function() {
                     assert.ok(
-                        Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'helpers'),
-                        "Expected 'helpers' in _virtualFiles for .pyj model"
+                        Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'lib/helpers'),
+                        "Expected 'lib/helpers' in _virtualFiles for .pyj model"
+                    );
+                });
+            },
+        },
+
+        {
+            name: "module_name_root_level_path",
+            description: "Root-level URIs (e.g. /utils.py) still map to a bare module name",
+            run_async: function() {
+                var model = make_model("x = 1\n", "/utils.py");
+                var env = make_service([model]);
+                return flush().then(function() {
+                    assert.ok(
+                        Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'utils'),
+                        "Root-level /utils.py should map to key 'utils'; got keys: " +
+                        JSON.stringify(Object.keys(env.svc._virtualFiles))
+                    );
+                });
+            },
+        },
+
+        {
+            name: "module_name_same_basename_no_collision",
+            description: "Two open models with the same basename in different dirs don't clobber each other",
+            run_async: function() {
+                var a = make_model("A = 1\n", "/scripts/utils/math.pyj");
+                var b = make_model("B = 2\n", "/scripts/servers/math.pyj");
+                var env = make_service([a, b]);
+                return flush().then(function() {
+                    assert.strictEqual(env.svc._virtualFiles['scripts/utils/math'],   "A = 1\n");
+                    assert.strictEqual(env.svc._virtualFiles['scripts/servers/math'], "B = 2\n");
+                });
+            },
+        },
+
+        {
+            name: "module_name_custom_derivation",
+            description: "options.moduleNameFromUri overrides the default (e.g. strip a 'home/' prefix)",
+            run_async: function() {
+                var model = make_model("x = 1\n", "/home/utils/math.pyj");
+                var env   = make_service([model], {
+                    moduleNameFromUri: function(uri) {
+                        var p = (uri && uri.path) || '';
+                        // Strip leading '/', 'home/' prefix, and the extension.
+                        return p.replace(/^\/+/, '')
+                                .replace(/^home\//, '')
+                                .replace(/\.(?:pyj?x?)$/, '') || null;
+                    },
+                });
+                return flush().then(function() {
+                    assert.ok(
+                        Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'utils/math'),
+                        "Custom callback should map /home/utils/math.pyj to 'utils/math'; got keys: " +
+                        JSON.stringify(Object.keys(env.svc._virtualFiles))
+                    );
+                });
+            },
+        },
+
+        {
+            name: "module_name_custom_derivation_returns_null_skips_registration",
+            description: "Returning null from the custom callback skips registering the model in _virtualFiles",
+            run_async: function() {
+                var model = make_model("x = 1\n", "/scratch/temp.pyj");
+                var env   = make_service([model], {
+                    moduleNameFromUri: function(uri) {
+                        var p = (uri && uri.path) || '';
+                        if (p.indexOf('/scratch/') === 0) return null;
+                        return p.replace(/^\/+/, '').replace(/\.(?:pyj?x?)$/, '') || null;
+                    },
+                });
+                return flush().then(function() {
+                    assert.strictEqual(
+                        Object.keys(env.svc._virtualFiles).length, 0,
+                        "Expected _virtualFiles to be empty when callback returns null; got keys: " +
+                        JSON.stringify(Object.keys(env.svc._virtualFiles))
                     );
                 });
             },
@@ -164,7 +240,8 @@ function make_tests(registerRapydScript, RS) {
                 return flush().then(function() {
                     assert.ok(
                         Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'utils'),
-                        "Expected 'utils' in _virtualFiles after model added dynamically"
+                        "Expected 'utils' in _virtualFiles after model added dynamically; got keys: " +
+                        JSON.stringify(Object.keys(env.svc._virtualFiles))
                     );
                 });
             },
