@@ -307,6 +307,13 @@ export class CompletionEngine {
     }
 
     /**
+     * Reset the virtual files available to import analysis.
+     */
+    clearVirtualFiles() {
+        this._virtualFiles = {};
+    }
+
+    /**
      * Produce Monaco completion items for the given position.
      *
      * @param {import('./scope.js').ScopeMap|null} scopeMap

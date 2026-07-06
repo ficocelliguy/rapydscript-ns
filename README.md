@@ -4124,6 +4124,7 @@ var service = registerRapydScript(monaco, {
 });
 
 // Live-update a module as the user edits it in another tab:
+service.clearVirtualFiles();
 service.setVirtualFiles({ utils: updatedSource });
 ```
 

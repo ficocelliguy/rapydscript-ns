@@ -320,6 +320,15 @@ class RapydScriptLanguageService {
     }
 
     /**
+     * Remove all virtual files available to the import resolver.
+     */
+    clearVirtualFiles() {
+        this._virtualFiles = {};
+        this._completions.clearVirtualFiles();
+        this._modelStates.forEach(state => state._schedule(0));
+    }
+
+    /**
      * Remove a virtual file by name.
      * @param {string} name
      */

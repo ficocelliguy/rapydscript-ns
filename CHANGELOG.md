@@ -1,4 +1,11 @@
-version 0.9.6 (unreleased)
+version 0.9.7
+=======================
+* Added `export_all` compile option — prefixes `export` to every top-level user-declared function, class, and variable in the output.
+* Added `parse()` on the web-repl bundle — `RapydScript.parse(code, opts)` on the browser bundle now returns the AST directly.
+* Added `service.clearVirtualFiles()` on the Monaco language service — wipes all registered virtual files and re-runs diagnostics on every attached model.
+* `SyntaxError` now extends the host's native `SyntaxError` when available (`window.SyntaxError` / `globalThis.SyntaxError`, falling back to `Error`) and expose a Babel/Acorn-style `.loc = {line, column}` alongside the existing `.line`/`.col`/`.lineNumber`/`.fileName` fields.
+
+version 0.9.6
 =======================
 * Added Python-style division-by-zero: `1 / 0`, `5 // 0`, and `7 % 0` now raise `ZeroDivisionError` (matches CPython) instead of producing `Infinity`/`NaN`. The augmented forms `/=`, `//=`, and `%=` also raise. Controlled by the new `python_division` flag, on by default; disable per-scope with `from __python__ import no_python_division` to revert to raw JS arithmetic semantics. When `overload_operators` is active, the operator dispatch helpers always raise on a zero divisor (matches the existing `python_modulo` precedence).
 * Added support for the Python iterator protocol (`__iter__` / `__next__`). A class that defines `__iter__(self)` (returning an iterator, typically `self`) and `__next__(self)` (returning the next value, raising `StopIteration` to stop) is now consumable by every iteration mechanism: `for x in obj`, `list(obj)`, `tuple(obj)`, `set(obj)`, `sum(obj)`, `iter(obj)`, `next(it)`, list/set/dict/generator comprehensions, `[*obj]` / `(*obj,)` / `{*obj}` spread, and native JS `for...of` / `[...obj]` — under both `--js-version 5` and modern targets. The compiler emits `Cls.prototype[Symbol.iterator] = Cls.prototype.__iter__` (already done) plus `Cls.prototype.next = ρσ_next_method`, a new runtime adapter that translates `__next__` / `StopIteration` into the JS `{done, value}` protocol. Both `raise StopIteration` (bare class) and `raise StopIteration()` are accepted.
