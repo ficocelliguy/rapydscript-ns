@@ -324,7 +324,7 @@ class RapydScriptLanguageService {
      */
     clearVirtualFiles() {
         this._virtualFiles = {};
-        this._completions.clearVirtualFiles();
+        this._completions.setVirtualFiles(this._virtualFiles);
         this._modelStates.forEach(state => state._schedule(0));
     }
 

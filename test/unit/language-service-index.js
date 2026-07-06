@@ -291,6 +291,121 @@ function make_tests(registerRapydScript, RS) {
             },
         },
 
+        // ── clearVirtualFiles ────────────────────────────────────────────
+
+        {
+            name: "clear_virtual_files_removes_manually_set_files",
+            description: "clearVirtualFiles wipes entries added via setVirtualFiles",
+            run_async: function() {
+                var env = make_service([]);
+                env.svc.setVirtualFiles({ mymod: "def foo():\n    return 1\n" });
+                assert.strictEqual(
+                    env.svc._virtualFiles['mymod'],
+                    "def foo():\n    return 1\n",
+                    "Pre-condition: 'mymod' should be present after setVirtualFiles"
+                );
+                env.svc.clearVirtualFiles();
+                assert.ok(
+                    !Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'mymod'),
+                    "'mymod' should be removed after clearVirtualFiles; got keys: " +
+                    JSON.stringify(Object.keys(env.svc._virtualFiles))
+                );
+                return Promise.resolve();
+            },
+        },
+
+        {
+            name: "clear_virtual_files_shares_reference_with_completions",
+            description: "clearVirtualFiles keeps service._virtualFiles and completions._virtualFiles pointing at the same object (regression test — cross-file completions used to break silently after clear)",
+            run_async: function() {
+                var utils_model = make_model("def get_items():\n    return []\n", "/utils.py");
+                var env = make_service([utils_model]);
+                return flush().then(function() {
+                    assert.strictEqual(
+                        env.svc._virtualFiles, env.svc._completions._virtualFiles,
+                        "Pre-condition: service and completions must share the same _virtualFiles reference"
+                    );
+
+                    env.svc.clearVirtualFiles();
+
+                    // Immediately after the clear (before the async _run fires),
+                    // the completions engine must still reference the same object.
+                    assert.strictEqual(
+                        env.svc._virtualFiles, env.svc._completions._virtualFiles,
+                        "After clearVirtualFiles, service and completions must still share the same reference"
+                    );
+
+                    return flush();
+                }).then(function() {
+                    // The auto re-run has fired; the model re-registers itself
+                    // into service._virtualFiles. Because completions shares the
+                    // reference, it must see the same content — this is exactly
+                    // what breaks when clearVirtualFiles hands the two sides
+                    // different empty objects.
+                    assert.strictEqual(
+                        env.svc._virtualFiles['utils'],
+                        "def get_items():\n    return []\n",
+                        "Model should re-register itself in _virtualFiles after the scheduled re-run"
+                    );
+                    assert.strictEqual(
+                        env.svc._completions._virtualFiles['utils'],
+                        "def get_items():\n    return []\n",
+                        "Completions engine must observe the re-registered model content via the shared reference"
+                    );
+                    assert.strictEqual(
+                        env.svc._virtualFiles, env.svc._completions._virtualFiles,
+                        "Post-run: service and completions must still share the same reference"
+                    );
+                });
+            },
+        },
+
+        {
+            name: "clear_virtual_files_reregisters_open_models",
+            description: "clearVirtualFiles triggers a re-run of every attached model so their content is re-added",
+            run_async: function() {
+                var utils_model = make_model("def get_items():\n    return []\n", "/utils.py");
+                var env = make_service([utils_model]);
+                return flush().then(function() {
+                    env.svc.setVirtualFiles({ scratch: "x = 1\n" });
+                    assert.ok(
+                        env.svc._virtualFiles['scratch'],
+                        "Pre-condition: 'scratch' should be set via setVirtualFiles"
+                    );
+                    assert.ok(
+                        env.svc._virtualFiles['utils'],
+                        "Pre-condition: 'utils' should be auto-registered from the open model"
+                    );
+
+                    env.svc.clearVirtualFiles();
+                    // Both entries are gone synchronously; the model re-registration
+                    // is scheduled asynchronously via _schedule(0).
+                    assert.ok(
+                        !Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'scratch'),
+                        "Manually-added 'scratch' should be gone immediately after clear"
+                    );
+                    assert.ok(
+                        !Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'utils'),
+                        "'utils' should be gone immediately after clear (before the async re-run)"
+                    );
+
+                    return flush();
+                }).then(function() {
+                    // After the async re-run, the open model has re-added itself,
+                    // but the manually-added file stays gone.
+                    assert.strictEqual(
+                        env.svc._virtualFiles['utils'],
+                        "def get_items():\n    return []\n",
+                        "Open model should be re-registered after clearVirtualFiles triggers a re-run"
+                    );
+                    assert.ok(
+                        !Object.prototype.hasOwnProperty.call(env.svc._virtualFiles, 'scratch'),
+                        "Manually-added 'scratch' should remain gone after the async re-run"
+                    );
+                });
+            },
+        },
+
         // ── Cross-file inferred return type via auto-populated virtualFiles ─
 
         {

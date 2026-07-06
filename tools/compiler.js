@@ -44,9 +44,18 @@ function virtual_readfile(name, encoding) {
         var rel = name.slice('__virtual__/'.length);
         if (rel.slice(-11) === '.pyj-cached') rel = rel.slice(0, -11);
         else if (rel.slice(-4) === '.pyj') rel = rel.slice(0, -4);
-        if (rel.slice(-9) === '/__init__') rel = rel.slice(0, -9);
+        // Check the exact key first so tests can distinguish "pkg" (module `pkg.pyj`)
+        // from "pkg/__init__" (package init file). Falls back to the legacy stripped
+        // form so existing tests that store the __init__ content under the "pkg" key
+        // continue to work.
         if (Object.prototype.hasOwnProperty.call(_current_virtual_files, rel)) {
             return _current_virtual_files[rel];
+        }
+        if (rel.slice(-9) === '/__init__') {
+            rel = rel.slice(0, -9);
+            if (Object.prototype.hasOwnProperty.call(_current_virtual_files, rel)) {
+                return _current_virtual_files[rel];
+            }
         }
     }
     return fs.readFileSync(name, encoding);

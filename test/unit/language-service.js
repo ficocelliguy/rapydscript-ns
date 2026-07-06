@@ -515,6 +515,56 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
             },
         },
 
+        // ── Relative imports ──────────────────────────────────────────────
+
+        {
+            name: "relative_import_top_level_error",
+            description: "`from .foo import x` in a top-level file (editor.pyj / __main__) produces a single ImportError marker mentioning beyond-top-level",
+            run: function () {
+                var markers = d().check("from .foo import x\nprint(x)");
+                // Should have exactly one error marker for the failed relative import.
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.ok(errors.length >= 1, "Expected an ImportError marker");
+                assert.ok(
+                    errors.some(function (m) { return m.message.indexOf("beyond top-level") !== -1; }),
+                    "Expected error message to mention 'beyond top-level', got: " +
+                    JSON.stringify(errors.map(function (m) { return m.message; }))
+                );
+            },
+        },
+
+        {
+            name: "relative_import_syntax_parses",
+            description: "The various relative-import forms tokenize without a SyntaxError (they may still raise ImportError for beyond-top-level)",
+            run: function () {
+                // All four forms use different level counts. In editor.pyj they
+                // all resolve beyond-top-level, but we only want to verify they
+                // parse — not that they resolve to a valid module.
+                var forms = [
+                    "from .mod import x",
+                    "from ..mod import x",
+                    "from ...mod import x",       // Ellipsis atom
+                    "from ....mod import x",      // Ellipsis + one dot (level 4)
+                    "from . import x",
+                    "from .. import x",
+                ];
+                forms.forEach(function (form) {
+                    var markers = d().check(form);
+                    // Every form should produce an ImportError (beyond top-level),
+                    // not a SyntaxError, indicating the parser accepted the syntax.
+                    assert.ok(
+                        markers.some(function (m) {
+                            return m.severity === SEV_ERROR &&
+                                (m.message.indexOf("beyond top-level") !== -1 ||
+                                 m.message.indexOf("beyond-top-level") !== -1);
+                        }),
+                        "Form '" + form + "' should raise an ImportError with 'beyond top-level', got: " +
+                        JSON.stringify(markers.map(function (m) { return m.message; }))
+                    );
+                });
+            },
+        },
+
         // ── Severity field ────────────────────────────────────────────────
 
         {

@@ -67,6 +67,7 @@ export declare class RapydScriptLanguageService {
   constructor(monaco: unknown, options: RapydScriptOptions);
 
   setVirtualFiles(files: Record<string, string>): void;
+  clearVirtualFiles(): void;
   removeVirtualFile(name: string): void;
   addGlobals(names: string[]): void;
   getScopeMap(model: unknown): unknown | null;

@@ -1036,6 +1036,109 @@ assrt.equal(fib(15), 610)
         },
     },
 
+    // ── Relative imports (from . import x, from ..pkg import y) ──────────
+
+    {
+        name: "relative_import_sibling",
+        description: "`from .utils import foo` inside pkg.mod resolves to pkg.utils",
+        src: [
+            "# globals: assrt",
+            "from pkg.mod import get_answer",
+            "assrt.equal(get_answer(), 42)",
+        ].join("\n"),
+        virtual_files: {
+            "pkg":       "",
+            "pkg/utils": "def foo():\n    return 42",
+            "pkg/mod":   "from .utils import foo\ndef get_answer():\n    return foo()",
+        },
+    },
+
+    {
+        name: "relative_import_parent_package",
+        description: "`from ..utils import foo` inside pkg.sub.mod resolves to pkg.utils",
+        src: [
+            "# globals: assrt",
+            "from pkg.sub.mod import get_answer",
+            "assrt.equal(get_answer(), 7)",
+        ].join("\n"),
+        virtual_files: {
+            "pkg":         "",
+            "pkg/sub":     "",
+            "pkg/utils":   "def foo():\n    return 7",
+            "pkg/sub/mod": "from ..utils import foo\ndef get_answer():\n    return foo()",
+        },
+    },
+
+    {
+        name: "relative_import_bare_dot",
+        description: "`from . import name` inside pkg.other pulls a name exported by the package's __init__",
+        src: [
+            "# globals: assrt",
+            "from pkg.other import get_version",
+            "assrt.equal(get_version(), '1.2.3')",
+        ].join("\n"),
+        virtual_files: {
+            // pkg/__init__ exports VERSION
+            "pkg/__init__": "VERSION = '1.2.3'",
+            "pkg/other":    "from . import VERSION\ndef get_version():\n    return VERSION",
+        },
+    },
+
+    {
+        name: "relative_import_from_package_init",
+        description: "`from .mod import x` in pkg/__init__ resolves to pkg.mod",
+        src: [
+            "# globals: assrt",
+            "from pkg import expose",
+            "assrt.equal(expose(), 55)",
+        ].join("\n"),
+        virtual_files: {
+            // Explicit /__init__ key so the file resolves to pkg/__init__.pyj
+            // (needed for the parser to recognise pkg as a package).
+            "pkg/__init__": "from .mod import helper\ndef expose():\n    return helper()",
+            "pkg/mod":      "def helper():\n    return 55",
+        },
+    },
+
+    {
+        name: "relative_import_triple_dot_ellipsis",
+        description: "`from ... import x` tokenizes the ... as an Ellipsis atom and counts as level 3",
+        src: [
+            "# globals: assrt",
+            "from pkg.a.b.mod import get_answer",
+            "assrt.equal(get_answer(), 3)",
+        ].join("\n"),
+        virtual_files: {
+            "pkg":         "",
+            "pkg/a":       "",
+            "pkg/a/b":     "",
+            "pkg/top":     "def helper():\n    return 3",
+            "pkg/a/b/mod": "from ...top import helper\ndef get_answer():\n    return helper()",
+        },
+    },
+
+    {
+        name: "relative_import_beyond_top_level_errors",
+        description: "`from ..foo import x` inside a top-level-package module raises an ImportError at parse time",
+        run: function () {
+            var src = "from pkg.mod import x\n";
+            var vf = {
+                "pkg":     "",
+                "pkg/mod": "from ..sibling import thing\nx = 1",
+            };
+            var threw = null;
+            try {
+                compile_virtual(src, vf);
+            } catch (e) {
+                threw = e;
+            }
+            if (!threw) throw new Error("expected an ImportError, none raised");
+            if (String(threw).indexOf("beyond top-level") === -1) {
+                throw new Error("wrong error: " + threw);
+            }
+        },
+    },
+
     // ── Walrus operator (:=) ──────────────────────────────────────────────
 
     {

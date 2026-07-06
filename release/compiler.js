@@ -10080,12 +10080,14 @@ return this.__repr__();
 
     (function(){
         var __name__ = "errors";
+        var _SyntaxErrorBase;
+        _SyntaxErrorBase = (typeof window !== "undefined" && window.SyntaxError) || (typeof globalThis !== "undefined" && globalThis.SyntaxError) || Error;
         var SyntaxError = function SyntaxError() {
             if (!(this instanceof SyntaxError)) return new SyntaxError(...arguments);
             if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter});
             SyntaxError.prototype.__init__.apply(this, arguments);
         };
-        ρσ_extends(SyntaxError, Error);
+        ρσ_extends(SyntaxError, _SyntaxErrorBase);
         SyntaxError.prototype.__init__ = function __init__(message, filename, line, col, pos, is_eof) {
             var self = this;
             self.stack = (new Error).stack;
@@ -10097,6 +10099,12 @@ return this.__repr__();
             self.filename = filename;
             self.lineNumber = line;
             self.fileName = filename;
+            self.loc = (function(){
+                var ρσ_d = Object.create(null);
+                ρσ_d["line"] = line;
+                ρσ_d["column"] = col;
+                return ρσ_d;
+            }).call(this);
         };
         if (!SyntaxError.prototype.__init__.__argnames__) Object.defineProperties(SyntaxError.prototype.__init__, {
             __argnames__ : {value: ["message", "filename", "line", "col", "pos", "is_eof"]},
@@ -10120,24 +10128,24 @@ return this.__repr__();
             __module__ : {value: "errors"}
         });
         SyntaxError.prototype.__repr__ = function __repr__ () {
-            if(Error.prototype.__repr__) return Error.prototype.__repr__.call(this);
+            if(_SyntaxErrorBase.prototype.__repr__) return _SyntaxErrorBase.prototype.__repr__.call(this);
             return "<" + __name__ + "." + this.constructor.name + " #" + this.ρσ_object_id + ">";
         };
         SyntaxError.prototype.__str__ = function __str__ () {
-            if(Error.prototype.__str__) return Error.prototype.__str__.call(this);
+            if(_SyntaxErrorBase.prototype.__str__) return _SyntaxErrorBase.prototype.__str__.call(this);
 return this.__repr__();
         };
         SyntaxError.prototype.__format__ = function __format__ () {
-            if(Error.prototype.__format__) return Error.prototype.__format__.call(this, arguments[0]);
+            if(_SyntaxErrorBase.prototype.__format__) return _SyntaxErrorBase.prototype.__format__.call(this, arguments[0]);
             if (!arguments[0]) return this.__str__();
             throw new TypeError("unsupported format specification");
         };
-        Object.defineProperty(SyntaxError.prototype, "__bases__", {value: [Error]});
+        Object.defineProperty(SyntaxError.prototype, "__bases__", {value: [_SyntaxErrorBase]});
         SyntaxError.__name__ = "SyntaxError";
         SyntaxError.__qualname__ = "SyntaxError";
         SyntaxError.__module__ = "errors";
         Object.defineProperty(SyntaxError.prototype, "__class__", {get: function() { return this.constructor; }, configurable: true});
-        if (typeof Error.__init_subclass__ === "function") Error.__init_subclass__.call(SyntaxError);
+        if (typeof _SyntaxErrorBase.__init_subclass__ === "function") _SyntaxErrorBase.__init_subclass__.call(SyntaxError);
 
         var ImportError = function ImportError() {
             if (!(this instanceof ImportError)) return new ImportError(...arguments);
@@ -10169,6 +10177,7 @@ return this.__repr__();
         
         if (typeof SyntaxError.__init_subclass__ === "function") SyntaxError.__init_subclass__.call(ImportError);
 
+        ρσ_modules.errors._SyntaxErrorBase = _SyntaxErrorBase;
         ρσ_modules.errors.SyntaxError = SyntaxError;
         ρσ_modules.errors.ImportError = ImportError;
     })();
@@ -17563,7 +17572,7 @@ return this.__repr__();
         var is_token = ρσ_modules.tokenizer.is_token;
         var RESERVED_WORDS = ρσ_modules.tokenizer.RESERVED_WORDS;
 
-        COMPILER_VERSION = "84e6151da926de39e780f3b59e61940291fd81c2";
+        COMPILER_VERSION = "84924b67501208e21c334dc988380e147909c729";
         PYTHON_FLAGS = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["dict_literals"] = true;
@@ -19490,7 +19499,7 @@ return this.__repr__();
                     import_error(ρσ_list_add(ρσ_list_add(ρσ_list_add("Detected a recursive import of: ", key), " while importing: "), module_id));
                 }
                 package_module_id = key.split(".").slice(0, -1).join(".");
-                if (len(package_module_id) > 0) {
+                if (len(package_module_id) > 0 && !((has_prop(importing_modules, package_module_id) && importing_modules[(typeof package_module_id === "number" && package_module_id < 0) ? importing_modules.length + package_module_id : package_module_id]))) {
                     do_import(package_module_id);
                 }
                 if (options.for_linting) {
@@ -19662,21 +19671,91 @@ return this.__repr__();
                 __module__ : {value: "parse"}
             });
 
+            function resolve_relative_import(level, rel_name) {
+                var filename, is_package, parts, pkg_parts, drop, base;
+                filename = options.filename || "";
+                is_package = filename.slice(-13) === "/__init__.pyj" || filename.slice(-13) === "\\__init__.pyj";
+                parts = (module_id === "__main__") ? ρσ_list_decorate([]) : module_id.split(".");
+                pkg_parts = (is_package) ? parts : parts.slice(0, parts.length - 1);
+                drop = level - 1;
+                if (drop >= pkg_parts.length) {
+                    import_error("attempted relative import beyond top-level package");
+                }
+                base = pkg_parts.slice(0, pkg_parts.length - drop);
+                if (rel_name) {
+                    base.push(rel_name);
+                }
+                return base.join(".");
+            };
+            if (!resolve_relative_import.__argnames__) Object.defineProperties(resolve_relative_import, {
+                __argnames__ : {value: ["level", "rel_name"]},
+                __module__ : {value: "parse"}
+            });
+
             function import_(from_import) {
-                var ans, tok, tmp, name, last_tok, key, alias, aimp, ρσ_unpack, classes, argnames, bracketed, exports, symdef, aname, obj, argvar, cname, imp;
+                var ans, level, rel_start_tok, rel_name, last_tok, key, tok, name, tmp, alias, aimp, ρσ_unpack, classes, argnames, bracketed, exports, symdef, aname, obj, argvar, cname, imp;
                 ans = new AST_Imports((function(){
                     var ρσ_d = Object.create(null);
                     ρσ_d["imports"] = ρσ_list_decorate([]);
                     return ρσ_d;
                 }).call(this));
                 while (true) {
-                    tok = tmp = name = last_tok = expression(false);
-                    key = "";
-                    while (is_node_type(tmp, AST_Dot)) {
-                        key = ρσ_list_add(ρσ_list_add(".", tmp.property), key);
-                        tmp = last_tok = tmp.expression;
+                    level = 0;
+                    rel_start_tok = null;
+                    if (from_import) {
+                        while (true) {
+                            if (is_("punc", ".")) {
+                                if (!rel_start_tok) {
+                                    rel_start_tok = S.token;
+                                }
+                                level = ρσ_list_iadd(level, 1);
+                                next();
+                            } else if (is_("atom", "Ellipsis")) {
+                                if (!rel_start_tok) {
+                                    rel_start_tok = S.token;
+                                }
+                                level = ρσ_list_iadd(level, 3);
+                                next();
+                            } else {
+                                break;
+                            }
+                        }
                     }
-                    key = ρσ_list_add(tmp.name, key);
+                    if (level > 0) {
+                        rel_name = "";
+                        last_tok = rel_start_tok;
+                        if (is_("name")) {
+                            rel_name = S.token.value;
+                            last_tok = S.token;
+                            next();
+                            while (is_("punc", ".")) {
+                                next();
+                                if (!is_("name")) {
+                                    croak("Expected a name after \".\" in import");
+                                }
+                                rel_name = ρσ_list_iadd(rel_name, ρσ_list_add(".", S.token.value));
+                                last_tok = S.token;
+                                next();
+                            }
+                        }
+                        key = resolve_relative_import(level, rel_name);
+                        tok = rel_start_tok;
+                        name = new AST_SymbolVar((function(){
+                            var ρσ_d = Object.create(null);
+                            ρσ_d["name"] = key;
+                            ρσ_d["start"] = rel_start_tok;
+                            ρσ_d["end"] = last_tok;
+                            return ρσ_d;
+                        }).call(this));
+                    } else {
+                        tok = tmp = name = last_tok = expression(false);
+                        key = "";
+                        while (is_node_type(tmp, AST_Dot)) {
+                            key = ρσ_list_add(ρσ_list_add(".", tmp.property), key);
+                            tmp = last_tok = tmp.expression;
+                        }
+                        key = ρσ_list_add(tmp.name, key);
+                    }
                     if (from_import && key === "__python__") {
                         return read_python_flags();
                     }

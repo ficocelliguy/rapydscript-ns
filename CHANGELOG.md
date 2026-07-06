@@ -1,8 +1,12 @@
+version 0.9.8
+=======================
+* Added support for Python-style relative imports: `from .mod import x`, `from ..pkg import y`, `from . import name`, `from ...top import z`, etc.
+* Added `service.clearVirtualFiles()` on the Monaco language service — wipes all registered virtual files and re-runs diagnostics on every attached model.
+
 version 0.9.7
 =======================
 * Added `export_all` compile option — prefixes `export` to every top-level user-declared function, class, and variable in the output.
 * Added `parse()` on the web-repl bundle — `RapydScript.parse(code, opts)` on the browser bundle now returns the AST directly.
-* Added `service.clearVirtualFiles()` on the Monaco language service — wipes all registered virtual files and re-runs diagnostics on every attached model.
 * `SyntaxError` now extends the host's native `SyntaxError` when available (`window.SyntaxError` / `globalThis.SyntaxError`, falling back to `Error`) and expose a Babel/Acorn-style `.loc = {line, column}` alongside the existing `.line`/`.col`/`.lineNumber`/`.fileName` fields.
 
 version 0.9.6

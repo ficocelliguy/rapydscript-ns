@@ -1348,9 +1348,12 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
         if has_prop(importing_modules, key) and importing_modules[key]:
             import_error('Detected a recursive import of: ' + key + ' while importing: ' + module_id)
 
-        # Ensure that the package containing this module is also imported
+        # Ensure that the package containing this module is also imported.
+        # Skip this if the parent is currently being imported (e.g. pkg/__init__.pyj
+        # doing `from .mod import x` triggers do_import('pkg.mod'), whose pre-import
+        # of `pkg` would otherwise trip the recursive-import check).
         package_module_id = key.split('.')[:-1].join('.')
-        if len(package_module_id) > 0:
+        if len(package_module_id) > 0 and not (has_prop(importing_modules, package_module_id) and importing_modules[package_module_id]):
             do_import(package_module_id)
 
         if options.for_linting:
@@ -1442,15 +1445,71 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
                 break
         return new AST_EmptyStatement({'stype':'scoped_flags', 'start':prev(), 'end':prev()})
 
+    def resolve_relative_import(level, rel_name):
+        # Convert a Python-style relative import (level dots + optional dotted name)
+        # into an absolute module key, using this module's id + filename.
+        filename = options.filename or ''
+        is_package = filename.slice(-13) is '/__init__.pyj' or filename.slice(-13) is '\\__init__.pyj'
+        parts = [] if module_id is '__main__' else module_id.split('.')
+        pkg_parts = parts if is_package else parts.slice(0, parts.length - 1)
+        drop = level - 1
+        if drop >= pkg_parts.length:
+            import_error('attempted relative import beyond top-level package')
+        base = pkg_parts.slice(0, pkg_parts.length - drop)
+        if rel_name:
+            base.push(rel_name)
+        return base.join('.')
+
     def import_(from_import):
         ans = new AST_Imports({'imports':[]})
         while True:
-            tok = tmp = name = last_tok = expression(False)
-            key = ''
-            while is_node_type(tmp, AST_Dot):
-                key = "." + tmp.property + key
-                tmp = last_tok = tmp.expression
-            key = tmp.name + key
+            # Detect leading dots for a Python-style relative import (only after `from`).
+            level = 0
+            rel_start_tok = None
+            if from_import:
+                while True:
+                    if is_('punc', '.'):
+                        if not rel_start_tok:
+                            rel_start_tok = S.token
+                        level += 1
+                        next()
+                    elif is_('atom', 'Ellipsis'):
+                        if not rel_start_tok:
+                            rel_start_tok = S.token
+                        level += 3
+                        next()
+                    else:
+                        break
+
+            if level > 0:
+                # Relative import: optionally read a dotted name after the dots.
+                rel_name = ''
+                last_tok = rel_start_tok
+                if is_('name'):
+                    rel_name = S.token.value
+                    last_tok = S.token
+                    next()
+                    while is_('punc', '.'):
+                        next()
+                        if not is_('name'):
+                            croak('Expected a name after "." in import')
+                        rel_name += '.' + S.token.value
+                        last_tok = S.token
+                        next()
+                key = resolve_relative_import(level, rel_name)
+                tok = rel_start_tok
+                name = new AST_SymbolVar({
+                    'name': key,
+                    'start': rel_start_tok,
+                    'end': last_tok,
+                })
+            else:
+                tok = tmp = name = last_tok = expression(False)
+                key = ''
+                while is_node_type(tmp, AST_Dot):
+                    key = "." + tmp.property + key
+                    tmp = last_tok = tmp.expression
+                key = tmp.name + key
             if from_import and key is '__python__':
                 return read_python_flags()
             alias = None
