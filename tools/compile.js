@@ -12,6 +12,66 @@ var vm = require('vm');
 var RapydScript = require("./compiler").create_compiler();
 var utils = require('./utils');
 
+function escape_regex_id(id) {
+    return id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Walk the top-level of the AST to collect exactly the names the user wrote in
+// the source file. Baselib symbols share the emitted output but never appear
+// in this list, so `export` prefixes only ever land on user code.
+function collect_toplevel_user_names(toplevel) {
+    var out = {func: [], async_func: [], class: [], let: []};
+    if (!toplevel) return out;
+    var body = toplevel.body || [];
+    for (var i = 0; i < body.length; i++) {
+        var stmt = body[i];
+        if (!stmt) continue;
+        if (RapydScript.AST_Function && stmt instanceof RapydScript.AST_Function) {
+            if (stmt.name && stmt.name.name) {
+                (stmt.is_async ? out.async_func : out.func).push(stmt.name.name);
+            }
+        } else if (RapydScript.AST_Class && stmt instanceof RapydScript.AST_Class) {
+            if (stmt.name && stmt.name.name) out.class.push(stmt.name.name);
+        }
+    }
+    var localvars = toplevel.localvars;
+    if (localvars && localvars.length) {
+        for (var j = 0; j < localvars.length; j++) {
+            var v = localvars[j];
+            var n = (v && typeof v === 'object' && v.name) || (typeof v === 'string' ? v : null);
+            if (n) out.let.push(n);
+        }
+    }
+    return out;
+}
+
+function apply_export_transforms(code, opts, toplevel) {
+    if (!opts.export_all && !opts.export_main) return code;
+    var names = collect_toplevel_user_names(toplevel);
+    var to_export;
+    if (opts.export_all) {
+        to_export = names;
+    } else {
+        to_export = {func: [], async_func: [], class: [], let: []};
+        if (names.func.indexOf('main') !== -1) to_export.func.push('main');
+        if (names.async_func.indexOf('main') !== -1) to_export.async_func.push('main');
+    }
+    function name_group(list) { return list.map(escape_regex_id).join('|'); }
+    if (to_export.func.length) {
+        code = code.replace(new RegExp('^(function\\s+(?:' + name_group(to_export.func) + ')\\b)', 'gm'), 'export $1');
+    }
+    if (to_export.async_func.length) {
+        code = code.replace(new RegExp('^(async\\s+function\\s+(?:' + name_group(to_export.async_func) + ')\\b)', 'gm'), 'export $1');
+    }
+    if (to_export.class.length) {
+        code = code.replace(new RegExp('^(var\\s+(?:' + name_group(to_export.class) + ')\\s*=\\s*function\\s+\\w+)', 'gm'), 'export $1');
+    }
+    if (to_export.let.length) {
+        code = code.replace(new RegExp('^(let\\s+(?:' + name_group(to_export.let) + ')\\b)', 'gm'), 'export $1');
+    }
+    return code;
+}
+
 function read_whole_file(filename, cb) {
     if (!filename) {
         var chunks = [];
@@ -59,9 +119,11 @@ function build_scoped_flags(flags_str) {
 module.exports = function(start_time, argv, base_path, src_path, lib_path) {
     // configure settings for the output
     var cache_dir = argv.cache_dir ? process_cache_dir(argv.cache_dir) : '';
+    // --module implies --export-all + --bare (ES-module output form).
+    var export_all = !!(argv.export_all || argv.module);
     var OUTPUT_OPTIONS = {
         beautify: !argv.uglify,
-        private_scope: !argv.bare && !argv.export_main,
+        private_scope: !argv.bare && !argv.export_main && !export_all,
         omit_baselib: argv.omit_baselib,
         js_version: parseInt(argv.js_version),
         keep_docstrings: argv.keep_docstrings,
@@ -165,10 +227,10 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
 
         output = output.get();
 
-        if (argv.export_main) {
-            output = output.replace(/^(function\smain)/gm, 'export $1')
-                .replace(/^(async\sfunction\smain)/gm, 'export $1');
-        }
+        output = apply_export_transforms(output, {
+            export_all: export_all,
+            export_main: !!argv.export_main,
+        }, TOPLEVEL);
 
         write_output(output);
 

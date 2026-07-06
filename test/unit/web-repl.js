@@ -5712,6 +5712,76 @@ var TESTS = [
         },
     },
 
+    {
+        name: "bundle_export_all_marks_user_toplevel",
+        description: "export_all prefixes user-declared functions, classes, and let vars with `export`",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "MY_CONST = 42",
+                "OTHER = 'hi'",
+                "def helper(x):",
+                "    return x * 2",
+                "async def fetch():",
+                "    return 1",
+                "def main():",
+                "    return helper(MY_CONST)",
+                "class Foo:",
+                "    def bar(self):",
+                "        pass",
+                "class Bar(Foo):",
+                "    pass",
+            ].join("\n"), { export_all: true, tree_shake: false, keep_baselib: false });
+            var expected = [
+                "export let MY_CONST",
+                "export function helper(",
+                "export async function fetch(",
+                "export function main(",
+                "export var Foo = function Foo",
+                "export var Bar = function Bar",
+            ];
+            expected.forEach(function (needle) {
+                assert.ok(js.indexOf(needle) !== -1, "expected substring not found: " + needle + "\n---\n" + js);
+            });
+        },
+    },
+
+    {
+        name: "bundle_export_all_leaves_baselib_untouched",
+        description: "export_all with keep_baselib does not prefix baselib helpers with `export`",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "def main():",
+                "    return 1",
+            ].join("\n"), { export_all: true, tree_shake: false, keep_baselib: true });
+            // main is user-declared → gets `export`
+            assert.ok(js.indexOf("export function main(") !== -1, "user's main should be exported");
+            // Baselib helpers like ρσ_bool, sum, map are declared as top-level
+            // functions in the bundled baselib; none of them should be exported.
+            var forbidden = ["export function sum(", "export function map(", "export function filter(", "export var Exception ="];
+            forbidden.forEach(function (needle) {
+                assert.ok(js.indexOf(needle) === -1, "baselib symbol wrongly exported: " + needle);
+            });
+        },
+    },
+
+    {
+        name: "bundle_export_main_still_works",
+        description: "export_main only prefixes the top-level main() function",
+        run: function () {
+            var repl = RS.web_repl();
+            var js = repl.compile([
+                "def helper():",
+                "    return 1",
+                "def main():",
+                "    return helper()",
+            ].join("\n"), { export_main: true, tree_shake: false, keep_baselib: false });
+            assert.ok(js.indexOf("export function main(") !== -1, "main should be exported");
+            assert.ok(js.indexOf("export function helper(") === -1, "helper should NOT be exported under export_main");
+        },
+    },
+
 ];
 
 // ---------------------------------------------------------------------------

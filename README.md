@@ -4181,7 +4181,8 @@ original `.py` file with working breakpoints and correct error stack frames.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `export_main` | bool | `false` | Add `export` to the top-level `main` function. |
+| `export_main` | bool | `false` | Add `export` to the top-level `main` (or `async def main`) function. |
+| `export_all` | bool | `false` | Add `export` to every top-level function, class, and variable declared in the source. Baselib symbols are left untouched even when `keep_baselib` is set. Subsumes `export_main`. |
 | `pythonize_strings` | bool | `false` | Add Python-style string methods to string literals. |
 | `keep_baselib` | bool | `false` | Embed the base library in the output. |
 | `keep_docstrings` | bool | `false` | Keep docstrings in the output. |

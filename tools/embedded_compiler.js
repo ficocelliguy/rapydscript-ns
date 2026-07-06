@@ -9,6 +9,88 @@
 var has_prop = Object.prototype.hasOwnProperty.call.bind(Object.prototype.hasOwnProperty);
 var PYTHON_MODE_FLAGS = ['dict_literals', 'overload_getitem', 'bound_methods', 'hash_literals', 'overload_operators', 'truthiness', 'jsx', 'type_enforcement'];
 
+function escape_regex_id(id) {
+    // Identifier chars in RapydScript are ASCII word chars — no metachar escape
+    // needed in practice, but stay safe against future changes.
+    return id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Walks the top-level of the AST to collect the exact names that were declared
+// in the user's source (as opposed to baselib/runtime names that may share the
+// output). Only these names will receive an `export` prefix — that way bundled
+// baselib symbols like `function sum()` are never touched.
+function collect_toplevel_user_names(compiler, toplevel) {
+    var out = {func: [], async_func: [], class: [], let: []};
+    if (!toplevel) return out;
+
+    var body = toplevel.body || [];
+    for (var i = 0; i < body.length; i++) {
+        var stmt = body[i];
+        if (!stmt) continue;
+        if (compiler.AST_Function && stmt instanceof compiler.AST_Function) {
+            if (stmt.name && stmt.name.name) {
+                (stmt.is_async ? out.async_func : out.func).push(stmt.name.name);
+            }
+        } else if (compiler.AST_Class && stmt instanceof compiler.AST_Class) {
+            if (stmt.name && stmt.name.name) out.class.push(stmt.name.name);
+        }
+    }
+
+    // localvars are emitted as a single `let <name>, <name>, ...;` line at the
+    // start of the user body; capture their names so we can target that line.
+    var localvars = toplevel.localvars;
+    if (localvars && localvars.length) {
+        for (var j = 0; j < localvars.length; j++) {
+            var v = localvars[j];
+            var n = (v && typeof v === 'object' && v.name) || (typeof v === 'string' ? v : null);
+            if (n) out.let.push(n);
+        }
+    }
+    return out;
+}
+
+// Applies the requested export{,_all,_main} transformations to already-compiled
+// JS output. `compiler` and `toplevel` let us scope the transform to exactly the
+// user-defined top-level names, so bundled baselib symbols aren't touched.
+function apply_export_transforms(code, opts, compiler, toplevel) {
+    if (!opts.export_all && !opts.export_main) return code;
+
+    var names = collect_toplevel_user_names(compiler, toplevel);
+    var to_export;
+    if (opts.export_all) {
+        to_export = names;
+    } else {
+        // export_main: only the top-level `main` (sync or async).
+        to_export = {func: [], async_func: [], class: [], let: []};
+        if (names.func.indexOf('main') !== -1) to_export.func.push('main');
+        if (names.async_func.indexOf('main') !== -1) to_export.async_func.push('main');
+    }
+
+    function name_group(list) { return list.map(escape_regex_id).join('|'); }
+
+    if (to_export.func.length) {
+        var re = new RegExp('^(function\\s+(?:' + name_group(to_export.func) + ')\\b)', 'gm');
+        code = code.replace(re, 'export $1');
+    }
+    if (to_export.async_func.length) {
+        var re_a = new RegExp('^(async\\s+function\\s+(?:' + name_group(to_export.async_func) + ')\\b)', 'gm');
+        code = code.replace(re_a, 'export $1');
+    }
+    if (to_export.class.length) {
+        // Classes emit as: `var Foo = function Foo() { ... };`
+        var re_c = new RegExp('^(var\\s+(?:' + name_group(to_export.class) + ')\\s*=\\s*function\\s+\\w+)', 'gm');
+        code = code.replace(re_c, 'export $1');
+    }
+    if (to_export.let.length) {
+        // localvars all land on the same beautified line: `let A, B, C;`. Match
+        // when the line's first identifier is one of ours — the line contains
+        // only user vars, so prefixing the whole line with `export` is correct.
+        var re_l = new RegExp('^(let\\s+(?:' + name_group(to_export.let) + ')\\b)', 'gm');
+        code = code.replace(re_l, 'export $1');
+    }
+    return code;
+}
+
 function build_scoped_flags(flags_str) {
     var result = Object.create(null);
     if (!flags_str) return result;
@@ -172,10 +254,7 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
             }
             var pythonize_strings = (opts.legacy_rapydscript !== true) ? true : !!opts.pythonize_strings;
             var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, pythonize_strings);
-            if (opts.export_main) {
-                ans = ans.replace(/^(function\smain)/gm, 'export $1')
-                    .replace(/^(async\sfunction\smain)/gm, 'export $1');
-            }
+            ans = apply_export_transforms(ans, opts, compiler, this.toplevel);
             if (classes) {
                 var exports = {};
                 var self = this;
@@ -238,12 +317,7 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
                 opts.filename || '<input>',
                 code
             );
-            var compiled_code = result.code;
-            if (opts.export_main) {
-                compiled_code = compiled_code
-                    .replace(/^(function\smain)/gm, 'export $1')
-                    .replace(/^(async\sfunction\smain)/gm, 'export $1');
-            }
+            var compiled_code = apply_export_transforms(result.code, opts, compiler, this.toplevel);
             if (classes) {
                 var exports_map = {};
                 var self_ref = this;

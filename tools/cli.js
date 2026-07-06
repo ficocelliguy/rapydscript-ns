@@ -340,7 +340,21 @@ opt("module", '', 'bool', false, function(){/*
 Output the compiled JavaScript as an ES module. Adds
 the export keyword before top-level function and const
 declarations, and removes the private scope wrapper
-(implies --bare).
+(implies --bare and --export-all).
+*/});
+
+opt("export_all", '', 'bool', false, function(){/*
+Prefix `export` to every top-level function, async function,
+class, and variable declared in the source file. Bundled
+baselib symbols are left untouched. Also removes the
+private-scope wrapper. Use to produce an ES module that
+re-exports everything defined at the top level of the .pyj file.
+*/});
+
+opt("export_main", '', 'bool', false, function(){/*
+Prefix `export` to the top-level `main` (or `async function main`)
+declaration only. Also removes the private-scope wrapper.
+Useful when the target module only needs a single entry point.
 */});
 
 opt("pythonize_strings", 'S', 'bool', false, function(){/*
