@@ -58,6 +58,13 @@ module.exports = function(compiler, baselib, vf_context) {
             return true;
         },
 
+        'parse': function web_repl_parse(code, opts) {
+            opts = opts || {};
+            opts.keep_docstrings = true;
+            opts.filename = opts.filename || '<input>';
+            return streaming_compiler.parse(code, opts);
+        },
+
         'compile': function web_repl_compile(code, opts) {
             opts = opts || {};
             opts.keep_docstrings = true;

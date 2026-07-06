@@ -213,7 +213,7 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
     return {
         'toplevel': null,
 
-        'compile': function streaming_compile(code, opts) {
+        'parse': function streaming_parse(code, opts) {
             opts = opts || {};
             var classes = (this.toplevel) ? this.toplevel.classes : undefined;
             var inherited_flags = (this.toplevel) ? this.toplevel.scoped_flags : undefined;
@@ -252,9 +252,6 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
                     libdir: undefined,
                 });
             }
-            var pythonize_strings = (opts.legacy_rapydscript !== true) ? true : !!opts.pythonize_strings;
-            var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, pythonize_strings);
-            ans = apply_export_transforms(ans, opts, compiler, this.toplevel);
             if (classes) {
                 var exports = {};
                 var self = this;
@@ -264,50 +261,20 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
                         self.toplevel.classes[name] = classes[name];
                 });
             }
-            scoped_flags = this.toplevel.scoped_flags;
+            return this.toplevel;
+        },
 
-            return ans;
+        'compile': function streaming_compile(code, opts) {
+            opts = opts || {};
+            this.parse(code, opts);
+            var pythonize_strings = (opts.legacy_rapydscript !== true) ? true : !!opts.pythonize_strings;
+            var ans = print_ast(this.toplevel, opts.keep_baselib, opts.keep_docstrings, opts.js_version, opts.private_scope, opts.write_name, pythonize_strings);
+            return apply_export_transforms(ans, opts, compiler, this.toplevel);
         },
 
         'compile_with_sourcemap': function compile_with_sourcemap(code, opts) {
             opts = opts || {};
-            var classes = (this.toplevel) ? this.toplevel.classes : undefined;
-            var inherited_flags = (this.toplevel) ? this.toplevel.scoped_flags : undefined;
-            var base_flags_sm = Object.create(null);
-            if (opts.legacy_rapydscript !== true) {
-                PYTHON_MODE_FLAGS.forEach(function(f) { base_flags_sm[f] = true; });
-            }
-            var scoped_flags = Object.assign(
-                base_flags_sm,
-                opts.python_flags ? build_scoped_flags(opts.python_flags) : {},
-                inherited_flags || {}
-            );
-            var vf = (opts.virtual_files && vf_context) ? opts.virtual_files : null;
-            var parse_opts = {
-                'filename': opts.filename || '<embedded>',
-                'basedir': '__stdlib__',
-                'classes': classes,
-                'scoped_flags': scoped_flags,
-                'discard_asserts': opts.discard_asserts,
-            };
-            if (vf) {
-                vf_context.set(vf);
-                parse_opts.import_dirs = ['__virtual__'];
-            }
-            try {
-                this.toplevel = compiler.parse(code, parse_opts);
-            } finally {
-                if (vf) vf_context.clear();
-            }
-            if (opts.tree_shake && compiler.tree_shake &&
-                    this.toplevel.imports && Object.keys(this.toplevel.imports).length) {
-                compiler.tree_shake(this.toplevel, {
-                    parse: compiler.parse,
-                    import_dirs: [],
-                    basedir: undefined,
-                    libdir: undefined,
-                });
-            }
+            this.parse(code, opts);
             var pythonize_strings_sm = (opts.legacy_rapydscript !== true) ? true : !!opts.pythonize_strings;
             var result = print_ast_with_sourcemap(
                 this.toplevel,
@@ -318,16 +285,6 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
                 code
             );
             var compiled_code = apply_export_transforms(result.code, opts, compiler, this.toplevel);
-            if (classes) {
-                var exports_map = {};
-                var self_ref = this;
-                this.toplevel.exports.forEach(function(name) { exports_map[name] = true; });
-                Object.getOwnPropertyNames(classes).forEach(function(name) {
-                    if (!has_prop(exports_map, name) && !has_prop(self_ref.toplevel.classes, name))
-                        self_ref.toplevel.classes[name] = classes[name];
-                });
-            }
-            scoped_flags = this.toplevel.scoped_flags;
             return { code: compiled_code, sourceMap: result.sourceMap };
         },
 

@@ -5767,6 +5767,34 @@ var TESTS = [
     },
 
     {
+        name: "bundle_parse_returns_ast",
+        description: "repl.parse returns the AST toplevel with body and applies scoped_flags",
+        run: function () {
+            var repl = RS.web_repl();
+            assert.equal(typeof repl.parse, "function");
+            var ast = repl.parse("x = 1\ndef f(y): return y + 1\n");
+            assert.ok(ast && typeof ast === "object", "parse should return an object");
+            assert.ok(Array.isArray(ast.body), "toplevel should have a body array");
+            assert.ok(ast.body.length >= 2, "expected at least two top-level statements");
+            // python_flags option threads through the same way as compile()
+            var ast2 = repl.parse("a = 1", { python_flags: "overload_operators" });
+            assert.ok(ast2.scoped_flags && ast2.scoped_flags.overload_operators === true,
+                "python_flags should populate scoped_flags");
+        },
+    },
+
+    {
+        name: "bundle_parse_then_compile_shares_state",
+        description: "After parse(), the streaming compiler still emits usable JS via compile()",
+        run: function () {
+            var repl = RS.web_repl();
+            repl.parse("noop = 0");
+            var js = repl.compile("assrt.equal(1 + 1, 2)", { keep_baselib: true });
+            run_js(js);
+        },
+    },
+
+    {
         name: "bundle_export_main_still_works",
         description: "export_main only prefixes the top-level main() function",
         run: function () {
