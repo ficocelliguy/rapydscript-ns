@@ -930,12 +930,78 @@ if jstype(Map) is not 'function' or jstype(Map.prototype.delete) is not 'functio
 else:
     v'ρσ_dict_implementation = Map'
 
+# Proxy handler that lets dict entries be read/written via dot notation and
+# destructuring like plain JS objects, while existing dict methods still win
+# on name collision. Assignment via d.foo = x routes into the map.
+# ρσ_JS_Proxy and ρσ_proxy_target_symbol are declared in baselib-internal.pyj;
+# both are var-hoisted but only referenced from these handlers at call time.
+ρσ_dict_proxy_handler = {
+    'get': def(target, prop, receiver):
+        if prop is ρσ_proxy_target_symbol:
+            return target
+        if jstype(prop) is 'symbol':
+            return v'Reflect.get(target, prop, target)'
+        if jstype(prop) is 'string' and prop[0] is 'ρ':
+            return v'Reflect.get(target, prop, target)'
+        if v'(prop in target)':
+            return v'Reflect.get(target, prop, target)'
+        m = target.jsmap
+        if m and m.has(prop):
+            return m.get(prop)
+        return undefined
+    ,
+    'set': def(target, prop, value, receiver):
+        if jstype(prop) is 'symbol':
+            return v'Reflect.set(target, prop, value, target)'
+        if jstype(prop) is 'string' and (prop is 'jsmap' or prop[0] is 'ρ'):
+            return v'Reflect.set(target, prop, value, target)'
+        target.jsmap.set(prop, value)
+        return True
+    ,
+    'has': def(target, prop):
+        if v'(prop in target)':
+            return True
+        if jstype(prop) is 'symbol':
+            return False
+        m = target.jsmap
+        return v'!!(m && m.has(prop))'
+    ,
+    'deleteProperty': def(target, prop):
+        m = target.jsmap
+        if m and jstype(prop) is not 'symbol' and m.has(prop):
+            m.delete(prop)
+            return True
+        return v'Reflect.deleteProperty(target, prop)'
+    ,
+    'ownKeys': def(target):
+        keys = v'Reflect.ownKeys(target).filter(function(k) { return typeof k !== "string" || (k !== "jsmap" && k[0] !== "ρ"); })'
+        m = target.jsmap
+        if m:
+            it = m.keys()
+            r = it.next()
+            while not r.done:
+                if jstype(r.value) is 'string' and keys.indexOf(r.value) < 0:
+                    keys.push(r.value)
+                r = it.next()
+        return keys
+    ,
+    'getOwnPropertyDescriptor': def(target, prop):
+        if jstype(prop) is not 'symbol' and prop is not 'jsmap' and (jstype(prop) is not 'string' or prop[0] is not 'ρ'):
+            m = target.jsmap
+            if m and m.has(prop):
+                return v'{value: m.get(prop), writable: true, enumerable: true, configurable: true}'
+        return v'Object.getOwnPropertyDescriptor(target, prop)'
+}
+v'(typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : global)["ρσ_dict_proxy_handler"] = ρσ_dict_proxy_handler'
+
 def ρσ_dict(iterable, **kw):
     if v'this instanceof ρσ_dict':
         this.jsmap = new ρσ_dict_implementation()  # noqa:undef
         if iterable is not undefined:
             this.update(iterable)
         this.update(kw)
+        if ρσ_JS_Proxy:
+            return new ρσ_JS_Proxy(this, ρσ_dict_proxy_handler)
         return this
     else:
         return new ρσ_dict(iterable, **kw)

@@ -7608,6 +7608,152 @@ assrt.equal(fib(15), 610)
         js_checks: [],
     },
 
+    // ── dict dot-notation access (Proxy-wrapped) ─────────────────────────────
+
+    {
+        name: "dict_dot_access_read",
+        description: "dict entries can be read via dot notation like a plain JS object",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'threads': 4, 'stock': True, 'name': 'foo'}",
+            "assrt.equal(d.threads, 4)",
+            "assrt.equal(d.stock, True)",
+            "assrt.equal(d.name, 'foo')",
+            "assrt.equal(d.missing, undefined)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_dot_access_write",
+        description: "assignment d.foo = x routes into the map (readable via [] and .get())",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {}",
+            "d.threads = 4",
+            "d.name = 'foo'",
+            "assrt.equal(d['threads'], 4)",
+            "assrt.equal(d.get('name'), 'foo')",
+            "assrt.equal(d.threads, 4)",
+            "assrt.equal(len(d), 2)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_destructuring_via_js",
+        description: "dict supports JS destructuring: const {threads, stock} = opts",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "opts = {'threads': 4, 'stock': True, 'additionalMsec': 100}",
+            "v'var {threads, stock, additionalMsec} = opts'",
+            "assrt.equal(v'threads', 4)",
+            "assrt.equal(v'stock', True)",
+            "assrt.equal(v'additionalMsec', 100)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_dot_access_methods_win",
+        description: "existing dict methods take precedence over stored keys of the same name",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {}",
+            "d['get'] = 'shadowed'",
+            "d['set'] = 'also shadowed'",
+            "assrt.equal(jstype(d.get), 'function')",
+            "assrt.equal(jstype(d.set), 'function')",
+            "assrt.equal(d.get('get'), 'shadowed')",
+            "assrt.equal(d.get('set'), 'also shadowed')",
+            "assrt.equal(d['get'], d.get)",
+            "assrt.ok(d.has('get'))",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_dot_access_delete",
+        description: "delete d.foo removes the map entry",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'a': 1, 'b': 2}",
+            "assrt.equal(d.a, 1)",
+            "v'delete d.a'",
+            "assrt.equal(d.a, undefined)",
+            "assrt.ok(not d.has('a'))",
+            "assrt.equal(len(d), 1)",
+            "assrt.equal(d.b, 2)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_in_operator_via_js",
+        description: "JS `in` operator sees both dict methods and stored keys",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'foo': 1}",
+            "assrt.ok(v\"'foo' in d\")",
+            "assrt.ok(v\"'get' in d\")",
+            "assrt.equal(v\"'missing' in d\", False)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_object_keys_returns_map_keys",
+        description: "Object.keys on a dict returns the map keys (excluding jsmap and internal props)",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'a': 1, 'b': 2, 'c': 3}",
+            "keys = v'Object.keys(d)'",
+            "keys.sort()",
+            "assrt.deepEqual(keys, ['a', 'b', 'c'])",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_wrap_still_works",
+        description: "ρσ_dict_wrap correctly assigns to .jsmap through the proxy",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "raw = v'new Map([[\"x\", 10], [\"y\", 20]])'",
+            "d = v'ρσ_dict_wrap(raw)'",
+            "assrt.equal(d.x, 10)",
+            "assrt.equal(d.y, 20)",
+            "assrt.equal(len(d), 2)",
+            "assrt.equal(d.jsmap, raw)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
+    {
+        name: "dict_python_iteration_still_works",
+        description: "Python-style iteration and dict methods work identically on proxied dicts",
+        src: [
+            "# globals: assrt",
+            "from __python__ import dict_literals",
+            "d = {'a': 1, 'b': 2, 'c': 3}",
+            "total = 0",
+            "for k in d:",
+            "    total += d[k]",
+            "assrt.equal(total, 6)",
+            "items = list(d.items())",
+            "assrt.equal(items.length, 3)",
+        ].join("\n"),
+        js_checks: [],
+    },
+
 ];
 
 // ── Runner ───────────────────────────────────────────────────────────────────

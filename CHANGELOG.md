@@ -1,3 +1,7 @@
+version 0.9.9
+=======================
+* Added support for js object-style key access and destructuring for jsmap, which python dictionary literals are transpiled into, for better integration into other js code
+
 version 0.9.8
 =======================
 * Added support for Python-style relative imports: `from .mod import x`, `from ..pkg import y`, `from . import name`, `from ...top import z`, etc.

@@ -1385,7 +1385,11 @@ def create_parser_ctx(S, import_dirs, module_id, baselib_items, imported_module_
             import_error("Failed Import: '" + key + "' module doesn't exist in any of the import directories: " + import_dirs.join(':'))
 
         try:
-            cached = JSON.parse(readfile(cache_file_name(filename, options.module_cache_dir), 'utf-8'))
+            # Use raw JSON.parse (not ρσ_json_parse) so 'cached' is a plain JS
+            # object graph — parse.pyj indexes it via dot-access (e.g.
+            # cached.classes), which on a ρσ_dict would surface prototype
+            # methods like `copy` and misregister them as classes.
+            cached = v'JSON.parse(readfile(cache_file_name(filename, options.module_cache_dir), "utf-8"))'
         except:
             cached = None
 

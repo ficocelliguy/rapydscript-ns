@@ -2706,7 +2706,8 @@ Object.defineProperty(ρσ_bytearray.prototype, "__class__", {get: function() { 
 if (typeof ρσ_bytes.__init_subclass__ === "function") ρσ_bytes.__init_subclass__.call(ρσ_bytearray);
 
 ρσ_bytearray.__name__ = "bytearray";
-var bytes = ρσ_bytes, bytearray = ρσ_bytearray;function ρσ_equals(a, b) {
+var bytes = ρσ_bytes, bytearray = ρσ_bytearray;let ρσ_dict_proxy_handler;
+function ρσ_equals(a, b) {
     var ρσ_unpack, akeys, bkeys, key;
     if (a === b) {
         return true;
@@ -4662,6 +4663,129 @@ if (typeof Map !== "function" || typeof Map.prototype.delete !== "function") {
 } else {
     ρσ_dict_implementation = Map;
 }
+ρσ_dict_proxy_handler = (function(){
+    var ρσ_d = {};
+    ρσ_d["get"] = (function() {
+        var ρσ_anonfunc = function (target, prop, receiver) {
+            var m;
+            if (prop === ρσ_proxy_target_symbol) {
+                return target;
+            }
+            if (typeof prop === "symbol") {
+                return Reflect.get(target, prop, target);
+            }
+            if (typeof prop === "string" && prop[0] === "ρ") {
+                return Reflect.get(target, prop, target);
+            }
+            if ((prop in target)) {
+                return Reflect.get(target, prop, target);
+            }
+            m = target.jsmap;
+            if (m && m.has(prop)) {
+                return m.get(prop);
+            }
+            return undefined;
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop", "receiver"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    ρσ_d["set"] = (function() {
+        var ρσ_anonfunc = function (target, prop, value, receiver) {
+            if (typeof prop === "symbol") {
+                return Reflect.set(target, prop, value, target);
+            }
+            if (typeof prop === "string" && (prop === "jsmap" || prop[0] === "ρ")) {
+                return Reflect.set(target, prop, value, target);
+            }
+            target.jsmap.set(prop, value);
+            return true;
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop", "value", "receiver"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    ρσ_d["has"] = (function() {
+        var ρσ_anonfunc = function (target, prop) {
+            var m;
+            if ((prop in target)) {
+                return true;
+            }
+            if (typeof prop === "symbol") {
+                return false;
+            }
+            m = target.jsmap;
+            return !!(m && m.has(prop));
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    ρσ_d["deleteProperty"] = (function() {
+        var ρσ_anonfunc = function (target, prop) {
+            var m;
+            m = target.jsmap;
+            if (m && typeof prop !== "symbol" && m.has(prop)) {
+                m.delete(prop);
+                return true;
+            }
+            return Reflect.deleteProperty(target, prop);
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    ρσ_d["ownKeys"] = (function() {
+        var ρσ_anonfunc = function (target) {
+            var keys, m, it, r;
+            keys = Reflect.ownKeys(target).filter(function(k) { return typeof k !== "string" || (k !== "jsmap" && k[0] !== "ρ"); });
+            m = target.jsmap;
+            if (m) {
+                it = m.keys();
+                r = it.next();
+                while (!r.done) {
+                    if (typeof r.value === "string" && keys.indexOf(r.value) < 0) {
+                        keys.push(r.value);
+                    }
+                    r = it.next();
+                }
+            }
+            return keys;
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    ρσ_d["getOwnPropertyDescriptor"] = (function() {
+        var ρσ_anonfunc = function (target, prop) {
+            var m;
+            if (typeof prop !== "symbol" && prop !== "jsmap" && (typeof prop !== "string" || prop[0] !== "ρ")) {
+                m = target.jsmap;
+                if (m && m.has(prop)) {
+                    return {value: m.get(prop), writable: true, enumerable: true, configurable: true};
+                }
+            }
+            return Object.getOwnPropertyDescriptor(target, prop);
+        };
+        if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
+            __argnames__ : {value: ["target", "prop"]},
+            __module__ : {value: "__main__"}
+        });
+        return ρσ_anonfunc;
+    })();
+    return ρσ_d;
+}).call(this);
+(typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : global)["ρσ_dict_proxy_handler"] = ρσ_dict_proxy_handler;
 function ρσ_dict() {
     var iterable = ( 0 === arguments.length-1 && arguments[arguments.length-1] !== null && typeof arguments[arguments.length-1] === "object" && arguments[arguments.length-1] [ρσ_kwargs_symbol] === true) ? undefined : arguments[0];
     var kw = arguments[arguments.length-1];
@@ -4673,6 +4797,9 @@ function ρσ_dict() {
             this.update(iterable);
         }
         this.update(kw);
+        if (ρσ_JS_Proxy) {
+            return new ρσ_JS_Proxy(this, ρσ_dict_proxy_handler);
+        }
         return this;
     } else {
         return ρσ_interpolate_kwargs_constructor.call(Object.create(ρσ_dict.prototype), false, ρσ_dict, [iterable].concat([ρσ_desugar_kwargs(kw)]));
@@ -6017,10 +6144,14 @@ if (!ρσ_interpolate_kwargs.__argnames__) Object.defineProperties(ρσ_interpol
 });
 
 function ρσ_interpolate_kwargs_constructor(apply, f, supplied_args) {
+    var ret;
     if (apply) {
-        f.apply(this, supplied_args);
+        ret = f.apply(this, supplied_args);
     } else {
-        ρσ_interpolate_kwargs.call(this, f, supplied_args);
+        ret = ρσ_interpolate_kwargs.call(this, f, supplied_args);
+    }
+    if (ret !== null && typeof ret === "object") {
+        return ret;
     }
     return this;
 };
@@ -17572,7 +17703,7 @@ return this.__repr__();
         var is_token = ρσ_modules.tokenizer.is_token;
         var RESERVED_WORDS = ρσ_modules.tokenizer.RESERVED_WORDS;
 
-        COMPILER_VERSION = "84924b67501208e21c334dc988380e147909c729";
+        COMPILER_VERSION = "bc672e2b88489df4ff865ec7560b9652b3f6f6b5";
         PYTHON_FLAGS = (function(){
             var ρσ_d = Object.create(null);
             ρσ_d["dict_literals"] = true;
@@ -19567,7 +19698,7 @@ return this.__repr__();
                     import_error(ρσ_list_add(ρσ_list_add(ρσ_list_add("Failed Import: '", key), "' module doesn't exist in any of the import directories: "), import_dirs.join(":")));
                 }
                 try {
-                    cached = ρσ_json_parse(readfile(cache_file_name(filename, options.module_cache_dir), "utf-8"));
+                    cached = JSON.parse(readfile(cache_file_name(filename, options.module_cache_dir), "utf-8"));
                 } catch (ρσ_Exception) {
                     ρσ_last_exception = ρσ_Exception;
                     {
@@ -29304,6 +29435,7 @@ return this.__repr__();
                                                 return ρσ_d;
                                             }).call(this);
                                             ρσ_d["static"] = cobj.static;
+                                            ρσ_d["classmethod"] = cobj.classmethod;
                                             ρσ_d["bound"] = cobj.bound;
                                             ρσ_d["classvars"] = cobj.classvars;
                                             return ρσ_d;

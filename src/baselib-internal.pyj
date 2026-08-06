@@ -189,10 +189,14 @@ def ρσ_interpolate_kwargs(f, supplied_args):
     return f.apply(this, supplied_args)
 
 def ρσ_interpolate_kwargs_constructor(apply, f, supplied_args):
+    # Mirror JS `new`: if the constructor returns an object, use it in place of
+    # `this` (e.g. ρσ_dict returns a Proxy wrapping the raw instance).
     if apply:
-        f.apply(this, supplied_args)
+        ret = f.apply(this, supplied_args)
     else:
-        ρσ_interpolate_kwargs.call(this, f, supplied_args)
+        ret = ρσ_interpolate_kwargs.call(this, f, supplied_args)
+    if ret is not None and jstype(ret) is 'object':
+        return ret
     return this
 
 def ρσ_getitem(obj, key):
