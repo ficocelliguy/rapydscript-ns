@@ -13,7 +13,7 @@ to native JS (with source maps) that reads like your Python code, but runs nativ
 This is a [fork of the original RapydScript](#reasons-for-the-fork) that adds many new features. The most notable
 change is that all the Python features that are optional in RapydScript are now enabled by default.
 
-
+ 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Contents**
