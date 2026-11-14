@@ -193,7 +193,10 @@ module.exports = function(compiler, baselib, runjs, name, vf_context) {
         var raw_mappings = [];
         var output = new compiler.OutputStream(output_options);
         output.push_node = function(node) {
-            if (node && node.start && node.start.line) {
+            // The toplevel spans the whole file; mapping it would attribute the
+            // runtime prelude emitted before any user code to line 1.
+            var is_toplevel = compiler.AST_Toplevel && node instanceof compiler.AST_Toplevel;
+            if (node && node.start && node.start.line && !is_toplevel) {
                 raw_mappings.push({
                     gen_line: this.current_line,
                     gen_col: this.current_col,

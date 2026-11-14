@@ -123,6 +123,29 @@ function run_js(js) {
     return sandbox.__done__;
 }
 
+// Decode a Source Map v3 `mappings` string into 0-based
+// {gen_line, gen_col, src_line, src_col} segments.
+function decode_mappings(mappings) {
+    var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    var out = [], src_line = 0, src_col = 0;
+    mappings.split(";").forEach(function (line, gen_line) {
+        var gen_col = 0;
+        line.split(",").forEach(function (seg) {
+            if (!seg) return;
+            var vals = [], shift = 0, value = 0;
+            for (var i = 0; i < seg.length; i++) {
+                var d = B64.indexOf(seg[i]);
+                value += (d & 31) << shift;
+                if (d & 32) shift += 5;
+                else { vals.push(value & 1 ? -(value >> 1) : value >> 1); value = shift = 0; }
+            }
+            gen_col += vals[0]; src_line += vals[2]; src_col += vals[3];
+            out.push({ gen_line: gen_line, gen_col: gen_col, src_line: src_line, src_col: src_col });
+        });
+    });
+    return out;
+}
+
 // Minimal React stub — mirrors the one in web-repl/env.js so that compiled
 // code that imports from the react library can run in a plain Node vm context.
 var REACT_STUB = (function () {
@@ -220,6 +243,96 @@ var TESTS = [
                 function (e) { return e && e.constructor && e.constructor.name === "AssertionError"; },
                 "expected AssertionError, got: " + js
             );
+        },
+    },
+
+    {
+        name: "bundle_reset_forgets_previous_compile",
+        description: "reset() drops classes and __python__ flags carried over from an earlier compile",
+        run: function () {
+            var repl = RS.web_repl();
+            repl.compile("from __python__ import no_truthiness\nclass Foo:\n    pass\n");
+            var leaked = repl.compile("if []:\n    print(1)\nFoo()\n");
+            assert.ok(/new Foo/.test(leaked), "precondition: class info carries over without reset");
+            repl.reset();
+            var js = repl.compile("if []:\n    print(1)\nFoo()\n");
+            assert.ok(!/new Foo/.test(js), "Foo() should be a plain call after reset: " + js);
+            assert.ok(/ρσ_bool\(/.test(js), "truthiness should be back on after reset: " + js);
+        },
+    },
+
+    {
+        name: "playground_examples_output",
+        description: "every web REPL example prints its recorded output when run through web-repl/runner.js",
+        run: async function () {
+            var runner   = require(path.join(BASE_PATH, "web-repl", "runner.js"));
+            var examples = require(path.join(BASE_PATH, "web-repl", "examples.js"));
+            for (var i = 0; i < examples.EXAMPLES.length; i++) {
+                var ex = examples.EXAMPLES[i];
+                var repl = RS.web_repl();
+                var compiled;
+                try {
+                    compiled = repl.compile_mapped(ex.source, { virtual_files: examples.VIRTUAL_FILES });
+                } catch (e) {
+                    assert.ok(ex.expect_compile_error, ex.id + " failed to compile: " + e.message);
+                    continue;
+                }
+                assert.ok(!ex.expect_compile_error, ex.id + " compiled but should not have");
+                var lines = [], error = null;
+                var handle = runner.run(RS, bundle_sandbox, {
+                    code: compiled.code, filename: "main.py",
+                    post: function (ev) {
+                        if (ev.type === "out") lines.push(ev.text);
+                        else if (ev.type === "error") error = ev;
+                    },
+                });
+                await handle.promise;
+                handle.restore();
+                assert.equal(lines.join("\n") + "\n", ex.expect, ex.id + " output");
+                assert.equal(error ? error.name : undefined, ex.expect_error, ex.id + " error");
+                if (error) assert.ok(/main\.py\.js:\d+:\d+/.test(error.stack), ex.id + " stack should name main.py.js:\n" + error.stack);
+            }
+        },
+    },
+
+    {
+        name: "bundle_compile_mapped_lines",
+        description: "compile_mapped maps generated lines back to the Python lines that produced them",
+        run: function () {
+            var repl = RS.web_repl();
+            var src = "def double(n):\n    return n * 2\n\nprint(double(21))\n";
+            var out = repl.compile_mapped(src);
+            var map = JSON.parse(out.sourceMap);
+            assert.equal(map.version, 3);
+            assert.equal(map.sourcesContent[0], src);
+            var segs = decode_mappings(map.mappings);
+            var js = out.code.split("\n");
+            function src_lines_of(pattern) {
+                var gl = js.findIndex(function (l) { return pattern.test(l); });
+                assert.ok(gl >= 0, "no JS line matches " + pattern + " in:\n" + out.code);
+                return segs.filter(function (s) { return s.gen_line === gl; })
+                           .map(function (s) { return s.src_line; });
+            }
+            function all_from(lines, expected) {
+                return lines.length > 0 && lines.every(function (l) { return l === expected; });
+            }
+            assert.ok(all_from(src_lines_of(/^function double/), 0));
+            assert.ok(all_from(src_lines_of(/^\s+return /), 1));
+            assert.ok(all_from(src_lines_of(/console\.log/), 3));
+        },
+    },
+
+    {
+        name: "bundle_compile_mapped_skips_toplevel",
+        description: "the runtime prelude before user code is not attributed to line 1",
+        run: function () {
+            var repl = RS.web_repl();
+            var out = repl.compile_mapped("x = 1\n\n\nprint(x)\n");
+            var segs = decode_mappings(JSON.parse(out.sourceMap).mappings);
+            var js = out.code.split("\n");
+            var prelude = js.findIndex(function (l) { return /String\.prototype\[/.test(l); });
+            assert.ok(prelude >= 0, "expected the pythonize_strings prelude in:\n" + out.code);
+            assert.deepEqual(segs.filter(function (s) { return s.gen_line === prelude; }), []);
         },
     },
 

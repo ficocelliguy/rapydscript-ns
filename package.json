@@ -32,6 +32,7 @@
     "start": "node bin/rapydscript",
     "build-self": "node bin/rapydscript self --complete",
     "build:ls": "node tools/build-language-service.js",
+    "repl": "node tools/serve-repl.js",
     "build": "rm -rf **/*pyj-cached dev && node bin/rapydscript self --complete && node bin/web-repl-export web-repl && node tools/build-language-service.js",
     "prepublishOnly": "node tools/build-language-service.js"
   },

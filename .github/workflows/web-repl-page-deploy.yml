@@ -33,10 +33,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      # The REPL page loads ./language-service/index.js (completions, hovers, lint) when present.
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp -r web-repl/. _site/
+          cp -r language-service _site/language-service
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './web-repl'
+          path: './_site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

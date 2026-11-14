@@ -79,6 +79,14 @@ module.exports = function(compiler, baselib, vf_context) {
             return streaming_compiler.compile_with_sourcemap(code, opts);
         },
 
+        // Forget the classes and __python__ flags carried over from earlier
+        // compiles, so the next compile sees its source in isolation (used by
+        // the playground, which recompiles the whole buffer on every edit).
+        'reset': function reset() {
+            streaming_compiler.toplevel = null;
+            this.in_block_mode = false;
+        },
+
         'runjs': function runjs(code) {
             var ans = vm.runInContext(strip_exports(code), ctx);
             if (ans !== undefined || ans === null) {

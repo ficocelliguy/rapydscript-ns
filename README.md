@@ -4215,6 +4215,33 @@ node bin/web-repl-export web-repl          # rebuilds web-repl/rapydscript.js
 node tools/build-language-service.js       # rebuilds language-service/index.js
 ```
 
+**Compiling repeatedly with one instance**
+
+A `web_repl()` instance remembers the classes and `from __python__ import ...`
+flags of everything it has compiled, so a REPL session can build on earlier
+input. To compile each source in isolation instead (as an editor that
+recompiles the whole buffer on every keystroke should), call `repl.reset()`
+before each compile.
+
+**Running the playground locally**
+
+`web-repl/index.html` is the playground published on GitHub Pages: Monaco
+editors for the source and the generated JavaScript, compile-as-you-type,
+source-map line linking (hover or select a line on either side to highlight
+what it maps to), sandboxed runs in a Worker with Python-style tracebacks, and
+completions/hovers from the language service. Serve the repository so the
+Worker and `../language-service/` can load:
+
+```bash
+npm run repl        # http://localhost:8765/web-repl/  (node tools/serve-repl.js [port])
+```
+
+Opened straight from `file://`, the page still works but runs programs on the
+page itself (Stop can't interrupt an infinite loop) and skips the language
+service. The page's examples live in `web-repl/examples.js`; each records its
+expected output, which `test/unit/web-repl.js` and the page's Self-test tab
+check.
+
 ### Running the tests
 
 ```bash

@@ -37,6 +37,8 @@ export interface WebReplInstance {
   parse(code: string, opts?: WebReplParseOptions): AST_Toplevel;
   compile(code: string, opts?: WebReplCompileOptions): string;
   compile_mapped(code: string, opts?: WebReplCompileOptions): WebReplCompileMappedResult;
+  /** Drop classes and __python__ flags remembered from earlier compiles. */
+  reset(): void;
   runjs(code: string): unknown;
   replace_print(writeLine: (...args: unknown[]) => void): void;
   is_input_complete(source: string): boolean;
