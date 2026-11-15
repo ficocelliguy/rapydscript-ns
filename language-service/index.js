@@ -1532,6 +1532,13 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
         if (node.alias) this.add_binding(node.alias.name);
     };
 
+    // match/case capture names: `case (x, y)`, `case [*rest]`, `case {**rest}`, `case p as name`
+    this.handle_match_pattern = function() {
+        const node = this.current_node;
+        const name = (node instanceof this.RS.AST_MatchMapping) ? node.rest_name : node.name;
+        if (name && name !== '_') this.add_binding(name);
+    };
+
     this.handle_while = function() {
         const node = this.current_node;
         const cond = node.condition;
@@ -1600,6 +1607,7 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
         else if (node instanceof RS.AST_Except)          this.handle_except();
         else if (node instanceof RS.AST_EmptyStatement)  this.handle_empty_statement();
         else if (node instanceof RS.AST_WithClause)      this.handle_with_clause();
+        else if (RS.AST_MatchPattern && node instanceof RS.AST_MatchPattern) this.handle_match_pattern();
         else if (node instanceof RS.AST_Object)          this.handle_object_literal();
         else if (node instanceof RS.AST_While)           this.handle_while();
 

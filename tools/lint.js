@@ -39,7 +39,7 @@ var BUILTINS = Object.create(null);
  ' NodeList alert console Node Symbol NamedNodeMap ρσ_eslice ρσ_delslice Number' +
  ' Boolean encodeURIComponent decodeURIComponent setTimeout setInterval' +
  ' setImmediate clearTimeout clearInterval clearImmediate requestAnimationFrame' +
- ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN Ellipsis bytes bytearray LookupError StopIteration ImportError ModuleNotFoundError NameError ExceptionGroup BaseExceptionGroup BaseException SystemExit KeyboardInterrupt GeneratorExit ArithmeticError OverflowError FloatingPointError RuntimeError NotImplementedError RecursionError OSError IOError EnvironmentError FileNotFoundError FileExistsError IsADirectoryError NotADirectoryError PermissionError TimeoutError InterruptedError BlockingIOError ChildProcessError ProcessLookupError ConnectionError BrokenPipeError ConnectionAbortedError ConnectionRefusedError ConnectionResetError EOFError BufferError StopAsyncIteration Warning UserWarning DeprecationWarning PendingDeprecationWarning RuntimeWarning SyntaxWarning FutureWarning ImportWarning UnicodeWarning BytesWarning ResourceWarning UnicodeError UnicodeEncodeError UnicodeTranslateError NotImplemented property delattr ascii type UnboundLocalError'
+ ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN Ellipsis next bytes bytearray LookupError StopIteration ImportError ModuleNotFoundError NameError ExceptionGroup BaseExceptionGroup BaseException SystemExit KeyboardInterrupt GeneratorExit ArithmeticError OverflowError FloatingPointError RuntimeError NotImplementedError RecursionError OSError IOError EnvironmentError FileNotFoundError FileExistsError IsADirectoryError NotADirectoryError PermissionError TimeoutError InterruptedError BlockingIOError ChildProcessError ProcessLookupError ConnectionError BrokenPipeError ConnectionAbortedError ConnectionRefusedError ConnectionResetError EOFError BufferError StopAsyncIteration Warning UserWarning DeprecationWarning PendingDeprecationWarning RuntimeWarning SyntaxWarning FutureWarning ImportWarning UnicodeWarning BytesWarning ResourceWarning UnicodeError UnicodeEncodeError UnicodeTranslateError NotImplemented property delattr ascii type UnboundLocalError'
  ).split(' ').forEach(function(x) { BUILTINS[x] = true; });
 
 Object.keys(RapydScript.NATIVE_CLASSES).forEach(function (name) { BUILTINS[name] = true; });
@@ -433,6 +433,13 @@ function Linter(toplevel, filename, code, options) {
         if (node.alias) this.add_binding(node.alias.name);
     };
 
+    // match/case capture names: `case (x, y)`, `case [*rest]`, `case {**rest}`, `case p as name`
+    this.handle_match_pattern = function() {
+        var node = this.current_node;
+        var name = (node instanceof RapydScript.AST_MatchMapping) ? node.rest_name : node.name;
+        if (name && name !== '_') this.add_binding(name);
+    };
+
     this._visit = function (node, cont) {
         if (node.lint_visited) return;
         this.current_node = node;
@@ -474,6 +481,8 @@ function Linter(toplevel, filename, code, options) {
             this.handle_empty_statement();
         } else if (node instanceof RapydScript.AST_WithClause) {
             this.handle_with_clause();
+        } else if (node instanceof RapydScript.AST_MatchPattern) {
+            this.handle_match_pattern();
         } else if (node instanceof RapydScript.AST_Object) {
             this.handle_object_literal();
         }

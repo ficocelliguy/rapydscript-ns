@@ -6,6 +6,7 @@ version 0.10.0
 * Added generator `send()`/`throw()`/`close()` (and async `asend()`/`athrow()`/`aclose()`), async comprehensions, keyword-only parameters after `*args`, starred tuple expressions, and nested f-string format specs. JS reserved words (`default`, `function`, ...) can now be used as Python names.
 * Added standard library modules `sys`, `os`/`os.path`, `time`, `types`, `numbers`, `collections.abc`, `warnings`, `weakref`, `struct`, `queue`, `secrets`, `inspect` and `calendar`, and expanded `math`, `random`, `json`, `re`, `datetime` (time zones, `strptime`), `string`, `collections` (`Counter`/`defaultdict`/`OrderedDict` are now `dict` subclasses; `namedtuple` instances are tuples) and `functools.lru_cache`.
 * Added the missing string methods (`casefold`, `isalpha`, `translate`, `str.maketrans`, ...) and builtins (`ascii`, `oct`, `delattr`), and fixed `print(end=...)`, `int()`/`float()` parsing, `max()`/`min()` with `key=`, `format()` alignment and `repr()` escaping to match Python.
+* Fix: the linter and language service reported names captured by `match`/`case` patterns as undefined.
 
 
 version 0.9.9

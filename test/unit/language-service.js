@@ -1275,6 +1275,46 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "match_captures_no_errors",
+            description: "names captured by match/case patterns are defined in the case body",
+            run: function () {
+                var markers = d().check([
+                    "def describe(point):",
+                    "    match point:",
+                    "        case (x, 0):",
+                    "            return x",
+                    "        case [first, *rest]:",
+                    "            return first, rest",
+                    "        case {'k': v, **others}:",
+                    "            return v, others",
+                    "        case (int() | float()) as num:",
+                    "            return num",
+                    "        case _:",
+                    "            return next(iter([point]))",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+
+        {
+            name: "match_capture_does_not_hide_undefined",
+            description: "an undefined name in a case body is still reported",
+            run: function () {
+                var markers = d().check([
+                    "def f(p):",
+                    "    match p:",
+                    "        case (x, y):",
+                    "            return x + y + z",
+                ].join("\n"));
+                var undef = markers.filter(function (m) { return m.severity === SEV_ERROR; })
+                    .map(function (m) { return m.message; });
+                assert.deepStrictEqual(undef, ['Undefined symbol: "z"']);
+            },
+        },
+
+        {
             name: "hash_eq_and_hash_no_errors",
             description: "class with both __eq__ and __hash__ produces no error markers",
             run: function () {
