@@ -3,7 +3,7 @@
 from __python__ import hash_literals
 
 from utils import make_predicate, defaults, repeat_string
-from tokenizer import is_identifier_char
+from tokenizer import is_identifier_char, PYTHON_NAMES_RESERVED_IN_JS
 
 DANGEROUS = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g
 
@@ -88,6 +88,9 @@ class OutputStream:
 
     def make_name(self, name):
         name = name.toString()
+        if PYTHON_NAMES_RESERVED_IN_JS[name]:
+            # A valid Python name (default, case, enum, ...) but reserved in JavaScript
+            name = 'ρσ_' + name
         if self.options.ascii_only:
             name = to_ascii(name, True)
 
@@ -95,6 +98,14 @@ class OutputStream:
 
     def print_name(self, name):
         self.print(self.make_name(name))
+
+    def print_property(self, name):
+        # An attribute name: obj.default stays obj.default (only variable
+        # names are renamed by make_name)
+        name = name.toString()
+        if self.options.ascii_only:
+            name = to_ascii(name, True)
+        self.print(name)
 
     def make_indent(self, back):
         return repeat_string(" ", self.options.indent_start + self._indentation - back * self.options.indent_level)
@@ -261,7 +272,7 @@ class OutputStream:
     def assign(self, name):
         # generates: '[name] = '
         if jstype(name) is "string":
-            self.print(name)
+            self.print(self.make_name(name))
         else:
             name.print(self)
         self.space()

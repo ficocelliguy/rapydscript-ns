@@ -1,0 +1,528 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'weakref' module on top of the JS WeakRef,
+# WeakMap and FinalizationRegistry builtins.
+#
+# Supported:
+#   ref(obj, callback=None)  — callable: r() returns obj, or None once the
+#                              object has been garbage collected
+#   ReferenceType            — alias of ref
+#   proxy(obj, callback=None)— transparent proxy; raises ReferenceError once
+#                              the referent is gone
+#   WeakKeyDictionary        — mapping with weakly-held (object) keys
+#   WeakValueDictionary      — mapping with weakly-held (object) values
+#   WeakSet                  — set of weakly-held objects
+#   finalize(obj, func, *args, **kwargs) — callable; .alive, .detach(),
+#                              .peek(), .atexit
+#   getweakrefcount(), getweakrefs() (always 0 / [] — not trackable)
+#
+# Notes / approximations:
+#   - Only objects (not str/int/float/bool/None) can be weakly referenced;
+#     attempting it raises TypeError, as in Python.
+#   - Where WeakRef / FinalizationRegistry are missing (very old engines)
+#     references are strong and callbacks never fire.
+#   - Garbage collection in JS is non-deterministic: unlike CPython, `del x`
+#     does not immediately clear weak references or run callbacks.
+
+_HAS_WEAKREF = v'typeof WeakRef === "function"'
+_HAS_FINREG = v'typeof FinalizationRegistry === "function"'
+_HAS_WEAKMAP = v'typeof WeakMap === "function"'
+
+
+def _check_referent(obj):
+    t = jstype(obj)
+    if obj is None or obj is undefined or (t is not 'object' and t is not 'function'):
+        name = 'NoneType' if obj is None or obj is undefined else ('str' if t is 'string' else ('bool' if t is 'boolean' else ('int' if t is 'number' and Number.isInteger(obj) else ('float' if t is 'number' else t))))
+        raise TypeError("cannot create weak reference to '" + name + "' object")
+
+
+def _make_holder(obj):
+    if _HAS_WEAKREF:
+        return v'new WeakRef(obj)'
+    return {'deref': def(): return obj;}
+
+
+def _deref(holder):
+    o = holder.deref()
+    return None if o is undefined else o
+
+
+def _make_callable(proto, fn):
+    # A real JS function (so it can be called) that is an instance of the
+    # given class: isinstance(r, ref) works and class methods are reachable.
+    Object.setPrototypeOf(fn, proto)
+    return fn
+
+
+_ref_registry = v'(typeof FinalizationRegistry === "function") ? new FinalizationRegistry(function(r) { if (typeof r.__callback__ === "function") { var cb = r.__callback__; r.__callback__ = null; try { cb(r); } catch (e) { if (typeof console === "object") console.error("Exception ignored in weakref callback:", e); } } }) : null'
+
+
+class ref:
+
+    def __new__(cls, obj, callback=None):
+        _check_referent(obj)
+        holder = _make_holder(obj)
+        r = _make_callable(cls.prototype, def(): return _deref(holder);)
+        Object.defineProperty(r, '_holder', {'value': holder, 'enumerable': False})
+        r.__callback__ = callback or None
+        if callback and _ref_registry:
+            _ref_registry.register(obj, r)
+        return r
+
+    def __eq__(self, other):
+        if not v'other instanceof ref':
+            return False
+        a, b = self(), other()
+        if a is None or b is None:
+            return self is other
+        return a is b or a == b
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        o = self()
+        if o is None:
+            raise TypeError('weak object has gone away')
+        return hash(o)
+
+    def __repr__(self):
+        o = self()
+        if o is None:
+            return '<weakref; dead>'
+        name = o.__name__ if jstype(o) is 'function' and o.__name__ else ((o.constructor.__name__ or o.constructor.name) if o.constructor else 'object')
+        return "<weakref; to '" + name + "'>"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+# Keep Function.prototype methods (call/apply/bind) reachable from ref objects.
+Object.setPrototypeOf(ref.prototype, v'Function.prototype')
+ReferenceType = ref
+
+
+class _ProxyMarker:
+    pass
+
+
+def proxy(obj, callback=None):
+    _check_referent(obj)
+    holder = _make_holder(obj)
+    if callback and _ref_registry:
+        token = {'__callback__': callback}
+        _ref_registry.register(obj, token)
+    if v'typeof Proxy !== "function"':
+        return obj
+
+    def target_or_raise():
+        o = holder.deref()
+        if o is undefined:
+            raise ReferenceError('weakly-referenced object no longer exists')
+        return o
+
+    def h_get(t, prop):
+        o = target_or_raise()
+        val = o[prop]
+        return val.bind(o) if jstype(val) is 'function' and prop is not 'constructor' else val
+
+    def h_set(t, prop, value):
+        target_or_raise()[prop] = value
+        return True
+
+    def h_has(t, prop):
+        o = target_or_raise()
+        return v'prop in o'
+
+    def h_delete(t, prop):
+        o = target_or_raise()
+        v'delete o[prop]'
+        return True
+
+    def h_own_keys(t):
+        return Reflect.ownKeys(target_or_raise())
+
+    def h_descriptor(t, prop):
+        d = Object.getOwnPropertyDescriptor(target_or_raise(), prop)
+        if d:
+            d.configurable = True
+        return d
+
+    def h_proto(t):
+        return Object.getPrototypeOf(target_or_raise())
+
+    def h_apply(t, this_arg, args):
+        return target_or_raise().apply(this_arg, args)
+
+    handler = {'get': h_get, 'set': h_set, 'has': h_has, 'deleteProperty': h_delete, 'ownKeys': h_own_keys,
+               'getOwnPropertyDescriptor': h_descriptor, 'getPrototypeOf': h_proto, 'apply': h_apply}
+    target = v'(typeof obj === "function") ? function() {} : {}'
+    return v'new Proxy(target, handler)'
+
+
+ProxyType = _ProxyMarker
+CallableProxyType = _ProxyMarker
+ProxyTypes = (ProxyType, CallableProxyType)
+
+
+def getweakrefcount(obj):
+    return 0
+
+
+def getweakrefs(obj):
+    return []
+
+
+# ---------------------------------------------------------------------------
+# WeakKeyDictionary / WeakSet — WeakMap for lookups plus a Set of WeakRefs to
+# the keys so the live keys can be iterated.
+# ---------------------------------------------------------------------------
+
+class _WeakKeyStore:
+
+    def __init__(self):
+        self._strong = not (_HAS_WEAKREF and _HAS_WEAKMAP)
+        self._map = v'new Map()' if self._strong else v'new WeakMap()'
+        self._refs = v'new Set()'
+
+    def set(self, key, value):
+        _check_referent(key)
+        entry = self._map.get(key)
+        if entry:
+            entry[0] = value
+            return
+        r = _make_holder(key)
+        self._map.set(key, [value, r])
+        self._refs.add(r)
+
+    def remove(self, key):
+        entry = self._map.get(key)
+        if not entry:
+            return False
+        self._map.delete(key)
+        self._refs.delete(entry[1])
+        return True
+
+    def live_keys(self):
+        ans = []
+        dead = []
+        v'for (var r of this._refs) { var k = r.deref(); if (k === undefined) dead.push(r); else ans.push(k); }'
+        for r in dead:
+            self._refs.delete(r)
+        return ans
+
+    def clear(self):
+        for k in self.live_keys():
+            self._map.delete(k)
+        self._refs.clear()
+
+
+def _is_weakable(key):
+    t = jstype(key)
+    return key is not None and key is not undefined and (t is 'object' or t is 'function')
+
+
+class WeakKeyDictionary:
+
+    def __init__(self, dict_=None):
+        self._store = _WeakKeyStore()
+        if dict_ is not None and dict_ is not undefined:
+            self.update(dict_)
+
+    def __getitem__(self, key):
+        entry = self._store._map.get(key) if _is_weakable(key) else None
+        if not entry:
+            raise KeyError(key)
+        return entry[0]
+
+    def __setitem__(self, key, value):
+        self._store.set(key, value)
+
+    def __delitem__(self, key):
+        if not _is_weakable(key) or not self._store.remove(key):
+            raise KeyError(key)
+
+    def __contains__(self, key):
+        return _is_weakable(key) and self._store._map.has(key)
+
+    def __len__(self):
+        return self._store.live_keys().length
+
+    def __iter__(self):
+        return iter(self._store.live_keys())
+
+    def keys(self):
+        return self._store.live_keys()
+
+    def values(self):
+        return [self._store._map.get(k)[0] for k in self._store.live_keys()]
+
+    def items(self):
+        return [(k, self._store._map.get(k)[0]) for k in self._store.live_keys()]
+
+    def keyrefs(self):
+        return [ref(k) for k in self._store.live_keys()]
+
+    def get(self, key, dflt=None):
+        if self.__contains__(key):
+            return self.__getitem__(key)
+        return dflt
+
+    def setdefault(self, key, dflt=None):
+        if not self.__contains__(key):
+            self.__setitem__(key, dflt)
+        return self.__getitem__(key)
+
+    def pop(self, key, *args):
+        if self.__contains__(key):
+            v = self.__getitem__(key)
+            self._store.remove(key)
+            return v
+        if args.length:
+            return args[0]
+        raise KeyError(key)
+
+    def popitem(self):
+        keys = self._store.live_keys()
+        if not keys.length:
+            raise KeyError('popitem(): dictionary is empty')
+        k = keys[0]
+        return (k, self.pop(k))
+
+    def update(self, other=None, **kwargs):
+        if other is not None and other is not undefined:
+            if jstype(other.items) is 'function':
+                for item in other.items():
+                    self.__setitem__(item[0], item[1])
+            else:
+                for item in other:
+                    self.__setitem__(item[0], item[1])
+
+    def clear(self):
+        self._store.clear()
+
+    def copy(self):
+        ans = WeakKeyDictionary()
+        for item in self.items():
+            ans.__setitem__(item[0], item[1])
+        return ans
+
+    def __repr__(self):
+        return '<WeakKeyDictionary with ' + self.__len__() + ' entries>'
+
+
+class WeakSet:
+
+    def __init__(self, data=None):
+        self._store = _WeakKeyStore()
+        if data is not None and data is not undefined:
+            for x in data:
+                self.add(x)
+
+    def add(self, item):
+        if not self.__contains__(item):
+            self._store.set(item, True)
+
+    def discard(self, item):
+        if _is_weakable(item):
+            self._store.remove(item)
+
+    def remove(self, item):
+        if not self.__contains__(item):
+            raise KeyError(item)
+        self._store.remove(item)
+
+    def pop(self):
+        keys = self._store.live_keys()
+        if not keys.length:
+            raise KeyError('pop from empty WeakSet')
+        self._store.remove(keys[0])
+        return keys[0]
+
+    def clear(self):
+        self._store.clear()
+
+    def __contains__(self, item):
+        return _is_weakable(item) and self._store._map.has(item)
+
+    def __len__(self):
+        return self._store.live_keys().length
+
+    def __iter__(self):
+        return iter(self._store.live_keys())
+
+    def copy(self):
+        return WeakSet(self._store.live_keys())
+
+    def __repr__(self):
+        return '<WeakSet with ' + self.__len__() + ' items>'
+
+
+# ---------------------------------------------------------------------------
+# WeakValueDictionary — a dict of key -> WeakRef(value)
+# ---------------------------------------------------------------------------
+
+class WeakValueDictionary:
+
+    def __init__(self, other=None, **kwargs):
+        self._data = dict()
+        if other is not None and other is not undefined:
+            self.update(other)
+        for k in Object.keys(kwargs):
+            self.__setitem__(k, kwargs[k])
+
+    def _live(self, key):
+        h = self._data.get(key)
+        if h is undefined or h is None:
+            return undefined
+        o = h.deref()
+        if o is undefined:
+            self._data.pop(key, None)
+        return o
+
+    def __getitem__(self, key):
+        o = self._live(key)
+        if o is undefined:
+            raise KeyError(key)
+        return o
+
+    def __setitem__(self, key, value):
+        _check_referent(value)
+        self._data.set(key, _make_holder(value))
+
+    def __delitem__(self, key):
+        if self._live(key) is undefined:
+            raise KeyError(key)
+        self._data.pop(key)
+
+    def __contains__(self, key):
+        return self._live(key) is not undefined
+
+    def keys(self):
+        return [k for k in list(self._data.keys()) if self._live(k) is not undefined]
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __len__(self):
+        return self.keys().length
+
+    def values(self):
+        return [self._live(k) for k in self.keys()]
+
+    def items(self):
+        return [(k, self._live(k)) for k in self.keys()]
+
+    def valuerefs(self):
+        return [ref(v) for v in self.values()]
+
+    def get(self, key, dflt=None):
+        o = self._live(key)
+        return dflt if o is undefined else o
+
+    def setdefault(self, key, dflt=None):
+        o = self._live(key)
+        if o is undefined:
+            self.__setitem__(key, dflt)
+            return dflt
+        return o
+
+    def pop(self, key, *args):
+        o = self._live(key)
+        if o is undefined:
+            if args.length:
+                return args[0]
+            raise KeyError(key)
+        self._data.pop(key)
+        return o
+
+    def popitem(self):
+        for k in self.keys():
+            return (k, self.pop(k))
+        raise KeyError('popitem(): dictionary is empty')
+
+    def update(self, other=None, **kwargs):
+        if other is not None and other is not undefined:
+            if jstype(other.items) is 'function':
+                for item in other.items():
+                    self.__setitem__(item[0], item[1])
+            elif Array.isArray(other):
+                for item in other:
+                    self.__setitem__(item[0], item[1])
+            else:
+                for k in Object.keys(other):
+                    self.__setitem__(k, other[k])
+        for k in Object.keys(kwargs):
+            self.__setitem__(k, kwargs[k])
+
+    def clear(self):
+        self._data.clear()
+
+    def copy(self):
+        ans = WeakValueDictionary()
+        for item in self.items():
+            ans.__setitem__(item[0], item[1])
+        return ans
+
+    def __repr__(self):
+        return '<WeakValueDictionary with ' + self.__len__() + ' entries>'
+
+
+# ---------------------------------------------------------------------------
+# finalize
+# ---------------------------------------------------------------------------
+
+_fin_registry = v'(typeof FinalizationRegistry === "function") ? new FinalizationRegistry(function(f) { try { f(); } catch (e) { if (typeof console === "object") console.error("Exception ignored in finalizer:", e); } }) : null'
+
+
+class finalize:
+
+    def __new__(cls, obj, func, *args, **kwargs):
+        _check_referent(obj)
+        holder = _make_holder(obj)
+        state = {'alive': True, 'func': func, 'args': args, 'kwargs': kwargs}
+
+        def call(*ignored):
+            if not state.alive:
+                return None
+            state.alive = False
+            if _fin_registry:
+                _fin_registry.unregister(f)
+            return state.func(*state.args, **state.kwargs)
+
+        f = _make_callable(cls.prototype, call)
+        Object.defineProperty(f, '_state', {'value': state, 'enumerable': False})
+        Object.defineProperty(f, '_holder', {'value': holder, 'enumerable': False})
+        f.atexit = True
+        if _fin_registry:
+            _fin_registry.register(obj, f, f)
+        return f
+
+    def detach(self):
+        st = self._state
+        if not st.alive:
+            return None
+        o = _deref(self._holder)
+        st.alive = False
+        if _fin_registry:
+            _fin_registry.unregister(self)
+        return (o, st.func, st.args, st.kwargs)
+
+    def peek(self):
+        st = self._state
+        if not st.alive:
+            return None
+        return (_deref(self._holder), st.func, st.args, st.kwargs)
+
+    def __repr__(self):
+        if not self._state.alive:
+            return '<finalize object; dead>'
+        o = _deref(self._holder)
+        name = (o.constructor.__name__ or o.constructor.name) if o and o.constructor else 'object'
+        return "<finalize object; for '" + name + "'>"
+
+
+Object.defineProperty(finalize.prototype, 'alive', {'get': def(): return this._state.alive;, 'configurable': True})
+Object.setPrototypeOf(finalize.prototype, v'Function.prototype')

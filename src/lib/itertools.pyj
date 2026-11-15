@@ -313,7 +313,7 @@ class groupby:
         while not self._curr.done and self._curr_key == group_key:
             group_items.push(self._curr.value)
             self._advance()
-        return {'value': [group_key, iter(group_items)], 'done': False}
+        return {'value': tuple([group_key, iter(group_items)]), 'done': False}
 
     def __next__(self):
         r = self.next()
@@ -394,7 +394,7 @@ class pairwise:
         r = self._it.next()
         if r.done:
             return {'value': undefined, 'done': True}
-        pair = [self._prev, r.value]
+        pair = tuple([self._prev, r.value])
         self._prev = r.value
         return {'value': pair, 'done': False}
 
@@ -491,7 +491,7 @@ class zip_longest:
                     values.push(r.value)
         if all_done:
             return {'value': undefined, 'done': True}
-        return {'value': values, 'done': False}
+        return {'value': tuple(values), 'done': False}
 
     def __next__(self):
         r = self.next()
@@ -518,7 +518,7 @@ def product(*iterables, **kwargs):
             for y in pool:
                 new_result.push(x.concat([y]))
         result = new_result
-    return iter(result)
+    return iter([tuple(t) for t in result])
 
 
 def permutations(iterable, r=None):
@@ -532,7 +532,7 @@ def permutations(iterable, r=None):
     result = []
     def _helper(current, remaining):
         if current.length == r:
-            result.push(current.slice())
+            result.push(tuple(current))
             return
         for i in range(remaining.length):
             current.push(remaining[i])
@@ -551,7 +551,7 @@ def combinations(iterable, r):
     result = []
     def _helper(start, current):
         if current.length == r:
-            result.push(current.slice())
+            result.push(tuple(current))
             return
         for i in range(start, n):
             current.push(pool[i])
@@ -570,7 +570,7 @@ def combinations_with_replacement(iterable, r):
     result = []
     def _helper(start, current):
         if current.length == r:
-            result.push(current.slice())
+            result.push(tuple(current))
             return
         for i in range(start, n):
             current.push(pool[i])

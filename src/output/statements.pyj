@@ -11,6 +11,15 @@ from ast import (
     AST_MatchAs, AST_MatchStar, AST_MatchSequence, AST_MatchMapping, AST_MatchClass,
     AST_AnnotatedAssign
 )
+from output.stream import OutputStream
+
+
+def _js_of(node, output):
+    # A node's JS as a string, for the match codegen, which builds subject
+    # expressions as strings (class patterns, mapping keys)
+    o = new OutputStream(output.options)
+    node.print(o)
+    return o.get()
 
 def force_statement(stat, output):
     if output.options.bracketize:
@@ -141,7 +150,10 @@ def print_with(self, output):
     exit_name = '__aexit__' if is_async else '__exit__'
 
     exits = v'[]'
-    output.assign('ρσ_with_exception'), output.print('undefined'), output.end_statement()
+    # Each `with` gets its own exception variable: a nested `with` that
+    # suppresses an exception must not make this one skip its normal exit.
+    exc = 'ρσ_with_exception_' + (output.with_counter + 1)  # numbered like its first clause
+    output.print('var '), output.assign(exc), output.print('undefined'), output.end_statement()
     for clause in self.clauses:
         output.with_counter += 1
         clause_name = 'ρσ_with_clause_' + output.with_counter
@@ -154,6 +166,7 @@ def print_with(self, output):
             output.assign(clause.alias.name)
         output.print(await_kw + clause_name + '.' + enter_name + '()')
         output.end_statement()
+    reversed_exits = exits.slice().reverse()
     output.indent(), output.print('try'), output.space()
     output.with_block(def():
         output.indent()
@@ -162,36 +175,38 @@ def print_with(self, output):
     )
     output.space(), output.print('catch(e)')
     output.with_block(def():
-        output.indent(), output.assign('ρσ_with_exception'), output.print('e'), output.end_statement()
-    )
-    reversed_exits = exits.slice().reverse()
-    output.newline(), output.indent(), output.spaced('if', '(ρσ_with_exception', '===', 'undefined)')
-    output.with_block(def():
-        for clause in reversed_exits:
-            # Python protocol: __exit__(None, None, None) on normal exit.
-            # For backward compat with the legacy 0-arg signature (`def __exit__(self):`),
-            # we dispatch on .length: a function declared with 0 explicit params
-            # is called with no args; otherwise we pass (None, None, None) so
-            # the standard `def __exit__(self, exc_type, exc_val, exc_tb):` form
-            # works.  Functions with `*args` or all-default params also have
-            # .length === 0 and receive the legacy 0-arg call (preserves
-            # behavior of code written before this fix).
-            output.indent()
-            output.print(clause + '.' + exit_name + '.length' + ' === 0 ? ' +
-                        await_kw + clause + '.' + exit_name + '() : ' +
-                        await_kw + clause + '.' + exit_name + '(null, null, null)')
-            output.end_statement()
-    )
-    output.space(), output.print('else'), output.space()
-    output.with_block(def():
+        output.indent(), output.assign(exc), output.print('e'), output.end_statement()
         output.indent(), output.assign('ρσ_with_suppress'), output.print('false'), output.end_statement()
         for clause in reversed_exits:
             # Exception path: always pass (exc_type, exc_val, exc_tb) — matches Python.
             output.indent()
-            output.spaced('ρσ_with_suppress', '|=', 'ρσ_bool(' + await_kw + clause + '.' + exit_name + '(ρσ_with_exception.constructor,',
-                            'ρσ_with_exception,', 'ρσ_with_exception.stack))')
+            output.spaced('ρσ_with_suppress', '|=', 'ρσ_bool(' + await_kw + clause + '.' + exit_name + '(' + exc + '.constructor,',
+                            exc + ',', exc + '.stack))')
             output.end_statement()
-        output.indent(), output.spaced('if', '(!ρσ_with_suppress)', 'throw ρσ_with_exception'), output.end_statement()
+        output.indent(), output.spaced('if', '(!ρσ_with_suppress)', 'throw', exc), output.end_statement()
+    )
+    # Normal exit runs in `finally` so that return / break / continue out of
+    # the body still call __exit__, as Python does.
+    output.space(), output.print('finally'), output.space()
+    output.with_block(def():
+        output.indent(), output.spaced('if', '(' + exc, '===', 'undefined)')
+        output.with_block(def():
+            for clause in reversed_exits:
+                # Python protocol: __exit__(None, None, None) on normal exit.
+                # For backward compat with the legacy 0-arg signature (`def __exit__(self):`),
+                # we dispatch on .length: a function declared with 0 explicit params
+                # is called with no args; otherwise we pass (None, None, None) so
+                # the standard `def __exit__(self, exc_type, exc_val, exc_tb):` form
+                # works.  Functions with `*args` or all-default params also have
+                # .length === 0 and receive the legacy 0-arg call (preserves
+                # behavior of code written before this fix).
+                output.indent()
+                output.print(clause + '.' + exit_name + '.length' + ' === 0 ? ' +
+                            await_kw + clause + '.' + exit_name + '() : ' +
+                            await_kw + clause + '.' + exit_name + '(null, null, null)')
+                output.end_statement()
+        )
+        output.newline()
     )
 
 def print_assert(self, output):
@@ -284,38 +299,23 @@ def _match_write_seq_cond(pattern, subj, output):
             output.print(')')
 
 def _match_write_map_cond(pattern, subj, output):
-    output.print('(' + subj + ' !== null && ' + subj + ' !== undefined && typeof ' + subj + ' === \'object\')')
+    # Only mappings match (dicts, Maps, plain JS objects), and keys are looked
+    # up the way the mapping does it: ρσ_match_* in baselib-internal
+    output.print('ρσ_match_mapping(' + subj + ')')
     for i, key in enumerate(pattern.keys):
-        output.print(' && (')
-        key.print(output)
-        output.print(' in ' + subj + ')')
+        key_js = _js_of(key, output)
+        output.print(' && ρσ_match_has(' + subj + ', ' + key_js + ')')
         # Sub-condition for non-trivial value patterns
         if not _match_is_always_true(pattern.values[i]):
-            val_var = subj + '[' + _key_to_js_str(key) + ']'
+            val_var = 'ρσ_match_get(' + subj + ', ' + key_js + ')'
             output.print(' && (')
             _match_write_cond(pattern.values[i], val_var, output)
             output.print(')')
 
-def _key_to_js_str(key_node):
-    """Return a JS expression string for a mapping key AST node."""
-    # For simple string and number literals we can produce the literal inline
-    from ast import AST_String, AST_Number, AST_True, AST_False, AST_Null
-    if is_node_type(key_node, AST_String):
-        return JSON.stringify(key_node.value)
-    elif is_node_type(key_node, AST_Number):
-        return str(key_node.value)
-    elif is_node_type(key_node, AST_True):
-        return 'true'
-    elif is_node_type(key_node, AST_False):
-        return 'false'
-    elif is_node_type(key_node, AST_Null):
-        return 'null'
-    return '"__key__"'
-
 def _match_write_class_cond(pattern, subj, output):
-    output.print('(' + subj + ' instanceof ')
-    pattern.cls.print(output)
-    output.print(')')
+    # isinstance semantics, so builtins match too: case int(n), case str()
+    cls_js = _js_of(pattern.cls, output)
+    output.print('ρσ_match_class(' + subj + ', ' + cls_js + ')')
     # Keyword patterns: check literal sub-patterns
     for i, kname in enumerate(pattern.keys):
         vpat = pattern.values[i]
@@ -329,11 +329,11 @@ def _match_write_class_cond(pattern, subj, output):
             output.print(')')
     # Positional patterns: check literal sub-patterns via __match_args__
     for i, ppat in enumerate(pattern.positional):
+        pos_var = 'ρσ_match_pos(' + subj + ', ' + cls_js + ', ' + str(i) + ')'
         if is_node_type(ppat, AST_MatchLiteral):
-            output.print(' && ' + subj + '[' + subj + '.constructor.__match_args__[' + str(i) + ']] === ')
+            output.print(' && ' + pos_var + ' === ')
             ppat.value.print(output)
         elif not _match_is_always_true(ppat):
-            pos_var = subj + '[' + subj + '.constructor.__match_args__[' + str(i) + ']]'
             output.print(' && (')
             _match_write_cond(ppat, pos_var, output)
             output.print(')')
@@ -384,20 +384,21 @@ def _match_write_bindings(pattern, subj, output):
                 _match_write_bindings(e, elem_var, output)
 
     elif is_node_type(pattern, AST_MatchMapping):
+        key_strs = [_js_of(k, output) for k in pattern.keys]
         for i, key in enumerate(pattern.keys):
-            val_var = subj + '[' + _key_to_js_str(key) + ']'
+            val_var = 'ρσ_match_get(' + subj + ', ' + key_strs[i] + ')'
             _match_write_bindings(pattern.values[i], val_var, output)
         if pattern.rest_name:
-            # Build rest object excluding matched keys
-            key_strs = [_key_to_js_str(k) for k in pattern.keys]
+            # **rest: a dict of the entries the pattern didn't name
             output.indent()
-            output.print(pattern.rest_name + ' = (function() { var ρσ_rest = {}; for (var ρσ_k in ' + subj + ') { if ([' + key_strs.join(', ') + '].indexOf(ρσ_k) < 0) ρσ_rest[ρσ_k] = ' + subj + '[ρσ_k]; } return ρσ_rest; })()')
+            output.print(pattern.rest_name + ' = ρσ_match_rest(' + subj + ', [' + key_strs.join(', ') + '])')
             output.end_statement()
 
     elif is_node_type(pattern, AST_MatchClass):
         # Positional patterns via __match_args__
+        cls_js = _js_of(pattern.cls, output)
         for i, ppat in enumerate(pattern.positional):
-            pos_var = subj + '[' + subj + '.constructor.__match_args__[' + str(i) + ']]'
+            pos_var = 'ρσ_match_pos(' + subj + ', ' + cls_js + ', ' + str(i) + ')'
             _match_write_bindings(ppat, pos_var, output)
         # Keyword patterns
         for i, kname in enumerate(pattern.keys):

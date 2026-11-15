@@ -1,0 +1,78 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# time.pyj
+# Tests for the time standard library module.
+
+from __python__ import overload_getitem, overload_operators
+import time
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Clocks ─────────────────────────────────────────────────────────────────
+t0 = time.time()
+ok(t0 > 1.6e9)
+ok(abs(time.time_ns() / 1e9 - t0) < 5)
+m0, p0 = time.monotonic(), time.perf_counter()
+ok(time.process_time() >= 0)
+
+# ── 2. sleep blocks for (at least) the requested time ────────────────────────
+time.sleep(0.03)
+ok(time.monotonic() - m0 >= 0.025)
+ok(time.perf_counter() - p0 >= 0.025)
+ok(time.time() - t0 >= 0.02)
+for bad in [-1, time.MAX_SLEEP + 1]:
+    try:
+        time.sleep(bad)
+        ok(False)
+    except ValueError:
+        pass
+
+# ── 3. gmtime / struct_time ───────────────────────────────────────────────────
+g = time.gmtime(1700000000)
+ade(list(g), [2023, 11, 14, 22, 13, 20, 1, 318, 0])
+ae(g.tm_year, 2023)
+ae(g.tm_mon, 11)
+ae(g.tm_mday, 14)
+ae(g.tm_wday, 1)  # Tuesday, Monday == 0
+ae(g.tm_yday, 318)
+ae(g[0], 2023)
+ae(g[-1], 0)
+ae(len(g), 9)
+y, mo, d, h, mi, s, wd, yd, dst = g
+ae(h, 22)
+ae(repr(g), 'time.struct_time(tm_year=2023, tm_mon=11, tm_mday=14, tm_hour=22, tm_min=13, tm_sec=20, tm_wday=1, tm_yday=318, tm_isdst=0)')
+ae(time.gmtime(0).tm_year, 1970)
+
+# ── 4. localtime / mktime round trip ──────────────────────────────────────────
+lt = time.localtime(1700000000)
+ae(time.mktime(lt), 1700000000)
+ae(len(time.localtime()), 9)
+
+# ── 5. strftime / asctime / ctime ─────────────────────────────────────────────
+fmt = '%Y-%m-%d %H:%M:%S %y %b %B %a %A %j %p %I %% %w %U %W'
+ae(time.strftime(fmt, g), '2023-11-14 22:13:20 23 Nov November Tue Tuesday 318 PM 10 % 2 46 46')
+ae(time.strftime(fmt, time.gmtime(0)), '1970-01-01 00:00:00 70 Jan January Thu Thursday 001 AM 12 % 4 00 00')
+ae(time.strftime('%c|%x|%X', g), 'Tue Nov 14 22:13:20 2023|11/14/23|22:13:20')
+ae(time.strftime('%G %V %u', time.gmtime(1104537600)), '2004 53 6')
+ae(time.asctime(g), 'Tue Nov 14 22:13:20 2023')
+ae(time.asctime(time.gmtime(951782400)), 'Tue Feb 29 00:00:00 2000')
+ok(len(time.ctime(0)) is 24)
+ok(len(time.strftime('%Y')) is 4)
+
+# ── 6. strptime ───────────────────────────────────────────────────────────────
+p = time.strptime('2023-11-14 22:13:20', '%Y-%m-%d %H:%M:%S')
+ade(list(p), [2023, 11, 14, 22, 13, 20, 1, 318, -1])
+ade(list(time.strptime('Mar 5 2021 3:04PM', '%b %d %Y %I:%M%p'))[:6], [2021, 3, 5, 15, 4, 0])
+try:
+    time.strptime('nope', '%Y')
+    ok(False)
+except ValueError:
+    pass
+
+# ── 7. timezone attributes ────────────────────────────────────────────────────
+ok(jstype(time.timezone) is 'number')
+ok(time.daylight is 0 or time.daylight is 1)
+ae(len(time.tzname), 2)

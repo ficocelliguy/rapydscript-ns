@@ -1,0 +1,100 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# os.pyj
+# Tests for the os and os.path standard library modules.
+
+from __python__ import overload_getitem
+import os
+import os.path
+from os.path import join, split, splitext, basename, dirname, normpath, isabs, relpath, commonprefix, commonpath
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+def tup(t):
+    return list(t)
+
+# ── 1. Constants ──────────────────────────────────────────────────────────────
+ae(os.sep, '/')
+ae(os.linesep, '\n')
+ae(os.name, 'posix')
+ae(os.curdir, '.')
+ae(os.pardir, '..')
+ok(os.path is not None and os.path.join is join)
+
+# ── 2. environ / getenv ───────────────────────────────────────────────────────
+ok(isinstance(os.environ, dict))
+ae(os.getenv('RAPYDSCRIPT_SURELY_UNSET_VAR'), None)
+ae(os.getenv('RAPYDSCRIPT_SURELY_UNSET_VAR', 'fallback'), 'fallback')
+os.environ['RS_TEST_VAR'] = 'v1'
+ae(os.getenv('RS_TEST_VAR'), 'v1')
+os.putenv('RS_TEST_VAR2', 'v2')
+ae(os.environ['RS_TEST_VAR2'], 'v2')
+os.unsetenv('RS_TEST_VAR2')
+ae(os.getenv('RS_TEST_VAR2'), None)
+cwd = os.getcwd()
+ok(jstype(cwd) is 'string' and cwd.length > 0 and cwd.indexOf('\\') < 0)
+
+# ── 3. join / split / splitext ────────────────────────────────────────────────
+ae(join('a', 'b', 'c'), 'a/b/c')
+ae(join('/a', '/b', 'c'), '/b/c')
+ae(join('a/', 'b'), 'a/b')
+ae(join('', 'x'), 'x')
+ade(tup(split('/a/b/c.txt')), ['/a/b', 'c.txt'])
+ade(tup(split('c.txt')), ['', 'c.txt'])
+ade(tup(split('/c')), ['/', 'c'])
+ade(tup(split('a//b//')), ['a//b', ''])
+ade(tup(split('//x')), ['//', 'x'])
+ade(tup(splitext('a/b.tar.gz')), ['a/b.tar', '.gz'])
+ade(tup(splitext('.bashrc')), ['.bashrc', ''])
+ade(tup(splitext('a/..b')), ['a/..b', ''])
+ade(tup(splitext('a.b/c')), ['a.b/c', ''])
+
+# ── 4. basename / dirname / isabs ─────────────────────────────────────────────
+ae(basename('/a/b/'), '')
+ae(basename('/a/b'), 'b')
+ae(dirname('/a/b/'), '/a/b')
+ae(dirname('a'), '')
+ae(dirname('/'), '/')
+ok(isabs('/x'))
+ok(not isabs('x'))
+
+# ── 5. normpath (matches CPython's posixpath) ─────────────────────────────────
+cases = [['', '.'], ['.', '.'], ['/', '/'], ['//', '//'], ['///', '/'], ['a/./b/../c', 'a/c'],
+         ['../../a', '../../a'], ['/../a', '/a'], ['a/../..', '..'], ['//a//b/', '//a/b']]
+for src, expected in cases:
+    ae(normpath(src), expected)
+
+# ── 6. abspath / relpath / commonprefix / commonpath ──────────────────────────
+ae(os.path.abspath('/x/../y'), '/y')
+ok(os.path.abspath('rel').endsWith('/rel'))
+ae(relpath('/a/b/c', '/a/x'), '../b/c')
+ae(relpath('/a', '/a'), '.')
+ae(relpath('/a/b', '/'), 'a/b')
+ae(commonprefix(['/usr/lib', '/usr/local/lib']), '/usr/l')
+ae(commonprefix([]), '')
+ae(commonpath(['/usr/lib', '/usr/local/lib']), '/usr')
+ae(commonpath(['a/b', 'a/c']), 'a')
+
+# ── 7. Filesystem queries ─────────────────────────────────────────────────────
+ok(not os.path.exists('/definitely/not/here/xyz'))
+ok(not os.path.isfile('/definitely/not/here/xyz'))
+ok(not os.path.isdir('/definitely/not/here/xyz'))
+# test_path is the test directory (a real directory under Node)
+ok(os.path.isdir(test_path))
+ok(os.path.isfile(test_path + '/os.pyj'))
+ok(os.path.getsize(test_path + '/os.pyj') > 0)
+ok(os.listdir(test_path).indexOf('os.pyj') >= 0)
+
+# ── 8. fspath / PathLike / urandom ────────────────────────────────────────────
+class P:
+    def __fspath__(self):
+        return '/p'
+ae(os.fspath('/s'), '/s')
+ae(os.fspath(P()), '/p')
+ok(isinstance(P(), os.PathLike))
+ok(not isinstance(3, os.PathLike))
+ae(join(P(), 'q'), '/p/q')
+ae(len(os.urandom(12)), 12)

@@ -29,11 +29,25 @@
 class Enum:
     """Base class for creating enumerated constants."""
 
+    def __new__(cls, value):
+        # Color(2): look a member up by value, as Python does
+        members = cls._value2member_map_
+        if members:
+            v'var ρσ_found = members.jsmap.get(value)'
+            if v'ρσ_found !== undefined':
+                return v'ρσ_found'
+        raise ValueError(repr(value) + ' is not a valid ' + cls.__name__)
+
     def __init__(self, value=None):
-        # Enum members are created lazily by __init_subclass__, not by calling
-        # the constructor directly.  This __init__ is intentionally a no-op so
-        # that the constructor can be called without side-effects.
         pass
+
+    @classmethod
+    def __class_getitem__(cls, name):
+        # Color['RED']: look a member up by name
+        member = cls._member_map_.jsmap.get(name) if cls._member_map_ else undefined
+        if member is undefined:
+            raise KeyError(name)
+        return member
 
     @property
     def name(self):
@@ -73,6 +87,8 @@ class Enum:
         proto = cls.prototype
         members = {}
         members_by_value = {}
+        member_map = dict()  # name -> member, in definition order
+        value_map = dict()  # value -> first member with it (hash-aware, so tuple values work)
         members_list = []
 
         keys = v"Object.keys(proto)"
@@ -101,12 +117,20 @@ class Enum:
             members[k] = ρσ_member
             if v"members_by_value[val] === undefined":
                 members_by_value[val] = ρσ_member
+            member_map.jsmap.set(k, ρσ_member)
+            if not value_map.jsmap.has(val):
+                value_map.jsmap.set(val, ρσ_member)
             members_list.push(ρσ_member)
 
         # Store the member registry on the class constructor itself.
         cls._members_ = members
         cls._members_by_value_ = members_by_value
         cls._member_names_ = members_list.map(def(m): return m._name_;)
+        cls._member_map_ = member_map
+        cls._value2member_map_ = value_map
+        cls.__members__ = member_map
+        cls.__len__ = def(): return members_list.length;
+        cls.__contains__ = def(m): return members_list.indexOf(m) >= 0;
 
         # Install Symbol.iterator on the class constructor itself (not the
         # prototype) so that ``list(Color)`` and ``for m in Color:`` work.

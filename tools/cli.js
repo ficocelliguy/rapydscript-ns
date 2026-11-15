@@ -254,7 +254,8 @@ scope from bleeding into other JavaScript logic
 opt("keep_docstrings", 'd', 'bool', false, function(){/*
 Keep the docstrings in the generated JavaScript as __doc__
 attributes on functions, classes and modules. Normally,
-the docstring are deleted to reduce download size.
+the docstrings are deleted to reduce download size
+(they are always kept when running code with --execute).
 */});
 
 opt("discard_asserts", 'a', 'bool', false, function(){/*

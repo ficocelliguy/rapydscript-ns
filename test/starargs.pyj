@@ -30,7 +30,9 @@ def throw_test(code):
 basic_test('a, b, c', 3)
 basic_test('*args', 0, 'args')
 basic_test('a, b, *args', 2, 'args')
-throw_test('*args, a')
+# a parameter after *args is keyword-only (valid Python), not an error
+kwonly_after_star = RapydScript.parse('def func(*args, a): pass\n', {'filename':'kwonly'}).body[0]
+assrt.ok(kwonly_after_star.argnames[0].kwonly)
 throw_test('*args, *a')
 basic_test('**kwargs', 0, undefined, 'kwargs')
 basic_test('*args, **kwargs', 0, 'args', 'kwargs')
@@ -413,8 +415,11 @@ throw_test('a, /, b, /')
 throw_test('a, *')
 throw_test('*')
 
-# Error: required kwonly after optional kwonly
-throw_test('*, a=1, b')
+# A required keyword-only param may follow an optional one (valid Python)
+def kwonly_mixed(*, a=1, b):
+    return [a, b]
+assrt.deepEqual(kwonly_mixed(b=2), [1, 2])
+assrt.deepEqual(kwonly_mixed(a=3, b=4), [3, 4])
 
 # --- Runtime tests ---
 

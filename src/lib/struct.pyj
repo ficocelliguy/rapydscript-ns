@@ -1,0 +1,405 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'struct' module.
+#
+# Supported:
+#   pack(fmt, *v), unpack(fmt, buffer), calcsize(fmt),
+#   pack_into(fmt, buffer, offset, *v), unpack_from(fmt, buffer, offset=0),
+#   iter_unpack(fmt, buffer), Struct(fmt), error
+#
+# Format characters: x c b B ? h H i I l L q Q n N P e f d s p
+# Byte-order prefixes: @ (native, aligned — the default), = (native size,
+# no alignment), < (little-endian), > and ! (big-endian).  Repeat counts
+# ('4h', '10s') are supported; whitespace between items is ignored.
+#
+# Notes:
+#   - pack() returns `bytes`; unpack() accepts bytes, bytearray,
+#     Uint8Array, ArrayBuffer or a list of ints and returns a tuple.
+#   - "Native" means a little-endian LP64 platform (as on 64-bit Linux and
+#     macOS): native l/L/n/N/P are 8 bytes; with any of = < > ! they use the
+#     standard sizes (l/L are 4 bytes).
+#   - q/Q (and native l/L/n/N/P) values outside the safe JS integer range
+#     (±2**53) are returned as BigInt; BigInt arguments are accepted.
+
+class error(Exception):
+    pass
+
+
+_STD_SIZES = {'x': 1, 'c': 1, 'b': 1, 'B': 1, '?': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4,
+              'l': 4, 'L': 4, 'q': 8, 'Q': 8, 'e': 2, 'f': 4, 'd': 8, 's': 1, 'p': 1}
+_NATIVE_SIZES = {'x': 1, 'c': 1, 'b': 1, 'B': 1, '?': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4,
+                 'l': 8, 'L': 8, 'q': 8, 'Q': 8, 'n': 8, 'N': 8, 'P': 8, 'e': 2, 'f': 4, 'd': 8, 's': 1, 'p': 1}
+_INT_RANGES = {
+    'b': [-128, 127], 'B': [0, 255], 'h': [-32768, 32767], 'H': [0, 65535],
+    'i': [-2147483648, 2147483647], 'I': [0, 4294967295],
+}
+
+_cache = {}
+
+
+def _parse(fmt):
+    if jstype(fmt) is not 'string':
+        if fmt and jstype(fmt.decode) is 'function':
+            fmt = fmt.decode('ascii')
+        else:
+            raise TypeError('Struct() argument 1 must be a str or bytes object, not ' + jstype(fmt))
+    if Object.prototype.hasOwnProperty.call(_cache, fmt):
+        return _cache[fmt]
+    i = 0
+    native = True
+    little = True
+    if fmt.length and '@=<>!'.indexOf(fmt[0]) >= 0:
+        c = fmt[0]
+        native = c is '@'
+        little = c is '@' or c is '=' or c is '<'
+        i = 1
+    sizes = _NATIVE_SIZES if native else _STD_SIZES
+    items = []  # [code, count, offset, size]
+    offset = 0
+    nvalues = 0
+    while i < fmt.length:
+        c = fmt[i]
+        if c is ' ' or c is '\t' or c is '\n' or c is '\r':
+            i += 1
+            continue
+        count = 1
+        has_count = False
+        if c >= '0' and c <= '9':
+            j = i
+            while j < fmt.length and fmt[j] >= '0' and fmt[j] <= '9':
+                j += 1
+            count = parseInt(fmt.slice(i, j), 10)
+            has_count = True
+            i = j
+            if i >= fmt.length:
+                raise error('repeat count given without format specifier')
+            c = fmt[i]
+        i += 1
+        if not Object.prototype.hasOwnProperty.call(sizes, c):
+            raise error('bad char in struct format')
+        size = sizes[c]
+        if native and c is not 's' and c is not 'p' and c is not 'x' and c is not 'c':
+            offset = Math.ceil(offset / size) * size  # natural alignment
+        if c is 's' or c is 'p':
+            items.push([c, count, offset, count])
+            offset += count
+            nvalues += 1
+        elif c is 'x':
+            offset += count
+        else:
+            for k in range(count):
+                items.push([c, 1, offset, size])
+                offset += size
+                nvalues += 1
+    ans = {'items': items, 'size': offset, 'little': little, 'native': native, 'nvalues': nvalues, 'format': fmt}
+    _cache[fmt] = ans
+    return ans
+
+
+def calcsize(fmt):
+    return _parse(fmt).size
+
+
+def _to_uint8(buffer):
+    if buffer is None or buffer is undefined:
+        raise TypeError("a bytes-like object is required, not 'NoneType'")
+    if v'buffer instanceof Uint8Array':
+        return buffer
+    if v'typeof ArrayBuffer === "function" && buffer instanceof ArrayBuffer':
+        return v'new Uint8Array(buffer)'
+    if v'typeof ArrayBuffer === "function" && ArrayBuffer.isView(buffer)':
+        return v'new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)'
+    if Array.isArray(buffer._data):
+        return v'Uint8Array.from(buffer._data)'
+    if Array.isArray(buffer):
+        return v'Uint8Array.from(buffer)'
+    if jstype(buffer) is 'string':
+        raise TypeError("a bytes-like object is required, not 'str'")
+    raise TypeError('a bytes-like object is required, not ' + jstype(buffer))
+
+
+def _float_to_half(val):
+    v'''
+    var f32 = new Float32Array(1), u32 = new Uint32Array(f32.buffer);
+    f32[0] = val;
+    var x = u32[0];
+    var sign = (x >>> 16) & 0x8000;
+    var exp = (x >>> 23) & 0xff;
+    var mant = x & 0x7fffff;
+    if (exp === 0xff) return sign | 0x7c00 | (mant ? 0x200 : 0);
+    if (isFinite(val) && Math.abs(val) >= 65520) return null;
+    var e = exp - 127 + 15;
+    if (e >= 0x1f) return sign | 0x7c00;
+    if (e <= 0) {
+        if (e < -10) return sign;
+        mant = mant | 0x800000;
+        var shift = 14 - e;
+        var half = mant >> shift;
+        var rem = mant & ((1 << shift) - 1), mid = 1 << (shift - 1);
+        if (rem > mid || (rem === mid && (half & 1))) half++;
+        return sign | half;
+    }
+    var h = sign | (e << 10) | (mant >> 13);
+    var r = mant & 0x1fff;
+    if (r > 0x1000 || (r === 0x1000 && (h & 1))) h++;
+    return h;
+    '''
+
+
+def _half_to_float(h):
+    v'''
+    var sign = (h & 0x8000) ? -1 : 1;
+    var exp = (h >> 10) & 0x1f;
+    var mant = h & 0x3ff;
+    if (exp === 0) return sign * Math.pow(2, -14) * (mant / 1024);
+    if (exp === 0x1f) return mant ? NaN : sign * Infinity;
+    return sign * Math.pow(2, exp - 15) * (1 + mant / 1024);
+    '''
+
+
+def _as_int(value, code):
+    if jstype(value) is 'boolean':
+        return 1 if value else 0
+    if jstype(value) is 'bigint':
+        return value
+    if jstype(value) is 'number' and Number.isInteger(value):
+        return value
+    if value is not None and value is not undefined and jstype(value.__index__) is 'function':
+        return value.__index__()
+    raise error('required argument is not an integer')
+
+
+def _pack_into_view(info, dv, u8, base, values):
+    if values.length is not info.nvalues:
+        raise error('pack expected ' + info.nvalues + ' items for packing (got ' + values.length + ')')
+    little = info.little
+    vi = 0
+    for item in info.items:
+        code, count, off, size = item
+        pos = base + off
+        val = values[vi]
+        vi += 1
+        if code is 's' or code is 'p':
+            if jstype(val) is 'string' or not (val and (Array.isArray(val._data) or v'val instanceof Uint8Array')):
+                raise error("argument for '" + code + "' must be a bytes object")
+            src = _to_uint8(val)
+            if code is 's':
+                n = Math.min(src.length, count)
+                for k in range(n):
+                    u8[pos + k] = src[k]
+            elif count > 0:
+                n = Math.min(src.length, count - 1, 255)
+                u8[pos] = n
+                for k in range(n):
+                    u8[pos + 1 + k] = src[k]
+        elif code is 'c':
+            if not (val and (Array.isArray(val._data) or v'val instanceof Uint8Array')) or _to_uint8(val).length is not 1:
+                raise error('char format requires a bytes object of length 1')
+            u8[pos] = _to_uint8(val)[0]
+        elif code is '?':
+            u8[pos] = 1 if val else 0
+        elif code is 'e' or code is 'f' or code is 'd':
+            if jstype(val) is 'boolean':
+                val = 1 if val else 0
+            if jstype(val) is not 'number':
+                if val is not None and val is not undefined and jstype(val.__float__) is 'function':
+                    val = val.__float__()
+                else:
+                    raise error('required argument is not a float')
+            if code is 'd':
+                dv.setFloat64(pos, val, little)
+            elif code is 'f':
+                if isFinite(val) and Math.abs(val) > 3.4028235677973366e+38:
+                    raise OverflowError('float too large to pack with f format')
+                dv.setFloat32(pos, val, little)
+            else:
+                h = _float_to_half(val)
+                if h is None:
+                    raise OverflowError('float too large to pack with e format')
+                dv.setUint16(pos, h, little)
+        else:
+            n = _as_int(val, code)
+            if size is 8:
+                big = v'BigInt(n)'
+                if code is 'q' or code is 'l' or code is 'n':
+                    if v'big < -(BigInt(1) << BigInt(63)) || big >= (BigInt(1) << BigInt(63))':
+                        raise error("'" + code + "' format requires -9223372036854775808 <= number <= 9223372036854775807")
+                    dv.setBigInt64(pos, big, little)
+                else:
+                    if v'big < BigInt(0) || big >= (BigInt(1) << BigInt(64))':
+                        raise error("'" + code + "' format requires 0 <= number <= 18446744073709551615")
+                    dv.setBigUint64(pos, big, little)
+            else:
+                rc = 'i' if code is 'l' else ('I' if code is 'L' else code)
+                rng = _INT_RANGES[rc]
+                if jstype(n) is 'bigint':
+                    n = Number(n)
+                if n < rng[0] or n > rng[1]:
+                    if code is 'b' or code is 'B':
+                        raise error(('byte' if code is 'b' else 'ubyte') + ' format requires ' + rng[0] + ' <= number <= ' + rng[1])
+                    raise error("'" + code + "' format requires " + rng[0] + ' <= number <= ' + rng[1])
+                if size is 1:
+                    if code is 'b':
+                        dv.setInt8(pos, n)
+                    else:
+                        dv.setUint8(pos, n)
+                elif size is 2:
+                    if code is 'h':
+                        dv.setInt16(pos, n, little)
+                    else:
+                        dv.setUint16(pos, n, little)
+                else:
+                    if rc is 'i':
+                        dv.setInt32(pos, n, little)
+                    else:
+                        dv.setUint32(pos, n, little)
+
+
+def _from_big(b):
+    if v'b >= BigInt(-9007199254740991) && b <= BigInt(9007199254740991)':
+        return Number(b)
+    return b
+
+
+def _unpack_view(info, dv, u8, base):
+    little = info.little
+    out = []
+    for item in info.items:
+        code, count, off, size = item
+        pos = base + off
+        if code is 's':
+            out.push(bytes(u8.slice(pos, pos + count)))
+        elif code is 'p':
+            if count is 0:
+                out.push(bytes())
+            else:
+                n = Math.min(u8[pos], count - 1)
+                out.push(bytes(u8.slice(pos + 1, pos + 1 + n)))
+        elif code is 'c':
+            out.push(bytes(u8.slice(pos, pos + 1)))
+        elif code is '?':
+            out.push(u8[pos] is not 0)
+        elif code is 'd':
+            out.push(dv.getFloat64(pos, little))
+        elif code is 'f':
+            out.push(dv.getFloat32(pos, little))
+        elif code is 'e':
+            out.push(_half_to_float(dv.getUint16(pos, little)))
+        elif size is 8:
+            if code is 'q' or code is 'l' or code is 'n':
+                out.push(_from_big(dv.getBigInt64(pos, little)))
+            else:
+                out.push(_from_big(dv.getBigUint64(pos, little)))
+        elif size is 1:
+            out.push(dv.getInt8(pos) if code is 'b' else dv.getUint8(pos))
+        elif size is 2:
+            out.push(dv.getInt16(pos, little) if code is 'h' else dv.getUint16(pos, little))
+        else:
+            out.push(dv.getInt32(pos, little) if code is 'i' or code is 'l' else dv.getUint32(pos, little))
+    return tuple(out)
+
+
+def _pack(info, values):
+    u8 = v'new Uint8Array(info.size)'
+    dv = v'new DataView(u8.buffer)'
+    _pack_into_view(info, dv, u8, 0, values)
+    return bytes(u8)
+
+
+def _unpack_from(info, buffer, offset):
+    u8 = _to_uint8(buffer)
+    if offset < 0:
+        offset += u8.length
+        if offset < 0:
+            raise error('offset ' + (offset - u8.length) + ' out of range for ' + u8.length + '-byte buffer')
+    if u8.length - offset < info.size:
+        raise error('unpack_from requires a buffer of at least ' + (info.size + offset) + ' bytes for unpacking ' +
+                    info.size + ' bytes at offset ' + offset + ' (actual buffer size is ' + u8.length + ')')
+    dv = v'new DataView(u8.buffer, u8.byteOffset, u8.byteLength)'
+    return _unpack_view(info, dv, u8, offset)
+
+
+def pack(fmt, *values):
+    return _pack(_parse(fmt), values)
+
+
+def _unpack(info, buffer):
+    u8 = _to_uint8(buffer)
+    if u8.length is not info.size:
+        raise error('unpack requires a buffer of ' + info.size + ' bytes')
+    return _unpack_from(info, u8, 0)
+
+
+def unpack(fmt, buffer):
+    return _unpack(_parse(fmt), buffer)
+
+
+def unpack_from(fmt, buffer, offset=0):
+    return _unpack_from(_parse(fmt), buffer, offset)
+
+
+def pack_into(fmt, buffer, offset, *values):
+    _pack_into(_parse(fmt), buffer, offset, values)
+
+
+def _pack_into(info, buffer, offset, values):
+    packed = _pack(info, values)._data
+    n = buffer.length if buffer._data is undefined else buffer._data.length
+    if offset < 0:
+        offset += n
+        if offset < 0:
+            raise error('offset ' + (offset - n) + ' out of range for ' + n + '-byte buffer')
+    if n - offset < info.size:
+        raise error('pack_into requires a buffer of at least ' + (info.size + offset) + ' bytes for packing ' +
+                    info.size + ' bytes at offset ' + offset + ' (actual buffer size is ' + n + ')')
+    for k in range(packed.length):
+        if jstype(buffer.__setitem__) is 'function':
+            buffer.__setitem__(offset + k, packed[k])
+        else:
+            buffer[offset + k] = packed[k]
+
+
+def iter_unpack(fmt, buffer):
+    return _iter_unpack(_parse(fmt), buffer)
+
+
+def _iter_unpack(info, buffer):
+    if info.size is 0:
+        raise error('cannot iteratively unpack with a struct of length 0')
+    u8 = _to_uint8(buffer)
+    if u8.length % info.size is not 0:
+        raise error('iterative unpacking requires a buffer of a multiple of ' + info.size + ' bytes')
+    pos = 0
+    while pos < u8.length:
+        yield _unpack_from(info, u8, pos)
+        pos += info.size
+
+
+class Struct:
+
+    def __init__(self, fmt):
+        self._info = _parse(fmt)
+        self.format = self._info.format
+        self.size = self._info.size
+
+    def pack(self, *values):
+        return _pack(self._info, values)
+
+    # NB: method names shadow the module-level functions inside these bodies
+    # (named function expressions), so only the _private helpers are used.
+    def unpack(self, buffer):
+        return _unpack(self._info, buffer)
+
+    def unpack_from(self, buffer, offset=0):
+        return _unpack_from(self._info, buffer, offset)
+
+    def pack_into(self, buffer, offset, *values):
+        _pack_into(self._info, buffer, offset, values)
+
+    def iter_unpack(self, buffer):
+        return _iter_unpack(self._info, buffer)
+
+    def __repr__(self):
+        return 'Struct(' + repr(self.format) + ')'

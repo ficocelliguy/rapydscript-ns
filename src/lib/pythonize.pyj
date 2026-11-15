@@ -6,7 +6,8 @@ def strings():
     string_funcs = set((
         'capitalize strip lstrip rstrip islower isupper isspace lower upper swapcase title'
         ' center count endswith startswith find rfind index rindex format join ljust rjust'
-        ' partition rpartition replace split rsplit splitlines zfill expandtabs').split(' '))
+        ' partition rpartition replace split rsplit splitlines zfill expandtabs casefold removeprefix removesuffix'
+        ' isalpha isdigit isdecimal isnumeric isalnum isidentifier isascii isprintable istitle translate encode').split(' '))
 
     if not arguments.length:
         exclude = {'split'}

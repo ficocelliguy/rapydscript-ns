@@ -183,7 +183,7 @@ ages = {"alice": 31}
 print("alice is", lookup(ages, "alice"))
 print("bob is", lookup(ages, "bob"))  # KeyError: the traceback points back here
 `,
-            expect: "ok: 42\ncaught: ValueError: age must be positive, got -3\ncaught: ValueError: Invalid literal for int with base 10: abc\nalice is 31\n",
+            expect: "ok: 42\ncaught: age must be positive, got -3\ncaught: invalid literal for int() with base 10: 'abc'\nalice is 31\n",
             expect_error: "KeyError",
         },
         {

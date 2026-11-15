@@ -185,7 +185,12 @@ ae(round(3.7),        4)
 ae(round(3.14159, 2), 3.14)
 ae(round(3.145,   2), 3.15)
 ae(round(1234,   -2), 1200)
-ae(round(0.5),        1)
+# exact ties round to the even neighbour, as in Python
+ae(round(0.5),        0)
+ae(round(1.5),        2)
+ae(round(2.5),        2)
+ae(round(-2.5),       -2)
+ae(round(1250,   -2), 1200)
 
 # ── 9. enumerate(iterable, start) ────────────────────────────────────────────
 # STATUS: ✓ WORKS (added in this release)
@@ -539,7 +544,7 @@ def _gen_throw():
 
 g = _gen_throw()
 ae(g.next().value, 1)
-ae(g.throw(ValueError('err')).value, 'caught')
+ae(g.throw(ValueError('err')), 'caught')  # throw() returns the next yielded value, as in Python
 
 # ── 26. Generator .send() ────────────────────────────────────────────────────
 # STATUS: ✓ WORKS

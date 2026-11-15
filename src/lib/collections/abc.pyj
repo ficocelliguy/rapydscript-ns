@@ -1,0 +1,874 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'collections.abc' module.
+#
+# Usage:
+#   from collections.abc import Iterable, Mapping, Sequence
+#   import collections.abc
+#
+# Every ABC supports isinstance() and issubclass() through class-level
+# __instancecheck__ / __subclasscheck__ hooks, and register(cls).
+#
+# Builtin membership:
+#   Hashable       — anything except list, dict, set, bytearray, plain JS
+#                    objects and instances whose __hash__ is None
+#   Iterable       — str, arrays, dict, set, range, JS Map/Set, anything with
+#                    __iter__ or [Symbol.iterator]
+#   Iterator       — objects with next()/__next__() that are also iterable
+#   Reversible     — str, list, tuple, range, dict, anything with __reversed__
+#   Generator      — JS generator objects
+#   Sized          — str, arrays, dict, set, Map/Set, anything with __len__
+#   Container      — str, arrays, dict, set, Map/Set, anything with __contains__
+#   Collection     — Sized + Iterable + Container
+#   Callable       — functions and classes
+#   Sequence       — str, list, tuple, range, bytes, bytearray, deque
+#   MutableSequence— list, bytearray, collections.deque
+#   ByteString     — bytes, bytearray
+#   Set            — set, frozenset, JS Set, dict keys()/items() views
+#   MutableSet     — set, JS Set
+#   Mapping        — dict, JS Map, plain JS objects, types.MappingProxyType
+#   MutableMapping — dict (incl. Counter, OrderedDict, defaultdict), JS Map,
+#                    plain JS objects, collections.ChainMap
+#   MappingView, KeysView, ItemsView, ValuesView — dict views
+#   Awaitable / Coroutine — Promises and thenables, __await__
+#   AsyncIterable / AsyncIterator / AsyncGenerator — Symbol.asyncIterator,
+#                    __aiter__ / __anext__
+#
+# Mixin methods (for user classes deriving from these ABCs, as in Python):
+#   Sequence:        __iter__, __contains__, __reversed__, index, count
+#   MutableSequence: append, extend, pop, remove, reverse, clear, __iadd__
+#                    (needs __getitem__, __setitem__, __delitem__, __len__,
+#                    insert)
+#   Mapping:         __contains__, keys, items, values, get, __eq__
+#   MutableMapping:  pop, popitem, clear, update, setdefault
+#   Set:             __le__, __lt__, __ge__, __gt__, __eq__, __and__, __or__,
+#                    __sub__, __xor__, isdisjoint
+#   MutableSet:      remove, pop, clear, __ior__, __iand__, __ixor__, __isub__
+#   Iterator:        __iter__ (returns self)
+#
+# Approximations: abstract methods are not enforced (instantiating an ABC
+# subclass that lacks them does not raise); plain JS objects count as
+# mutable mappings; Coroutine matches any thenable.
+
+from _abc_support import abc_instancecheck, abc_subclasscheck, abc_register, set_predicates, set_parents, inherits
+from collections import deque, ChainMap
+
+# Set, Iterator, Generator, ... below shadow JS globals of the same name in
+# this module, so keep handles on the JS builtins.
+def _js(name):
+    v'try { return (typeof globalThis !== "undefined") ? globalThis[name] : eval(name); } catch (e) { return null; }'
+
+
+_JSMap = _js('Map')
+_JSSet = _js('Set')
+_JSString = _js('String')
+_JSArray = _js('Array')
+_JSPromise = _js('Promise')
+_JSObject = _js('Object')
+
+# ---------------------------------------------------------------------------
+# Value predicates
+# ---------------------------------------------------------------------------
+
+def _is_none(x):
+    return x is None or x is undefined
+
+
+def _is_str(x):
+    return jstype(x) is 'string' or v'x instanceof String'
+
+
+def _is_array(x):
+    return Array.isArray(x)
+
+
+def _is_list(x):
+    return Array.isArray(x) and x.ρσ_is_tuple is not True
+
+
+def _is_tuple(x):
+    return Array.isArray(x) and x.ρσ_is_tuple is True
+
+
+def _is_range(x):
+    return not _is_none(x) and x.ρσ_is_range is True
+
+
+def _is_bytes(x):
+    return not _is_none(x) and v'x instanceof bytes'
+
+
+def _is_bytearray(x):
+    return not _is_none(x) and v'x instanceof bytearray'
+
+
+def _is_dict(x):
+    return not _is_none(x) and (v'x instanceof dict' or (jstype(Map) is 'function' and v'x instanceof Map'))
+
+
+def _is_plain_object(x):
+    if _is_none(x) or jstype(x) is not 'object':
+        return False
+    if x.ρσ_is_range is True:
+        return False
+    p = Object.getPrototypeOf(x)
+    return p is None or p is Object.prototype
+
+
+def _is_set(x):
+    return not _is_none(x) and (v'x instanceof set' or (_JSSet and v'x instanceof _JSSet'))
+
+
+def _is_frozenset(x):
+    return not _is_none(x) and v'x instanceof frozenset'
+
+
+def _view_kind(x):
+    if _is_none(x) or jstype(x) is not 'object':
+        return None
+    if x.constructor and x.constructor.name is 'ρσ_dict_view' and jstype(x._kind) is 'string':
+        return x._kind
+    return None
+
+
+def _has_fn(x, name):
+    return not _is_none(x) and jstype(x[name]) is 'function'
+
+
+def _has_iter(x):
+    return not _is_none(x) and (jstype(x[ρσ_iterator_symbol]) is 'function' or jstype(x.__iter__) is 'function')
+
+
+def _hashable(x):
+    if _is_none(x):
+        return True
+    t = jstype(x)
+    if t is not 'object' and t is not 'function':
+        return True
+    if t is 'function':
+        return True
+    if x.__hash__ is None:
+        return False
+    if _is_list(x) or _is_dict(x) or _is_bytearray(x) or _is_plain_object(x):
+        return False
+    if _is_set(x) and not _is_frozenset(x):
+        return False
+    return True
+
+
+def _iterable(x):
+    return _is_str(x) or _has_iter(x) or _is_range(x) or _is_dict(x) or _is_set(x) or _is_plain_object(x)
+
+
+def _iterator(x):
+    return (_has_fn(x, 'next') or _has_fn(x, '__next__')) and _has_iter(x) and not _is_str(x) and not _is_array(x)
+
+
+def _reversible(x):
+    return _is_str(x) or _is_array(x) or _is_range(x) or (not _is_none(x) and v'x instanceof dict') or _has_fn(x, '__reversed__')
+
+
+def _generator(x):
+    if _is_none(x) or jstype(x) is not 'object':
+        return False
+    return Object.prototype.toString.call(x) is '[object Generator]' or (_has_fn(x, 'next') and _has_fn(x, 'throw') and _has_fn(x, 'return') and _has_iter(x))
+
+
+def _sized(x):
+    if _is_str(x) or _is_array(x) or _is_range(x) or _is_dict(x) or _is_set(x) or _is_plain_object(x) or _has_fn(x, '__len__'):
+        return True
+    return _view_kind(x) is not None
+
+
+def _container(x):
+    return _is_str(x) or _is_array(x) or _is_range(x) or _is_dict(x) or _is_set(x) or _is_plain_object(x) or _has_fn(x, '__contains__') or _view_kind(x) is not None
+
+
+def _collection(x):
+    return _sized(x) and _iterable(x) and _container(x)
+
+
+def _callable(x):
+    return jstype(x) is 'function'
+
+
+def _sequence(x):
+    return _is_str(x) or _is_array(x) or _is_range(x) or _is_bytes(x)
+
+
+def _mutable_sequence(x):
+    return _is_list(x) or _is_bytearray(x)
+
+
+def _byte_string(x):
+    return _is_bytes(x)
+
+
+def _abstract_set(x):
+    k = _view_kind(x)
+    return _is_set(x) or _is_frozenset(x) or k is 'keys' or k is 'items'
+
+
+def _mutable_set(x):
+    return _is_set(x) and not _is_frozenset(x)
+
+
+def _mapping(x):
+    return _is_dict(x) or _is_plain_object(x) or (not _is_none(x) and x.constructor and x.constructor.__name__ is 'MappingProxyType')
+
+
+def _mutable_mapping(x):
+    return _is_dict(x) or _is_plain_object(x)
+
+
+def _awaitable(x):
+    return not _is_none(x) and ((jstype(Promise) is 'function' and v'x instanceof Promise') or _has_fn(x, 'then') or _has_fn(x, '__await__'))
+
+
+def _async_iterable(x):
+    return not _is_none(x) and ((jstype(Symbol) is 'function' and Symbol.asyncIterator and jstype(x[Symbol.asyncIterator]) is 'function') or _has_fn(x, '__aiter__'))
+
+
+def _async_iterator(x):
+    return _async_iterable(x) and (_has_fn(x, '__anext__') or _has_fn(x, 'next'))
+
+
+def _async_generator(x):
+    return not _is_none(x) and jstype(x) is 'object' and Object.prototype.toString.call(x) is '[object AsyncGenerator]'
+
+
+# ---------------------------------------------------------------------------
+# Class predicates (issubclass with builtin / structural classes)
+# ---------------------------------------------------------------------------
+
+def _proto_has(c, name):
+    return jstype(c) is 'function' and c.prototype and jstype(c.prototype[name]) is 'function'
+
+
+def _cls_in(c, classes):
+    for k in classes:
+        if k and c is k:
+            return True
+    return False
+
+
+_SEQUENCES = [str, list, tuple, range, bytes, bytearray, _JSString, _JSArray]
+_MUT_SEQUENCES = [list, bytearray, _JSArray]
+_MAPPINGS = [dict, _JSMap, _JSObject]
+_SETS = [set, frozenset, _JSSet]
+_MUT_SETS = [set, _JSSet]
+_UNHASHABLE = [list, dict, set, bytearray, _JSArray, _JSMap, _JSSet, _JSObject]
+
+
+def _cls_iterable(c):
+    return _cls_in(c, _SEQUENCES) or _cls_in(c, _MAPPINGS) or _cls_in(c, _SETS) or _proto_has(c, '__iter__') or _proto_has(c, ρσ_iterator_symbol)
+
+
+def _cls_sized(c):
+    return _cls_in(c, _SEQUENCES) or _cls_in(c, _MAPPINGS) or _cls_in(c, _SETS) or _proto_has(c, '__len__')
+
+
+def _cls_container(c):
+    return _cls_in(c, _SEQUENCES) or _cls_in(c, _MAPPINGS) or _cls_in(c, _SETS) or _proto_has(c, '__contains__')
+
+
+def _cls_hashable(c):
+    if _cls_in(c, _UNHASHABLE):
+        return False
+    if jstype(c) is not 'function':
+        return False
+    return not (c.prototype and c.prototype.__hash__ is None)
+
+
+# ---------------------------------------------------------------------------
+# The ABCs
+# ---------------------------------------------------------------------------
+
+class Hashable:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Awaitable:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Coroutine(Awaitable):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class AsyncIterable:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class AsyncIterator(AsyncIterable):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def __aiter__(self):
+        return self
+
+
+class AsyncGenerator(AsyncIterator):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Iterable:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Iterator(Iterable):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        raise StopIteration()
+
+
+class Reversible(Iterable):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Generator(Iterator):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Sized:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Container:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Callable:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Collection(Sized):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+def _seq_len(self):
+    return self.__len__()
+
+
+class Sequence(Reversible):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def __iter__(self):
+        i = 0
+        while True:
+            try:
+                v = self.__getitem__(i)
+            except IndexError:
+                return
+            yield v
+            i += 1
+
+    def __contains__(self, value):
+        for v in self:
+            if v is value or v == value:
+                return True
+        return False
+
+    def __reversed__(self):
+        i = self.__len__() - 1
+        while i >= 0:
+            yield self.__getitem__(i)
+            i -= 1
+
+    def index(self, value, start=0, stop=None):
+        n = self.__len__()
+        if start < 0:
+            start = Math.max(n + start, 0)
+        if stop is None or stop is undefined:
+            stop = n
+        elif stop < 0:
+            stop += n
+        i = start
+        while i < stop:
+            try:
+                v = self.__getitem__(i)
+            except IndexError:
+                break
+            if v is value or v == value:
+                return i
+            i += 1
+        raise ValueError(repr(value) + ' is not in sequence')
+
+    def count(self, value):
+        n = 0
+        for v in self:
+            if v is value or v == value:
+                n += 1
+        return n
+
+
+class MutableSequence(Sequence):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def append(self, value):
+        self.insert(self.__len__(), value)
+
+    def clear(self):
+        try:
+            while True:
+                self.pop()
+        except IndexError:
+            pass
+
+    def reverse(self):
+        n = self.__len__()
+        for i in range(Math.floor(n / 2)):
+            a = self.__getitem__(i)
+            self.__setitem__(i, self.__getitem__(n - i - 1))
+            self.__setitem__(n - i - 1, a)
+
+    def extend(self, values):
+        if values is self:
+            values = [v for v in values]
+        for v in values:
+            self.append(v)
+
+    def pop(self, index=-1):
+        if index < 0:
+            index += self.__len__()
+        if index < 0 or index >= self.__len__():
+            raise IndexError('pop from empty list' if self.__len__() is 0 else 'pop index out of range')
+        v = self.__getitem__(index)
+        self.__delitem__(index)
+        return v
+
+    def remove(self, value):
+        self.__delitem__(self.index(value))
+
+    def __iadd__(self, values):
+        self.extend(values)
+        return self
+
+
+class ByteString(Sequence):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Set(Collection):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    @classmethod
+    def _from_iterable(cls, it):
+        return cls(it)
+
+    def __le__(self, other):
+        if not isinstance(other, Set):
+            return NotImplemented
+        if self.__len__() > len(other):
+            return False
+        for elem in self:
+            if elem not in other:
+                return False
+        return True
+
+    def __lt__(self, other):
+        if not isinstance(other, Set):
+            return NotImplemented
+        return self.__len__() < len(other) and self.__le__(other)
+
+    def __ge__(self, other):
+        if not isinstance(other, Set):
+            return NotImplemented
+        if self.__len__() < len(other):
+            return False
+        for elem in other:
+            if not self.__contains__(elem):
+                return False
+        return True
+
+    def __gt__(self, other):
+        if not isinstance(other, Set):
+            return NotImplemented
+        return self.__len__() > len(other) and self.__ge__(other)
+
+    def __eq__(self, other):
+        if not isinstance(other, Set):
+            return False
+        return self.__len__() is len(other) and self.__le__(other)
+
+    def __and__(self, other):
+        return self.constructor._from_iterable([v for v in other if self.__contains__(v)])
+
+    def __or__(self, other):
+        items = [v for v in self]
+        for v in other:
+            if not self.__contains__(v):
+                items.push(v)
+        return self.constructor._from_iterable(items)
+
+    def __sub__(self, other):
+        return self.constructor._from_iterable([v for v in self if v not in other])
+
+    def __xor__(self, other):
+        items = [v for v in self if v not in other]
+        for v in other:
+            if not self.__contains__(v):
+                items.push(v)
+        return self.constructor._from_iterable(items)
+
+    def isdisjoint(self, other):
+        for v in other:
+            if self.__contains__(v):
+                return False
+        return True
+
+
+class MutableSet(Set):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def remove(self, value):
+        if not self.__contains__(value):
+            raise KeyError(value)
+        self.discard(value)
+
+    def pop(self):
+        for v in self:
+            self.discard(v)
+            return v
+        raise KeyError('pop from an empty set')
+
+    def clear(self):
+        try:
+            while True:
+                self.pop()
+        except KeyError:
+            pass
+
+    def __ior__(self, it):
+        for v in it:
+            self.add(v)
+        return self
+
+    def __iand__(self, it):
+        for v in [x for x in self if x not in it]:
+            self.discard(v)
+        return self
+
+    def __ixor__(self, it):
+        if it is self:
+            self.clear()
+            return self
+        for v in it:
+            if self.__contains__(v):
+                self.discard(v)
+            else:
+                self.add(v)
+        return self
+
+    def __isub__(self, it):
+        if it is self:
+            self.clear()
+            return self
+        for v in it:
+            self.discard(v)
+        return self
+
+
+class Mapping(Collection):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def get(self, key, dflt=None):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return dflt
+
+    def __contains__(self, key):
+        try:
+            self.__getitem__(key)
+        except KeyError:
+            return False
+        return True
+
+    def keys(self):
+        return [k for k in self]
+
+    def items(self):
+        return [(k, self.__getitem__(k)) for k in self]
+
+    def values(self):
+        return [self.__getitem__(k) for k in self]
+
+    def __eq__(self, other):
+        if not isinstance(other, Mapping):
+            return False
+        if self.__len__() is not len(other):
+            return False
+        for k in self:
+            if not (k in other):
+                return False
+            ov = other.__getitem__(k) if jstype(other.__getitem__) is 'function' else other[k]
+            if ov != self.__getitem__(k):
+                return False
+        return True
+
+
+class MutableMapping(Mapping):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def pop(self, key, *args):
+        try:
+            value = self.__getitem__(key)
+        except KeyError:
+            if args.length:
+                return args[0]
+            raise
+        self.__delitem__(key)
+        return value
+
+    def popitem(self):
+        for key in self:
+            value = self.__getitem__(key)
+            self.__delitem__(key)
+            return (key, value)
+        raise KeyError('popitem(): dictionary is empty')
+
+    def clear(self):
+        try:
+            while True:
+                self.popitem()
+        except KeyError:
+            pass
+
+    def update(self, other=None, **kwds):
+        if other is not None and other is not undefined:
+            if jstype(other.keys) is 'function':
+                for key in other.keys():
+                    self.__setitem__(key, other.__getitem__(key) if jstype(other.__getitem__) is 'function' else other[key])
+            elif _is_plain_object(other):
+                for key in Object.keys(other):
+                    self.__setitem__(key, other[key])
+            else:
+                for pair in other:
+                    self.__setitem__(pair[0], pair[1])
+        for key in Object.keys(kwds):
+            self.__setitem__(key, kwds[key])
+
+    def setdefault(self, key, dflt=None):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            self.__setitem__(key, dflt)
+        return dflt
+
+
+class MappingView(Sized):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def __init__(self, mapping):
+        self._mapping = mapping
+
+    def __len__(self):
+        return len(self._mapping)
+
+
+class KeysView(MappingView):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def __iter__(self):
+        for k in self._mapping:
+            yield k
+
+    def __contains__(self, key):
+        return key in self._mapping
+
+
+class ItemsView(MappingView):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def __iter__(self):
+        for k in self._mapping:
+            yield (k, self._mapping.__getitem__(k))
+
+
+class ValuesView(MappingView):
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+    def __iter__(self):
+        for k in self._mapping:
+            yield self._mapping.__getitem__(k)
+
+
+# ---------------------------------------------------------------------------
+# Wiring: virtual parents (Python's multiple inheritance), predicates and
+# registrations of library classes.
+# ---------------------------------------------------------------------------
+
+set_parents(Coroutine, [Awaitable])
+set_parents(Collection, [Sized, Iterable, Container])
+set_parents(Sequence, [Reversible, Collection])
+set_parents(Set, [Collection])
+set_parents(Mapping, [Collection])
+set_parents(KeysView, [MappingView, Set])
+set_parents(ItemsView, [MappingView, Set])
+set_parents(ValuesView, [MappingView, Collection])
+
+set_predicates(Hashable, _hashable, _cls_hashable)
+set_predicates(Awaitable, _awaitable, def(c): return c is _JSPromise or _proto_has(c, '__await__') or _proto_has(c, 'then');)
+set_predicates(Coroutine, _awaitable, def(c): return c is _JSPromise;)
+set_predicates(AsyncIterable, _async_iterable, def(c): return _proto_has(c, '__aiter__');)
+set_predicates(AsyncIterator, _async_iterator, def(c): return _proto_has(c, '__aiter__') and _proto_has(c, '__anext__');)
+set_predicates(AsyncGenerator, _async_generator, def(c): return False;)
+set_predicates(Iterable, _iterable, _cls_iterable)
+set_predicates(Iterator, _iterator, def(c): return (_proto_has(c, '__next__') or _proto_has(c, 'next')) and _cls_iterable(c);)
+set_predicates(Reversible, _reversible, def(c): return _cls_in(c, [str, list, tuple, range, dict, bytes, bytearray, _JSArray, _JSString]) or (_proto_has(c, '__reversed__') and _cls_iterable(c));)
+set_predicates(Generator, _generator, def(c): return False;)
+set_predicates(Sized, _sized, _cls_sized)
+set_predicates(Container, _container, _cls_container)
+set_predicates(Callable, _callable, def(c): return _proto_has(c, '__call__');)
+set_predicates(Collection, _collection, def(c): return _cls_sized(c) and _cls_iterable(c) and _cls_container(c);)
+set_predicates(Sequence, _sequence, def(c): return _cls_in(c, _SEQUENCES);)
+set_predicates(MutableSequence, _mutable_sequence, def(c): return _cls_in(c, _MUT_SEQUENCES);)
+set_predicates(ByteString, _byte_string, def(c): return c is bytes or c is bytearray;)
+set_predicates(Set, _abstract_set, def(c): return _cls_in(c, _SETS);)
+set_predicates(MutableSet, _mutable_set, def(c): return _cls_in(c, _MUT_SETS);)
+set_predicates(Mapping, _mapping, def(c): return _cls_in(c, _MAPPINGS) or c.__name__ is 'MappingProxyType';)
+set_predicates(MutableMapping, _mutable_mapping, def(c): return _cls_in(c, _MAPPINGS);)
+set_predicates(MappingView, def(x): return _view_kind(x) is not None;, def(c): return False;)
+set_predicates(KeysView, def(x): return _view_kind(x) is 'keys';, def(c): return False;)
+set_predicates(ItemsView, def(x): return _view_kind(x) is 'items';, def(c): return False;)
+set_predicates(ValuesView, def(x): return _view_kind(x) is 'values';, def(c): return False;)
+
+MutableSequence.register(deque)
+MutableMapping.register(ChainMap)

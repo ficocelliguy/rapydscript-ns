@@ -625,7 +625,7 @@ var TESTS = [
         js_checks: [
             "Animal.__name__ = \"Animal\"",
             "Animal.__qualname__ = \"Animal\"",
-            "Animal.__module__ =",
+            'Object.defineProperty(Animal, "__module__"',
             'Object.defineProperty(Animal.prototype, "__class__"',
         ],
     },
@@ -1741,7 +1741,7 @@ assrt.equal(fib(15), 610)
             "assrt.equal(d.name, 'Rex')",
             "assrt.equal(d.breed, 'Labrador')",
         ].join("\n"),
-        js_checks: [/Animal\.prototype\.__init__\.call\(this/],
+        js_checks: [/ρσ_super_method\(Dog, this, "__init__", Animal\.prototype\.__init__\)\.call\(this/],
     },
 
     {
@@ -1758,7 +1758,7 @@ assrt.equal(fib(15), 610)
             "c = Child()",
             "assrt.equal(c.greet(), 'Hello World')",
         ].join("\n"),
-        js_checks: [/Base\.prototype\.greet\.call\(this/],
+        js_checks: [/ρσ_super_method\(Child, this, "greet", Base\.prototype\.greet\)\.call\(this/],
     },
 
     {
@@ -1775,7 +1775,7 @@ assrt.equal(fib(15), 610)
             "la = LoggingAdder()",
             "assrt.equal(la.add(3, 4), 7)",
         ].join("\n"),
-        js_checks: [/Adder\.prototype\.add\.call\(this/],
+        js_checks: [/ρσ_super_method\(LoggingAdder, this, "add", Adder\.prototype\.add\)\.call\(this/],
     },
 
     {
@@ -1792,7 +1792,7 @@ assrt.equal(fib(15), 610)
             "b = B()",
             "assrt.equal(b.val(), 'AB')",
         ].join("\n"),
-        js_checks: [/A\.prototype\.val\.call\(this/],
+        js_checks: [/ρσ_super_method\(B, this, "val", A\.prototype\.val\)\.call\(this/],
     },
 
     {
@@ -1982,7 +1982,7 @@ assrt.equal(fib(15), 610)
             "print('hello')",
             "print(1, 2, 3)",
         ].join("\n"),
-        js_checks: ["console.log(ρσ_str(\"hello\"))", "console.log(ρσ_str(1), ρσ_str(2), ρσ_str(3))"],
+        js_checks: ["console.log(ρσ_print_flush(ρσ_str(\"hello\")))", "console.log(ρσ_print_flush(ρσ_str(1) + \" \" + ρσ_str(2) + \" \" + ρσ_str(3)))"],
     },
 
     {
@@ -2028,7 +2028,7 @@ assrt.equal(fib(15), 610)
             "print('test')",
         ].join("\n"),
         // The compiled JS must NOT contain 'var print = ' (which would overwrite window.print)
-        js_checks: [/console\.log\(ρσ_str\("test"\)\)/],
+        js_checks: [/console\.log\(ρσ_print_flush\(ρσ_str\("test"\)\)\)/],
     },
 
     {
@@ -2499,8 +2499,8 @@ assrt.equal(fib(15), 610)
             "od['c'] = 3",
             "assrt.equal(od['a'], 1)",
             "assrt.equal(od['b'], 2)",
-            "assrt.deepEqual(od.keys(), ['a', 'b', 'c'])",
-            "assrt.deepEqual(od.values(), [1, 2, 3])",
+            "assrt.deepEqual(list(od.keys()), ['a', 'b', 'c'])",
+            "assrt.deepEqual(list(od.values()), [1, 2, 3])",
         ].join("\n"),
         js_checks: [],
     },
@@ -2526,9 +2526,9 @@ assrt.equal(fib(15), 610)
             "od2['y'] = 20",
             "od2['z'] = 30",
             "od2.move_to_end('x')",
-            "assrt.deepEqual(od2.keys(), ['y', 'z', 'x'])",
+            "assrt.deepEqual(list(od2.keys()), ['y', 'z', 'x'])",
             "od2.move_to_end('x', last=False)",
-            "assrt.deepEqual(od2.keys(), ['x', 'y', 'z'])",
+            "assrt.deepEqual(list(od2.keys()), ['x', 'y', 'z'])",
         ].join("\n"),
         js_checks: [],
     },
@@ -5648,7 +5648,7 @@ assrt.equal(fib(15), 610)
 
     {
         name: "with_statement_scope_declared",
-        description: "with statement ρσ_with_exception/ρσ_with_suppress are scope-declared (not implicit globals)",
+        description: "with statement temporaries are declared (not implicit globals)",
         src: [
             "# globals: assrt",
             "class CM:",
@@ -5665,7 +5665,7 @@ assrt.equal(fib(15), 610)
             "    assrt.ok(c.entered)",
             "assrt.ok(c.exited)",
         ].join("\n"),
-        js_checks: [/let\s[^;]*ρσ_with_exception/, /let\s[^;]*ρσ_with_suppress/],
+        js_checks: [/var ρσ_with_exception_\d+ = undefined/, /let\s[^;]*ρσ_with_suppress/],
     },
 
     // ── BigInt literals ────────────────────────────────────────────────────
@@ -7236,8 +7236,27 @@ assrt.equal(fib(15), 610)
         js_checks: [
             "await ρσ_with_clause_1.__aenter__()",
             "await ρσ_with_clause_1.__aexit__()",
-            "await ρσ_with_clause_1.__aexit__(ρσ_with_exception.constructor",
+            "await ρσ_with_clause_1.__aexit__(ρσ_with_exception_1.constructor",
         ],
+    },
+
+    {
+        name: "await_in_comprehension",
+        description: "a comprehension containing await runs in an awaited async function",
+        src: [
+            "# globals: assrt",
+            "async def double(i):",
+            "    return i * 2",
+            "async def _main():",
+            "    values = [await double(i) for i in range(3)]",
+            "    assrt.deepEqual(values, [0, 2, 4])",
+            "    mapping = {i: await double(i) for i in range(2)}",
+            "    assrt.equal(mapping[1], 2)",
+            "    nested = [x for x in [await double(5)]]",
+            "    assrt.deepEqual(nested, [10])",
+            "v'globalThis.__done__ = _main();'",
+        ].join("\n"),
+        js_checks: ["(await (async function()"],
     },
 
     {

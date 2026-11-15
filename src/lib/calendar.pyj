@@ -1,0 +1,335 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'calendar' module (text output).
+#
+# Supported:
+#   isleap, leapdays, weekday, monthrange, monthcalendar, timegm,
+#   setfirstweekday, firstweekday, month, prmonth, calendar, prcal,
+#   weekheader, month_name, month_abbr, day_name, day_abbr,
+#   MONDAY..SUNDAY, JANUARY..DECEMBER,
+#   Calendar (iterweekdays, itermonthdays, itermonthdays2, itermonthdays3,
+#   monthdayscalendar, monthdays2calendar, yeardayscalendar,
+#   yeardays2calendar), TextCalendar (formatmonth, prmonth, formatyear,
+#   pryear, formatweekheader, ...), IllegalMonthError, IllegalWeekdayError
+#
+# Not supported: HTMLCalendar, LocaleTextCalendar/LocaleHTMLCalendar,
+# itermonthdates() (would need datetime.date objects).  Names are English.
+#
+# month_name / month_abbr have '' at index 0, as in Python.
+
+MONDAY = 0
+TUESDAY = 1
+WEDNESDAY = 2
+THURSDAY = 3
+FRIDAY = 4
+SATURDAY = 5
+SUNDAY = 6
+
+JANUARY = 1
+FEBRUARY = 2
+MARCH = 3
+APRIL = 4
+MAY = 5
+JUNE = 6
+JULY = 7
+AUGUST = 8
+SEPTEMBER = 9
+OCTOBER = 10
+NOVEMBER = 11
+DECEMBER = 12
+
+day_name = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+day_abbr = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+month_name = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July',
+              'August', 'September', 'October', 'November', 'December']
+month_abbr = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+mdays = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+
+class IllegalMonthError(ValueError):
+
+    def __init__(self, month):
+        self.month = month
+        ValueError.__init__(self, 'bad month number ' + month + '; must be 1-12')
+
+    def __str__(self):
+        return 'bad month number ' + self.month + '; must be 1-12'
+
+
+class IllegalWeekdayError(ValueError):
+
+    def __init__(self, weekday):
+        self.weekday = weekday
+        ValueError.__init__(self, 'bad weekday number ' + weekday + '; must be 0 (Monday) to 6 (Sunday)')
+
+    def __str__(self):
+        return 'bad weekday number ' + self.weekday + '; must be 0 (Monday) to 6 (Sunday)'
+
+
+def _check_month(month):
+    if not (1 <= month <= 12):
+        raise IllegalMonthError(month)
+
+
+def isleap(year):
+    return year % 4 is 0 and (year % 100 is not 0 or year % 400 is 0)
+
+
+def leapdays(y1, y2):
+    y1 -= 1
+    y2 -= 1
+    return (Math.floor(y2 / 4) - Math.floor(y1 / 4)) - (Math.floor(y2 / 100) - Math.floor(y1 / 100)) + (Math.floor(y2 / 400) - Math.floor(y1 / 400))
+
+
+def _utc_ms(year, month, day):
+    d = v'new Date(Date.UTC(2000, month - 1, day))'
+    d.setUTCFullYear(year)  # Date.UTC maps years 0-99 to 1900-1999
+    return d.getTime()
+
+
+def weekday(year, month, day):
+    if not (1 <= year <= 9999):
+        year = 2000 + year % 400
+    return (v'new Date(_utc_ms(year, month, day))'.getUTCDay() + 6) % 7
+
+
+def monthrange(year, month):
+    _check_month(month)
+    day1 = weekday(year, month, 1)
+    ndays = mdays[month] + (1 if month is FEBRUARY and isleap(year) else 0)
+    return (day1, ndays)
+
+
+def _monthlen(year, month):
+    return mdays[month] + (1 if month is FEBRUARY and isleap(year) else 0)
+
+
+def timegm(t):
+    year, month, day, hour, minute, second = t[0], t[1], t[2], t[3], t[4], t[5]
+    days = Math.round(_utc_ms(year, month, 1) / 86400000) + day - 1
+    return ((days * 24 + hour) * 60 + minute) * 60 + second
+
+
+def _center(s, width):
+    # Same padding split as CPython's str.center
+    marg = width - s.length
+    if marg <= 0:
+        return s
+    left = Math.floor(marg / 2) + (marg & width & 1)
+    return ' '.repeat(left) + s + ' '.repeat(marg - left)
+
+
+def _rstrip(s):
+    return s.replace(/\s+$/, '')
+
+
+class Calendar:
+
+    def __init__(self, firstweekday=0):
+        self._firstweekday = firstweekday % 7
+
+    def getfirstweekday(self):
+        return self._firstweekday % 7
+
+    def setfirstweekday(self, firstweekday):
+        if not (MONDAY <= firstweekday <= SUNDAY):
+            raise IllegalWeekdayError(firstweekday)
+        self._firstweekday = firstweekday
+
+    def iterweekdays(self):
+        return [(i % 7) for i in range(self._firstweekday, self._firstweekday + 7)]
+
+    def itermonthdays2(self, year, month):
+        # (day, weekday) pairs for complete weeks; day is 0 outside the month
+        _check_month(month)
+        day1, ndays = monthrange(year, month)
+        days_before = ((day1 - self._firstweekday) % 7 + 7) % 7
+        ans = []
+        wd = self._firstweekday
+        for i in range(days_before):
+            ans.push((0, wd % 7))
+            wd += 1
+        for d in range(1, ndays + 1):
+            ans.push((d, wd % 7))
+            wd += 1
+        days_after = (self._firstweekday - day1 - ndays) % 7
+        days_after = (days_after + 7) % 7
+        for i in range(days_after):
+            ans.push((0, wd % 7))
+            wd += 1
+        return ans
+
+    def itermonthdays(self, year, month):
+        return [p[0] for p in self.itermonthdays2(year, month)]
+
+    def itermonthdays3(self, year, month):
+        _check_month(month)
+        day1, ndays = monthrange(year, month)
+        days_before = ((day1 - self._firstweekday) % 7 + 7) % 7
+        days_after = ((self._firstweekday - day1 - ndays) % 7 + 7) % 7
+        py, pm = (year - 1, 12) if month is 1 else (year, month - 1)
+        ny, nm = (year + 1, 1) if month is 12 else (year, month + 1)
+        plen = _monthlen(py, pm)
+        ans = []
+        for d in range(plen - days_before + 1, plen + 1):
+            ans.push((py, pm, d))
+        for d in range(1, ndays + 1):
+            ans.push((year, month, d))
+        for d in range(1, days_after + 1):
+            ans.push((ny, nm, d))
+        return ans
+
+    def itermonthdays4(self, year, month):
+        ans = []
+        for i, t in enumerate(self.itermonthdays3(year, month)):
+            ans.push((t[0], t[1], t[2], (self._firstweekday + i) % 7))
+        return ans
+
+    def monthdays2calendar(self, year, month):
+        days = self.itermonthdays2(year, month)
+        return [days.slice(i, i + 7) for i in range(0, days.length, 7)]
+
+    def monthdayscalendar(self, year, month):
+        days = self.itermonthdays(year, month)
+        return [days.slice(i, i + 7) for i in range(0, days.length, 7)]
+
+    def yeardays2calendar(self, year, width=3):
+        months = [self.monthdays2calendar(year, m) for m in range(JANUARY, JANUARY + 12)]
+        return [months.slice(i, i + width) for i in range(0, 12, width)]
+
+    def yeardayscalendar(self, year, width=3):
+        months = [self.monthdayscalendar(year, m) for m in range(JANUARY, JANUARY + 12)]
+        return [months.slice(i, i + width) for i in range(0, 12, width)]
+
+
+Object.defineProperty(Calendar.prototype, 'firstweekday', {
+    'get': def(): return this._firstweekday % 7;,
+    'set': def(val): this.setfirstweekday(val);,
+    'configurable': True,
+})
+
+
+class TextCalendar(Calendar):
+
+    def formatday(self, day, wd, width):
+        s = '' if day is 0 else (' ' + day if day < 10 else day + '')
+        return _center(s, width)
+
+    def formatweek(self, theweek, width):
+        return [self.formatday(p[0], p[1], width) for p in theweek].join(' ')
+
+    def formatweekday(self, day, width):
+        names = day_name if width >= 9 else day_abbr
+        return _center(names[day].slice(0, width), width)
+
+    def formatweekheader(self, width):
+        return [self.formatweekday(i, width) for i in self.iterweekdays()].join(' ')
+
+    def formatmonthname(self, theyear, themonth, width, withyear=True):
+        s = month_name[themonth]
+        if withyear:
+            s = s + ' ' + theyear
+        return _center(s, width)
+
+    def prweek(self, theweek, width):
+        print(self.formatweek(theweek, width), end='')
+
+    def formatmonth(self, theyear, themonth, w=0, l=0):
+        w = Math.max(2, w)
+        l = Math.max(1, l)
+        nl = '\n'.repeat(l)
+        s = _rstrip(self.formatmonthname(theyear, themonth, 7 * (w + 1) - 1))
+        s += nl
+        s += _rstrip(self.formatweekheader(w))
+        s += nl
+        for week in self.monthdays2calendar(theyear, themonth):
+            s += _rstrip(self.formatweek(week, w))
+            s += nl
+        return s
+
+    def prmonth(self, theyear, themonth, w=0, l=0):
+        print(self.formatmonth(theyear, themonth, w, l), end='')
+
+    def formatyear(self, theyear, w=2, l=1, c=6, m=3):
+        w = Math.max(2, w)
+        l = Math.max(1, l)
+        c = Math.max(2, c)
+        nl = '\n'.repeat(l)
+        colwidth = (w + 1) * 7 - 1
+        spacing = ' '.repeat(c)
+
+        def formatstring(cols):
+            return [_center(col, colwidth) for col in cols].join(spacing)
+
+        out = []
+        out.push(_rstrip(_center(theyear + '', colwidth * m + c * (m - 1))))
+        out.push(nl)
+        header = self.formatweekheader(w)
+        for i, row in enumerate(self.yeardays2calendar(theyear, m)):
+            months = range(m * i + 1, Math.min(m * (i + 1) + 1, 13))
+            out.push(nl)
+            out.push(_rstrip(formatstring([self.formatmonthname(theyear, k, colwidth, False) for k in months])))
+            out.push(nl)
+            out.push(_rstrip(formatstring([header for k in months])))
+            out.push(nl)
+            height = 0
+            for cal in row:
+                height = Math.max(height, cal.length)
+            for j in range(height):
+                weeks = []
+                for cal in row:
+                    weeks.push('' if j >= cal.length else self.formatweek(cal[j], w))
+                out.push(_rstrip(formatstring(weeks)))
+                out.push(nl)
+        return out.join('')
+
+    def pryear(self, theyear, w=0, l=0, c=6, m=3):
+        print(self.formatyear(theyear, w, l, c, m), end='')
+
+
+_cal = TextCalendar()  # the module-level calendar used by the functions below
+
+
+def firstweekday():
+    return _cal.getfirstweekday()
+
+
+def setfirstweekday(firstweekday):
+    if not (MONDAY <= firstweekday <= SUNDAY):
+        raise IllegalWeekdayError(firstweekday)
+    _cal._firstweekday = firstweekday
+
+
+def monthcalendar(year, month):
+    return _cal.monthdayscalendar(year, month)
+
+
+def prweek(theweek, width):
+    _cal.prweek(theweek, width)
+
+
+def week(theweek, width):
+    return _cal.formatweek(theweek, width)
+
+
+def weekheader(width):
+    return _cal.formatweekheader(width)
+
+
+def prmonth(theyear, themonth, w=0, l=0):
+    _cal.prmonth(theyear, themonth, w, l)
+
+
+def month(theyear, themonth, w=0, l=0):
+    return _cal.formatmonth(theyear, themonth, w, l)
+
+
+def calendar(theyear, w=2, l=1, c=6, m=3):
+    return _cal.formatyear(theyear, w, l, c, m)
+
+
+def prcal(theyear, w=0, l=0, c=6, m=3):
+    _cal.pryear(theyear, w, l, c, m)

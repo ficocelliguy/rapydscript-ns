@@ -1,0 +1,160 @@
+# globals: assrt
+#
+# Python's builtin exception hierarchy, str()/repr() of exceptions, and the
+# NotImplemented singleton.
+
+from __python__ import overload_operators
+
+ae = assrt.equal
+ok = assrt.ok
+
+# ── the hierarchy ──────────────────────────────────────────────────────────
+ok(issubclass(Exception, BaseException))
+ok(issubclass(ZeroDivisionError, ArithmeticError))
+ok(issubclass(OverflowError, ArithmeticError))
+ok(issubclass(NotImplementedError, RuntimeError))
+ok(issubclass(RecursionError, RuntimeError))
+ok(issubclass(FileNotFoundError, OSError))
+ok(issubclass(BrokenPipeError, ConnectionError))
+ok(issubclass(ConnectionError, OSError))
+ok(issubclass(UnicodeDecodeError, UnicodeError))
+ok(issubclass(UnicodeError, ValueError))
+ok(issubclass(DeprecationWarning, Warning))
+ok(issubclass(KeyError, LookupError))
+ok(not issubclass(SystemExit, Exception))
+ok(IOError is OSError)
+ok(EnvironmentError is OSError)
+ae(NotImplementedError.__name__, 'NotImplementedError')
+ae(NotImplementedError('x').name, 'NotImplementedError')
+
+# Calling a class built by the factory without `new` still constructs it.
+err = FileNotFoundError('missing.txt')
+ok(isinstance(err, FileNotFoundError))
+ok(isinstance(err, OSError))
+ok(isinstance(err, Exception))
+ae(type(err).__name__, 'FileNotFoundError')
+
+# ── raising and catching ──────────────────────────────────────────────────
+caught = None
+try:
+    raise NotImplementedError('todo')
+except RuntimeError as e:
+    caught = e
+ok(isinstance(caught, NotImplementedError))
+ae(str(caught), 'todo')
+
+# `raise Cls` raises an instance
+caught = None
+try:
+    raise StopIteration
+except StopIteration as e:
+    caught = e
+ok(isinstance(caught, StopIteration))
+
+# `except Exception` lets SystemExit / KeyboardInterrupt / GeneratorExit through
+order = []
+try:
+    try:
+        raise SystemExit(3)
+    except Exception:
+        order.push('Exception')
+except BaseException as e:
+    order.push('BaseException')
+    ae(e.args[0], 3)
+ae(order.join(','), 'BaseException')
+
+# ...but still catches errors thrown by the JS runtime
+caught = None
+try:
+    v'null.foo'
+except Exception as e:
+    caught = e
+ok(caught is not None)
+
+# stack overflow is a RecursionError
+def recurse(n):
+    return recurse(n + 1)
+caught = None
+try:
+    recurse(0)
+except RecursionError:
+    caught = 'RecursionError'
+ae(caught, 'RecursionError')
+
+# ── str() / repr() ────────────────────────────────────────────────────────
+ae(str(ValueError('bad')), 'bad')
+ae(str(ValueError()), '')
+ae(str(ValueError('bad', 2)), "('bad', 2)")
+ae(repr(ValueError('bad')), "ValueError('bad')")
+ae(repr(ValueError()), 'ValueError()')
+ae(repr(OSError(2, 'nope')), "OSError(2, 'nope')")
+ae(str(KeyError('k')), "'k'")
+ae(f'{ValueError("in f-string")}', 'in f-string')
+ae(repr(ValueError('a').args), "('a',)")
+ae(str(ExceptionGroup('many', [ValueError(1), KeyError(2)])), 'many (2 sub-exceptions)')
+
+class AppError(Exception):
+    def __init__(self, code):
+        super().__init__(f'failed with {code}')
+        self.code = code
+
+e = AppError(7)
+ae(str(e), 'failed with 7')
+ae(e.code, 7)
+ae(repr(e), "AppError('failed with 7')")
+
+# native JS errors read like their Python counterparts
+try:
+    undefined_name_for_test
+except NameError as e:
+    ae(type(e).__name__, 'NameError')
+    ok(str(e).indexOf('undefined_name_for_test') >= 0)
+    ok(str(e).indexOf('ReferenceError') < 0)
+
+# ── NotImplemented ────────────────────────────────────────────────────────
+ae(repr(NotImplemented), 'NotImplemented')
+
+class Money:
+    def __init__(self, cents):
+        self.cents = cents
+    def __add__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        return Money(self.cents + other.cents)
+    def __radd__(self, other):
+        if other is 0:  # lets sum() start from 0
+            return self
+        return NotImplemented
+    def __eq__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        return self.cents is other.cents
+
+ae((Money(1) + Money(2)).cents, 3)
+ae((0 + Money(5)).cents, 5)
+ok(Money(4) == Money(4))
+ok(not (Money(4) == 4))
+caught = None
+try:
+    Money(1) + 'x'
+except TypeError as e:
+    caught = str(e)
+ok(caught is not None and caught.indexOf('unsupported operand') >= 0)
+
+# ── stdlib modules raise the builtin RuntimeError, not a private copy ──────
+from contextlib import contextmanager
+import asyncio
+ok(asyncio.RuntimeError is RuntimeError)
+
+@contextmanager
+def never_yields():
+    if False:
+        yield
+
+caught = None
+try:
+    with never_yields():
+        pass
+except RuntimeError as e:
+    caught = str(e)
+ae(caught, 'generator did not yield')

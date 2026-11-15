@@ -2,7 +2,7 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-from ast import AST_ClassCall, AST_New, has_calls, AST_Dot, AST_SymbolRef, AST_String, is_node_type
+from ast import AST_ClassCall, AST_New, AST_Method, has_calls, refers_to, AST_Dot, AST_SymbolRef, AST_String, is_node_type
 from output.stream import OutputStream
 from parse import parse as ρσ_rs_parse
 from output.statements import print_bracketed
@@ -52,6 +52,9 @@ def function_preamble(node, output, offset):
         return
     # If this function has optional parameters/*args/**kwargs declare it differently
     fname = node.name.name if node.name else anonfunc
+    # How the body refers to its own function object (for __defaults__): an
+    # unnamed function expression has no own name binding, but ρσ_anonfunc.
+    fref = anonfunc if node.emit_unnamed or not node.name else node.name.name
     kw = 'arguments[arguments.length-1]'
 
     # === Type enforcement: max positional-arg count check ===
@@ -83,13 +86,13 @@ def function_preamble(node, output, offset):
                 if not arg.kwonly:
                     miss_msg = fname + '() missing required positional argument: \'' + arg.name + '\''
                     output.indent()
-                    output.print('if (' + arg.name + ' === undefined) throw new TypeError(' + JSON.stringify(miss_msg) + ')')
+                    output.print('if (' + output.make_name(arg.name) + ' === undefined) throw new TypeError(' + JSON.stringify(miss_msg) + ')')
                     output.end_statement()
                 if arg.annotation:
                     annot_name = arg.annotation.name or ''
                     type_msg = fname + '() argument \'' + arg.name + '\' must be ' + annot_name
                     output.indent()
-                    output.print('if (' + arg.name + ' !== undefined && !ρσ_instanceof(' + arg.name + ', ')
+                    output.print('if (' + output.make_name(arg.name) + ' !== undefined && !ρσ_type_check(' + output.make_name(arg.name) + ', ')
                     arg.annotation.print(output)
                     output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ')')
                     output.end_statement()
@@ -120,7 +123,7 @@ def function_preamble(node, output, offset):
             if arg.kwonly:
                 # Keyword-only params: initialize from defaults or undefined; read from kwargs later
                 if Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
-                    output.print(fname + '.__defaults__.'), arg.print(output)
+                    output.print(fref + '.__defaults__.' + arg.name)
                 else:
                     output.print('undefined')
             else:
@@ -129,7 +132,7 @@ def function_preamble(node, output, offset):
                     output.spaced('(arguments[' + i + ']', '===', 'undefined', '||',
                                     '(', i, '===', 'arguments.length-1', '&&', kw, '!==', 'null', '&&', 'typeof', kw, '===', '"object"', '&&',
                                     kw, '[ρσ_kwargs_symbol]', '===', 'true))', '?', '')
-                    output.print(fname + '.__defaults__.'), arg.print(output)
+                    output.print(fref + '.__defaults__.' + arg.name)
                     output.space(), output.print(':'), output.space()
                     output.print('arguments[' + i + ']')
                 else:
@@ -137,9 +140,9 @@ def function_preamble(node, output, offset):
                                     kw, '[ρσ_kwargs_symbol]', '===', 'true)', '?', 'undefined', ':', '')
                     output.print('arguments[' + i + ']')
             output.end_statement()
-    if a.kwargs or a.has_defaults or a.bare_star:
+    if a.kwargs or a.has_defaults or a.bare_star or a.kwonly_count:
         # Look for an options object
-        kw = a.kwargs.name if a.kwargs else 'ρσ_kwargs_obj'
+        kw = output.make_name(a.kwargs.name) if a.kwargs else 'ρσ_kwargs_obj'
         output.indent()
         output.spaced('var', kw, '=', 'arguments[arguments.length-1]')
         output.end_statement()
@@ -186,7 +189,7 @@ def function_preamble(node, output, offset):
                 output.spaced('if', '(Object.prototype.hasOwnProperty.call(' + kw + ',', '"' + dname + '"))')
                 output.with_block(def():
                     output.indent()
-                    output.spaced(dname, '=', kw + '.' + dname)
+                    output.spaced(output.make_name(dname), '=', kw + '.' + dname)
                     output.end_statement()
                     if a.kwargs:
                         output.indent()
@@ -195,7 +198,7 @@ def function_preamble(node, output, offset):
                 )
                 output.newline()
         # Read keyword-only params from the kwargs object (with or without defaults)
-        if a.bare_star:
+        if a.bare_star or a.kwonly_count:
             for arg in a:
                 if not arg.kwonly:
                     continue
@@ -204,7 +207,7 @@ def function_preamble(node, output, offset):
                 output.spaced('if', '(Object.prototype.hasOwnProperty.call(' + kw + ',', '"' + aname + '"))')
                 output.with_block(def():
                     output.indent()
-                    output.spaced(aname, '=', kw + '.' + aname)
+                    output.spaced(output.make_name(aname), '=', kw + '.' + aname)
                     output.end_statement()
                     if a.kwargs:
                         output.indent()
@@ -238,13 +241,18 @@ def function_preamble(node, output, offset):
 
     if a.starargs is not undefined:
         # Define the *args parameter, putting in whatever is left after assigning the formal parameters and the options object
-        nargs = a.length - offset
+        # (keyword-only params, which follow *args, take no positional slot)
+        nargs = 0
+        for c, arg in enumerate(a):
+            if c >= offset and not arg.kwonly:
+                nargs += 1
         output.indent()
-        output.spaced('var', a.starargs.name, '=', 'Array.prototype.slice.call(arguments,', nargs + ')')
+        # *args is a tuple, as in Python
+        output.spaced('var', output.make_name(a.starargs.name), '=', 'ρσ_tuple_decorate(Array.prototype.slice.call(arguments,', nargs + '))')
         output.end_statement()
         # Remove the options object, if present
         output.indent()
-        output.spaced('if', '(' + kw, '!==', 'null', '&&', 'typeof', kw, '===', '"object"', '&&', kw, '[ρσ_kwargs_symbol]', '===', 'true)', a.starargs.name)
+        output.spaced('if', '(' + kw, '!==', 'null', '&&', 'typeof', kw, '===', '"object"', '&&', kw, '[ρσ_kwargs_symbol]', '===', 'true)', output.make_name(a.starargs.name))
         output.print('.pop()')
         output.end_statement()
 
@@ -270,7 +278,7 @@ def function_preamble(node, output, offset):
             if not Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
                 miss_msg = fname + '() missing required positional argument: \'' + arg.name + '\''
                 output.indent()
-                output.print('if (' + arg.name + ' === undefined) throw new TypeError(' + JSON.stringify(miss_msg) + ')')
+                output.print('if (' + output.make_name(arg.name) + ' === undefined) throw new TypeError(' + JSON.stringify(miss_msg) + ')')
                 output.end_statement()
         # Required keyword-only args (no default)
         for c, arg in enumerate(a):
@@ -279,7 +287,7 @@ def function_preamble(node, output, offset):
             if not Object.prototype.hasOwnProperty.call(a.defaults, arg.name):
                 miss_kw = fname + '() missing required keyword-only argument: \'' + arg.name + '\''
                 output.indent()
-                output.print('if (' + arg.name + ' === undefined) throw new TypeError(' + JSON.stringify(miss_kw) + ')')
+                output.print('if (' + output.make_name(arg.name) + ' === undefined) throw new TypeError(' + JSON.stringify(miss_kw) + ')')
                 output.end_statement()
         # Type annotation checks (skip *args and **kwargs)
         for c, arg in enumerate(a):
@@ -290,7 +298,7 @@ def function_preamble(node, output, offset):
             annot_name = arg.annotation.name or ''
             type_msg = fname + '() argument \'' + arg.name + '\' must be ' + annot_name
             output.indent()
-            output.print('if (' + arg.name + ' !== undefined && !ρσ_instanceof(' + arg.name + ', ')
+            output.print('if (' + output.make_name(arg.name) + ' !== undefined && !ρσ_type_check(' + output.make_name(arg.name) + ', ')
             arg.annotation.print(output)
             output.print(')) throw new TypeError(' + JSON.stringify(type_msg) + ')')
             output.end_statement()
@@ -304,7 +312,7 @@ def has_annotations(self):
     return False
 
 def function_annotation(self, output, strip_first, name):
-    fname = name or (self.name.name if self.name else anonfunc)
+    fname = name or (output.make_name(self.name.name) if self.name else anonfunc)
     props = Object.create(None)
 
     # Create __annotations__
@@ -372,6 +380,16 @@ def function_annotation(self, output, strip_first, name):
     props.__module__ = def():
         output.print(module_name)
 
+    # __name__ (writable, as functools.wraps assigns it)
+    pyname = self.name.name if self.name and self.name.name else '<lambda>'
+    props.__name__ = def():
+        output.print(JSON.stringify(pyname) + ', writable: true, configurable: true')
+
+    # Methods take self as `this`; property() and friends check this marker
+    if strip_first:
+        props.ρσ_self_is_this = def():
+            output.print('true')
+
     names = Object.keys(props)
     output.indent()
     # Only define the properties if they were not already defined, which
@@ -389,7 +407,11 @@ def function_annotation(self, output, strip_first, name):
     output.print(')'), output.end_statement()
 
 
-def function_definition(self, output, strip_first, as_expression):
+def function_definition(self, output, strip_first, as_expression, unnamed):
+    # unnamed: emit an anonymous function expression (its .name is set after).
+    # A decorated `def fib` must not be a named expression `function fib`:
+    # that name would shadow, inside the body, the decorated `fib` that
+    # recursive calls are meant to reach (so @lru_cache never saw them).
     as_expression = as_expression or self.is_expression or self.is_anonymous
     if as_expression:
         orig_indent = output.indentation()
@@ -403,7 +425,10 @@ def function_definition(self, output, strip_first, as_expression):
     if self.is_async and not self.is_generator:
         output.print("async"), output.space()
     output.print("function"), output.space()
-    if self.name:
+    self.emit_unnamed = bool(unnamed)
+    # A method's name must not shadow a module-level name it refers to:
+    # def unpack(self, x): return unpack(x) calls the global unpack
+    if self.name and not unnamed and not (is_node_type(self, AST_Method) and refers_to(self, self.name.name)):
         self.name.print(output)
 
     if self.is_generator:
@@ -418,15 +443,11 @@ def function_definition(self, output, strip_first, as_expression):
             output.indent()
             output.spaced('var', 'result', '=', 'js_generator.apply(this,', 'arguments)')
             output.end_statement()
-            # Python's generator objects use a separate method to send data to the generator.
-            # For async generators, asend() is the async equivalent — alias it to next as well.
+            # Python's generator methods: send() / throw() / close() (asend() /
+            # athrow() / aclose() for async generators); see baselib-internal
             output.indent()
-            output.spaced('result.send', '=', 'result.next')
+            output.print(('ρσ_async_generator_methods' if self.is_async else 'ρσ_generator_methods') + '(result)')
             output.end_statement()
-            if self.is_async:
-                output.indent()
-                output.spaced('result.asend', '=', 'result.next')
-                output.end_statement()
             output.indent()
             output.spaced('return', 'result')
             output.end_statement()
@@ -437,6 +458,10 @@ def function_definition(self, output, strip_first, as_expression):
 
     if as_expression:
         output.end_statement()
+        if unnamed and self.name:
+            output.indent()
+            output.print('Object.defineProperty(' + anonfunc + ', "name", {value: ' + JSON.stringify(self.name.name) + ', configurable: true})')
+            output.end_statement()
         function_annotation(self, output, strip_first, anonfunc)
         output.indent(), output.spaced('return', anonfunc), output.end_statement()
         output.set_indentation(orig_indent)
@@ -448,7 +473,7 @@ def print_function(output):
         output.print("var")
         output.space()
         output.assign(self.name.name)
-        decorate(self.decorators, output, def():function_definition(self, output, False, True);)
+        decorate(self.decorators, output, def():function_definition(self, output, False, True, True);)
         output.end_statement()
     else:
         function_definition(self, output, False)
@@ -479,15 +504,28 @@ def print_function_call(self, output):
         nonlocal is_prototype_call
         if is_node_type(self, AST_ClassCall):
             # class methods are called through the prototype unless static
-            if self.static:
+            if self.static and not self.bind_this:
                 self.class.print(output)
                 output.print(".")
                 output.print(self.method)
             else:
+                # Prototype methods, and classmethods reached through super(),
+                # take this as the receiver: Cls.prototype.m.call(this, ...) /
+                # Cls.m.call(this, ...)
                 is_prototype_call = True
-                self.class.print(output)
-                output.print(".prototype.")
-                output.print(self.method)
+                if self.super_from:
+                    # super(): the next class in the MRO that defines the method
+                    output.print('ρσ_super_method('), self.super_from.print(output)
+                    output.print(', this, ' + JSON.stringify(self.method) + ', ')
+                    if self.class:
+                        self.class.print(output), output.print('.prototype.' + self.method)
+                    else:
+                        output.print('undefined')
+                    output.print(')')
+                else:
+                    self.class.print(output)
+                    output.print("." if self.static else ".prototype.")
+                    output.print(self.method)
                 if not no_call:
                     output.print(".call")
         else:
@@ -518,7 +556,8 @@ def print_function_call(self, output):
             output.print('{')
             for i, pair in enumerate(self.args.kwargs):
                 if i: output.comma()
-                pair[0].print(output)
+                # the keyword's Python name (a property key, so even default= is fine)
+                output.print_property(pair[0].name)
                 output.print(':')
                 output.space()
                 pair[1].print(output)
@@ -586,14 +625,24 @@ def print_function_call(self, output):
             )
         elif is_node_type(self.expression, AST_SymbolRef) and self.expression.name is 'print':
             # Bare print(...) → console.log(...) to avoid clobbering window.print
-            # Wrap each arg in ρσ_str() so type() and other objects display like Python
+            # Wrap each arg in ρσ_str() so type() and other objects display like Python.
+            # The first goes through ρσ_print_flush(), which prepends any partial
+            # line left by an earlier print(..., end='').
             output.print('console.log')
             output.with_parens(def():
+                if not self.args.length:
+                    output.print('ρσ_print_flush("")')
+                # several arguments are joined into one string: console.log would
+                # treat %s / %d / %j in a first string argument as format directives
+                if self.args.length:
+                    output.print('ρσ_print_flush(')
                 for i, a in enumerate(self.args):
                     if i:
-                        output.comma()
+                        output.print(' + " " + ')
                     output.print('ρσ_str(')
                     a.print(output)
+                    output.print(')')
+                if self.args.length:
                     output.print(')')
             )
         elif (is_node_type(self.expression, AST_SymbolRef) and
@@ -704,8 +753,15 @@ def print_function_call(self, output):
             output.print('.apply(')
             do_print_this()
 
-    if is_prototype_call and self.args.length > 1:
-        self.args.shift()
+    # The receiver (this) was printed above, so drop it from the positional
+    # arguments, without changing the AST (it may be printed more than once)
+    all_args = self.args
+    if is_prototype_call and (all_args.length > 1 or has_kwargs):
+        positional = all_args.slice(1)
+        positional.kwargs = all_args.kwargs
+        positional.kwarg_items = all_args.kwarg_items
+        positional.starargs = all_args.starargs
+        self.args = positional
 
     print_positional_args()
 
@@ -717,6 +773,7 @@ def print_function_call(self, output):
         output.print(']')
         if self.args.length:
             output.print(')')
+    self.args = all_args
 
     output.print(')')
     if not is_repeatable:

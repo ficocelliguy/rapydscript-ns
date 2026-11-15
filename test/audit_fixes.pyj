@@ -1,0 +1,983 @@
+# globals: assrt
+#
+# Regressions for one-line fixes from the 2026-11 Python-compatibility audit.
+
+from __python__ import overload_getitem, bound_methods, overload_operators
+
+import math, re  # several modules in one import statement used to crash the compiler
+from collections import defaultdict
+
+ae = assrt.equal
+ok = assrt.ok
+
+def same(actual, expected):
+    ae(JSON.stringify(actual), JSON.stringify(expected))
+
+ae(math.floor(2.5), 2)
+ok_match = re.match(r'\d+', '42x')
+ae(ok_match.group(0), '42')
+
+# int() / float() with no argument, as defaultdict(int) / defaultdict(float) call them
+ae(int(), 0)
+ae(float(), 0)
+counts = defaultdict(int)
+for ch in 'abca':
+    counts[ch] += 1
+ae(counts['a'], 2)
+
+# int() of a float truncates toward zero at full precision (was 32-bit `| 0`)
+ae(int(3e10), 30000000000)
+ae(int(-2.7), -2)
+ae(int(2 ** 40 + 0.5), 1099511627776)
+caught = None
+try:
+    int(v'Infinity')
+except OverflowError:
+    caught = 'OverflowError'
+ae(caught, 'OverflowError')
+caught = None
+try:
+    int(v'NaN')
+except ValueError:
+    caught = 'ValueError'
+ae(caught, 'ValueError')
+
+ae(oct(8), '0o10')
+ae(oct(-8), '-0o10')
+ae(oct(0), '0o0')
+
+# ── `not` binds looser than comparisons ────────────────────────────────────
+x, y = 1, 2
+ae(not x == y, True)
+ae(not 3 in [1, 2], True)
+ae(not x is None, True)
+ae(not x < 0, True)
+ae((not x) == False, True)
+same([v for v in range(6) if not v % 3 == 0], [1, 2, 4, 5])
+ae(not x == y and x == 1, True)
+
+# ── every comparison chains, Python-style ──────────────────────────────────
+a = 5
+ae(0 < a == 5, True)
+ae(1 == 1 == 1, True)
+ae(1 < 2 == 2, True)
+ae(a == 5 == 5, True)
+ae(1 < 2 > 5, False)
+ae(3 > 2 > 1 > 0, True)
+ae(2 in [1, 2] in [[1, 2]], True)
+ae(x is x is x, True)
+# parenthesized comparisons don't chain
+ae((1 < 2) < 3, True)
+ae((1 == 1) == True, True)
+# middle operands are evaluated once; the chain short-circuits
+calls = []
+def f(v):
+    calls.push(v)
+    return v
+ae(1 < f(2) < f(3) < 4, True)
+same(calls, [2, 3])
+calls = []
+ae(1 < f(9) < f(3) < f(100), False)
+same(calls, [9, 3])
+
+# ── several statements on one line after a compound header ────────────────
+def one_liner(): calls.push('a'); calls.push('b')
+calls = []
+one_liner()
+same(calls, ['a', 'b'])
+calls = []
+for i in range(2): calls.push(i); calls.push('x')
+same(calls, [0, 'x', 1, 'x'])
+n = 0
+while n < 2: n += 1; calls.push(n)
+ae(n, 2)
+class Pt:
+    def __init__(self, px, py): self.px = px; self.py = py
+pt = Pt(3, 4)
+ae(pt.px + pt.py, 7)
+reached_end = False
+class Quiet:
+    def __enter__(self): return self
+    def __exit__(self, *args): calls.push('exit'); return False
+with Quiet(): calls.push('body')
+reached_end = True  # a one-line `...; return False` used to end the program here
+ae(reached_end, True)
+# a `;` that ends an inline function still ends it
+same([1, 2, 3].map(def(v): return v * 2;, None), [2, 4, 6])
+
+# ── subscript targets in tuple assignment ──────────────────────────────────
+arr = [1, 2, 3]
+arr[0], arr[2] = arr[2], arr[0]
+same(arr, [3, 2, 1])
+d = {}
+d['a'], d['b'] = 1, 2
+ae(d['a'] + d['b'], 3)
+lst = [0, 0]
+i = 0
+lst[i], i = 5, 1
+same(lst, [5, 0])
+ae(i, 1)
+grid = [[1, 2], [3, 4]]
+grid[0][0], grid[1][1] = grid[1][1], grid[0][0]
+same(grid, [[4, 2], [3, 1]])
+
+# ── `with`: __exit__ runs on return / break / continue ─────────────────────
+events = []
+class Tracked:
+    def __init__(self, name, suppress=False):
+        self.name = name
+        self.suppress = suppress
+    def __enter__(self):
+        events.push('enter ' + self.name)
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        events.push('exit ' + self.name)
+        return self.suppress
+
+def returns_inside():
+    with Tracked('r'):
+        return 'value'
+ae(returns_inside(), 'value')
+same(events, ['enter r', 'exit r'])
+
+events = []
+for i in range(3):
+    with Tracked('loop' + str(i)):
+        if i is 0:
+            continue
+        break
+same(events, ['enter loop0', 'exit loop0', 'enter loop1', 'exit loop1'])
+
+# an inner `with` that suppresses an exception doesn't stop the outer one's exit
+events = []
+with Tracked('outer'):
+    with Tracked('inner', True):
+        raise ValueError('suppressed')
+same(events, ['enter outer', 'enter inner', 'exit inner', 'exit outer'])
+
+from contextlib import contextmanager
+@contextmanager
+def managed():
+    events.push('setup')
+    try:
+        yield 5
+    finally:
+        events.push('cleanup')
+def uses_managed():
+    with managed() as v:
+        return v
+events = []
+ae(uses_managed(), 5)
+same(events, ['setup', 'cleanup'])
+
+# ── range: membership, indexing, reversed, equality ──────────────────────
+ae(5 in range(10), True)
+ae(10 in range(10), False)
+ae(4 in range(0, 10, 2), True)
+ae(5 in range(0, 10, 2), False)
+ae(7 in range(10, 0, -3), True)
+ae(2.5 in range(5), False)
+ae(10 ** 9 - 1 in range(10 ** 9), True)
+ae(range(10, 0, -3)[-1], 1)
+ae(range(5)[2], 2)
+caught = None
+try:
+    range(3)[3]
+except IndexError:
+    caught = 'IndexError'
+ae(caught, 'IndexError')
+same(list(reversed(range(5))), [4, 3, 2, 1, 0])
+same(list(reversed(range(1, 10, 3))), [7, 4, 1])
+same(list(reversed(dict([('a', 1), ('b', 2)]))), ['b', 'a'])
+ok(range(5) == range(5))
+ok(range(0) == range(3, 3))
+ok(not (range(5) == range(6)))
+caught = None
+try:
+    range(1, 5, 0)
+except ValueError:
+    caught = 'ValueError'
+ae(caught, 'ValueError')
+
+# ── min / max return the element, with Python ordering ───────────────────
+ae(max(['aa', 'b', 'cccc'], key=len), 'cccc')
+ae(min(['aa', 'b', 'cccc'], key=len), 'b')
+ae(max('apple', 'banana'), 'banana')
+ae(min(['b', 'a', 'c']), 'a')
+same(max([(1, 'a'), (2, 'b'), (2, 'a')]), [2, 'b'])
+counts = dict([('x', 3), ('y', 7), ('z', 5)])
+ae(max(counts, key=def(k): return counts[k];), 'y')
+ae(max([3, 9, 9], key=def(v): return v % 5;), 9)  # first of equal keys wins
+class Ver:
+    def __init__(self, n):
+        self.n = n
+    def __lt__(self, other):
+        return self.n < other.n
+    def __gt__(self, other):
+        return self.n > other.n
+ae(max([Ver(2), Ver(5), Ver(1)]).n, 5)
+ae(min([Ver(2), Ver(5), Ver(1)]).n, 1)
+caught = None
+try:
+    max([])
+except ValueError:
+    caught = 'ValueError'
+ae(caught, 'ValueError')
+ae(max(list(range(200000))), 199999)  # no stack overflow on large inputs
+
+# ── decorators on methods receive self first ─────────────────────────────
+def doubled(fn):
+    def wrapper(self, x):
+        return fn(self, x) * 2
+    return wrapper
+def passthrough(fn):
+    def wrapper(*args):
+        return fn(*args)
+    return wrapper
+marked = []
+def mark(fn):
+    marked.push(fn)
+    return fn
+class Calc:
+    def __init__(self, k):
+        self.k = k
+    @doubled
+    def add(self, x):
+        return x + self.k
+    @passthrough
+    @doubled
+    def stacked(self, x):
+        return x
+    @mark
+    def plain(self):
+        return self.k
+    @classmethod
+    @passthrough
+    def make(cls, k):
+        return cls(k)
+c = Calc(1)
+ae(c.add(5), 12)
+ae(c.stacked(4), 8)
+ae(c.plain(), 1)
+ae(marked.length, 1)
+ae(Calc.make(7).k, 7)
+bound = c.add
+ae(bound(1), 4)
+
+# ── ** binds tighter than unary minus and is right-associative ───────────
+x = 5
+ae(-x ** 2, -25)
+ae(-2 ** 2, -4)
+ae(2 ** 3 ** 2, 512)
+ae(2 ** -1, 0.5)
+ae((-2) ** 2, 4)
+ae(2 * 3 ** 2, 18)
+ae(10 - 2 ** 3, 2)
+
+# ── round(): exact ties go to the even neighbour ──────────────────────────
+ae(round(2.5), 2)
+ae(round(3.5), 4)
+ae(round(-2.5), -2)
+ae(round(0.125, 2), 0.12)
+ae(round(2.675, 2), 2.67)  # 2.675 is really 2.67499999... in binary
+ae(round(1250, -2), 1200)
+ae(round(1350, -2), 1400)
+ae(str.format('{:.0f}', 2.5), '2')
+ae(str.format('{:.1f}', 2.25), '2.2')
+ae('%.0f' % 0.5, '0')
+
+# ── sets and dicts compare hashable members by value ─────────────────────
+points = set()
+points.add((0, 0))
+points.add((0, 0))
+points.add((1, 2))
+ae(len(points), 2)
+ok((0, 0) in points)
+ok(not ((2, 1) in points))
+points.discard((0, 0))
+ok(not ((0, 0) in points))
+grid = dict()
+grid[(2, 3)] = 'a'
+grid[(2, 3)] = 'b'
+ae(len(grid), 1)
+ae(grid[(2, 3)], 'b')
+ae(grid.get((2, 3)), 'b')
+ok((2, 3) in grid)
+ae(hash((1, 2)), hash((1, 2)))
+ok(frozenset([2, 1]) in set([frozenset([1, 2])]))
+class Key:
+    def __init__(self, v):
+        self.v = v
+    def __eq__(self, other):
+        return isinstance(other, Key) and self.v is other.v
+    def __hash__(self):
+        return hash(self.v)
+ae(len(set([Key(1), Key(1), Key(2)])), 2)
+keyed = dict()
+keyed[Key('a')] = 1
+ae(keyed.get(Key('a')), 1)
+# lists are still kept by identity, not rejected
+lists = set()
+lists.add([1])
+lists.add([1])
+ae(len(lists), 2)
+
+# ── dict views are live and reusable ─────────────────────────────────────
+d = dict([('a', 1), ('b', 2)])
+ks = d.keys()
+ae(len(ks), 2)
+ok('a' in ks)
+ok(2 in d.values())
+ok(('a', 1) in d.items())
+ok(not (('a', 2) in d.items()))
+same(list(ks), ['a', 'b'])
+same(list(ks), ['a', 'b'])  # a second pass still sees everything
+d['c'] = 3
+same(list(ks), ['a', 'b', 'c'])  # live
+ae(str(ks), "dict_keys(['a', 'b', 'c'])")
+ae(str(d.items()), "dict_items([('a', 1), ('b', 2), ('c', 3)])")
+ae(len(ks & set(['a', 'z'])), 1)
+ok((set(['b']) | ks) == set(['a', 'b', 'c']))
+ok(ks == set(['a', 'b', 'c']))
+same(list(reversed(d.keys())), ['c', 'b', 'a'])
+first = d.items().next().value  # JS-iterator style use keeps working
+same(first, ['a', 1])
+
+# ── extended slice assignment ─────────────────────────────────────────────
+arr = [0, 1, 2, 3, 4, 5]
+arr[::2] = ['a', 'b', 'c']
+same(arr, ['a', 1, 'b', 3, 'c', 5])
+arr = [0, 1, 2, 3]
+arr[::-1] = [9, 8, 7, 6]
+same(arr, [6, 7, 8, 9])
+arr = [1, 2, 3, 4]
+arr[::-2] = 'xy'
+same(arr, [1, 'y', 3, 'x'])
+caught = None
+try:
+    arr[::2] = [1]
+except ValueError as e:
+    caught = str(e)
+ae(caught, 'attempt to assign sequence of size 1 to extended slice of size 2')
+arr = [1, 2, 3]
+arr[1:2] = [7, 8]  # plain slices still splice
+same(arr, [1, 7, 8, 3])
+
+# ── print(end=...) continues the line ────────────────────────────────────
+lines = []
+real_log = console.log
+console.log = def(*parts): lines.push(parts.join(' '));
+print('a', end='')
+print('b')
+print('x', 'y', sep='-', end='!\n')
+for i in range(3):
+    print(i, end=',')
+print()
+print('multi\nline', end='')
+print(' tail')
+console.log = real_log
+same(lines, ['ab', 'x-y!', '0,1,2,', 'multi', 'line tail'])
+
+# ── int() / float() accept only Python literals ──────────────────────────
+ae(int(' -7 '), -7)
+ae(int('1_000'), 1000)
+ae(int('0x1F', 16), 31)
+ae(int('0b101', 0), 5)
+ae(int('z', 36), 35)
+for bad in ['3.5', '12abc', '', '1__0', '_1']:
+    caught = None
+    try:
+        int(bad)
+    except ValueError as e:
+        caught = str(e)
+    ae(caught, 'invalid literal for int() with base 10: ' + repr(bad))
+ae(float(' 1.5 '), 1.5)
+ae(float('1_000.5'), 1000.5)
+ae(float('.5'), 0.5)
+for bad in ['1.5abc', 'abc', '1e', '']:
+    caught = None
+    try:
+        float(bad)
+    except ValueError as e:
+        caught = str(e)
+    ae(caught, 'could not convert string to float: ' + repr(bad))
+
+# ── keyword-only parameters after *args; lambda parameter forms ──────────
+def collect(*items, sep='-'):
+    return str.join(sep, [str(i) for i in items])
+ae(collect(1, 2, 3), '1-2-3')
+ae(collect(1, 2, sep='+'), '1+2')
+def needs_key(a, *rest, key):
+    return [a, rest.length, key]
+same(needs_key(1, 2, 3, key='k'), [1, 2, 'k'])
+def mixed(*, a=1, b):
+    return [a, b]
+same(mixed(b=2), [1, 2])
+scale = lambda x, *, factor=3: x * factor
+ae(scale(2), 6)
+ae(scale(2, factor=5), 10)
+minus = lambda x, /, y: x - y
+ae(minus(5, 2), 3)
+
+# ── == evaluates each operand once ───────────────────────────────────────
+numbers = iter([1, 2, 0, 3])
+seen = []
+while (n := next(numbers)) != 0:
+    seen.push(n)
+same(seen, [1, 2])
+hits = []
+def tick():
+    hits.push(1)
+    return 5
+ok(tick() == 5)
+ok([tick()][0] == 5)
+ae(hits.length, 2)
+
+# ── out-of-range indexing and unpacking raise ────────────────────────────
+for bad in [def(): return [1, 2, 3][5];, def(): return 'abc'[3];, def(): return (1, 2)[-3];]:
+    caught = None
+    try:
+        bad()
+    except IndexError as e:
+        caught = str(e)
+    ok(caught is not None and caught.indexOf('index out of range') >= 0)
+ae([1, 2, 3][-1], 3)
+caught = None
+try:
+    lst = [1]
+    lst[3] = 0
+except IndexError as e:
+    caught = str(e)
+ae(caught, 'list assignment index out of range')
+caught = None
+try:
+    p, q = [1, 2, 3]
+except ValueError as e:
+    caught = str(e)
+ae(caught, 'too many values to unpack (expected 2)')
+caught = None
+try:
+    p, q, r = [1, 2]
+except ValueError as e:
+    caught = str(e)
+ae(caught, 'not enough values to unpack (expected 3, got 2)')
+caught = None
+try:
+    len(5)
+except TypeError as e:
+    caught = str(e)
+ok(caught is not None and caught.indexOf('has no len()') >= 0)
+
+# ── re.findall returns groups; empty matches don't hang ──────────────────
+import re
+same(re.findall(r'(\d)x', '1x2x'), ['1', '2'])
+same(re.findall(r'(\w)=(\d)', 'a=1,b=2'), [['a', '1'], ['b', '2']])
+same(re.findall(r'\d+', 'a1b22'), ['1', '22'])
+ae(re.sub('x*', '-', 'abc'), '-a-b-c-')
+same([m.start() for m in re.finditer(r'\b', 'a b')], [0, 1, 2, 3])
+
+# ── Counter / defaultdict / OrderedDict keep key types ───────────────────
+from collections import Counter, OrderedDict
+counts = Counter([1, 2, 2, 3, 3, 3])
+ae(counts.most_common(1)[0][0] + 1, 4)
+ae(counts[99], 0)
+ok(isinstance(counts, dict))
+ae(str(Counter('aab')), "Counter({'a': 2, 'b': 1})")
+ae(Counter([(1, 2), (1, 2)])[(1, 2)], 2)
+groups = defaultdict(list)
+groups[(1, 2)].push('a')
+groups[5].push('b')
+same(list(groups.keys()), [[1, 2], 5])
+ae(groups[5][0], 'b')
+tally = defaultdict(int)
+for w in ['a', 'b', 'a']:
+    tally[w] += 1
+ae(tally['a'], 2)
+ae(str(defaultdict(list)), "defaultdict(<class 'list'>, {})")
+od = OrderedDict([('b', 1), ('a', 2)])
+od.move_to_end('b')
+same(list(od.keys()), ['a', 'b'])
+ok(OrderedDict([('a', 1)]) == dict([('a', 1)]))
+
+# ── recursive functions see their decorated name (lru_cache memoizes) ────
+from functools import lru_cache
+fib_calls = []
+@lru_cache(maxsize=None)
+def fib(n):
+    fib_calls.push(n)
+    return n if n < 2 else fib(n - 1) + fib(n - 2)
+ae(fib(25), 75025)
+ae(fib_calls.length, 26)
+ae(fib.cache_info().misses, 26)
+@lru_cache
+def add_kw(a, b=1):
+    return a + b
+ae(add_kw(1, b=2), 3)
+ae(add_kw(1, b=2), 3)
+ae(add_kw.cache_info().hits, 1)
+
+# ── floats print like Python's repr, where the value tells us it's a float ─
+ae(str(v'Infinity'), 'inf')
+ae(str(v'-Infinity'), '-inf')
+ae(str(v'NaN'), 'nan')
+ae(str(-0.0), '-0.0')
+ae(str(1e-05), '1e-05')
+ae(str(1.5e-10), '1.5e-10')
+ae(str(0.0001), '0.0001')
+ae(repr([1e-07, 2.5]), '[1e-07, 2.5]')
+
+# ── str.replace with an empty pattern ────────────────────────────────────
+ae(str.replace('abc', '', '-'), '-a-b-c-')
+ae(str.replace('abc', '', '-', 2), '-a-bc')
+ae(str.replace('', '', 'x'), 'x')
+
+# ── return inside a generator ────────────────────────────────────────────
+def limited(n):
+    for i in range(n):
+        if i is 2:
+            return 'stopped'
+        yield i
+def delegating():
+    result = yield from limited(5)
+    yield 'got ' + result
+same(list(limited(5)), [0, 1])
+same(list(delegating()), [0, 1, 'got stopped'])
+
+# ── annotated assignments with subscripted types keep their value ────────
+nums: list[int] = [1, 2]
+table: dict[str, int] = dict([('a', 1)])
+same(nums, [1, 2])
+ae(table['a'], 1)
+
+# ── match on builtin types, __match_args__, mapping **rest ───────────────
+class Pt:
+    __match_args__ = ('x', 'y')
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+def describe(v):
+    match v:
+        case int(n) if n > 10:
+            return 'big ' + str(n)
+        case int(n):
+            return 'int ' + str(n)
+        case str(s):
+            return 'str ' + s
+        case [first, *others]:
+            return 'list ' + str(first) + ' +' + str(len(others))
+        case {'k': val, **rest}:
+            return 'map ' + str(val) + ' ' + str(len(rest))
+        case Pt(0, y):
+            return 'y-axis ' + str(y)
+        case Pt(x, y):
+            return 'pt ' + str(x) + ',' + str(y)
+        case _:
+            return 'other'
+ae(describe(42), 'big 42')
+ae(describe(3), 'int 3')
+ae(describe('hi'), 'str hi')
+ae(describe([1, 2, 3]), 'list 1 +2')
+ae(describe({'k': 1, 'z': 2}), 'map 1 1')
+ae(describe(dict([('k', 5)])), 'map 5 0')
+ae(describe(Pt(0, 7)), 'y-axis 7')
+ae(describe(Pt(3, 4)), 'pt 3,4')
+ae(describe(None), 'other')
+
+# ── type enforcement accepts what Python's type system does ──────────────
+from __python__ import type_enforcement
+from typing import Optional, TypeVar, List
+def scaled(v: float, w: Optional[float] = None, z: int | None = None) -> float:
+    return v + (w or 0) + (z or 0)
+ae(scaled(3), 3)
+ae(scaled(2, 1), 3)
+ae(scaled(1.5, None, 2), 3.5)
+caught = None
+try:
+    scaled('no')
+except TypeError:
+    caught = 'TypeError'
+ae(caught, 'TypeError')
+T = TypeVar('T')
+def first_of(items: List[T], fallback: T = None) -> T:
+    return items[0] if items else fallback
+ae(first_of([5, 6]), 5)
+def size_of(xs: list[int] = [], node: 'Node' = None):
+    return len(xs)
+ae(size_of([1, 2, 3]), 3)
+ae(size_of(), 0)
+
+# ── list.count / id() / bool and object / repr quotes ────────────────────
+ae([[1], [1], [2]].count([1]), 2)
+first_list = [1]
+second_list = [1]
+ok(id(first_list) is not id(second_list))
+ae(id(first_list), id(first_list))
+ok(isinstance(True, int))
+ok(issubclass(bool, int))
+ok(isinstance(5, object) and isinstance(None, object))
+ok(1 == True)
+ok(not (2 == True))
+ae(repr("it's"), '"it\'s"')
+ae(repr('say "hi"'), "'say \"hi\"'")
+
+# ── super() inside a classmethod ─────────────────────────────────────────
+class Shape:
+    @classmethod
+    def create(cls, size):
+        made = cls()
+        made.size = size
+        return made
+class Tile(Shape):
+    @classmethod
+    def create(cls, size):
+        made = super().create(size * 2)
+        made.kind = 'tile'
+        return made
+tile = Tile.create(3)
+ok(isinstance(tile, Tile))
+ae(tile.size, 6)
+ae(tile.kind, 'tile')
+
+# ── generator send / throw / close ───────────────────────────────────────
+def running_total():
+    total = 0
+    while True:
+        try:
+            value = yield total
+        except ValueError:
+            value = 100
+        if value is None:
+            return total
+        total += value
+acc = running_total()
+ae(next(acc), 0)
+ae(acc.send(5), 5)
+ae(acc.throw(ValueError), 105)
+caught = None
+try:
+    acc.send(None)
+except StopIteration as e:
+    caught = e.value
+ae(caught, 105)
+cleanup_log = []
+def with_cleanup():
+    try:
+        yield 1
+        yield 2
+    finally:
+        cleanup_log.push('done')
+cg = with_cleanup()
+next(cg)
+cg.close()
+same(cleanup_log, ['done'])
+
+# ── import enum; value / name lookup ─────────────────────────────────────
+import enum
+class Level(enum.Enum):
+    LOW = 1
+    HIGH = 2
+ok(Level(2) is Level.HIGH)
+ok(Level['LOW'] is Level.LOW)
+ae(len(Level), 2)
+caught = None
+try:
+    Level(9)
+except ValueError as e:
+    caught = str(e)
+ae(caught, '9 is not a valid Level')
+
+# ── json: Python's output format; loads gives dicts and lists ────────────
+import json
+ae(json.dumps([1, 2.5, None, True]), '[1, 2.5, null, true]')
+ae(json.dumps(dict([('b', 1), ('a', 2)]), sort_keys=True), '{"a": 2, "b": 1}')
+ae(json.dumps(dict([('a', 1)]), separators=(',', ':')), '{"a":1}')
+ae(json.dumps([1, [2]], indent=2), '[\n  1,\n  [\n    2\n  ]\n]')
+loaded = json.loads('{"k": [1, 2], "n": null}')
+ok(isinstance(loaded, dict))
+ae(loaded.get('n'), None)
+loaded.get('k').append(3)
+same(loaded.get('k'), [1, 2, 3])
+caught = None
+try:
+    json.dumps(set([1]))
+except TypeError:
+    caught = 'TypeError'
+ae(caught, 'TypeError')
+caught = None
+try:
+    json.loads('{bad')
+except json.JSONDecodeError:
+    caught = 'JSONDecodeError'
+ae(caught, 'JSONDecodeError')
+
+# ── math / random additions ──────────────────────────────────────────────
+import math, random
+ok(math.isclose(0.1 + 0.2, 0.3))
+ae(math.comb(10, 3), 120)
+ae(math.perm(5, 2), 20)
+ae(math.prod([1, 2, 3, 4]), 24)
+ae(math.gcd(12, 18, 30), 6)
+ae(math.lcm(4, 6), 12)
+ae(math.isqrt(17), 4)
+ae(math.dist([0, 0], [3, 4]), 5)
+ae(math.hypot(1, 2, 2), 3)
+caught = None
+try:
+    math.sqrt(-1)
+except ValueError as e:
+    caught = str(e)
+ae(caught, 'math domain error')
+gen_a = random.Random(42)
+gen_b = random.Random(42)
+ae(gen_a.random(), gen_b.random())
+ae(len(random.sample(range(10), 3)), 3)
+ae(len(random.choices(['a', 'b'], k=5)), 5)
+same(random.choices([1, 2], weights=[0, 1], k=2), [2, 2])
+
+# ── property(), descriptors, __set_name__, delattr ───────────────────────
+class PropCls:
+    def __init__(self):
+        self._x = 1
+    def getx(self):
+        return self._x
+    def setx(self, v):
+        self._x = v * 2
+    def delx(self):
+        self._x = None
+    x = property(getx, setx, delx, 'the x')
+
+pc = PropCls()
+pc.x = 5
+ae(pc.x, 10)
+del pc.x
+ae(pc.x, None)
+ok(isinstance(PropCls.x, property))
+ae(PropCls.x.__doc__, 'the x')
+
+class Deleter:
+    def __init__(self):
+        self._v = 3
+    @property
+    def v(self):
+        return self._v
+    @v.deleter
+    def v(self):
+        self._v = 0
+dl = Deleter()
+del dl.v
+ae(dl.v, 0)
+
+class Typed:
+    def __set_name__(self, owner, name):
+        self.name = '_' + name
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return getattr(obj, self.name, 'unset')
+    def __set__(self, obj, value):
+        if not isinstance(value, int):
+            raise TypeError('need int')
+        setattr(obj, self.name, value)
+
+class Pt:
+    x = Typed()
+pt = Pt()
+ae(pt.x, 'unset')
+pt.x = 4
+ae(pt._x, 4)
+assrt.throws(def(): pt.x = 'a';, TypeError)
+
+class Bare:
+    pass
+bare = Bare()
+bare.a = 1
+delattr(bare, 'a')
+ok(not hasattr(bare, 'a'))
+assrt.throws(def(): del bare.zzz;, AttributeError)
+
+# ── metaclasses and type() ───────────────────────────────────────────────
+class Registry(type):
+    classes = []
+    def __new__(mcs, name, bases, ns):
+        cls = super().__new__(mcs, name, bases, ns)
+        Registry.classes.append(name)
+        return cls
+    def __init__(cls, name, bases, ns):
+        super().__init__(name, bases, ns)
+        cls.tag = str.lower(name)
+    def describe(cls):
+        return 'class ' + cls.__name__
+
+class RBase(metaclass=Registry):
+    pass
+class RChild(RBase):
+    pass
+same(Registry.classes, ['RBase', 'RChild'])
+ae(RChild.tag, 'rchild')
+ae(RChild.describe(), 'class RChild')
+ok(isinstance(RChild, Registry))
+ok(type(RBase) is Registry)
+ok(type(int) is type)
+ae(type(5).__name__ + type(5.5).__name__ + type('s').__name__, 'intfloatstr')
+
+def dyn_hello(self):
+    return 'hi ' + self.n
+Dyn = type('Dyn', (object,), {'n': 'dyn', 'hello': dyn_hello})
+ae(Dyn().hello(), 'hi dyn')
+ae(dyn_hello.__name__, 'dyn_hello')
+
+# ── C3 MRO and cooperative super() ───────────────────────────────────────
+class MA:
+    def go(self):
+        return ['A']
+class MB(MA):
+    def go(self):
+        return ['B'].concat(super().go())
+class MC(MA):
+    def go(self):
+        return ['C'].concat(super().go())
+class MD(MB, MC):
+    def go(self):
+        return ['D'].concat(super().go())
+same(MD().go(), ['D', 'B', 'C', 'A'])
+same([k.__name__ for k in MD.__mro__], ['MD', 'MB', 'MC', 'MA', 'object'])
+ok(issubclass(MD, MC))
+
+class CoopMixin:
+    def __init__(self, **kw):
+        self.mixed = True
+        super().__init__(**kw)
+class CoopBase:
+    def __init__(self, x=0):
+        self.x = x
+class CoopBoth(CoopMixin, CoopBase):
+    def __init__(self, x):
+        super().__init__(x=x)
+cb = CoopBoth(5)
+ok(cb.mixed)
+ae(cb.x, 5)
+
+# ── sequence protocol via __getitem__ ────────────────────────────────────
+class GetSeq:
+    def __getitem__(self, i):
+        if i >= 3:
+            raise IndexError(i)
+        return i * 10
+same(list(GetSeq()), [0, 10, 20])
+ok(20 in GetSeq())
+ae(sum(GetSeq()), 30)
+
+# ── tuples, sets, strings ────────────────────────────────────────────────
+ok(isinstance(list(enumerate('a'))[0], tuple))
+ok(isinstance(list(zip('a', 'b'))[0], tuple))
+ok(isinstance(divmod(7, 2), tuple))
+ok(isinstance(str.partition('a=b', '='), tuple))
+ok(isinstance((1, 2, 3)[1:], tuple))
+ae(repr(set()), 'set()')
+same(sorted({1, 2}.union([3], (4,))), [1, 2, 3, 4])
+ok({1, 2}.issubset([1, 2, 3]))
+ae(str.zfill('-42', 6), '-00042')
+ae(str.count('abc', ''), 4)
+ae(str.translate('hello', str.maketrans('el', 'ip')), 'hippo')
+ok(str.isalpha('héllo'))
+same(str.splitlines('a\nb\n', True), ['a\n', 'b\n'])
+ae(str.casefold('Straße'), 'strasse')
+ae(ascii('é'), "'\\xe9'")
+ae(SystemExit(3).code, 3)
+
+from collections import namedtuple
+NPoint = namedtuple('NPoint', 'x y', defaults=[0])
+np = NPoint(1)
+ae(len(np), 2)
+ok(isinstance(np, tuple))
+ok(np == (1, 0))
+ae(repr(np._replace(y=5)), 'NPoint(x=1, y=5)')
+ae(NPoint(y=3, x=2).y, 3)
+
+class ObjDict:
+    def __init__(self):
+        self.a = 1
+od = ObjDict()
+od.__dict__.update({'b': 2})
+ae(od.b, 2)
+
+# ── unbound names: del → NameError, read before assignment → UnboundLocalError
+ub_x = 1
+del ub_x
+assrt.throws(def(): print(ub_x);, NameError)
+ub_x = 2
+ae(ub_x, 2)
+
+def ub_local():
+    try:
+        return ub_g
+    except UnboundLocalError:
+        return 'unbound'
+    ub_g = 3
+ae(ub_local(), 'unbound')
+
+def ub_del_twice():
+    v = 1
+    del v
+    try:
+        del v
+    except UnboundLocalError:
+        return 'raised'
+ae(ub_del_twice(), 'raised')
+
+def ub_loop():
+    total = 0
+    for i in range(3):
+        if i > 0:
+            total += prev
+        prev = i
+    return total
+ae(ub_loop(), 1)
+
+# ── builtin methods read as values keep their receiver ─────────────────────
+bm_list = []
+bm_add = bm_list.append
+bm_add(1)
+same(bm_list, [1])
+bm_nums = [3, 1, 2]
+bm_sort = bm_nums.sort
+bm_sort()
+same(bm_nums, [1, 2, 3])
+bm_set = set()
+bm_set_add = bm_set.add
+bm_set_add(4)
+ok(4 in bm_set)
+class BmData:
+    def __init__(self):
+        self.count = 0
+bmd = BmData()
+bmd.count, bmd.index = 5, 6
+ae(bmd.count + bmd.index, 11)
+
+# ── metaclass __call__ ──────────────────────────────────────────────────────
+class SingletonMeta(type):
+    _instances = dict()  # this file doesn't enable dict_literals, so {} would be a JS object
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+class OneConfig(metaclass=SingletonMeta):
+    def __init__(self, name='default'):
+        self.name = name
+oc1 = OneConfig('first')
+ok(OneConfig('second') is oc1)
+ae(oc1.name, 'first')
+
+# ── class __dict__, format alignment, repr escapes, getattr ────────────────
+class NsCls:
+    x = 1
+    def m(self):
+        pass
+ok('x' in NsCls.__dict__ and 'm' in NsCls.__dict__)
+assrt.throws(def(): NsCls.__dict__['y'] = 1;, TypeError)
+ae(format('a', '5'), 'a    ')
+ae(format(7, '5'), '    7')
+ae(format('a', '05'), 'a0000')
+ae(repr(v'String.fromCharCode(11)'), "'\\x0b'")
+ae(getattr(3, 'nope', 'dflt'), 'dflt')
+ok(not hasattr(3, 'nope'))

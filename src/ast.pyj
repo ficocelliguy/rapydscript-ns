@@ -605,6 +605,9 @@ class AST_Class(AST_Scope):
         'classvars': '[dict] map containing all class variables as keys, to be used to easily test for existence of a class variable',
         'has_new': "[boolean] true if the class defines a __new__ method",
         'has_attr_dunders': "[boolean] true if the class defines any of __getattr__/__setattr__/__delattr__/__getattribute__",
+        'inherited_static': '[dict] static methods inherited from the bases (flattened)',
+        'has_metaclass': '[boolean] the class or a base was created with metaclass=',
+        'inherited_classmethod': '[dict] classmethods inherited from the bases (flattened)',
         'class_kwargs': "[array] keyword arguments from class header (e.g. class C(Base, key=val):) as [[key_node, value_node], ...]",
         'slots': "[array|null] list of __slots__ attribute names, null if not defined",
     }
@@ -629,6 +632,7 @@ class AST_Method(AST_Lambda):
         "is_classmethod": "[boolean] true if method is a classmethod",
         "is_getter": "[boolean] true if method is a property getter",
         "is_setter": "[boolean] true if method is a property setter",
+        "is_deleter": "[boolean] true if method is a property deleter",
     }
 
 # }}}
@@ -822,7 +826,9 @@ class AST_ClassCall(AST_BaseCall):
     properties = {
         "class": "[string] name of the class method belongs to",
         'method': "[string] class method being called",
-        "static": "[boolean] defines whether the method is static"
+        "static": "[boolean] defines whether the method is static",
+        "bind_this": "[boolean] call a static (class-level) method with this as its receiver: a parent classmethod reached through super()",
+        "super_from": "[AST_Node?] for super().method(): the class super() appears in, so the method is looked up along the MRO",
     }
 
     def _walk(self, visitor):
@@ -842,6 +848,7 @@ class AST_Super(AST_Node):
     properties = {
         'parent': "[AST_Node] the parent class expression",
         'class_name': "[string] name of the class where super() appears",
+        'class_ref': "[AST_Node?] a reference to that class (None when it can't be named)",
     }
 
     def _walk(self, visitor):
@@ -922,6 +929,9 @@ class AST_PropAccess(AST_Node):
 
 class AST_Dot(AST_PropAccess):
     "A dotted property access expression"
+    properties = {
+        'bind_value': "[boolean] a builtin method name read as a value, which must keep its receiver (see BIND_ON_READ in parse.pyj)",
+    }
 
     def _walk(self, visitor):
         return visitor._visit(self, def():
@@ -956,15 +966,21 @@ class AST_Splice(AST_PropAccess):
     'Index-style property access, i.e. `a[3:5]`'
     properties = {
         'property2': "[AST_Node] the 2nd property to access - typically ending index for the array.",
+        'step': "[AST_Node|None] the step of an extended slice (a[::2] = ...); when set, property / property2 may be None",
         'assignment': "[AST_Node] The data being spliced in."
     }
 
     def _walk(self, visitor):
         return visitor._visit(self, def():
             self.expression._walk(visitor)
-            self.property._walk(visitor)
+            if self.property:
+                self.property._walk(visitor)
             if self.property2:
                 self.property2._walk(visitor)
+            if self.step:
+                self.step._walk(visitor)
+            if self.assignment:
+                self.assignment._walk(visitor)
         )
 
 class AST_Unary(AST_Node):
@@ -995,7 +1011,9 @@ class AST_Binary(AST_Node):
         'strict_arith': "[bool] Whether incompatible operand types raise TypeError (default True when overloaded; disable with no_strict_arithmetic)",
         'python_mod': "[bool] Whether `%` uses Python-style modulo (sign of divisor); disable with no_python_modulo",
         'python_div': "[bool] Whether `/`/`//` raise ZeroDivisionError on divide-by-zero; disable with no_python_division",
-        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)"
+        'python_truthiness': "[bool] Whether to use Python truthiness (from __python__ import truthiness)",
+        'chained': "[bool] A comparison continuing a Python comparison chain: `left` is the previous comparison, so `a < b == c` is (a < b) and (b == c)",
+        'parenthesized': "[bool] Whether the source wrapped this expression in parentheses"
     }
 
     def _walk(self, visitor):
@@ -1257,7 +1275,8 @@ class AST_SymbolCatch(AST_SymbolDeclaration):
 class AST_SymbolRef(AST_Symbol):
     "Reference to some symbol (not definition/declaration)"
     properties = {
-        'parens': "[boolean/S] if true, this variable is wrapped in parentheses"
+        'parens': "[boolean/S] if true, this variable is wrapped in parentheses",
+        'unbound_check': "[string?] 'local' / 'global' / 'del_local' / 'del_global' when this read may find the name unbound (set by mark_unbound_reads in parse.pyj)",
     }
 
 class AST_This(AST_Symbol):
@@ -1468,6 +1487,20 @@ class AST_JSXExprContainer(AST_Node):
 
 class Found(Exception):
     pass
+
+def refers_to(node, name):
+    # Whether a name is referenced (as a plain symbol) anywhere inside node
+    found = False
+    for stmt in node.body:
+        try:
+            stmt.walk(new TreeWalker(def(n):
+                if is_node_type(n, AST_SymbolRef) and n.name is name:
+                    raise Found()
+            ))
+        except Found:
+            found = True
+            break
+    return found
 
 def has_calls(expression):
     # Technically, in JavaScript property access is also dynamic and can

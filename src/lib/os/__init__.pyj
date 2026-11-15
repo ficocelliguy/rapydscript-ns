@@ -1,0 +1,143 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of a subset of Python's 'os' module.
+#
+# Sub-modules:
+#   os.path — POSIX path manipulation (also available as os.path after
+#             `import os`)
+#
+# Supported:
+#   name ('posix'), sep, altsep, extsep, curdir, pardir, pathsep, linesep,
+#   devnull, environ (a dict, populated from process.env under Node),
+#   getenv(), putenv(), unsetenv(), getcwd(), getpid(), cpu_count(),
+#   urandom(), fspath(), listdir() (Node only), PathLike
+#
+# Notes:
+#   - Paths always use POSIX semantics ('/' separator), even on Windows hosts;
+#     getcwd() converts backslashes to '/'.  In a browser getcwd() is '/'.
+#   - environ is a snapshot: changing it does not alter process.env except
+#     through putenv() / unsetenv().
+
+import os.path as path
+
+name = 'posix'
+sep = '/'
+altsep = None
+extsep = '.'
+curdir = '.'
+pardir = '..'
+pathsep = ':'
+linesep = '\n'
+defpath = '/bin:/usr/bin'
+devnull = '/dev/null'
+
+SEEK_SET = 0
+SEEK_CUR = 1
+SEEK_END = 2
+F_OK = 0
+R_OK = 4
+W_OK = 2
+X_OK = 1
+
+
+def _node_process():
+    v'if (typeof process !== "undefined" && process && process.versions) return process'
+    v'if (typeof window === "undefined" && typeof require === "function") { try { return require("process"); } catch (e) {} }'
+    return None
+
+
+def _node_fs():
+    v'if (typeof window === "undefined" && typeof require === "function") { try { return require("fs"); } catch (e) {} }'
+    return None
+
+
+def _make_environ():
+    env = dict()
+    proc = _node_process()
+    if proc and proc.env:
+        for k in Object.keys(proc.env):
+            env.set(k, proc.env[k])
+    return env
+
+
+environ = _make_environ()
+
+
+def getenv(key, dflt=None, **kw):
+    # `default` is reserved in JS, so the parameter is named dflt; a
+    # default=... keyword argument is still honoured.
+    if v"kw['default'] !== undefined":
+        dflt = v"kw['default']"
+    if dflt is undefined:
+        dflt = None
+    if environ.has(key):
+        return environ.get(key)
+    return dflt
+
+
+def putenv(key, value):
+    environ.set(key, value)
+    proc = _node_process()
+    if proc and proc.env:
+        proc.env[key] = value
+
+
+def unsetenv(key):
+    environ.pop(key, None)
+    proc = _node_process()
+    if proc and proc.env:
+        v'delete proc.env[key]'
+
+
+def getcwd():
+    return path._getcwd()
+
+
+def fspath(p):
+    if jstype(p) is 'string':
+        return p
+    if p and jstype(p.__fspath__) is 'function':
+        return p.__fspath__()
+    raise TypeError('expected str, bytes or os.PathLike object, not ' + jstype(p))
+
+
+class PathLike:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return v'obj instanceof cls' or (obj is not None and obj is not undefined and jstype(obj.__fspath__) is 'function')
+
+    def __fspath__(self):
+        raise NotImplementedError()
+
+
+def getpid():
+    proc = _node_process()
+    return proc.pid if proc and proc.pid else 1
+
+
+def cpu_count():
+    v'if (typeof navigator !== "undefined" && navigator && navigator.hardwareConcurrency) return navigator.hardwareConcurrency'
+    v'if (typeof window === "undefined" && typeof require === "function") { try { return require("os").cpus().length || null; } catch (e) {} }'
+    return None
+
+
+def urandom(n):
+    data = v'new Uint8Array(n)'
+    v'''var c = (typeof globalThis !== "undefined" && globalThis.crypto && globalThis.crypto.getRandomValues) ? globalThis.crypto : null;
+    if (c) { for (var off = 0; off < n; off += 65536) c.getRandomValues(data.subarray(off, Math.min(n, off + 65536))); }
+    else if (typeof require === "function") { var b = require("crypto").randomBytes(n); for (var i = 0; i < n; i++) data[i] = b[i]; }
+    else { for (var i = 0; i < n; i++) data[i] = Math.floor(Math.random() * 256); }'''
+    return bytes(data)
+
+
+def listdir(p='.'):
+    fs = _node_fs()
+    if not fs:
+        raise OSError('listdir() is not available in this environment')
+    try:
+        return fs.readdirSync(fspath(p))
+    except:
+        raise FileNotFoundError("[Errno 2] No such file or directory: '" + p + "'")

@@ -1,0 +1,102 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# struct.pyj
+# Tests for the struct standard library module.
+# Expected byte strings were produced with CPython.
+
+from __python__ import overload_getitem
+import struct
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+def hx(b):
+    return b.hex()
+
+def lst(t):
+    return list(t)
+
+# ── 1. calcsize (standard sizes; native = LP64 with alignment) ───────────────
+ae(struct.calcsize('b'), 1)
+ae(struct.calcsize('=bi'), 5)
+ae(struct.calcsize('<bi'), 5)
+ae(struct.calcsize('bi'), 8)        # native alignment pads to 4
+ae(struct.calcsize('@cid'), 16)
+ae(struct.calcsize('<cid'), 13)
+ae(struct.calcsize('>hhl'), 8)
+ae(struct.calcsize('q'), 8)
+ae(struct.calcsize('3s'), 3)
+ae(struct.calcsize('5p'), 5)
+ae(struct.calcsize('xxi'), 8)
+ae(struct.calcsize('2h3B'), 7)
+ae(struct.calcsize('0s'), 0)
+ae(struct.calcsize('!Q'), 8)
+ae(struct.calcsize('< h h'), 4)
+
+# ── 2. integers, both byte orders ─────────────────────────────────────────────
+ae(hx(struct.pack('<hHiI', -2, 65535, -100000, 4000000000)), 'feffffff6079feff00286bee')
+ae(hx(struct.pack('>hHiI', -2, 65535, -100000, 4000000000)), 'fffefffffffe7960ee6b2800')
+ae(hx(struct.pack('!i', 1)), '00000001')
+ae(hx(struct.pack('<q', -1)), 'ffffffffffffffff')
+ade(lst(struct.unpack('<q', bytes([255, 255, 255, 255, 255, 255, 255, 255]))), [-1])
+# values beyond 2**53 come back as BigInt (exact)
+big = struct.unpack('>Q', bytes([0, 32, 0, 0, 0, 0, 0, 1]))[0]
+ae(String(big), '9007199254740993')
+ok(jstype(struct.unpack('>Q', bytes([0, 32, 0, 0, 0, 0, 0, 1]))[0]) is 'bigint')
+ae(struct.unpack('>Q', bytes([0, 0, 0, 0, 0, 0, 1, 0]))[0], 256)
+ade(lst(struct.unpack('<hHiI', struct.pack('<hHiI', -2, 65535, -100000, 4000000000))), [-2, 65535, -100000, 4000000000])
+ae(hx(struct.pack('@bi', 1, 2)), '0100000002000000')
+ae(hx(struct.pack('=bi', 1, 2)), '0102000000')
+
+# ── 3. strings, bools, chars ──────────────────────────────────────────────────
+packed = struct.pack('<3s5p?c', b'abcdef', b'xy', True, b'Z')
+ae(hx(packed), '6162630278790000015a')
+r = struct.unpack('<3s5p?c', packed)
+ok(r[0] == b'abc')
+ok(r[1] == b'xy')
+ae(r[2], True)
+ok(r[3] == b'Z')
+
+# ── 4. floats ─────────────────────────────────────────────────────────────────
+ae(hx(struct.pack('<efd', 1.5, 0.1, 3.14159)), '003ecdcccc3d6e861bf0f9210940')
+fl = struct.unpack('<efd', struct.pack('<efd', 1.5, 0.1, 3.14159))
+ae(fl[0], 1.5)
+ae(fl[1], 0.10000000149011612)
+ae(fl[2], 3.14159)
+ae(hx(struct.pack('<e', 65504.0)), 'ff7b')
+ae(struct.unpack('<e', bytes([0, 0x3c]))[0], 1)
+ae(struct.unpack('<e', bytes([1, 0]))[0], 5.960464477539063e-08)
+
+# ── 5. unpack_from / iter_unpack / pack_into / Struct ─────────────────────────
+ade(lst(struct.unpack_from('<h', bytes([0, 1, 2]), 1)), [513])
+ade([lst(t) for t in struct.iter_unpack('<h', bytes([1, 0, 2, 0, 3, 0]))], [[1], [2], [3]])
+s = struct.Struct('>I2s')
+ae(s.size, 6)
+ae(s.format, '>I2s')
+ae(hx(s.pack(258, b'ok')), '000001026f6b')
+u = s.unpack(bytes([0, 0, 1, 2, 111, 107]))
+ae(u[0], 258)
+ok(u[1] == b'ok')
+ba = bytearray(6)
+struct.pack_into('<hI', ba, 0, 7, 9)
+ae(hx(ba), '070009000000')
+ade(lst(struct.unpack('<hI', ba)), [7, 9])
+
+# ── 6. errors ─────────────────────────────────────────────────────────────────
+def err(fn):
+    try:
+        fn()
+    except struct.error as e:
+        return str(e)
+    return None
+
+ae(err(def(): struct.pack('b', 200);), 'byte format requires -128 <= number <= 127')
+ae(err(def(): struct.pack('B', -1);), 'ubyte format requires 0 <= number <= 255')
+ae(err(def(): struct.pack('i', 'x');), 'required argument is not an integer')
+ae(err(def(): struct.unpack('i', bytes([0]));), 'unpack requires a buffer of 4 bytes')
+ae(err(def(): struct.calcsize('z');), 'bad char in struct format')
+ae(err(def(): struct.pack('ii', 1);), 'pack expected 2 items for packing (got 1)')
+ae(err(def(): struct.pack('4', 1);), 'repeat count given without format specifier')
+ok(issubclass(struct.error, Exception))

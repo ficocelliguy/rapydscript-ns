@@ -47,8 +47,8 @@ class QueueFull(Exception):
     pass
 
 
-class RuntimeError(Exception):
-    pass
+# The builtin, so `except RuntimeError` catches errors raised here.
+RuntimeError = ρσ_builtin_exceptions.RuntimeError
 
 
 # ---------------------------------------------------------------------------

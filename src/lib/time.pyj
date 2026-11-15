@@ -1,0 +1,431 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of a subset of Python's 'time' module.
+#
+# Supported:
+#   time(), time_ns(), monotonic(), monotonic_ns(), perf_counter(),
+#   perf_counter_ns(), process_time(), process_time_ns(), thread_time(),
+#   sleep(), localtime(), gmtime(), mktime(), asctime(), ctime(),
+#   strftime(), strptime() (common directives), struct_time,
+#   timezone, altzone, daylight, tzname
+#
+# IMPORTANT — sleep():
+#   JavaScript cannot suspend a thread, so sleep(secs) is a *busy-wait*: it
+#   spins until the time has elapsed, blocking the whole event loop (timers,
+#   rendering, I/O callbacks) for that long.  This gives Python semantics for
+#   short pauses in scripts, but should be avoided in UI code.  Waits longer
+#   than MAX_SLEEP seconds (60) raise ValueError rather than freezing the page.
+#   In async code use `await asyncio.sleep(secs)` instead, which yields.
+#
+# Notes:
+#   - struct_time is a tuple (indexable, unpackable) with tm_* attributes.
+#     tm_wday uses Python's convention (Monday == 0).
+#   - process_time()/thread_time() fall back to perf_counter() where CPU time
+#     is not available (browsers).
+#   - strftime supports %a %A %b %B %c %d %f %H %I %j %m %M %p %S %U %w %W
+#     %x %X %y %Y %z %Z %e %G %u %V %%; locale is always C/English.
+
+MAX_SLEEP = 60
+
+_DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+_MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+                'August', 'September', 'October', 'November', 'December']
+_FIELDS = ['tm_year', 'tm_mon', 'tm_mday', 'tm_hour', 'tm_min', 'tm_sec', 'tm_wday', 'tm_yday', 'tm_isdst']
+
+
+def _node_process():
+    v'if (typeof process !== "undefined" && process && process.versions) return process'
+    v'if (typeof window === "undefined" && typeof require === "function") { try { return require("process"); } catch (e) {} }'
+    return None
+
+
+def _make_perf_now():
+    v'if (typeof performance !== "undefined" && performance && typeof performance.now === "function") return function() { return performance.now(); }'
+    proc = _node_process()
+    if proc and jstype(proc.hrtime) is 'function':
+        def hr():
+            t = proc.hrtime()
+            return t[0] * 1e3 + t[1] / 1e6
+        return hr
+    return def(): return Date.now();
+
+
+_perf_now = _make_perf_now()
+_perf_origin = Date.now() - _perf_now()
+
+
+def time():
+    return Date.now() / 1000
+
+
+def time_ns():
+    # A JS number (not a BigInt) so it behaves as an int; values above 2**53
+    # are rounded, which is far below the millisecond resolution of Date.now().
+    return Date.now() * 1000000
+
+
+def monotonic():
+    return _perf_now() / 1000
+
+
+def monotonic_ns():
+    return Math.round(_perf_now() * 1e6)
+
+
+def perf_counter():
+    return _perf_now() / 1000
+
+
+def perf_counter_ns():
+    return Math.round(_perf_now() * 1e6)
+
+
+def process_time():
+    proc = _node_process()
+    if proc and jstype(proc.cpuUsage) is 'function':
+        u = proc.cpuUsage()
+        return (u.user + u.system) / 1e6
+    return _perf_now() / 1000
+
+
+def process_time_ns():
+    return Math.round(process_time() * 1e9)
+
+
+def thread_time():
+    return process_time()
+
+
+def thread_time_ns():
+    return process_time_ns()
+
+
+def sleep(secs):
+    if jstype(secs) is not 'number' or isNaN(secs):
+        raise TypeError("'" + jstype(secs) + "' object cannot be interpreted as an integer or float")
+    if secs < 0:
+        raise ValueError('sleep length must be non-negative')
+    if secs > MAX_SLEEP:
+        raise ValueError('time.sleep(' + secs + ') would block the JavaScript event loop for too long (max ' + MAX_SLEEP + 's); use asyncio.sleep() instead')
+    # SharedArrayBuffer + Atomics.wait gives a real (CPU-idle) block where it is
+    # allowed (Node, workers); otherwise spin.
+    v'''
+    var ms = secs * 1000;
+    try {
+        if (typeof SharedArrayBuffer === "function" && typeof Atomics === "object" && typeof window === "undefined") {
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+            return null;
+        }
+    } catch (e) {}
+    var end = Date.now() + ms;
+    while (Date.now() < end) {}
+    '''
+    return None
+
+
+# ---------------------------------------------------------------------------
+# struct_time
+# ---------------------------------------------------------------------------
+
+def _struct_time_repr():
+    self = this
+    parts = []
+    for i, name in enumerate(_FIELDS):
+        parts.push(name + '=' + self[i])
+    return 'time.struct_time(' + parts.join(', ') + ')'
+
+
+def struct_time(seq, zone=None, gmtoff=None):
+    if seq.length is not 9:
+        raise TypeError('time.struct_time() takes a 9-sequence (' + seq.length + '-sequence given)')
+    ans = tuple(seq)
+    for i, name in enumerate(_FIELDS):
+        Object.defineProperty(ans, name, {'value': ans[i], 'enumerable': False})
+    Object.defineProperty(ans, 'tm_zone', {'value': zone, 'enumerable': False})
+    Object.defineProperty(ans, 'tm_gmtoff', {'value': gmtoff, 'enumerable': False})
+    Object.defineProperty(ans, 'n_fields', {'value': 11, 'enumerable': False})
+    Object.defineProperty(ans, 'n_sequence_fields', {'value': 9, 'enumerable': False})
+    for name in ['__repr__', '__str__', 'toString', 'inspect']:
+        Object.defineProperty(ans, name, {'value': _struct_time_repr, 'enumerable': False})
+    return ans
+
+struct_time.__name__ = 'struct_time'
+
+
+def _yday(year, month, day):
+    return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 1)) / 86400000) + 1
+
+
+def _is_dst(d):
+    jan = v'new Date(d.getFullYear(), 0, 1)'.getTimezoneOffset()
+    jul = v'new Date(d.getFullYear(), 6, 1)'.getTimezoneOffset()
+    return 1 if (jan is not jul and d.getTimezoneOffset() is Math.min(jan, jul)) else 0
+
+
+def _tz_name(d):
+    try:
+        parts = v'new Intl.DateTimeFormat("en-US", {timeZoneName: "short"})'.formatToParts(d)
+        for p in parts:
+            if p.type is 'timeZoneName':
+                return p.value
+    except:
+        pass
+    return 'UTC' if d.getTimezoneOffset() is 0 else ''
+
+
+def _secs_to_date(secs):
+    if secs is None or secs is undefined:
+        return v'new Date()'
+    if jstype(secs) is 'bigint':
+        secs = Number(secs)
+    if jstype(secs) is not 'number' or isNaN(secs):
+        raise TypeError('an integer is required')
+    return v'new Date(Math.floor(secs) * 1000)'
+
+
+def gmtime(secs=None):
+    d = _secs_to_date(secs)
+    y, m, day = d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()
+    return struct_time([y, m, day, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(),
+                        (d.getUTCDay() + 6) % 7, _yday(y, m, day), 0], 'UTC', 0)
+
+
+def localtime(secs=None):
+    d = _secs_to_date(secs)
+    y, m, day = d.getFullYear(), d.getMonth() + 1, d.getDate()
+    return struct_time([y, m, day, d.getHours(), d.getMinutes(), d.getSeconds(),
+                        (d.getDay() + 6) % 7, _yday(y, m, day), _is_dst(d)], _tz_name(d), -d.getTimezoneOffset() * 60)
+
+
+def mktime(t):
+    if not t or t.length is not 9:
+        raise TypeError('mktime(): illegal time tuple argument')
+    d = v'new Date(t[0], t[1] - 1, t[2], t[3], t[4], t[5])'
+    if t[0] >= 0 and t[0] < 100:
+        d.setFullYear(t[0])
+    ms = d.getTime()
+    if isNaN(ms):
+        raise OverflowError('mktime argument out of range')
+    return ms / 1000
+
+
+def _now_struct(t):
+    return localtime() if t is None or t is undefined else t
+
+
+def _pad(n, width, ch):
+    s = (n if n >= 0 else -n) + ''
+    while s.length < width:
+        s = (ch or '0') + s
+    return ('-' if n < 0 else '') + s
+
+
+def asctime(t=None):
+    t = _now_struct(t)
+    return (_DAY_NAMES[t[6]].slice(0, 3) + ' ' + _MONTH_NAMES[t[1] - 1].slice(0, 3) + ' ' +
+            _pad(t[2], 2, ' ') + ' ' + _pad(t[3], 2) + ':' + _pad(t[4], 2) + ':' + _pad(t[5], 2) + ' ' + t[0])
+
+
+def ctime(secs=None):
+    return asctime(localtime(secs))
+
+
+def _iso_week(t):
+    # Returns [iso_year, iso_week, iso_weekday(1-7)]
+    wday = t[6] + 1
+    d = v'new Date(Date.UTC(t[0], t[1] - 1, t[2]))'
+    d.setUTCDate(d.getUTCDate() + 4 - wday)
+    year = d.getUTCFullYear()
+    week = Math.ceil(((d.getTime() - Date.UTC(year, 0, 1)) / 86400000 + 1) / 7)
+    return [year, week, wday]
+
+
+def _week_number(t, first_monday):
+    yday = t[7] - 1
+    wday = t[6] if first_monday else (t[6] + 1) % 7
+    return Math.floor((yday + 7 - wday) / 7)
+
+
+def strftime(fmt, t=None):
+    t = _now_struct(t)
+    if not t or t.length is not 9:
+        raise TypeError('Tuple or struct_time argument required')
+    if t[1] < 1 or t[1] > 12:
+        raise ValueError('month out of range')
+    hour12 = t[3] % 12 or 12
+    gmtoff = t.tm_gmtoff
+    if gmtoff is None or gmtoff is undefined:
+        gmtoff = -(v'new Date()'.getTimezoneOffset()) * 60
+    out = []
+    i = 0
+    while i < fmt.length:
+        ch = fmt[i]
+        if ch is not '%' or i + 1 >= fmt.length:
+            out.push(ch)
+            i += 1
+            continue
+        c = fmt[i + 1]
+        i += 2
+        if c is 'Y':
+            out.push(t[0] + '')
+        elif c is 'y':
+            out.push(_pad(t[0] % 100, 2))
+        elif c is 'm':
+            out.push(_pad(t[1], 2))
+        elif c is 'd':
+            out.push(_pad(t[2], 2))
+        elif c is 'e':
+            out.push(_pad(t[2], 2, ' '))
+        elif c is 'H':
+            out.push(_pad(t[3], 2))
+        elif c is 'I':
+            out.push(_pad(hour12, 2))
+        elif c is 'M':
+            out.push(_pad(t[4], 2))
+        elif c is 'S':
+            out.push(_pad(t[5], 2))
+        elif c is 'f':
+            out.push('000000')
+        elif c is 'p':
+            out.push('AM' if t[3] < 12 else 'PM')
+        elif c is 'b' or c is 'h':
+            out.push(_MONTH_NAMES[t[1] - 1].slice(0, 3))
+        elif c is 'B':
+            out.push(_MONTH_NAMES[t[1] - 1])
+        elif c is 'a':
+            out.push(_DAY_NAMES[t[6]].slice(0, 3))
+        elif c is 'A':
+            out.push(_DAY_NAMES[t[6]])
+        elif c is 'w':
+            out.push(((t[6] + 1) % 7) + '')
+        elif c is 'u':
+            out.push((t[6] + 1) + '')
+        elif c is 'j':
+            out.push(_pad(t[7], 3))
+        elif c is 'U':
+            out.push(_pad(_week_number(t, False), 2))
+        elif c is 'W':
+            out.push(_pad(_week_number(t, True), 2))
+        elif c is 'V':
+            out.push(_pad(_iso_week(t)[1], 2))
+        elif c is 'G':
+            out.push(_iso_week(t)[0] + '')
+        elif c is 'c':
+            out.push(asctime(t))
+        elif c is 'x':
+            out.push(_pad(t[1], 2) + '/' + _pad(t[2], 2) + '/' + _pad(t[0] % 100, 2))
+        elif c is 'X':
+            out.push(_pad(t[3], 2) + ':' + _pad(t[4], 2) + ':' + _pad(t[5], 2))
+        elif c is 'z':
+            off = Math.abs(gmtoff)
+            out.push(('-' if gmtoff < 0 else '+') + _pad(Math.floor(off / 3600), 2) + _pad(Math.floor((off % 3600) / 60), 2))
+        elif c is 'Z':
+            out.push(t.tm_zone or '')
+        elif c is '%':
+            out.push('%')
+        elif c is 'n':
+            out.push('\n')
+        elif c is 't':
+            out.push('\t')
+        else:
+            out.push('%' + c)
+    return out.join('')
+
+
+def strptime(string, fmt='%a %b %d %H:%M:%S %Y'):
+    # Supports %Y %y %m %d %H %I %M %S %p %b %B %a %A %j %f %z %%.
+    fields = {'Y': 1900, 'm': 1, 'd': 1, 'H': 0, 'M': 0, 'S': 0}
+    pm = None
+    hour12 = None
+    pattern = ''
+    order = []
+    i = 0
+    while i < fmt.length:
+        ch = fmt[i]
+        if ch is '%' and i + 1 < fmt.length:
+            c = fmt[i + 1]
+            i += 2
+            if c is 'Y':
+                pattern += '(\\d{4})'
+            elif c in ['m', 'd', 'H', 'I', 'M', 'S', 'y']:
+                pattern += '(\\d{1,2})'
+            elif c is 'j':
+                pattern += '(\\d{1,3})'
+            elif c is 'f':
+                pattern += '(\\d{1,6})'
+            elif c is 'p':
+                pattern += '(AM|PM|am|pm)'
+            elif c is 'b' or c is 'B' or c is 'a' or c is 'A' or c is 'h':
+                pattern += '([A-Za-z]+)'
+            elif c is 'z':
+                pattern += '([+-]\\d{4}|Z)'
+            elif c is '%':
+                pattern += '%'
+                continue
+            else:
+                raise ValueError("'" + c + "' is a bad directive in format '%" + c + "'")
+            order.push(c)
+        else:
+            if /\s/.test(ch):
+                pattern += '\\s+'
+            else:
+                pattern += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            i += 1
+    m = v'new RegExp("^" + pattern + "$")'.exec(string)
+    if not m:
+        raise ValueError("time data '" + string + "' does not match format '" + fmt + "'")
+    yday = None
+    for idx, c in enumerate(order):
+        val = m[idx + 1]
+        if c is 'b' or c is 'B' or c is 'h':
+            found = -1
+            for mi, name in enumerate(_MONTH_NAMES):
+                if name.toLowerCase() is val.toLowerCase() or name.slice(0, 3).toLowerCase() is val.toLowerCase():
+                    found = mi
+            if found < 0:
+                raise ValueError("time data '" + string + "' does not match format '" + fmt + "'")
+            fields.m = found + 1
+        elif c is 'a' or c is 'A':
+            pass
+        elif c is 'p':
+            pm = val.toUpperCase() is 'PM'
+        elif c is 'y':
+            n = parseInt(val, 10)
+            fields.Y = n + (2000 if n < 69 else 1900)
+        elif c is 'I':
+            hour12 = parseInt(val, 10)
+        elif c is 'j':
+            yday = parseInt(val, 10)
+        elif c is 'f' or c is 'z':
+            pass
+        else:
+            fields[c] = parseInt(val, 10)
+    if hour12 is not None:
+        fields.H = (hour12 % 12) + (12 if pm else 0)
+    if yday is not None:
+        d = v'new Date(Date.UTC(fields.Y, 0, yday))'
+        fields.m, fields.d = d.getUTCMonth() + 1, d.getUTCDate()
+    d = v'new Date(Date.UTC(fields.Y, fields.m - 1, fields.d))'
+    if d.getUTCMonth() + 1 is not fields.m:
+        raise ValueError('day is out of range for month')
+    return struct_time([fields.Y, fields.m, fields.d, fields.H, fields.M, fields.S,
+                        (d.getUTCDay() + 6) % 7, _yday(fields.Y, fields.m, fields.d), -1])
+
+
+def _init_tz():
+    now = v'new Date()'
+    jan = v'new Date(now.getFullYear(), 0, 1)'
+    jul = v'new Date(now.getFullYear(), 6, 1)'
+    std = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset())
+    dst = Math.min(jan.getTimezoneOffset(), jul.getTimezoneOffset())
+    std_date = jan if jan.getTimezoneOffset() is std else jul
+    dst_date = jul if std_date is jan else jan
+    return [std * 60, dst * 60, 1 if std is not dst else 0, (_tz_name(std_date), _tz_name(dst_date))]
+
+_tz = _init_tz()
+timezone = _tz[0]
+altzone = _tz[1]
+daylight = _tz[2]
+tzname = _tz[3]

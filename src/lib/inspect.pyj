@@ -1,0 +1,623 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of a subset of Python's 'inspect' module.
+#
+# Supported:
+#   Predicates: isfunction, isclass, ismethod, isbuiltin, isroutine,
+#     ismodule, isgeneratorfunction, isgenerator, iscoroutinefunction,
+#     iscoroutine, isasyncgenfunction, isasyncgen, isawaitable, isabstract
+#   getmembers(obj, predicate=None) — sorted list of (name, value) tuples
+#   getdoc(obj), cleandoc(doc), getmodule(obj), getmro(cls)
+#   signature(callable) -> Signature (str() like '(a, b=1, *args, c, **kw)',
+#     .parameters (ordered dict of name -> Parameter), .return_annotation)
+#   Parameter (name, kind, default, annotation; kinds POSITIONAL_ONLY ...
+#     VAR_KEYWORD), Signature.empty / Parameter.empty
+#   getfullargspec(func) -> FullArgSpec
+#   currentframe() (None), stack() ([])
+#
+# Approximations (JS keeps far less metadata than CPython):
+#   - signature() reads the __argnames__ / __defaults__ / __annotations__
+#     RapydScript attaches to compiled functions; *args, **kwargs and
+#     keyword-only parameters are recovered from the compiled code.  Native
+#     JS functions get a signature built from Function.length (p0, p1, ...).
+#     Bound methods (with the bound_methods flag) no longer carry the
+#     metadata, so their signature falls back to the same JS-level guess.
+#   - ismethod() recognises functions created by types.MethodType or
+#     Function.prototype.bind; with plain RapydScript classes (no
+#     bound_methods flag) obj.method is the unbound function and
+#     ismethod() returns False for it.
+#   - getmembers() lists own attributes plus everything reachable through
+#     the prototype chain (excluding Object/Function builtins and the
+#     compiler's internal ρσ_ helpers).
+
+from types import ModuleType
+
+
+def _is_none(x):
+    return x is None or x is undefined
+
+
+def _src(f):
+    v'try { return Function.prototype.toString.call(f); } catch (e) { return ""; }'
+
+
+def _ctor_name(f):
+    return f.constructor.name if f and f.constructor else ''
+
+
+_BUILTIN_CLASSES = [int, float, str, bool, list, tuple, dict, set, frozenset, bytes, bytearray, complex, object]
+
+
+def isclass(obj):
+    if jstype(obj) is not 'function':
+        return False
+    if _BUILTIN_CLASSES.indexOf(obj) >= 0:
+        return True
+    p = obj.prototype
+    if p and (Object.prototype.hasOwnProperty.call(p, '__bases__') or obj.__qualname__ is not undefined and Object.prototype.hasOwnProperty.call(obj, '__qualname__') and Object.prototype.hasOwnProperty.call(p, '__init__')):
+        return True
+    if p and (obj is Error or v'p instanceof Error'):
+        return True
+    return /^class[\s{]/.test(_src(obj))
+
+
+def isbuiltin(obj):
+    return jstype(obj) is 'function' and not isclass(obj) and /\{\s*\[native code\]\s*\}\s*$/.test(_src(obj)) and not (obj.name and obj.name.startsWith('bound '))
+
+
+def ismethod(obj):
+    if jstype(obj) is not 'function':
+        return False
+    if obj.__self__ is not undefined and obj.__func__ is not undefined:
+        return True
+    return jstype(obj.name) is 'string' and obj.name.startsWith('bound ') and not isclass(obj)
+
+
+def isfunction(obj):
+    return jstype(obj) is 'function' and not isclass(obj) and not ismethod(obj) and not isbuiltin(obj)
+
+
+def isroutine(obj):
+    return jstype(obj) is 'function' and not isclass(obj)
+
+
+def ismodule(obj):
+    return isinstance(obj, ModuleType)
+
+
+def isgeneratorfunction(obj):
+    if jstype(obj) is not 'function':
+        return False
+    if _ctor_name(obj) is 'GeneratorFunction':
+        return True
+    return _src(obj).indexOf('function* js_generator') >= 0
+
+
+def isasyncgenfunction(obj):
+    return jstype(obj) is 'function' and _ctor_name(obj) is 'AsyncGeneratorFunction'
+
+
+def iscoroutinefunction(obj):
+    return jstype(obj) is 'function' and _ctor_name(obj) is 'AsyncFunction'
+
+
+def isgenerator(obj):
+    return not _is_none(obj) and jstype(obj) is 'object' and Object.prototype.toString.call(obj) is '[object Generator]'
+
+
+def isasyncgen(obj):
+    return not _is_none(obj) and jstype(obj) is 'object' and Object.prototype.toString.call(obj) is '[object AsyncGenerator]'
+
+
+def isawaitable(obj):
+    if _is_none(obj):
+        return False
+    if v'typeof Promise === "function" && obj instanceof Promise':
+        return True
+    return (jstype(obj) is 'object' or jstype(obj) is 'function') and (jstype(obj.then) is 'function' or jstype(obj.__await__) is 'function')
+
+
+def iscoroutine(obj):
+    return not _is_none(obj) and v'typeof Promise === "function" && obj instanceof Promise'
+
+
+def isabstract(obj):
+    if not isclass(obj):
+        return False
+    am = obj.__abstractmethods__
+    if _is_none(am):
+        return False
+    return (am.size if jstype(am.size) is 'number' else len(am)) > 0
+
+
+def isdatadescriptor(obj):
+    return not _is_none(obj) and (jstype(obj.__set__) is 'function' or jstype(obj.__delete__) is 'function')
+
+
+def getmro(cls):
+    ans = []
+    c = cls
+    while jstype(c) is 'function' and c is not v'Function.prototype':
+        ans.push(c)
+        p = Object.getPrototypeOf(c.prototype) if c.prototype else None
+        c = p.constructor if p and p is not Object.prototype else None
+    ans.push(object)
+    return tuple(ans)
+
+
+# ---------------------------------------------------------------------------
+# getmembers
+# ---------------------------------------------------------------------------
+
+def _skip_name(name):
+    return jstype(name) is not 'string' or name.startsWith('ρσ') or name is '__bind_methods__' or name is 'caller' or name is 'callee' or name is 'arguments'
+
+
+class _PropertyInfo:
+    # Stands in for a Python `property` object for accessors found on a class
+    def __init__(self, name, desc):
+        self.__name__ = name
+        self.fget = desc.get or None
+        self.fset = desc.set or None
+        self.fdel = None
+
+    def __set__(self, obj, value):
+        if not self.fset:
+            raise AttributeError("can't set attribute")
+        self.fset.call(obj, value)
+
+    def __repr__(self):
+        return '<property object ' + self.__name__ + '>'
+
+
+def getmembers(obj, predicate=None):
+    names = []
+    seen = {}
+
+    def add(n):
+        if not _skip_name(n) and not Object.prototype.hasOwnProperty.call(seen, n):
+            seen[n] = True
+            names.push(n)
+
+    stop_protos = [Object.prototype, v'Function.prototype']
+    o = obj if (jstype(obj) is 'object' or jstype(obj) is 'function') and obj is not None else Object(obj)
+    while o and stop_protos.indexOf(o) < 0:
+        for n in Object.getOwnPropertyNames(o):
+            add(n)
+        o = Object.getPrototypeOf(o)
+    is_cls = isclass(obj) and obj.prototype
+    if is_cls:
+        # methods / class attributes live on the prototype chain
+        o = obj.prototype
+        while o and stop_protos.indexOf(o) < 0:
+            for n in Object.getOwnPropertyNames(o):
+                if n is not '__class__':
+                    add(n)
+            o = Object.getPrototypeOf(o)
+    ans = []
+    for n in names:
+        try:
+            if is_cls and not v'(n in obj)':
+                desc = None
+                o = obj.prototype
+                while o and not desc:
+                    desc = Object.getOwnPropertyDescriptor(o, n)
+                    o = Object.getPrototypeOf(o)
+                val = desc.value if desc and v'"value" in desc' else (_PropertyInfo(n, desc) if desc else undefined)
+            else:
+                val = obj[n]
+        except:
+            continue
+        if n is 'constructor':
+            continue
+        if predicate and not predicate(val):
+            continue
+        ans.push((n, val))
+    ans.sort(def(a, b): return -1 if a[0] < b[0] else (1 if a[0] > b[0] else 0);)
+    return ans
+
+
+getmembers_static = getmembers
+
+
+# ---------------------------------------------------------------------------
+# Docs / modules
+# ---------------------------------------------------------------------------
+
+def cleandoc(doc):
+    lines = doc.replace(/\t/g, '        ').split('\n')
+    margin = None
+    for line in lines.slice(1):
+        content = line.replace(/^\s+/, '')
+        if content.length:
+            indent = line.length - content.length
+            margin = indent if margin is None else Math.min(margin, indent)
+    if lines.length:
+        lines[0] = lines[0].replace(/^\s+/, '')
+    if margin is not None:
+        for i in range(1, lines.length):
+            lines[i] = lines[i].slice(margin)
+    while lines.length and not lines[lines.length - 1].trim():
+        lines.pop()
+    while lines.length and not lines[0].trim():
+        lines.shift()
+    return lines.join('\n')
+
+
+def getdoc(obj):
+    if _is_none(obj):
+        return None
+    doc = obj.__doc__
+    if (doc is undefined or doc is None) and jstype(obj) is 'function' and obj.prototype:
+        doc = obj.prototype.__doc__  # class docstrings live on the prototype
+    if (doc is undefined or doc is None) and jstype(obj) is 'object' and obj.constructor:
+        doc = obj.constructor.__doc__
+    if jstype(doc) is not 'string':
+        return None
+    # The compiler already strips docstring indentation (keeping relative
+    # indentation), so only clean docs that still look raw, e.g. ones
+    # assigned to __doc__ by hand that start with a newline + indentation.
+    if /^\s/.test(doc):
+        return cleandoc(doc)
+    return doc.replace(/\s+$/, '')
+
+
+def getmodule(obj):
+    if _is_none(obj):
+        return None
+    name = obj.__module__
+    if name is undefined and jstype(obj) is 'object' and obj.constructor:
+        name = obj.constructor.__module__
+    if jstype(name) is not 'string':
+        return None
+    v'if (typeof ρσ_modules === "object" && ρσ_modules && Object.prototype.hasOwnProperty.call(ρσ_modules, name)) return ρσ_modules[name]'
+    return None
+
+
+def currentframe():
+    return None
+
+
+def stack(context=1):
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Signature
+# ---------------------------------------------------------------------------
+
+class _empty:
+    pass
+
+_empty.__name__ = '_empty'
+
+
+def _format_annotation(a):
+    if jstype(a) is 'string':
+        return a
+    if jstype(a) is 'function' and a.__name__:
+        return a.__name__
+    if jstype(a) is 'function' and a.name:
+        return a.name
+    return repr(a)
+
+
+class Parameter:
+
+    def __init__(self, name, kind, default=_empty, annotation=_empty):
+        self.name = name
+        self.kind = kind
+        self.default = default
+        self.annotation = annotation
+
+    def __str__(self):
+        s = self.name
+        if self.annotation is not _empty:
+            s += ': ' + _format_annotation(self.annotation)
+        if self.default is not _empty:
+            s += (' = ' if self.annotation is not _empty else '=') + repr(self.default)
+        if self.kind is Parameter.VAR_POSITIONAL:
+            s = '*' + s
+        elif self.kind is Parameter.VAR_KEYWORD:
+            s = '**' + s
+        return s
+
+    def __repr__(self):
+        return '<Parameter "' + self.__str__() + '">'
+
+    def __eq__(self, other):
+        return v'other instanceof Parameter' and self.name is other.name and self.kind is other.kind and self.default == other.default and self.annotation == other.annotation
+
+
+Parameter.empty = _empty
+Parameter.POSITIONAL_ONLY = 0
+Parameter.POSITIONAL_OR_KEYWORD = 1
+Parameter.VAR_POSITIONAL = 2
+Parameter.KEYWORD_ONLY = 3
+Parameter.VAR_KEYWORD = 4
+_KIND_NAMES = ['POSITIONAL_ONLY', 'POSITIONAL_OR_KEYWORD', 'VAR_POSITIONAL', 'KEYWORD_ONLY', 'VAR_KEYWORD']
+
+
+class Signature:
+
+    def __init__(self, parameters=None, return_annotation=_empty):
+        self.parameters = dict()
+        if parameters:
+            for p in parameters:
+                self.parameters.set(p.name, p)
+        self.return_annotation = return_annotation
+
+    def __str__(self):
+        parts = []
+        star_done = False
+        for p in self.parameters.values():
+            if p.kind is Parameter.VAR_POSITIONAL:
+                star_done = True
+            elif p.kind is Parameter.KEYWORD_ONLY and not star_done:
+                parts.push('*')
+                star_done = True
+            parts.push(p.__str__())
+        ans = '(' + parts.join(', ') + ')'
+        if self.return_annotation is not _empty:
+            ans += ' -> ' + _format_annotation(self.return_annotation)
+        return ans
+
+    def __repr__(self):
+        return '<Signature ' + self.__str__() + '>'
+
+    def __eq__(self, other):
+        if not v'other instanceof Signature':
+            return False
+        a, b = list(self.parameters.values()), list(other.parameters.values())
+        if a.length is not b.length:
+            return False
+        for i in range(a.length):
+            if not a[i].__eq__(b[i]):
+                return False
+        return self.return_annotation == other.return_annotation
+
+    def replace(self, parameters=None, return_annotation=None):
+        params = parameters if parameters is not None else list(self.parameters.values())
+        ra = return_annotation if return_annotation is not None else self.return_annotation
+        return Signature(params, ra)
+
+    def bind(self, *args, **kwargs):
+        return _bind(self, args, kwargs, False)
+
+    def bind_partial(self, *args, **kwargs):
+        return _bind(self, args, kwargs, True)
+
+
+Signature.empty = _empty
+
+
+class BoundArguments:
+
+    def __init__(self, signature, args_map):
+        self.signature = signature
+        self.arguments = args_map
+
+    @property
+    def args(self):
+        ans = []
+        for p in self.signature.parameters.values():
+            if not self.arguments.has(p.name):
+                if p.kind is Parameter.KEYWORD_ONLY or p.kind is Parameter.VAR_KEYWORD:
+                    break
+                continue
+            if p.kind is Parameter.VAR_POSITIONAL:
+                ans = ans.concat(list(self.arguments.get(p.name)))
+            elif p.kind is Parameter.POSITIONAL_ONLY or p.kind is Parameter.POSITIONAL_OR_KEYWORD:
+                ans.push(self.arguments.get(p.name))
+        return tuple(ans)
+
+    @property
+    def kwargs(self):
+        ans = dict()
+        for p in self.signature.parameters.values():
+            if not self.arguments.has(p.name):
+                continue
+            if p.kind is Parameter.KEYWORD_ONLY:
+                ans.set(p.name, self.arguments.get(p.name))
+            elif p.kind is Parameter.VAR_KEYWORD:
+                ans.update(self.arguments.get(p.name))
+        return ans
+
+    def apply_defaults(self):
+        ordered = dict()
+        for p in self.signature.parameters.values():
+            if self.arguments.has(p.name):
+                ordered.set(p.name, self.arguments.get(p.name))
+            elif p.default is not _empty:
+                ordered.set(p.name, p.default)
+            elif p.kind is Parameter.VAR_POSITIONAL:
+                ordered.set(p.name, tuple())
+            elif p.kind is Parameter.VAR_KEYWORD:
+                ordered.set(p.name, dict())
+        self.arguments = ordered
+
+    def __repr__(self):
+        parts = []
+        for item in self.arguments.items():
+            parts.push(item[0] + '=' + repr(item[1]))
+        return '<BoundArguments (' + parts.join(', ') + ')>'
+
+
+def _bind(sig, args, kwargs, partial):
+    bound_args = dict()
+    params = list(sig.parameters.values())
+    ai = 0
+    kw = dict()
+    for k in Object.keys(kwargs):
+        kw.set(k, kwargs[k])
+    varkw = None
+    for p in params:
+        if p.kind is Parameter.POSITIONAL_ONLY or p.kind is Parameter.POSITIONAL_OR_KEYWORD:
+            if ai < args.length:
+                if kw.has(p.name) and p.kind is Parameter.POSITIONAL_OR_KEYWORD:
+                    raise TypeError("multiple values for argument '" + p.name + "'")
+                bound_args.set(p.name, args[ai])
+                ai += 1
+            elif kw.has(p.name) and p.kind is Parameter.POSITIONAL_OR_KEYWORD:
+                bound_args.set(p.name, kw.pop(p.name))
+            elif p.default is _empty and not partial:
+                raise TypeError("missing a required argument: '" + p.name + "'")
+        elif p.kind is Parameter.VAR_POSITIONAL:
+            if ai < args.length:
+                bound_args.set(p.name, tuple(args.slice(ai)))
+                ai = args.length
+        elif p.kind is Parameter.KEYWORD_ONLY:
+            if kw.has(p.name):
+                bound_args.set(p.name, kw.pop(p.name))
+            elif p.default is _empty and not partial:
+                raise TypeError("missing a required argument: '" + p.name + "'")
+        else:
+            varkw = p
+    if ai < args.length:
+        raise TypeError('too many positional bound_args')
+    if kw.__len__():
+        if varkw is None:
+            raise TypeError("got an unexpected keyword argument '" + list(kw.keys())[0] + "'")
+        bound_args.set(varkw.name, kw)
+    return BoundArguments(sig, bound_args)
+
+
+def _analyse(func):
+    # Returns [args, varargs, varkw, defaults_obj, kwonly, annotations]
+    src = _src(func)
+    argnames = func.__argnames__
+    defaults = func.__defaults__ or {}
+    annotations = func.__annotations__ or {}
+    if not Array.isArray(argnames) and (func.__module__ is not undefined or func.__handles_kwarg_interpolation__):
+        argnames = []  # a RapydScript function without named parameters
+    if not Array.isArray(argnames):
+        # A native / non-RapydScript function: read the JS parameter list.
+        m = /^[^(]*\(([^)]*)\)/.exec(src)
+        names = []
+        if m and src.indexOf('[native code]') < 0:
+            for part in m[1].split(','):
+                part = part.replace(/\/\*.*?\*\//g, '').trim()
+                if not part:
+                    continue
+                if part.startsWith('...'):
+                    return [names, part.slice(3), None, {}, [], {}]
+                names.push(part.split('=')[0].trim())
+        else:
+            for i in range(func.length or 0):
+                names.push('p' + i)
+        return [names, None, None, {}, [], {}]
+    varargs = None
+    m = /var\s+([\w$]+)\s*=\s*ρσ_tuple_decorate\(Array\.prototype\.slice\.call\(arguments,\s*\d+\)\)/.exec(src)
+    if not m:
+        m = /var\s+([\w$]+)\s*=\s*Array\.prototype\.slice\.call\(arguments,\s*\d+\)/.exec(src)
+    if m:
+        varargs = m[1]
+    varkw = None
+    m = /([\w$]+)\s*=\s*ρσ_kwargs_to_dict\(\1\)/.exec(src)
+    if m:
+        varkw = m[1]
+    kwonly = []
+    re = /hasOwnProperty\.call\([\w$]+,\s*"([^"]+)"\)/g
+    while True:
+        m = re.exec(src)
+        if not m:
+            break
+        n = m[1]
+        if argnames.indexOf(n) < 0 and kwonly.indexOf(n) < 0:
+            kwonly.push(n)
+    re2 = /missing required keyword-only argument: '([^']+)'/g
+    while True:
+        m = re2.exec(src)
+        if not m:
+            break
+        if kwonly.indexOf(m[1]) < 0:
+            kwonly.push(m[1])
+    for n in Object.keys(defaults):
+        if argnames.indexOf(n) < 0 and kwonly.indexOf(n) < 0:
+            kwonly.push(n)
+    return [argnames.slice(), varargs, varkw, defaults, kwonly, annotations]
+
+
+def _unwrap(func):
+    while jstype(func) is 'function' and jstype(func.__wrapped__) is 'function':
+        func = func.__wrapped__
+    return func
+
+
+def signature(obj, follow_wrapped=True):
+    if jstype(obj) is not 'function':
+        if not _is_none(obj) and jstype(obj.__call__) is 'function':
+            return signature(obj.__call__)
+        raise TypeError(repr(obj) + ' is not a callable object')
+    if jstype(obj.__signature__) is 'object' and v'obj.__signature__ instanceof Signature':
+        return obj.__signature__
+    func = obj
+    if follow_wrapped:
+        func = _unwrap(func)
+    if isclass(func) and func.prototype and jstype(func.prototype.__init__) is 'function':
+        func = func.prototype.__init__
+    if obj.__func__ and jstype(obj.__func__) is 'function':
+        # types.MethodType: drop the first (self) parameter
+        inner = signature(obj.__func__)
+        params = list(inner.parameters.values()).slice(1)
+        return Signature(params, inner.return_annotation)
+    info = _analyse(func)
+    args, varargs, varkw, defaults, kwonly, annotations = info
+    has = def(o, k): return Object.prototype.hasOwnProperty.call(o, k);
+    ann = def(n): return annotations[n] if has(annotations, n) else _empty;
+    params = []
+    for n in args:
+        params.push(Parameter(n, Parameter.POSITIONAL_OR_KEYWORD, defaults[n] if has(defaults, n) else _empty, ann(n)))
+    if varargs:
+        params.push(Parameter(varargs, Parameter.VAR_POSITIONAL, _empty, ann(varargs)))
+    for n in kwonly:
+        params.push(Parameter(n, Parameter.KEYWORD_ONLY, defaults[n] if has(defaults, n) else _empty, ann(n)))
+    if varkw:
+        params.push(Parameter(varkw, Parameter.VAR_KEYWORD, _empty, ann(varkw)))
+    return Signature(params, annotations['return'] if has(annotations, 'return') else _empty)
+
+
+class FullArgSpec:
+
+    def __init__(self, args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations):
+        self.args = args
+        self.varargs = varargs
+        self.varkw = varkw
+        self.defaults = defaults
+        self.kwonlyargs = kwonlyargs
+        self.kwonlydefaults = kwonlydefaults
+        self.annotations = annotations
+
+    def __repr__(self):
+        return ('FullArgSpec(args=' + repr(self.args) + ', varargs=' + repr(self.varargs) + ', varkw=' + repr(self.varkw) +
+                ', defaults=' + repr(self.defaults) + ', kwonlyargs=' + repr(self.kwonlyargs) +
+                ', kwonlydefaults=' + repr(self.kwonlydefaults) + ', annotations=' + repr(self.annotations) + ')')
+
+
+def getfullargspec(func):
+    sig = signature(func, False)
+    args, kwonly = [], []
+    defaults, kwdefaults = [], dict()
+    varargs = varkw = None
+    annotations = dict()
+    for p in sig.parameters.values():
+        if p.annotation is not _empty:
+            annotations.set(p.name, p.annotation)
+        if p.kind is Parameter.POSITIONAL_OR_KEYWORD or p.kind is Parameter.POSITIONAL_ONLY:
+            args.push(p.name)
+            if p.default is not _empty:
+                defaults.push(p.default)
+        elif p.kind is Parameter.VAR_POSITIONAL:
+            varargs = p.name
+        elif p.kind is Parameter.KEYWORD_ONLY:
+            kwonly.push(p.name)
+            if p.default is not _empty:
+                kwdefaults.set(p.name, p.default)
+        else:
+            varkw = p.name
+    if sig.return_annotation is not _empty:
+        annotations.set('return', sig.return_annotation)
+    return FullArgSpec(args, varargs, varkw, tuple(defaults) if defaults.length else None, kwonly,
+                       kwdefaults if kwdefaults.__len__() else None, annotations)

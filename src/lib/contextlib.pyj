@@ -61,10 +61,9 @@
 #     the with-statement machinery propagates whatever __exit__ throws.
 
 
-# RuntimeError is not defined in the RapydScript baselib; define it here so
-# that the contextmanager helpers can raise it for protocol violations.
-class RuntimeError(Exception):
-    pass
+# The builtin, re-exported under this module's own name (a module-level
+# `RuntimeError` would otherwise shadow the builtin with a different class).
+RuntimeError = ρσ_builtin_exceptions.RuntimeError
 
 
 class AbstractContextManager:
@@ -238,7 +237,7 @@ def contextmanager(func):
                 v"""
                 var ρσ_cm_result;
                 try {
-                    ρσ_cm_result = gen.throw(exc_val);
+                    ρσ_cm_result = (gen.ρσ_js_throw || gen.throw).call(gen, exc_val);  // iterator-protocol throw
                 } catch (ρσ_cm_err) {
                     // Generator did not catch the exception (re-raised or threw a
                     // different one).  If it's the same object, return false so
@@ -317,7 +316,7 @@ def asynccontextmanager(func):
                 v"""
                 var ρσ_acm_result;
                 try {
-                    ρσ_acm_result = await gen.throw(exc_val);
+                    ρσ_acm_result = await (gen.ρσ_js_throw || gen.throw).call(gen, exc_val);  // iterator-protocol throw
                 } catch (ρσ_acm_err) {
                     // Generator did not catch the exception (re-raised or threw
                     // a different one).  If it's the same object, return false

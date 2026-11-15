@@ -1,0 +1,84 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# types.pyj
+# Tests for the types standard library module.
+
+from __python__ import overload_getitem
+import types
+from types import SimpleNamespace
+
+ae  = assrt.equal
+ok  = assrt.ok
+
+# ── 1. SimpleNamespace ────────────────────────────────────────────────────────
+ns = SimpleNamespace(a=1, b='x')
+ae(ns.a, 1)
+ae(ns.b, 'x')
+ae(repr(ns), "namespace(a=1, b='x')")
+ae(str(ns), "namespace(a=1, b='x')")
+ns.c = [1, 2]
+ae(repr(ns), "namespace(a=1, b='x', c=[1, 2])")
+ok(ns == SimpleNamespace(a=1, b='x', c=[1, 2]))
+ok(not (ns == SimpleNamespace(a=1)))
+ok(ns != SimpleNamespace(a=1))
+ae(repr(SimpleNamespace()), 'namespace()')
+ok('a' in ns)
+ok('zz' not in ns)
+
+# ── 2. Function / generator / None types ──────────────────────────────────────
+def f(x):
+    return x
+
+class C:
+    def m(self):
+        return 42
+
+def gen():
+    yield 1
+
+ok(isinstance(f, types.FunctionType))
+ok(isinstance(def(): pass;, types.LambdaType))
+ok(not isinstance(C, types.FunctionType))
+ok(not isinstance(1, types.FunctionType))
+ok(isinstance(gen(), types.GeneratorType))
+ok(not isinstance([], types.GeneratorType))
+ok(not isinstance(gen, types.GeneratorType))
+ok(isinstance(None, types.NoneType))
+ok(not isinstance(0, types.NoneType))
+
+# ── 3. MethodType binds a function to an object ───────────────────────────────
+c = C()
+bm = types.MethodType(def(self, extra): return [self is c, extra];, c)
+r = bm(5)
+ok(r[0])
+ae(r[1], 5)
+ok(isinstance(bm, types.MethodType))
+ok(not isinstance(f, types.MethodType))
+ok(bm.__self__ is c)
+
+# ── 4. ModuleType ─────────────────────────────────────────────────────────────
+ok(isinstance(types, types.ModuleType))
+ok(not isinstance(ns, types.ModuleType))
+m = types.ModuleType('mymod')
+ae(m.__name__, 'mymod')
+ok(isinstance(m, types.ModuleType))
+
+# ── 5. MappingProxyType is read-only ──────────────────────────────────────────
+mp = types.MappingProxyType({'k': 1})
+ae(mp['k'], 1)
+ok('k' in mp)
+ae(len(mp), 1)
+ae(mp.get('z', 5), 5)
+try:
+    mp['k'] = 2
+    ok(False)
+except TypeError:
+    pass
+
+# ── 6. new_class ──────────────────────────────────────────────────────────────
+def _body(ns):
+    ns['hello'] = def(): return 'hi';
+N = types.new_class('N', [], None, _body)
+ae(N.__name__, 'N')
+ae(N().hello(), 'hi')

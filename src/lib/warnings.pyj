@@ -1,0 +1,241 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'warnings' module.
+#
+# Supported:
+#   warn(message, category=UserWarning, stacklevel=1, source=None)
+#   warn_explicit(message, category, filename, lineno, module=None, ...)
+#   filterwarnings(action, message='', category=Warning, module='', lineno=0, append=False)
+#   simplefilter(action, category=Warning, lineno=0, append=False)
+#   resetwarnings()
+#   catch_warnings(record=False) — context manager; with record=True the
+#       `as` target is a list of WarningMessage objects (.message, .category,
+#       .filename, .lineno)
+#   showwarning(message, category, filename, lineno, file=None, line=None)
+#   formatwarning(message, category, filename, lineno, line=None)
+#   filters, WarningMessage, the builtin Warning classes
+#
+# Actions: 'error' (raise), 'ignore', 'always'/'all', 'default'/'module'
+# (once per distinct message+category), 'once'.
+#
+# Notes:
+#   - Warnings are printed with console.warn as "<Category>: message".
+#     Assigning warnings.showwarning = fn redirects output, as in Python.
+#   - There is no reliable call-stack introspection in JS, so filename is
+#     always '<unknown>', lineno 0, and the `module` filter field matches
+#     against '__main__'.  stacklevel is accepted and ignored.
+#   - As in CPython, changing the filters (or entering catch_warnings)
+#     resets the "already shown" registry used by the 'default' action.
+
+filters = []
+defaultaction = 'default'
+onceregistry = {}
+_default_registry = {}
+_record_stack = []
+_VALID_ACTIONS = ['error', 'ignore', 'always', 'all', 'default', 'module', 'once']
+
+
+def _filters_mutated():
+    nonlocal _default_registry
+    _default_registry = {}
+
+
+def _check_action(action):
+    if _VALID_ACTIONS.indexOf(action) < 0:
+        raise ValueError('invalid action: ' + repr(action))
+
+
+def _cat_name(category):
+    return category.__name__ or category.name or 'Warning'
+
+
+def _is_warning_class(c):
+    return jstype(c) is 'function' and (c is Warning or v'c.prototype instanceof Warning')
+
+
+def filterwarnings(action, message='', category=None, module='', lineno=0, append=False):
+    _check_action(action)
+    if category is None or category is undefined:
+        category = Warning
+    if not _is_warning_class(category):
+        raise TypeError('category must be a Warning subclass')
+    if lineno < 0:
+        raise ValueError('lineno must be an int >= 0')
+    msg_re = v'new RegExp("^(?:" + message + ")", "i")' if message else None
+    mod_re = v'new RegExp("^(?:" + module + ")$")' if module else None
+    _add_filter([action, msg_re, category, mod_re, lineno], append)
+
+
+def simplefilter(action, category=None, lineno=0, append=False):
+    _check_action(action)
+    if category is None or category is undefined:
+        category = Warning
+    if lineno < 0:
+        raise ValueError('lineno must be an int >= 0')
+    _add_filter([action, None, category, None, lineno], append)
+
+
+def _same_filter(a, b):
+    return a[0] is b[0] and (a[1] + '') is (b[1] + '') and a[2] is b[2] and (a[3] + '') is (b[3] + '') and a[4] is b[4]
+
+
+def _add_filter(item, append):
+    for i in range(filters.length):
+        if _same_filter(filters[i], item):
+            if append:
+                _filters_mutated()
+                return
+            filters.splice(i, 1)
+            break
+    if append:
+        filters.push(item)
+    else:
+        filters.unshift(item)
+    _filters_mutated()
+
+
+def resetwarnings():
+    filters.splice(0, filters.length)
+    _filters_mutated()
+
+
+class WarningMessage:
+
+    def __init__(self, message, category, filename, lineno, file=None, line=None, source=None):
+        self.message = message
+        self.category = category
+        self.filename = filename
+        self.lineno = lineno
+        self.file = file
+        self.line = line
+        self.source = source
+        self._category_name = _cat_name(category) if category else None
+
+    def __str__(self):
+        return ('{message : ' + repr(self.message) + ', category : ' + repr(self._category_name) +
+                ', filename : ' + repr(self.filename) + ', lineno : ' + self.lineno + ', line : ' + repr(self.line) + '}')
+
+    def __repr__(self):
+        return self.__str__()
+
+
+def formatwarning(message, category, filename, lineno, line=None):
+    return _cat_name(category) + ': ' + str(message)
+
+
+def _default_showwarning(message, category, filename, lineno, file=None, line=None):
+    text = formatwarning(message, category, filename, lineno, line)
+    if file and jstype(file.write) is 'function':
+        file.write(text + '\n')
+        return
+    if v'typeof console' is 'object':
+        if jstype(console.warn) is 'function':
+            console.warn(text)
+        else:
+            console.log(text)
+
+
+showwarning = _default_showwarning
+
+
+def _current_showwarning():
+    v'if (typeof ρσ_modules === "object" && ρσ_modules && ρσ_modules.warnings && typeof ρσ_modules.warnings.showwarning === "function") return ρσ_modules.warnings.showwarning'
+    return showwarning
+
+
+def _show(msg_obj):
+    if _record_stack.length and _record_stack[_record_stack.length - 1]:
+        _record_stack[_record_stack.length - 1].push(msg_obj)
+        return
+    fn = _current_showwarning()
+    fn(msg_obj.message, msg_obj.category, msg_obj.filename, msg_obj.lineno, msg_obj.file, msg_obj.line)
+
+
+def _find_action(text, category, module, lineno):
+    for item in filters:
+        action, msg_re, cat, mod_re, ln = item
+        if msg_re and not msg_re.test(text):
+            continue
+        if not (category is cat or issubclass(category, cat)):
+            continue
+        if mod_re and not mod_re.test(module):
+            continue
+        if ln and ln is not lineno:
+            continue
+        return action
+    return defaultaction
+
+
+def warn_explicit(message, category, filename, lineno, module=None, registry=None, module_globals=None, source=None):
+    if v'message instanceof Warning':
+        text = str(message)
+        category = message.constructor
+    else:
+        if category is None or category is undefined:
+            category = UserWarning
+        if not _is_warning_class(category):
+            raise TypeError('category must be a Warning subclass, not ' + repr(category))
+        text = str(message)
+        message = v'new category(text)'
+    module = module or '__main__'
+    action = _find_action(text, category, module, lineno)
+    if action is 'ignore':
+        return
+    if action is 'error':
+        raise message
+    key = _cat_name(category) + '\0' + text
+    if action is 'once':
+        if onceregistry[key]:
+            return
+        onceregistry[key] = True
+    elif action is 'default' or action is 'module':
+        if _default_registry[key]:
+            return
+        _default_registry[key] = True
+    _show(WarningMessage(message, category, filename, lineno, None, None, source))
+
+
+def warn(message, category=None, stacklevel=1, source=None):
+    warn_explicit(message, category, '<unknown>', 0, '__main__', None, None, source)
+
+
+class catch_warnings:
+
+    def __init__(self, record=False, module=None, action=None, category=None, lineno=0, append=False):
+        self._record = record
+        self._entered = False
+        self._action = action
+        self._category = category
+        self._lineno = lineno
+        self._append = append
+
+    def __enter__(self):
+        if self._entered:
+            raise RuntimeError('Cannot enter ' + repr(self) + ' twice')
+        self._entered = True
+        self._saved_filters = filters.slice()
+        self._saved_registry = _default_registry
+        self._saved_show = _current_showwarning()
+        _filters_mutated()
+        if self._action:
+            simplefilter(self._action, self._category, self._lineno, self._append)
+        log = [] if self._record else None
+        _record_stack.push(log)
+        return log
+
+    def __exit__(self, *args):
+        nonlocal _default_registry
+        if not self._entered:
+            raise RuntimeError('Cannot exit ' + repr(self) + ' without entering first')
+        filters.splice(0, filters.length)
+        for f in self._saved_filters:
+            filters.push(f)
+        _default_registry = self._saved_registry
+        _record_stack.pop()
+        v'if (typeof ρσ_modules === "object" && ρσ_modules && ρσ_modules.warnings) ρσ_modules.warnings.showwarning = this._saved_show'
+        return False
+
+    def __repr__(self):
+        return 'catch_warnings(record=' + ('True' if self._record else 'False') + ')'

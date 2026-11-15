@@ -34,6 +34,8 @@ export const STDLIB_MODULES = [
     'abc', 'aes', 'asyncio', 'base64', 'bisect', 'collections', 'contextlib', 'copy', 'csv', 'dataclasses', 'datetime', 'decimal', 'difflib', 'elementmaker', 'encodings', 'enum',
     'fractions', 'functools', 'gettext', 'heapq', 'html', 'http', 'io', 'itertools', 'json', 'logging', 'math', 'numpy', 'operator',
     'pprint', 'pythonize', 'random', 're', 'react', 'statistics', 'string', 'textwrap', 'traceback', 'typing', 'urllib', 'uuid',
+    'calendar', 'inspect', 'numbers', 'os', 'queue', 'secrets', 'struct', 'sys', 'time', 'types', 'warnings', 'weakref',
+    '_abc_support',  // internal helper shared by numbers and collections.abc
     // Pseudo-modules for language feature flags (from __python__ import ...)
     '__python__', '__builtins__',
 ];
@@ -46,14 +48,14 @@ export const BASE_BUILTINS = (
     'this self window document chr ord iterator_symbol print len range dir' +
     ' eval exec undefined arguments abs max min enumerate pow callable reversed sum' +
     ' getattr isFinite setattr hasattr parseInt parseFloat options_object' +
-    ' isNaN JSON Math list set list_wrap ρσ_modules require bool int bin' +
+    ' isNaN JSON Math list set list_wrap ρσ_modules require bool int bin oct' +
     ' float complex iter Error EvalError set_wrap frozenset RangeError ReferenceError SyntaxError' +
     ' str TypeError URIError Exception AssertionError IndexError AttributeError KeyError' +
     ' ValueError ZeroDivisionError ImportError ModuleNotFoundError StopIteration map hex filter zip dict dict_wrap UnicodeDecodeError HTMLCollection' +
     ' NodeList alert console Node Symbol NamedNodeMap ρσ_eslice ρσ_delslice Number' +
     ' Boolean encodeURIComponent decodeURIComponent setTimeout setInterval' +
     ' setImmediate clearTimeout clearInterval clearImmediate requestAnimationFrame' +
-    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next __import__ ρσ_new ρσ_object_new hash ρσ_object_setattr ρσ_object_getattr ρσ_object_delattr ExceptionGroup BaseExceptionGroup tuple bytes bytearray format object vars locals globals type'
+    ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN super Ellipsis slice all any next __import__ ρσ_new ρσ_object_new hash ρσ_object_setattr ρσ_object_getattr ρσ_object_delattr ExceptionGroup BaseExceptionGroup BaseException SystemExit KeyboardInterrupt GeneratorExit ArithmeticError OverflowError FloatingPointError RuntimeError NotImplementedError RecursionError OSError IOError EnvironmentError FileNotFoundError FileExistsError IsADirectoryError NotADirectoryError PermissionError TimeoutError InterruptedError BlockingIOError ChildProcessError ProcessLookupError ConnectionError BrokenPipeError ConnectionAbortedError ConnectionRefusedError ConnectionResetError EOFError BufferError StopAsyncIteration Warning UserWarning DeprecationWarning PendingDeprecationWarning RuntimeWarning SyntaxWarning FutureWarning ImportWarning UnicodeWarning BytesWarning ResourceWarning UnicodeError UnicodeEncodeError UnicodeTranslateError NotImplemented tuple bytes bytearray format object vars locals globals type property delattr ascii UnboundLocalError'
 ).split(' ');
 
 // ---------------------------------------------------------------------------
@@ -299,7 +301,7 @@ function Linter(RS, toplevel, code, builtins, knownModules) {
             if (node instanceof RS.AST_Method) {
                 scope.methods[name] = true;
                 if (has_prop(scope.seen_method_names, name)) {
-                    if (!node.is_setter)
+                    if (!node.is_setter && !node.is_deleter)
                         this.messages.push(msg_from_node('dup-method', name, node, WARN, scope.seen_method_names[name]));
                 } else {
                     scope.seen_method_names[name] = node.start.line;

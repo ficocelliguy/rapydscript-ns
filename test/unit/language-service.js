@@ -1234,6 +1234,28 @@ function make_tests(Diagnostics, RS, STDLIB_MODULES) {
         },
 
         {
+            name: "builtin_exceptions_no_errors",
+            description: "Python's builtin exception classes and NotImplemented are known names",
+            run: function () {
+                var markers = d().check([
+                    "def area():",
+                    "    raise NotImplementedError('subclasses define area')",
+                    "def add(other):",
+                    "    return NotImplemented",
+                    "try:",
+                    "    area()",
+                    "except (RuntimeError, OSError, FileNotFoundError, RecursionError) as e:",
+                    "    print(e)",
+                    "except BaseException:",
+                    "    raise SystemExit(1)",
+                    "w = DeprecationWarning('old')",
+                ].join("\n"));
+                var errors = markers.filter(function (m) { return m.severity === SEV_ERROR; });
+                assert.deepStrictEqual(errors, [],
+                    "Expected no errors but got: " + JSON.stringify(errors));
+            },
+        },
+        {
             name: "hash_dunder_no_errors",
             description: "__hash__ method in a class produces no error markers",
             run: function () {

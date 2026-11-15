@@ -1,0 +1,88 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# queue.pyj
+# Tests for the queue standard library module (non-blocking semantics).
+
+from __python__ import overload_getitem
+import queue
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+def raises(exc, fn):
+    try:
+        fn()
+    except exc:
+        return True
+    return False
+
+# ── 1. FIFO Queue ─────────────────────────────────────────────────────────────
+q = queue.Queue()
+for i in range(3):
+    q.put(i)
+ae(q.qsize(), 3)
+ok(not q.empty())
+ok(not q.full())
+ade([q.get() for _ in range(3)], [0, 1, 2])
+ok(q.empty())
+ok(raises(queue.Empty, def(): q.get_nowait();))
+ok(raises(queue.Empty, def(): q.get();))  # cannot block: raises immediately
+ok(raises(queue.Empty, def(): q.get(True, 1);))
+
+# ── 2. Bounded queue ──────────────────────────────────────────────────────────
+b = queue.Queue(maxsize=2)
+b.put(1)
+b.put_nowait(2)
+ok(b.full())
+ok(raises(queue.Full, def(): b.put_nowait(3);))
+ok(raises(queue.Full, def(): b.put(3);))
+ae(b.get(), 1)
+ok(not b.full())
+
+# ── 3. LIFO and priority queues ───────────────────────────────────────────────
+l = queue.LifoQueue()
+for i in range(3):
+    l.put(i)
+ade([l.get() for _ in range(3)], [2, 1, 0])
+
+p = queue.PriorityQueue()
+for item in [(10, 'ten'), (2, 'two'), (9, 'nine'), (2, 'a'), (100, 'hundred'), (1, 'one')]:
+    p.put(item)
+ade([list(p.get()) for _ in range(6)], [[1, 'one'], [2, 'a'], [2, 'two'], [9, 'nine'], [10, 'ten'], [100, 'hundred']])
+p2 = queue.PriorityQueue()
+for n in [5, 3, 11, 1, 20, 7, 2]:
+    p2.put(n)
+ade([p2.get_nowait() for _ in range(7)], [1, 2, 3, 5, 7, 11, 20])
+
+# ── 4. SimpleQueue ────────────────────────────────────────────────────────────
+s = queue.SimpleQueue()
+s.put('a')
+s.put_nowait('b')
+ae(s.qsize(), 2)
+ae(s.get(), 'a')
+ae(s.get_nowait(), 'b')
+ok(s.empty())
+ok(raises(queue.Empty, def(): s.get();))
+
+# ── 5. task_done / join ───────────────────────────────────────────────────────
+q = queue.Queue()
+q.put('x')
+q.put('y')
+ok(raises(RuntimeError, def(): q.join();))  # would deadlock
+q.get()
+q.task_done()
+q.get()
+q.task_done()
+q.join()
+ae(q.unfinished_tasks, 0)
+ok(raises(ValueError, def(): q.task_done();))
+
+# ── 6. shutdown ───────────────────────────────────────────────────────────────
+q = queue.Queue()
+q.put(1)
+q.shutdown()
+ok(raises(queue.ShutDown, def(): q.put(2);))
+ae(q.get(), 1)
+ok(raises(queue.ShutDown, def(): q.get();))

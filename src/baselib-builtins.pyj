@@ -22,41 +22,124 @@ def ρσ_bool(val):
     return True
 ρσ_bool.__name__ = 'bool'
 
+# A JS console can only write whole lines, so text printed with an `end` that
+# isn't a newline (print('.', end='')) waits here and starts the next line
+# printed. If nothing follows, it is printed once the currently running code
+# finishes (a microtask), so a trailing partial line is never lost.
+v'var ρσ_print_pending = "", ρσ_print_scheduled = false'
+
+def ρσ_print_flush(first):
+    # Called by every compiled print(): prepends any pending partial line.
+    if v'ρσ_print_pending === ""':
+        return first
+    ans = ρσ_print_pending + first
+    v'ρσ_print_pending = ""'
+    return ans
+
+def ρσ_print_flush_pending():
+    v'ρσ_print_scheduled = false'
+    if v'ρσ_print_pending !== ""' and v'typeof console' is 'object':
+        console.log(ρσ_print_flush(''))
+
 def ρσ_print(*args, **kwargs):
-    if v'typeof console' is 'object':
-        sep = kwargs.sep if kwargs.sep is not undefined else ' '
-        parts = [ρσ_str(a) for a in args]
-        console.log(parts.join(sep))
+    sep = ' ' if kwargs.sep is undefined or kwargs.sep is None else kwargs.sep
+    end = '\n' if kwargs.end is undefined or kwargs.end is None else kwargs.end
+    parts = [ρσ_str(a) for a in args]
+    text = parts.join(sep) + end
+    out = kwargs.file
+    if out is not undefined and out is not None and jstype(out.write) is 'function':
+        out.write(text)  # print(..., file=buf)
+        return
+    if v'typeof console' is not 'object':
+        return
+    text = ρσ_print_flush(text)
+    nl = text.lastIndexOf('\n')
+    if nl >= 0:
+        console.log(text.slice(0, nl))
+    v'ρσ_print_pending = text.slice(nl + 1)'
+    if v'ρσ_print_pending !== "" && !ρσ_print_scheduled':
+        v'ρσ_print_scheduled = true'
+        if v'typeof Promise === "function"':
+            v'Promise.resolve().then(ρσ_print_flush_pending)'
+        elif v'typeof setTimeout === "function"':
+            v'setTimeout(ρσ_print_flush_pending, 0)'
+        else:
+            ρσ_print_flush_pending()  # no way to defer in this host: emit it now
 
 def ρσ_int(val, base):
+    if val is undefined:
+        return 0  # int() is 0, which is what defaultdict(int) relies on
     if jstype(val) is "number":
-        ans = val | 0
+        if not isFinite(val):
+            if isNaN(val):
+                raise ValueError('cannot convert float NaN to integer')
+            raise OverflowError('cannot convert float infinity to integer')
+        # Math.trunc, not `val | 0`, which wraps anything past 32 bits
+        ans = Math.trunc(val)
     elif val is not None and jstype(val.__int__) is 'function' and (base is None or base is undefined):
         return val.__int__()
+    elif jstype(val) is 'boolean':
+        return 1 if val else 0
     else:
-        ans = parseInt(val, base or 10)
-    if isNaN(ans):
-        raise ValueError('Invalid literal for int with base ' + (base or 10) + ': ' + val)
+        ans = ρσ_parse_int_literal(val, 10 if base is undefined or base is None else base)
     return ans
+
+def ρσ_parse_int_literal(val, base):
+    # Python's int(str, base): whitespace, a sign, `_` between digits, and a
+    # 0x / 0o / 0b prefix for that base (any of them with base 0). parseInt alone
+    # would accept '12abc' and '3.5'.
+    if base is not 0 and (base < 2 or base > 36):
+        raise ValueError('int() base must be >= 2 and <= 36, or 0')
+    given_base = base
+    s = (val + '').trim()
+    m = v'/^([+-]?)(?:0([xob])_?)?([0-9a-z]+(?:_[0-9a-z]+)*)$/i'.exec(s)
+    ok = m is not None
+    if ok:
+        prefix = m[2].toLowerCase() if m[2] else ''
+        prefix_base = {'x': 16, 'o': 8, 'b': 2}[prefix] if prefix else 0
+        if base is 0:
+            if prefix_base:
+                base = prefix_base
+            else:
+                base = 10
+                ok = v'/^(0+|[1-9][0-9]*)$/'.test(m[3].replace(v'/_/g', ''))  # no leading zeros
+        elif prefix_base and prefix_base is not base:
+            ok = False
+    if ok:
+        digits = m[3].replace(v'/_/g', '').toLowerCase()
+        valid = '0123456789abcdefghijklmnopqrstuvwxyz'.slice(0, base)
+        for v'var i = 0; i < digits.length; i++':
+            if valid.indexOf(digits[i]) is -1:
+                ok = False
+                break
+    if not ok:
+        raise ValueError('invalid literal for int() with base ' + given_base + ': ' + ρσ_repr(val + ''))
+    ans = parseInt(digits, base)
+    return -ans if m[1] is '-' else ans
 ρσ_int.__name__ = 'int'
 
 def ρσ_float(val):
+    if val is undefined:
+        return 0.0
     if jstype(val) is "number":
         ans = val
     elif val is not None and jstype(val.__float__) is 'function':
         return val.__float__()
+    elif jstype(val) is 'boolean':
+        return 1.0 if val else 0.0
     else:
-        ans = parseFloat(val)
-    if isNaN(ans):
-        if jstype(val) is 'string':
-            s = val.trim().toLowerCase()
-            if s is 'inf' or s is '+inf' or s is 'infinity' or s is '+infinity':
-                return v'Infinity'
-            if s is '-inf' or s is '-infinity':
-                return v'-Infinity'
-            if s is 'nan' or s is '+nan' or s is '-nan':
-                return v'NaN'
-        raise ValueError('Could not convert string to float: ' + arguments[0])
+        s = (val + '').trim()
+        lower = s.toLowerCase()
+        if lower is 'inf' or lower is '+inf' or lower is 'infinity' or lower is '+infinity':
+            return v'Infinity'
+        if lower is '-inf' or lower is '-infinity':
+            return v'-Infinity'
+        if lower is 'nan' or lower is '+nan' or lower is '-nan':
+            return v'NaN'
+        # Python's float literal grammar; parseFloat alone would accept '1.5abc'
+        if not v'/^[+-]?(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)(?:e[+-]?\d(?:_?\d)*)?$/i'.test(s):
+            raise ValueError('could not convert string to float: ' + ρσ_repr(val + ''))
+        ans = parseFloat(s.replace(v'/_/g', ''))
     return ans
 ρσ_float.__name__ = 'float'
 
@@ -108,8 +191,21 @@ def options_object(f):
             arguments[arguments.length - 1][ρσ_kwargs_symbol] = True
         return f.apply(this, arguments)
 
+v'var ρσ_id_map = typeof WeakMap === "function" ? new WeakMap() : null, ρσ_id_counter = 0'
+
 def ρσ_id(x):
-    return x.ρσ_object_id
+    # A unique, stable id per live object (lists, dicts and functions included,
+    # which have no ρσ_object_id); equal primitives share one, like small ints.
+    if v'x !== null && (typeof x === "object" || typeof x === "function")':
+        if x.ρσ_object_id is not undefined:
+            return x.ρσ_object_id
+        if ρσ_id_map:
+            ans = ρσ_id_map.get(x)
+            if ans is undefined:
+                ans = v'0x40000000 + (++ρσ_id_counter)'  # clear of ρσ_object_id values
+                ρσ_id_map.set(x, ans)
+            return ans
+    return ρσ_hash(x)
 
 def ρσ_dir(item):
     # TODO: this isn't really representative of real Python's dir(), nor is it
@@ -148,13 +244,31 @@ def ρσ_callable_call(fn):
     raise TypeError('object is not callable')
 
 
+def ρσ_to_fixed(x, n):
+    # x.toFixed(n), but an exact tie rounds to the even digit as Python does:
+    # format(2.5, '.0f') is '2' and round(0.125, 2) is 0.12. toFixed rounds the
+    # exact binary value (so 2.675 -> '2.67' already) but sends ties away from zero.
+    s = x.toFixed(n)
+    if not isFinite(x) or Math.abs(x) >= 1e21:
+        return s
+    exact = x.toFixed(Math.min(100, n + 60))  # far enough to tell an exact tie
+    dot = exact.indexOf('.')
+    if not v'/^50*$/'.test(exact.slice(dot + 1 + n)):
+        return s
+    kept = exact.slice(0, dot + (1 + n if n else 0))  # truncated toward zero
+    return kept if (kept.charCodeAt(kept.length - 1) - 48) % 2 is 0 else s
+
 def ρσ_round(x, ndigits):
     if x is not None and jstype(x.__round__) is 'function':
         return x.__round__(ndigits if ndigits is not undefined else None)
-    if ndigits is undefined or ndigits is 0:
-        return Math.round(x)
-    factor = Math.pow(10, ndigits)
-    return Math.round(x * factor) / factor
+    if jstype(x) is not 'number' or not isFinite(x):
+        return x
+    if ndigits is undefined or ndigits is None:
+        ndigits = 0
+    if ndigits >= 0:
+        return Number(ρσ_to_fixed(x, Math.min(ndigits, 100)))
+    factor = Math.pow(10, -ndigits)  # round(1250, -2) == 1200
+    return Number(ρσ_to_fixed(x / factor, 0)) * factor
 
 def ρσ_bin(x):
     if jstype(x) is not 'number' or x % 1 is not 0:
@@ -176,6 +290,16 @@ def ρσ_hex(x):
         ans = '0x' + ans
     return ans
 
+def ρσ_oct(x):
+    if jstype(x) is not 'number' or x % 1 is not 0:
+        raise TypeError('integer required')
+    ans = x.toString(8)
+    if ans[0] is '-':
+        ans = '-' + '0o' + ans[1:]
+    else:
+        ans = '0o' + ans
+    return ans
+
 def ρσ_enumerate(iterable, start):
     offset = 0 if start is undefined else start
     ans = {'_i': offset - 1}
@@ -186,7 +310,7 @@ def ρσ_enumerate(iterable, start):
                 this._i += 1
                 idx = this._i - offset
                 if idx < iterable.length:
-                    return {'done': False, 'value': [this._i, iterable[idx]]}
+                    return {'done': False, 'value': ρσ_tuple_decorate([this._i, iterable[idx]])}
                 return v"{'done':true}"
         return ans
     if jstype(iterable[ρσ_iterator_symbol]) is 'function':
@@ -197,11 +321,16 @@ def ρσ_enumerate(iterable, start):
             if r.done:
                 return v"{'done':true}"
             this._i += 1
-            return {'done': False, 'value': [this._i, r.value]}
+            return {'done': False, 'value': ρσ_tuple_decorate([this._i, r.value])}
         return ans
-    return ρσ_enumerate(Object.keys(iterable), start)
+    return ρσ_enumerate(ρσ_Iterable(iterable), start)
 
 def ρσ_reversed(iterable):
+    if iterable is not None and iterable is not undefined and jstype(iterable.__reversed__) is 'function':
+        return iterable.__reversed__()
+    if not ρσ_arraylike(iterable) and iterable is not None and iterable is not undefined and jstype(iterable[ρσ_iterator_symbol]) is 'function':
+        # dicts (insertion-ordered) and other finite iterables
+        iterable = ρσ_list_constructor(iterable)
     if ρσ_arraylike(iterable):
         ans = v'{"_i": iterable.length}'
         ans['next'] = def():
@@ -233,6 +362,8 @@ def ρσ_iter(iterable, sentinel):
     # Generate a JavaScript iterator object from iterable
     if jstype(iterable[ρσ_iterator_symbol]) is 'function':
         return iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
+    if iterable and jstype(iterable.__getitem__) is 'function' and not ρσ_arraylike(iterable):
+        return ρσ_getitem_iterator(iterable)
     if ρσ_arraylike(iterable):
         ans = v'{"_i":-1}'
         ans[ρσ_iterator_symbol] = def():
@@ -243,7 +374,7 @@ def ρσ_iter(iterable, sentinel):
                 return v"{'done':false, 'value':iterable[this._i]}"
             return v"{'done':true}"
         return ans
-    return ρσ_iter(Object.keys(iterable))
+    return ρσ_iter(ρσ_Iterable(iterable))
 
 def ρσ_range_next(step, length):
     this._i += step
@@ -257,9 +388,12 @@ def ρσ_range(start, stop, step):
     if arguments.length <= 1:
         stop = start or 0
         start = 0
-    step = arguments[2] or 1
+    step = 1 if arguments[2] is undefined else arguments[2]
+    if step is 0:
+        raise ValueError('range() arg 3 must not be zero')
     length = Math.max(Math.ceil((stop - start) / step), 0)
     ans = v'{start:start, step:step, stop:stop}'
+    ans.ρσ_is_range = True
     ans[ρσ_iterator_symbol] = def():
         it = v'{"_i": start - step, "_idx": -1}'
         it.next = ρσ_range_next.bind(it, step, length)
@@ -276,8 +410,35 @@ def ρσ_range(start, stop, step):
         return this._cached.index(val)
     ans.__len__ = def():
         return length
+    # Membership, indexing and equality are arithmetic, as in Python: no list
+    # is built, so `n in range(10**9)` is instant.
+    ans.__contains__ = def(val):
+        if jstype(val) is 'boolean':
+            val = 1 if val else 0
+        if jstype(val) is not 'number' or val % 1 is not 0:
+            return False
+        if step > 0:
+            if val < start or val >= stop:
+                return False
+        elif val > start or val <= stop:
+            return False
+        return (val - start) % step is 0
+    ans.__getitem__ = def(i):
+        if i < 0:
+            i += length
+        if i < 0 or i >= length:
+            raise IndexError('range object index out of range')
+        return start + i * step
+    ans.__eq__ = def(other):
+        if not other or not other.ρσ_is_range:
+            return False
+        if length is not other.__len__():
+            return False
+        return length is 0 or (start is other.start and (length is 1 or step is other.step))
+    ans.__reversed__ = def():
+        return ρσ_range(start + (length - 1) * step, start - step, -step)
     ans.__repr__ = def():
-        return f'range({start}, {stop}, {step})'
+        return f'range({start}, {stop})' if step is 1 else f'range({start}, {stop}, {step})'
     ans.__str__ = ans.toString = ans.__repr__
     if jstype(Proxy) is 'function':
         ans = new Proxy(ans, {
@@ -287,23 +448,30 @@ def ρσ_range(start, stop, step):
                     if not isNaN(iprop):
                         prop = iprop
                 if jstype(prop) is 'number':
-                    if not obj._cached:
-                        obj._cached = list(obj)
-                    return obj._cached[prop]
+                    return obj.__getitem__(prop)
                 return obj[prop]
         })
     return ans
 
+def ρσ_no_attribute(obj, name):
+    if jstype(obj) is 'function' and obj.__name__:
+        return AttributeError("type object '" + obj.__name__ + "' has no attribute '" + name + "'")
+    return AttributeError("'" + ρσ_type(obj).__name__ + "' object has no attribute '" + name + "'")
+
 def ρσ_getattr(obj, name, defval):
     try:
         ret = obj[name]
-    except TypeError:
+    except TypeError:  # obj is None / undefined
         if defval is undefined:
-            raise AttributeError('The attribute ' + name + ' is not present')
+            raise ρσ_no_attribute(obj, name)
         return defval
-    if ret is undefined and not v'(name in obj)':
+    except AttributeError:  # raised by __getattr__ / a property
         if defval is undefined:
-            raise AttributeError('The attribute ' + name + ' is not present')
+            raise
+        return defval
+    if ret is undefined and not v'(name in Object(obj))':
+        if defval is undefined:
+            raise ρσ_no_attribute(obj, name)
         ret = defval
     return ret
 
@@ -311,19 +479,33 @@ def ρσ_setattr(obj, name, value):
     obj[name] = value
 
 def ρσ_hasattr(obj, name):
-    return v'name in obj'
+    if obj is None or obj is undefined:
+        return v'name in Object(obj)'
+    try:
+        val = obj[name]
+    except AttributeError:
+        return False  # __getattr__ / a property raised
+    return val is not undefined or v'name in Object(obj)'
 
 ρσ_len = (def ():
 
     def len(obj):
         if ρσ_arraylike(obj): return obj.length
-        if jstype(obj.__len__) is 'function': return obj.__len__()
+        if obj is None or obj is undefined:
+            raise TypeError("object of type 'NoneType' has no len()")
+        if jstype(obj.__len__) is 'function': return obj.__len__()  # (incl. a class-level __len__, e.g. an Enum)
+        if v'typeof obj === "number" || typeof obj === "boolean" || typeof obj === "bigint" || typeof obj === "function"':
+            raise TypeError("object of type '" + ρσ_arith_type_name(obj) + "' has no len()")
         if v'obj instanceof Set' or v'obj instanceof Map': return obj.size
         return Object.keys(obj).length
 
     def len5(obj):
         if ρσ_arraylike(obj): return obj.length
-        if jstype(obj.__len__) is 'function': return obj.__len__()
+        if obj is None or obj is undefined:
+            raise TypeError("object of type 'NoneType' has no len()")
+        if jstype(obj.__len__) is 'function': return obj.__len__()  # (incl. a class-level __len__, e.g. an Enum)
+        if v'typeof obj === "number" || typeof obj === "boolean" || typeof obj === "bigint" || typeof obj === "function"':
+            raise TypeError("object of type '" + ρσ_arith_type_name(obj) + "' has no len()")
         return Object.keys(obj).length
 
     return len if v'typeof Set' is 'function' and v'typeof Map' is 'function' else len5
@@ -355,21 +537,57 @@ def ρσ_pow(x, y, z):
         ans %= z
     return ans
 
+# Returned by binary dunders (__add__, __eq__, ...) that don't handle the other
+# operand; the operator helpers then try the reflected method, as Python does.
+v'var NotImplemented = Object.freeze({__repr__: function () { return "NotImplemented"; }, __str__: function () { return "NotImplemented"; }, toString: function () { return "NotImplemented"; }})'
+
 ρσ_NoneType = v'{"__name__": "NoneType"}'
 ρσ_NoneType.toString = def(): return "<class 'NoneType'>";
-ρσ_js_builtin_names = v'{"Number": "float", "String": "str", "Boolean": "bool", "Array": "list", "Object": "object", "Function": "function", "RegExp": "RegExp", "Date": "datetime", "Map": "dict", "Set": "set", "Uint8Array": "bytes"}'
+ρσ_js_builtin_names = v'{"Number": "float", "String": "str", "Boolean": "bool", "Array": "list", "Object": "object", "Function": "function", "RegExp": "RegExp", "Date": "datetime", "Map": "dict", "Set": "set", "Uint8Array": "bytes", "ReferenceError": "NameError", "InternalError": "RecursionError"}'
 
-def ρσ_type(x):
+def ρσ_type(x, bases, ns):
+    if arguments.length is 3:
+        return ρσ_make_class(x, bases, ns)  # type(name, bases, dict)
     if x is None or x is undefined:
         return ρσ_NoneType
-    c = x.constructor
+    t = jstype(x)
+    if t is 'number':
+        c = ρσ_int if Number.isInteger(x) else ρσ_float
+    elif t is 'string':
+        c = ρσ_str
+    elif t is 'boolean':
+        c = ρσ_bool
+    elif Array.isArray(x) and (x.constructor is Array or x.constructor is ρσ_list_constructor or x.constructor is ρσ_tuple_constructor):
+        c = ρσ_tuple_constructor if x.ρσ_is_tuple else ρσ_list_constructor
+    elif t is 'function' and ((x.prototype and Array.isArray(x.prototype.__bases__)) or v'[ρσ_int, ρσ_float, ρσ_bool, ρσ_str, ρσ_object, ρσ_type, ρσ_list_constructor, ρσ_tuple_constructor, ρσ_dict, ρσ_set, ρσ_frozenset].indexOf(x) >= 0'):
+        c = x.ρσ_metaclass or ρσ_type  # the type of a class is its metaclass
+    else:
+        c = x.constructor
     if not c:
         return ρσ_NoneType
     if not v'Object.prototype.hasOwnProperty.call(c, "__ρσ_ts")':
         n = c.__name__ or ρσ_js_builtin_names[c.name] or c.name or 'object'
         c.toString = def(): return "<class '" + n + "'>";
         c.__ρσ_ts = True
+        # Native errors (TypeError, ReferenceError, ...) reach user code through
+        # `except`; give them the Python name so type(e).__name__ works.
+        if not c.__name__ and (c is Error or v'c.prototype instanceof Error'):
+            c.__name__ = n
     return c
+
+# type is subclassable (metaclasses): see ρσ_apply_metaclass
+ρσ_type.__name__ = ρσ_type.__qualname__ = 'type'
+ρσ_type.prototype.__init__ = def(): pass;
+# type.__call__(cls, *args): construct an instance (used via super().__call__ in a metaclass)
+v'ρσ_type.prototype.__call__ = function () { var saved = ρσ_meta_bypass; ρσ_meta_bypass = this; try { return this.apply(undefined, arguments); } finally { ρσ_meta_bypass = saved; } }'
+ρσ_type.__new__ = def(mcs, name, bases, ns):
+    if ρσ_pending_class:
+        return ρσ_pending_class  # super().__new__() inside a metaclass's __new__
+    cls = ρσ_make_class(name, bases, ns)
+    if mcs and mcs is not ρσ_type:
+        ρσ_apply_metaclass(cls, mcs)
+    return cls
+ρσ_type.toString = def(): return "<class 'type'>";
 
 
 def ρσ_issubclass(cls, base):
@@ -378,13 +596,17 @@ def ρσ_issubclass(cls, base):
             if ρσ_issubclass(cls, b):
                 return True
         return False
+    if base is not None and base is not undefined and jstype(base.__subclasscheck__) is 'function':
+        return bool(base.__subclasscheck__(cls))  # ABCs (collections.abc, numbers)
     if jstype(cls) is not 'function':
         raise TypeError('issubclass() arg 1 must be a class')
     if jstype(base) is not 'function':
         raise TypeError('issubclass() arg 2 must be a class')
-    if cls is base:
-        return True
+    if cls is base or base is ρσ_object or (cls is ρσ_bool and base is ρσ_int):
+        return True  # everything is an object; bool subclasses int
     v'var proto = cls.prototype; while (proto !== null && proto !== undefined) { if (proto === base.prototype) return true; proto = Object.getPrototypeOf(proto); }'
+    if cls.ρσ_multi:
+        return ρσ_mro(cls).indexOf(base) >= 0  # a non-first base of a multiple-inheritance class
     return False
 
 
@@ -401,6 +623,12 @@ def ρσ_hash(obj):
             ρσ_h = (((ρσ_h << 5) + ρσ_h) ^ obj.charCodeAt(ρσ_i)) | 0;
         }
         return ρσ_h;
+    }'''
+    v'''if (obj.ρσ_is_tuple === true) {
+        // Tuples hash by value, like Python's (unhashable elements raise)
+        var ρσ_th = 0x345678;
+        for (var ρσ_ti = 0; ρσ_ti < obj.length; ρσ_ti++) ρσ_th = Math.imul(ρσ_th ^ ρσ_hash(obj[ρσ_ti]), 1000003);
+        return (ρσ_th ^ obj.length) | 0;
     }'''
     v'if (obj.__hash__ === null) throw new TypeError("unhashable type: \'" + (obj.constructor && obj.constructor.name ? obj.constructor.name : "object") + "\'")'
     v'if (typeof obj.__hash__ === "function") return obj.__hash__()'
@@ -438,25 +666,41 @@ def ρσ_divmod(x, y):
     if y is 0:
         raise ZeroDivisionError('integer division or modulo by zero')
     d = Math.floor(x / y)
-    return d, x - d * y
+    return ρσ_tuple_decorate([d, x - d * y])
 
 
 def ρσ_max(*args, **kwargs):
+    # Bound to Math.max (for max) or Math.min (for min). Returns the first
+    # element whose key is largest / smallest, compared with Python ordering
+    # (strings, lists and tuples, objects defining __lt__ / __gt__), as Python does.
+    is_max = this is Math.max
+    name = 'max' if is_max else 'min'
+    defval = kwargs.defval if kwargs.defval is not undefined else kwargs['default']
     if args.length is 0:
-        if kwargs.defval is not undefined:
-            return kwargs.defval
-        raise TypeError('expected at least one argument')
-    if args.length is 1:
-        args = args[0]
-    if kwargs.key:
-        args = [kwargs.key(x) for x in args]
-    if not Array.isArray(args):
-        args = list(args)
-    if args.length:
-        return this.apply(None, args)
-    if kwargs.defval is not undefined:
-        return kwargs.defval
-    raise TypeError('expected at least one argument')
+        if defval is not undefined:
+            return defval  # RapydScript extension: max(defval=x)
+        raise TypeError(name + ' expected at least 1 argument, got 0')
+    items = args[0] if args.length is 1 else args
+    if not Array.isArray(items):
+        items = list(items)
+    if items.length is 0:
+        if defval is not undefined:
+            return defval
+        raise ValueError(name + '() iterable argument is empty')
+    key = kwargs.key
+    best = items[0]
+    best_key = key(best) if key else best
+    for v'var i = 1; i < items.length; i++':
+        item = items[i]
+        k = key(item) if key else item
+        if jstype(k) is 'number' and jstype(best_key) is 'number':
+            better = v'k > best_key' if is_max else v'k < best_key'
+        else:
+            better = ρσ_op_gt(k, best_key) if is_max else ρσ_op_lt(k, best_key)
+        if better:
+            best = item
+            best_key = k
+    return best
 
 
 class ρσ_slice:
@@ -602,17 +846,42 @@ def ρσ_eval(expr, globals, locals):
     '''
 ρσ_eval.__name__ = 'eval'
 
-def ρσ_vars(obj):
+def ρσ_vars(obj, write_through):
     # vars(obj) -> dict of obj's own instance attributes (like Python's obj.__dict__)
     # vars()    -> compiler rewrites to vars(this) — see output/functions.pyj
+    # write_through (obj.__dict__): setting / deleting keys changes the object
     v'''
     var _d;
+    if (write_through === true && typeof obj === "function" && obj.prototype && Array.isArray(obj.prototype.__bases__)) {
+        // Cls.__dict__: the class namespace (methods, class variables and the
+        // class's own static attributes), read-only like Python's mappingproxy
+        _d = ρσ_class_namespace(obj);
+        Object.keys(obj).forEach(function (k) {
+            if (k.indexOf("ρσ") !== 0 && !_d.jsmap.has(k)) _d.jsmap.set(k, obj[k]);
+        });
+        if (obj.__doc__ !== undefined) _d.jsmap.set("__doc__", obj.__doc__);
+        var ro = function () { throw new TypeError("'mappingproxy' object does not support item assignment"); };
+        _d.jsmap.set = ro;
+        _d.jsmap.delete = ro;
+        _d.jsmap.clear = ro;
+        return _d;
+    }
     if (typeof ρσ_dict === "function") {
         _d = new ρσ_dict();
         if (obj !== undefined && obj !== null) {
+            var proto = Object.getPrototypeOf(obj);
             Object.keys(obj).forEach(function(k) {
-                if (k.charCodeAt(0) !== 0x03c1) { _d.jsmap.set(k, obj[k]); }
+                if (k.charCodeAt(0) === 0x03c1) return;
+                // methods bound onto the instance (bound_methods) aren't attributes
+                if (typeof obj[k] === "function" && proto && typeof proto[k] === "function") return;
+                _d.jsmap.set(k, obj[k]);
             });
+            if (write_through === true && typeof obj === "object") {
+                var jm = _d.jsmap, jset = jm.set, jdel = jm.delete, jclear = jm.clear;
+                jm.set = function (k, v) { jset.call(jm, k, v); if (typeof k === "string") obj[k] = v; return jm; };
+                jm.delete = function (k) { var had = jdel.call(jm, k); if (typeof k === "string") delete obj[k]; return had; };
+                jm.clear = function () { jm.forEach(function (v, k) { if (typeof k === "string") delete obj[k]; }); jclear.call(jm); };
+            }
         }
     } else {
         _d = Object.create(null);
@@ -852,10 +1121,11 @@ class ρσ_complex:
 
 ρσ_complex.__name__ = 'complex'
 
+v'var property = ρσ_property, delattr = ρσ_delattr'
 v'var abs = ρσ_abs, max = ρσ_max.bind(Math.max), min = ρσ_max.bind(Math.min), bool = ρσ_bool, type = ρσ_type'
 v'var float = ρσ_float, int = ρσ_int, long = ρσ_long, complex = ρσ_complex, arraylike = ρσ_arraylike_creator(), ρσ_arraylike = arraylike'
 v'var id = ρσ_id, get_module = ρσ_get_module, pow = ρσ_pow, divmod = ρσ_divmod, __import__ = ρσ__import__'
-v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, callable = ρσ_callable, round = ρσ_round'
+v'var dir = ρσ_dir, ord = ρσ_ord, chr = ρσ_chr, bin = ρσ_bin, hex = ρσ_hex, oct = ρσ_oct, callable = ρσ_callable, round = ρσ_round'
 v'var enumerate = ρσ_enumerate, iter = ρσ_iter, reversed = ρσ_reversed, len = ρσ_len'
 v'var range = ρσ_range, getattr = ρσ_getattr, setattr = ρσ_setattr, hasattr = ρσ_hasattr, issubclass = ρσ_issubclass, hash = ρσ_hash, next = ρσ_next'
 v'var exec = ρσ_exec'

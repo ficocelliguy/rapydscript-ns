@@ -3,6 +3,39 @@
 
 # globals: exports, console, ρσ_iterator_symbol, ρσ_kwargs_symbol, ρσ_arraylike, ρσ_list_contains, ρσ_list_constructor, ρσ_str, ρσ_int, ρσ_float, ρσ_slice
 
+# lst.append / s.upper / st.add read as a value: bind the builtin method to its
+# receiver, as Python's bound methods do. Other values are returned unchanged.
+v"""
+function ρσ_attr_bind(obj, name) {
+    var v = obj[name];
+    if (typeof v !== "function" || typeof obj === "function" || ρσ_is_class_proto(obj)) return v;
+    var builtin = v === Array.prototype[name] || v === String.prototype[name] || v === ρσ_str.prototype[name] ||
+        v === ρσ_set.prototype[name] || v === ρσ_frozenset.prototype[name] ||
+        v === ρσ_list_extend || v === ρσ_list_index || v === ρσ_list_pop || v === ρσ_list_remove ||
+        v === ρσ_list_insert || v === ρσ_list_copy || v === ρσ_list_clear || v === ρσ_list_count ||
+        v === ρσ_list_sort || v === ρσ_tuple_count || v === ρσ_tuple_index ||
+        v === Array.prototype.push || v === Array.prototype.pop || v === Array.prototype.reverse;
+    return builtin ? v.bind(obj) : v;
+}
+"""
+
+# Unbound names: `del x` stores ρσ_unbound; reads that may find a name unbound
+# go through ρσ_check_bound (see mark_unbound_reads in parse.pyj)
+v"""
+var ρσ_unbound = Object.freeze({toString: function () { return "<unbound>"; }});
+function ρσ_del_name(value, name, kind) {
+    ρσ_check_bound(value, name, kind);
+    return ρσ_unbound;
+}
+function ρσ_check_bound(value, name, kind) {
+    if (value === ρσ_unbound || (value === undefined && (kind === "local" || kind === "global"))) {
+        if (kind === "local" || kind === "del_local") throw new UnboundLocalError("cannot access local variable '" + name + "' where it is not associated with a value");
+        throw new ReferenceError("name '" + name + "' is not defined");
+    }
+    return value;
+}
+"""
+
 def ρσ_eslice(arr, step, start, end):
     if jstype(arr) is 'string' or v'arr instanceof String':
         is_string = True
@@ -16,9 +49,14 @@ def ρσ_eslice(arr, step, start, end):
     if jstype(start) is "undefined": start = 0
     if jstype(end) is "undefined": end = arr.length
 
-    arr = arr.slice(start, end).filter(def(e, i): return i % step is 0;)
+    is_tuple = arr.ρσ_is_tuple
+    arr = Array.prototype.slice.call(arr, start, end).filter(def(e, i): return i % step is 0;)
     if is_string:
         arr = arr.join('')
+    elif is_tuple:
+        arr = ρσ_tuple_decorate(arr)  # a slice of a tuple is a tuple
+    else:
+        arr = ρσ_list_decorate(arr)
     return arr
 
 def ρσ_delslice(arr, step, start, end):
@@ -57,16 +95,29 @@ def ρσ_flatten(arr):
     return ans
 
 def ρσ_unpack_asarray(num, iterable):
+    # a, b = iterable: Python requires exactly as many values as targets
     if ρσ_arraylike(iterable):
-        return iterable
-    ans = v'[]'
-    if jstype(iterable[ρσ_iterator_symbol]) is 'function':
-        iterator = iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
-        result = iterator.next()
-        while not result.done and ans.length < num:
-            ans.push(result.value)
+        ans = iterable
+    else:
+        ans = v'[]'
+        if iterable is not None and iterable is not undefined and jstype(iterable[ρσ_iterator_symbol]) is 'function':
+            iterator = iterable.keys() if jstype(Map) is 'function' and v'iterable instanceof Map' else iterable[ρσ_iterator_symbol]()
             result = iterator.next()
+            while not result.done and ans.length <= num:  # one extra reveals "too many"
+                ans.push(result.value)
+                result = iterator.next()
+        else:
+            raise TypeError('cannot unpack non-iterable ' + ρσ_arith_type_name(iterable) + ' object')
+    if ans.length > num:
+        raise ValueError('too many values to unpack (expected ' + num + ')')
+    if ans.length < num:
+        raise ValueError('not enough values to unpack (expected ' + num + ', got ' + ans.length + ')')
     return ans
+
+def ρσ_index_error(obj, key, assigning):
+    # Python's IndexError for an out-of-range index on a list, tuple or str
+    kind = 'string' if jstype(obj) is 'string' else ('tuple' if obj.ρσ_is_tuple else 'list')
+    raise IndexError(kind + (' assignment' if assigning else '') + ' index out of range')
 
 def ρσ_unpack_iter_check(value):
     # Raised when a for-loop tuple-unpacks a value that is a string. In Python,
@@ -129,6 +180,12 @@ def ρσ_in(val, arr):
         return arr.has(val)
     if ρσ_arraylike(arr):
         return ρσ_list_contains.call(arr, val)
+    if jstype(arr[ρσ_iterator_symbol]) is 'function' or jstype(arr.__getitem__) is 'function':
+        # no __contains__: search what iterating the object yields
+        for item in ρσ_Iterable(arr):
+            if item is val or ρσ_equals(item, val):
+                return True
+        return False
     return Object.prototype.hasOwnProperty.call(arr, val)
 
 def ρσ_Iterable(iterable):
@@ -144,8 +201,31 @@ def ρσ_Iterable(iterable):
             ans.push(result.value)
             result = iterator.next()
         return ans
+    if jstype(iterable.__getitem__) is 'function':
+        return ρσ_Iterable(ρσ_getitem_iterator(iterable))  # the old sequence protocol
     # so we can use 'for ... in' syntax with objects, as we would with dicts in python
     return Object.keys(iterable)
+
+# Iterating an object that only defines __getitem__: items 0, 1, 2, ... until
+# IndexError (or StopIteration), as Python's sequence iteration protocol
+def ρσ_getitem_iterator(obj):
+    ans = v'{"_i": 0, "_done": false}'
+    ans[ρσ_iterator_symbol] = def():
+        return this
+    ans['next'] = def():
+        if this._done:
+            return v"{'done':true}"
+        try:
+            val = obj.__getitem__(this._i)
+        except IndexError:
+            this._done = True
+            return v"{'done':true}"
+        except StopIteration:
+            this._done = True
+            return v"{'done':true}"
+        this._i += 1
+        return v"{'done':false,'value':val}"
+    return ans
 
 def ρσ_desugar_kwargs():
     ans = Object.create(None)
@@ -161,6 +241,303 @@ def ρσ_desugar_kwargs():
             for v'var j = 0; j < keys.length; j++':
                 ans[keys[j]] = arg[keys[j]]
     return ans
+
+# A method compiles to a function that takes `self` from `this`, but a Python
+# decorator receives (and its wrapper calls) a function that takes `self` as
+# its first argument. A decorated method is therefore compiled as
+#   ρσ_method_from_func(decorator(ρσ_func_from_method(function m(x) {...})))
+
+def ρσ_copy_func_props(src, dst, drop_first_argname):
+    for name in Object.getOwnPropertyNames(src):
+        if name is 'length' or name is 'name' or name is 'prototype' or name is 'arguments' or name is 'caller' or name is 'ρσ_method' or name is 'ρσ_self_is_this':
+            continue
+        if v'Object.prototype.hasOwnProperty.call(dst, name)':
+            continue
+        desc = Object.getOwnPropertyDescriptor(src, name)
+        if name is '__argnames__' and Array.isArray(desc.value):
+            desc.value = desc.value.slice(1) if drop_first_argname else ['self'].concat(desc.value)
+        v'Object.defineProperty(dst, name, desc)'
+    if src.name:
+        v'Object.defineProperty(dst, "name", {value: src.name, configurable: true})'
+
+def ρσ_func_from_method(m):
+    f = v'function () { return m.apply(arguments[0], Array.prototype.slice.call(arguments, 1)); }'
+    ρσ_copy_func_props(m, f, False)
+    v'Object.defineProperty(f, "ρσ_method", {value: m})'
+    return f
+
+def ρσ_method_from_func(f):
+    if jstype(f) is not 'function':
+        return f  # e.g. a descriptor object; leave it to attribute lookup
+    if f.ρσ_method:
+        # The decorator returned the function it was given (it registered or
+        # marked it): keep the original method, plus anything set on it.
+        m = f.ρσ_method
+        ρσ_copy_func_props(f, m, True)
+        return m
+    method = v'function () { return f.apply(this, [this].concat(Array.prototype.slice.call(arguments))); }'
+    ρσ_copy_func_props(f, method, True)
+    v'Object.defineProperty(method, "ρσ_self_is_this", {value: true})'
+    return method
+
+# ── Descriptors, property, delattr and metaclasses ──────────────────────────
+v"""
+function ρσ_is_class_proto(o) {
+    return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, "constructor") && typeof o.constructor === "function" && o.constructor.prototype === o;
+}
+
+// A method (self is `this`) as a function taking self first
+function ρσ_as_func(f) {
+    if (typeof f === "function" && f.ρσ_self_is_this) return ρσ_func_from_method(f);
+    return f;
+}
+
+function ρσ_define_deleter(proto, name, fn) {
+    if (!Object.prototype.hasOwnProperty.call(proto, "ρσ_deleters")) {
+        Object.defineProperty(proto, "ρσ_deleters", {value: Object.create(proto.ρσ_deleters || null), configurable: true});
+    }
+    proto.ρσ_deleters[name] = fn;
+}
+
+function ρσ_property(fget, fset, fdel, doc) {
+    if (!(this instanceof ρσ_property)) return new ρσ_property(fget, fset, fdel, doc);
+    this.fget = ρσ_as_func(fget === undefined ? null : fget);
+    this.fset = ρσ_as_func(fset === undefined ? null : fset);
+    this.fdel = ρσ_as_func(fdel === undefined ? null : fdel);
+    this.__doc__ = (doc === undefined || doc === null) ? ((fget && fget.__doc__) || null) : doc;
+    Object.defineProperty(this, "ρσ_name", {value: (fget && fget.name) || "", writable: true, configurable: true});
+}
+Object.defineProperty(ρσ_property, "__argnames__", {value: ["fget", "fset", "fdel", "doc"]});
+ρσ_property.__name__ = ρσ_property.__qualname__ = "property";
+ρσ_property.prototype.ρσ_missing = function (what) {
+    return "property '" + this.ρσ_name + "' of '" + ((this.ρσ_owner && this.ρσ_owner.__name__) || "object") + "' object has no " + what;
+};
+ρσ_property.prototype.__get__ = function (obj, objtype) {
+    if (obj === null || obj === undefined) return this;
+    if (typeof this.fget !== "function") throw new AttributeError(this.ρσ_missing("getter"));
+    return this.fget(obj);
+};
+ρσ_property.prototype.__set__ = function (obj, value) {
+    if (typeof this.fset !== "function") throw new AttributeError(this.ρσ_missing("setter"));
+    this.fset(obj, value);
+};
+ρσ_property.prototype.__delete__ = function (obj) {
+    if (typeof this.fdel !== "function") throw new AttributeError(this.ρσ_missing("deleter"));
+    this.fdel(obj);
+};
+ρσ_property.prototype.__set_name__ = function (owner, name) {
+    this.ρσ_name = name;
+    Object.defineProperty(this, "ρσ_owner", {value: owner, configurable: true, writable: true});
+};
+ρσ_property.prototype.getter = function (f) { return ρσ_property(f, this.fset, this.fdel, this.__doc__); };
+ρσ_property.prototype.setter = function (f) { return ρσ_property(this.fget, f, this.fdel, this.__doc__); };
+ρσ_property.prototype.deleter = function (f) { return ρσ_property(this.fget, this.fset, f, this.__doc__); };
+ρσ_property.prototype.__repr__ = function () { return "<property object>"; };
+ρσ_property.prototype.__str__ = ρσ_property.prototype.__repr__;
+
+// Class variables holding descriptors (objects with __get__/__set__/__delete__)
+// become accessors on the prototype; __set_name__ is called on every class
+// variable that has one, as type.__new__ does.
+function ρσ_install_descriptors(cls) {
+    var proto = cls.prototype;
+    if (!proto) return;
+    var names = Object.getOwnPropertyNames(proto);
+    for (var i = 0; i < names.length; i++) {
+        var name = names[i];
+        if (name === "constructor" || name === "__bases__") continue;
+        var d = Object.getOwnPropertyDescriptor(proto, name);
+        if (!d || !("value" in d)) continue;
+        var v = d.value;
+        if (v === null || typeof v !== "object" || Array.isArray(v)) continue;
+        var has_get, has_set, has_del, set_name;
+        try {
+            has_get = typeof v.__get__ === "function";
+            has_set = typeof v.__set__ === "function";
+            has_del = typeof v.__delete__ === "function";
+            set_name = v.__set_name__;
+        } catch (e) { continue; }
+        if (typeof set_name === "function") v.__set_name__(cls, name);
+        if (!has_get && !has_set && !has_del) continue;
+        ρσ_install_descriptor(proto, name, v, d.enumerable);
+        if (has_del) ρσ_define_deleter(proto, name, ρσ_descriptor_deleter(v));
+    }
+}
+
+function ρσ_descriptor_deleter(v) {
+    return function () { v.__delete__(this); };
+}
+
+function ρσ_install_descriptor(proto, name, v, enumerable) {
+    Object.defineProperty(proto, name, {
+        enumerable: enumerable,
+        configurable: true,
+        get: function () {
+            if (typeof v.__get__ !== "function") return v;
+            if (ρσ_is_class_proto(this)) return v.__get__(null, this.constructor);
+            return v.__get__(this, this.constructor);
+        },
+        set: function (value) {
+            if (typeof v.__set__ === "function" && !ρσ_is_class_proto(this)) v.__set__(this, value);
+            else Object.defineProperty(this, name, {value: value, writable: true, enumerable: true, configurable: true});
+        }
+    });
+}
+
+function ρσ_delattr(obj, name) {
+    if (obj === null || obj === undefined) throw new AttributeError("'NoneType' object has no attribute '" + name + "'");
+    if (typeof obj.__delattr__ === "function") {
+        delete obj[name];
+        return;
+    }
+    var deleters = obj.ρσ_deleters;
+    if (deleters && typeof deleters[name] === "function") {
+        deleters[name].call(obj);
+        return;
+    }
+    if (Object.prototype.hasOwnProperty.call(obj, name)) {
+        if (!delete obj[name]) throw new AttributeError("cannot delete attribute '" + name + "'");
+        return;
+    }
+    if (typeof obj === "function" && obj.prototype && Object.prototype.hasOwnProperty.call(obj.prototype, name)) {
+        delete obj.prototype[name];
+        return;
+    }
+    var tname = (typeof obj === "function" && obj.__name__) ? "type object '" + obj.__name__ + "'" : "'" + ρσ_type(obj).__name__ + "' object";
+    if (name in Object(obj)) throw new AttributeError(tname + " attribute '" + name + "' cannot be deleted");
+    throw new AttributeError(tname + " has no attribute '" + name + "'");
+}
+
+// Metaclasses. class C(metaclass=M) is still a JS constructor; once it exists,
+// M.__new__ and M.__init__ run with (name, bases, namespace), M's methods are
+// reachable from C (and its subclasses), and isinstance(C, M) / type(C) work.
+var ρσ_pending_class = null;
+
+// A metaclass's __call__ runs instead of the constructor (classes compiled
+// with a metaclass check ρσ_mcall first); type.__call__ then builds the
+// instance, with ρσ_meta_bypass letting that one construction through.
+var ρσ_meta_bypass = null;
+
+function ρσ_meta_enter(cls, self) {
+    if (ρσ_meta_bypass === cls) {
+        if (self instanceof cls) ρσ_meta_bypass = null;
+        return false;
+    }
+    return true;
+}
+
+function ρσ_meta_call(cls, args) {
+    return cls.ρσ_metaclass.prototype.__call__.apply(cls, args);
+}
+
+function ρσ_class_namespace(cls) {
+    var ns = ρσ_dict(), proto = cls.prototype;
+    ns.jsmap.set("__module__", cls.__module__);
+    ns.jsmap.set("__qualname__", cls.__qualname__ || cls.__name__);
+    var names = Object.getOwnPropertyNames(proto);
+    for (var i = 0; i < names.length; i++) {
+        var k = names[i];
+        if (k === "constructor" || k === "__bases__" || k === "__class__" || k === "__bind_methods__" || k.indexOf("ρσ") === 0) continue;
+        var d = Object.getOwnPropertyDescriptor(proto, k);
+        ns.jsmap.set(k, "value" in d ? d.value : proto[k]);
+    }
+    return ns;
+}
+
+function ρσ_metaclass_methods(cls, M) {
+    var seen = Object.create(null);
+    for (var p = M.prototype; p && p !== ρσ_type.prototype && p !== Object.prototype; p = Object.getPrototypeOf(p)) {
+        var names = Object.getOwnPropertyNames(p);
+        for (var i = 0; i < names.length; i++) {
+            var k = names[i];
+            if (seen[k] || k === "constructor" || k === "__init__" || k === "__bases__" || k === "__class__" || k === "__bind_methods__" || k.indexOf("ρσ") === 0) continue;
+            seen[k] = true;
+            var d = Object.getOwnPropertyDescriptor(p, k);
+            if (d.get) {
+                Object.defineProperty(cls, k, {get: d.get, set: d.set, configurable: true});
+            } else if (typeof d.value === "function" && !(k in cls)) {
+                Object.defineProperty(cls, k, {get: ρσ_bind_to_this(d.value), configurable: true});
+            } else if (!(k in cls)) {
+                ρσ_forward_meta_attr(cls, p, k);  // a metaclass attribute, read through the class
+            }
+        }
+    }
+}
+
+function ρσ_forward_meta_attr(cls, proto, k) {
+    Object.defineProperty(cls, k, {
+        get: function () { return proto[k]; },
+        set: function (v) { Object.defineProperty(this, k, {value: v, writable: true, enumerable: true, configurable: true}); },
+        configurable: true
+    });
+}
+
+function ρσ_bind_to_this(f) {
+    return function () { return f.bind(this); };
+}
+
+function ρσ_apply_metaclass(cls, M) {
+    if (typeof M !== "function") return;
+    Object.defineProperty(cls, "ρσ_metaclass", {value: M, writable: true, configurable: true});
+    if (M === ρσ_type) return;
+    var bases = ρσ_tuple_decorate((cls.prototype.__bases__ || []).slice());
+    var name = cls.__name__;
+    if (!(M.prototype instanceof ρσ_type)) {
+        M(name, bases, ρσ_class_namespace(cls));  // a plain callable used as the metaclass
+        return;
+    }
+    ρσ_metaclass_methods(cls, M);
+    if (typeof M.prototype.__call__ === "function" && M.prototype.__call__ !== ρσ_type.prototype.__call__) {
+        Object.defineProperty(cls, "ρσ_mcall", {value: true, configurable: true});
+    }
+    if (typeof M.__new__ === "function" && M.__new__ !== ρσ_type.__new__) {
+        var ns = ρσ_class_namespace(cls), saved = ρσ_pending_class;
+        ρσ_pending_class = cls;
+        try {
+            M.__new__(M, name, bases, ns);
+        } finally {
+            ρσ_pending_class = saved;
+        }
+        // changes the metaclass made to the namespace apply to the class
+        ns.jsmap.forEach(function (val, key) {
+            if (typeof key === "string" && key !== "__module__" && key !== "__qualname__" && cls.prototype[key] !== val) cls.prototype[key] = val;
+        });
+    }
+    var init = M.prototype.__init__;
+    if (typeof init === "function" && init !== ρσ_type.prototype.__init__) init.call(cls, name, bases, ρσ_class_namespace(cls));
+}
+
+// type(name, bases, dict): create a class at runtime
+function ρσ_make_class(name, bases, ns) {
+    bases = bases ? Array.prototype.slice.call(bases) : [];
+    var parent = bases.length ? bases[0] : null;
+    var C = function () {
+        if (C.ρσ_mcall && ρσ_meta_enter(C, this)) return ρσ_meta_call(C, arguments);
+        if (!(this instanceof C)) return new C(...arguments);
+        if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value": ++ρσ_object_counter});
+        if (typeof this.__init__ === "function") this.__init__.apply(this, arguments);
+    };
+    if (parent) ρσ_extends(C, parent);
+    Object.defineProperty(C, "name", {value: name, configurable: true});
+    var entries = [];
+    if (ns && ns.jsmap) ns.jsmap.forEach(function (v, k) { entries.push([k, v]); });
+    else if (ns) Object.keys(ns).forEach(function (k) { entries.push([k, ns[k]]); });
+    for (var i = 0; i < entries.length; i++) {
+        var k = entries[i][0], v = entries[i][1];
+        if (k === "__module__" || k === "__qualname__") continue;
+        C.prototype[k] = (typeof v === "function" && !v.ρσ_self_is_this) ? ρσ_method_from_func(v) : v;
+    }
+    Object.defineProperty(C.prototype, "__bases__", {value: bases.length ? bases : [ρσ_object]});
+    C.__name__ = name;
+    C.__qualname__ = name;
+    Object.defineProperty(C, "__module__", {value: "__main__", writable: true, configurable: true});
+    Object.defineProperty(C.prototype, "__class__", {get: function () { return this.constructor; }, configurable: true});
+    ρσ_install_descriptors(C);
+    if (parent && typeof parent.__init_subclass__ === "function") parent.__init_subclass__.call(C);
+    if (bases.length > 1) ρσ_mixin.apply(null, [C].concat(bases.slice(1)));
+    if (C.ρσ_metaclass) ρσ_apply_metaclass(C, C.ρσ_metaclass);
+    return C;
+}
+"""
 
 def ρσ_interpolate_kwargs(f, supplied_args):
     if not f.__argnames__:
@@ -209,8 +586,11 @@ def ρσ_getitem(obj, key):
             v'(key.step  !== null && key.step  !== undefined) ? key.step  : 1',
             v'(key.start !== null && key.start !== undefined) ? key.start : undefined',
             v'(key.stop  !== null && key.stop  !== undefined) ? key.stop  : undefined')
-    if jstype(key) is 'number' and key < 0:
-        key += obj.length
+    if jstype(key) is 'number':
+        if key < 0:
+            key += obj.length
+        if (Array.isArray(obj) or jstype(obj) is 'string') and (key < 0 or key >= obj.length) and key % 1 is 0:
+            ρσ_index_error(obj, key)
     return obj[key]
 
 def ρσ_setitem(obj, key, val):
@@ -221,8 +601,11 @@ def ρσ_setitem(obj, key, val):
             v'(key.start !== null && key.start !== undefined) ? key.start : 0',
             v'(key.stop  !== null && key.stop  !== undefined) ? key.stop  : obj.length')
     else:
-        if jstype(key) is 'number' and key < 0:
-            key += obj.length
+        if jstype(key) is 'number':
+            if key < 0:
+                key += obj.length
+            if Array.isArray(obj) and (key < 0 or key >= obj.length) and key % 1 is 0:
+                ρσ_index_error(obj, key, True)
         obj[key] = val
     return val
 
@@ -256,6 +639,38 @@ def ρσ_splice(arr, val, start, end):
         end += arr.length
     Array.prototype.splice.apply(arr, v'[start, end - start].concat(val)')
 
+def ρσ_eslice_assign(arr, val, start, stop, step):
+    # a[start:stop:step] = val, with CPython's index rules (PySlice_AdjustIndices)
+    if step is undefined or step is None:
+        step = 1
+    if step is 0:
+        raise ValueError('slice step cannot be zero')
+    values = val if Array.isArray(val) else ρσ_list_constructor(val)
+    if step is 1:
+        return ρσ_splice(arr, values, start, stop)
+    n = arr.length
+    if step > 0:
+        lower, upper = 0, n
+    else:
+        lower, upper = -1, n - 1
+    if start is undefined or start is None:
+        start = upper if step < 0 else lower
+    else:
+        start = Math.max(start + n, lower) if start < 0 else Math.min(start, upper)
+    if stop is undefined or stop is None:
+        stop = lower if step < 0 else upper
+    else:
+        stop = Math.max(stop + n, lower) if stop < 0 else Math.min(stop, upper)
+    indices = []
+    i = start
+    while (i < stop if step > 0 else i > stop):
+        indices.push(i)
+        i += step
+    if values.length is not indices.length:
+        raise ValueError('attempt to assign sequence of size ' + values.length + ' to extended slice of size ' + indices.length)
+    for v'var j = 0; j < indices.length; j++':
+        arr[indices[j]] = values[j]
+
 ρσ_exists = {
      'n': def(expr):
         return expr is not undefined and expr is not None
@@ -277,10 +692,12 @@ def ρσ_splice(arr, val, start, end):
 v'(typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : global)["ρσ_exists"] = ρσ_exists'
 
 def ρσ_mixin():
-    # Implement a depth-first left-to-right method resolution order This is not
-    # the same as python's MRO, but I really dont feel like implementing the C3
-    # linearization right now, if that is even possible with prototypical
-    # inheritance.
+    # Copies the other bases' attributes onto the class (the JS prototype chain
+    # only follows the first base), depth-first left-to-right. super() calls
+    # and __mro__ follow the C3 linearization instead (see ρσ_mro).
+    v'Object.defineProperty(arguments[0], "ρσ_multi", {value: true, configurable: true})'
+    v'Object.defineProperty(arguments[0], "__mro__", {get: function () { return ρσ_tuple_decorate(ρσ_mro(this).slice()); }, configurable: true})'
+    ρσ_mro(arguments[0])  # raises TypeError for an inconsistent hierarchy, as class creation does
     seen = Object.create(None)
     # Ensure the following special properties are never copied
     seen.__argnames__ = seen.__handles_kwarg_interpolation__ = seen.__init__ = seen.__annotations__ = seen.__doc__ = seen.__bind_methods__ = seen.__bases__ = seen.constructor = seen.__class__ = True
@@ -303,6 +720,55 @@ def ρσ_mixin():
                 resolved_props[name] = Object.getOwnPropertyDescriptor(p, name)
             p = Object.getPrototypeOf(p)
     Object.defineProperties(target, resolved_props)
+
+v"""
+// C3 linearization of a class's bases (Python's method resolution order)
+function ρσ_mro(cls) {
+    if (Object.prototype.hasOwnProperty.call(cls, "ρσ_mro_cache")) return cls.ρσ_mro_cache;
+    var bases = (cls.prototype && Array.isArray(cls.prototype.__bases__)) ? cls.prototype.__bases__ : [];
+    bases = bases.filter(function (b) { return typeof b === "function" && b !== ρσ_object && b !== Object; });
+    var seqs = bases.map(function (b) { return ρσ_mro(b).slice(); });
+    seqs.push(bases.slice());
+    var result = [cls];
+    while (true) {
+        seqs = seqs.filter(function (q) { return q.length > 0; });
+        if (!seqs.length) break;
+        var head = null;
+        for (var i = 0; i < seqs.length && head === null; i++) {
+            var cand = seqs[i][0];
+            var in_tail = seqs.some(function (q) { return q.indexOf(cand) > 0; });
+            if (!in_tail) head = cand;
+        }
+        if (head === null) throw new TypeError("Cannot create a consistent method resolution order (MRO) for bases " + bases.map(function (b) { return b.__name__ || b.name; }).join(", "));
+        result.push(head);
+        for (var j = 0; j < seqs.length; j++) if (seqs[j][0] === head) seqs[j].shift();
+    }
+    if (result[result.length - 1] !== ρσ_object) result.push(ρσ_object);
+    Object.defineProperty(cls, "ρσ_mro_cache", {value: result, configurable: true});
+    return result;
+}
+
+function ρσ_noop() {}
+
+// super().name inside class cur: the next class after cur in the MRO of the
+// instance's (or class's) type that defines name. Without multiple inheritance
+// that is always the parent's method (dflt), so no lookup is done.
+function ρσ_super_method(cur, self, name, dflt) {
+    var cls = typeof self === "function" ? self : ((self !== null && self !== undefined) ? self.constructor : null);
+    if (cls && cls.ρσ_multi) {
+        var mro = ρσ_mro(cls), i = mro.indexOf(cur);
+        if (i >= 0) {
+            for (var j = i + 1; j < mro.length; j++) {
+                var p = mro[j].prototype;
+                if (p && Object.prototype.hasOwnProperty.call(p, name) && typeof p[name] === "function") return p[name];
+            }
+        }
+    }
+    if (dflt !== undefined) return dflt;
+    if (name === "__init__" || name === "__init_subclass__" || name === "__set_name__") return ρσ_noop;
+    throw new AttributeError("'super' object has no attribute '" + name + "'");
+}
+"""
 
 # Returns a Python-style type name used in arithmetic TypeError messages.
 def ρσ_arith_type_name(v):
@@ -328,8 +794,12 @@ def ρσ_arith_type_name(v):
 # enforces Python-style type compatibility before the native JS operation.
 # Incompatible operand types raise TypeError, mirroring Python semantics.
 def ρσ_op_add(a, b):
-    if a is not None and jstype(a.__add__) is 'function': return a.__add__(b)
-    if b is not None and jstype(b.__radd__) is 'function': return b.__radd__(a)
+    if a is not None and jstype(a.__add__) is 'function':
+        ρσ_r = a.__add__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__radd__) is 'function':
+        ρσ_r = b.__radd__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b):
         if a.ρσ_is_tuple and b.ρσ_is_tuple:
             return ρσ_tuple_constructor(a.concat(b))
@@ -342,8 +812,12 @@ def ρσ_op_add(a, b):
     raise TypeError("unsupported operand type(s) for +: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_sub(a, b):
-    if a is not None and jstype(a.__sub__) is 'function': return a.__sub__(b)
-    if b is not None and jstype(b.__rsub__) is 'function': return b.__rsub__(a)
+    if a is not None and jstype(a.__sub__) is 'function':
+        ρσ_r = a.__sub__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rsub__) is 'function':
+        ρσ_r = b.__rsub__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return a - b
@@ -351,8 +825,12 @@ def ρσ_op_sub(a, b):
     raise TypeError("unsupported operand type(s) for -: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_mul(a, b):
-    if a is not None and jstype(a.__mul__) is 'function': return a.__mul__(b)
-    if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
+    if a is not None and jstype(a.__mul__) is 'function':
+        ρσ_r = a.__mul__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rmul__) is 'function':
+        ρσ_r = b.__rmul__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(Math.max(0, b))
@@ -372,8 +850,12 @@ def ρσ_op_mul(a, b):
     raise TypeError("unsupported operand type(s) for *: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_truediv(a, b):
-    if a is not None and jstype(a.__truediv__) is 'function': return a.__truediv__(b)
-    if b is not None and jstype(b.__rtruediv__) is 'function': return b.__rtruediv__(a)
+    if a is not None and jstype(a.__truediv__) is 'function':
+        ρσ_r = a.__truediv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rtruediv__) is 'function':
+        ρσ_r = b.__rtruediv__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
@@ -384,8 +866,12 @@ def ρσ_op_truediv(a, b):
     raise TypeError("unsupported operand type(s) for /: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_floordiv(a, b):
-    if a is not None and jstype(a.__floordiv__) is 'function': return a.__floordiv__(b)
-    if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
+    if a is not None and jstype(a.__floordiv__) is 'function':
+        ρσ_r = a.__floordiv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rfloordiv__) is 'function':
+        ρσ_r = b.__rfloordiv__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'):
@@ -397,8 +883,12 @@ def ρσ_op_floordiv(a, b):
     raise TypeError("unsupported operand type(s) for //: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_mod(a, b):
-    if a is not None and jstype(a.__mod__) is 'function': return a.__mod__(b)
-    if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
+    if a is not None and jstype(a.__mod__) is 'function':
+        ρσ_r = a.__mod__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rmod__) is 'function':
+        ρσ_r = b.__rmod__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if ta is 'string' or v'a instanceof String':
@@ -412,8 +902,12 @@ def ρσ_op_mod(a, b):
     raise TypeError("unsupported operand type(s) for %: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_pow(a, b):
-    if a is not None and jstype(a.__pow__) is 'function': return a.__pow__(b)
-    if b is not None and jstype(b.__rpow__) is 'function': return b.__rpow__(a)
+    if a is not None and jstype(a.__pow__) is 'function':
+        ρσ_r = a.__pow__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rpow__) is 'function':
+        ρσ_r = b.__rpow__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return Math.pow(a, b)
@@ -424,8 +918,12 @@ def ρσ_op_pow(a, b):
     raise TypeError("unsupported operand type(s) for **: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_and(a, b):
-    if a is not None and jstype(a.__and__) is 'function': return a.__and__(b)
-    if b is not None and jstype(b.__rand__) is 'function': return b.__rand__(a)
+    if a is not None and jstype(a.__and__) is 'function':
+        ρσ_r = a.__and__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rand__) is 'function':
+        ρσ_r = b.__rand__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a & b'
@@ -433,8 +931,14 @@ def ρσ_op_and(a, b):
     raise TypeError("unsupported operand type(s) for &: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_or(a, b):
-    if a is not None and jstype(a.__or__) is 'function': return a.__or__(b)
-    if b is not None and jstype(b.__ror__) is 'function': return b.__ror__(a)
+    if a is not None and jstype(a.__or__) is 'function':
+        ρσ_r = a.__or__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__ror__) is 'function':
+        ρσ_r = b.__ror__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if ρσ_is_annotation_like(a) and ρσ_is_annotation_like(b):
+        return ρσ_union_alias(a, b)  # int | None (PEP 604)
     ta = jstype(a)
     tb = jstype(b)
     if ta is 'object' and tb is 'object' and a is not None and b is not None and not Array.isArray(a) and not Array.isArray(b) and v'a.constructor === Object' and v'b.constructor === Object':
@@ -444,8 +948,12 @@ def ρσ_op_or(a, b):
     raise TypeError("unsupported operand type(s) for |: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_xor(a, b):
-    if a is not None and jstype(a.__xor__) is 'function': return a.__xor__(b)
-    if b is not None and jstype(b.__rxor__) is 'function': return b.__rxor__(a)
+    if a is not None and jstype(a.__xor__) is 'function':
+        ρσ_r = a.__xor__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rxor__) is 'function':
+        ρσ_r = b.__rxor__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a ^ b'
@@ -453,8 +961,12 @@ def ρσ_op_xor(a, b):
     raise TypeError("unsupported operand type(s) for ^: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_lshift(a, b):
-    if a is not None and jstype(a.__lshift__) is 'function': return a.__lshift__(b)
-    if b is not None and jstype(b.__rlshift__) is 'function': return b.__rlshift__(a)
+    if a is not None and jstype(a.__lshift__) is 'function':
+        ρσ_r = a.__lshift__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rlshift__) is 'function':
+        ρσ_r = b.__rlshift__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a << b'
@@ -462,8 +974,12 @@ def ρσ_op_lshift(a, b):
     raise TypeError("unsupported operand type(s) for <<: '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_rshift(a, b):
-    if a is not None and jstype(a.__rshift__) is 'function': return a.__rshift__(b)
-    if b is not None and jstype(b.__rrshift__) is 'function': return b.__rrshift__(a)
+    if a is not None and jstype(a.__rshift__) is 'function':
+        ρσ_r = a.__rshift__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rrshift__) is 'function':
+        ρσ_r = b.__rrshift__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'number' or ta is 'boolean') and (tb is 'number' or tb is 'boolean'): return v'a >> b'
@@ -475,8 +991,12 @@ def ρσ_op_rshift(a, b):
 # lexicographically, enforces type compatibility, and raises TypeError otherwise.
 # ρσ_op_gt / ρσ_op_ge delegate to ρσ_op_lt / ρσ_op_le after dunder checks.
 def ρσ_op_lt(a, b):
-    if a is not None and jstype(a.__lt__) is 'function': return a.__lt__(b)
-    if b is not None and jstype(b.__gt__) is 'function': return b.__gt__(a)
+    if a is not None and jstype(a.__lt__) is 'function':
+        ρσ_r = a.__lt__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__gt__) is 'function':
+        ρσ_r = b.__gt__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b):
         n = Math.min(a.length, b.length)
         for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
@@ -493,8 +1013,12 @@ def ρσ_op_lt(a, b):
     raise TypeError("'<' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_le(a, b):
-    if a is not None and jstype(a.__le__) is 'function': return a.__le__(b)
-    if b is not None and jstype(b.__ge__) is 'function': return b.__ge__(a)
+    if a is not None and jstype(a.__le__) is 'function':
+        ρσ_r = a.__le__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__ge__) is 'function':
+        ρσ_r = b.__ge__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b):
         n = Math.min(a.length, b.length)
         for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
@@ -511,8 +1035,12 @@ def ρσ_op_le(a, b):
     raise TypeError("'<=' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_gt(a, b):
-    if a is not None and jstype(a.__gt__) is 'function': return a.__gt__(b)
-    if b is not None and jstype(b.__lt__) is 'function': return b.__lt__(a)
+    if a is not None and jstype(a.__gt__) is 'function':
+        ρσ_r = a.__gt__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__lt__) is 'function':
+        ρσ_r = b.__lt__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b): return ρσ_op_lt(b, a)
     ta = jstype(a)
     tb = jstype(b)
@@ -522,8 +1050,12 @@ def ρσ_op_gt(a, b):
     raise TypeError("'>' not supported between instances of '" + ρσ_arith_type_name(a) + "' and '" + ρσ_arith_type_name(b) + "'")
 
 def ρσ_op_ge(a, b):
-    if a is not None and jstype(a.__ge__) is 'function': return a.__ge__(b)
-    if b is not None and jstype(b.__le__) is 'function': return b.__le__(a)
+    if a is not None and jstype(a.__ge__) is 'function':
+        ρσ_r = a.__ge__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__le__) is 'function':
+        ρσ_r = b.__le__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b): return ρσ_op_le(b, a)
     ta = jstype(a)
     tb = jstype(b)
@@ -541,9 +1073,11 @@ def ρσ_list_add(a, b):
             return ρσ_tuple_constructor(a.concat(b))
         return ρσ_list_constructor(a.concat(b))
     if a is not None and a is not undefined and jstype(a.__add__) is 'function':
-        return a.__add__(b)
+        ρσ_r = a.__add__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if b is not None and b is not undefined and jstype(b.__radd__) is 'function':
-        return b.__radd__(a)
+        ρσ_r = b.__radd__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return v'a + b'
 
 # ρσ_list_iadd: used for +=; extends a in-place when both sides are arrays (Python semantics).
@@ -554,9 +1088,14 @@ def ρσ_list_iadd(a, b):
         v'Array.prototype.push.apply(a, b)'
         return a
     if a is not None and a is not undefined and jstype(a.__iadd__) is 'function':
-        return a.__iadd__(b)
+        ρσ_r = a.__iadd__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if a is not None and a is not undefined and jstype(a.__add__) is 'function':
-        return a.__add__(b)
+        ρσ_r = a.__add__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and b is not undefined and jstype(b.__radd__) is 'function':
+        ρσ_r = b.__radd__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return v'a + b'
 
 # Unary operator overloading helpers
@@ -581,39 +1120,57 @@ def ρσ_op_invert(a):
 
 # Augmented-assignment helpers: try __i<op>__ first, fall back to binary op
 def ρσ_op_iadd(a, b):
-    if a is not None and jstype(a.__iadd__) is 'function': return a.__iadd__(b)
+    if a is not None and jstype(a.__iadd__) is 'function':
+        ρσ_r = a.__iadd__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_add(a, b)
 
 def ρσ_op_isub(a, b):
-    if a is not None and jstype(a.__isub__) is 'function': return a.__isub__(b)
+    if a is not None and jstype(a.__isub__) is 'function':
+        ρσ_r = a.__isub__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_sub(a, b)
 
 def ρσ_op_imul(a, b):
-    if a is not None and jstype(a.__imul__) is 'function': return a.__imul__(b)
+    if a is not None and jstype(a.__imul__) is 'function':
+        ρσ_r = a.__imul__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_mul(a, b)
 
 def ρσ_op_itruediv(a, b):
-    if a is not None and jstype(a.__itruediv__) is 'function': return a.__itruediv__(b)
+    if a is not None and jstype(a.__itruediv__) is 'function':
+        ρσ_r = a.__itruediv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_truediv(a, b)
 
 def ρσ_op_ifloordiv(a, b):
-    if a is not None and jstype(a.__ifloordiv__) is 'function': return a.__ifloordiv__(b)
+    if a is not None and jstype(a.__ifloordiv__) is 'function':
+        ρσ_r = a.__ifloordiv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_floordiv(a, b)
 
 def ρσ_op_imod(a, b):
-    if a is not None and jstype(a.__imod__) is 'function': return a.__imod__(b)
+    if a is not None and jstype(a.__imod__) is 'function':
+        ρσ_r = a.__imod__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_mod(a, b)
 
 def ρσ_op_ipow(a, b):
-    if a is not None and jstype(a.__ipow__) is 'function': return a.__ipow__(b)
+    if a is not None and jstype(a.__ipow__) is 'function':
+        ρσ_r = a.__ipow__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_pow(a, b)
 
 def ρσ_op_iand(a, b):
-    if a is not None and jstype(a.__iand__) is 'function': return a.__iand__(b)
+    if a is not None and jstype(a.__iand__) is 'function':
+        ρσ_r = a.__iand__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_and(a, b)
 
 def ρσ_op_ior(a, b):
-    if a is not None and jstype(a.__ior__) is 'function': return a.__ior__(b)
+    if a is not None and jstype(a.__ior__) is 'function':
+        ρσ_r = a.__ior__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if ta is 'object' and tb is 'object' and a is not None and b is not None and not Array.isArray(a) and not Array.isArray(b) and v'a.constructor === Object' and v'b.constructor === Object':
@@ -622,23 +1179,33 @@ def ρσ_op_ior(a, b):
     return ρσ_op_or(a, b)
 
 def ρσ_op_ixor(a, b):
-    if a is not None and jstype(a.__ixor__) is 'function': return a.__ixor__(b)
+    if a is not None and jstype(a.__ixor__) is 'function':
+        ρσ_r = a.__ixor__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_xor(a, b)
 
 def ρσ_op_ilshift(a, b):
-    if a is not None and jstype(a.__ilshift__) is 'function': return a.__ilshift__(b)
+    if a is not None and jstype(a.__ilshift__) is 'function':
+        ρσ_r = a.__ilshift__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_lshift(a, b)
 
 def ρσ_op_irshift(a, b):
-    if a is not None and jstype(a.__irshift__) is 'function': return a.__irshift__(b)
+    if a is not None and jstype(a.__irshift__) is 'function':
+        ρσ_r = a.__irshift__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_rshift(a, b)
 
 # No-strict (ns) variants: same dunder dispatch but JS native fallback instead of TypeError.
 # Used when overload_operators is active but strict_arithmetic is disabled
 # (from __python__ import no_strict_arithmetic).
 def ρσ_op_add_ns(a, b):
-    if a is not None and jstype(a.__add__) is 'function': return a.__add__(b)
-    if b is not None and jstype(b.__radd__) is 'function': return b.__radd__(a)
+    if a is not None and jstype(a.__add__) is 'function':
+        ρσ_r = a.__add__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__radd__) is 'function':
+        ρσ_r = b.__radd__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b):
         if a.ρσ_is_tuple and b.ρσ_is_tuple:
             return ρσ_tuple_constructor(a.concat(b))
@@ -646,13 +1213,21 @@ def ρσ_op_add_ns(a, b):
     return v'a + b'
 
 def ρσ_op_sub_ns(a, b):
-    if a is not None and jstype(a.__sub__) is 'function': return a.__sub__(b)
-    if b is not None and jstype(b.__rsub__) is 'function': return b.__rsub__(a)
+    if a is not None and jstype(a.__sub__) is 'function':
+        ρσ_r = a.__sub__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rsub__) is 'function':
+        ρσ_r = b.__rsub__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return v'a - b'
 
 def ρσ_op_mul_ns(a, b):
-    if a is not None and jstype(a.__mul__) is 'function': return a.__mul__(b)
-    if b is not None and jstype(b.__rmul__) is 'function': return b.__rmul__(a)
+    if a is not None and jstype(a.__mul__) is 'function':
+        ρσ_r = a.__mul__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rmul__) is 'function':
+        ρσ_r = b.__rmul__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if (ta is 'string' or v'a instanceof String') and (tb is 'number' or tb is 'boolean'): return a.repeat(Math.max(0, b))
@@ -670,15 +1245,23 @@ def ρσ_op_mul_ns(a, b):
     return v'a * b'
 
 def ρσ_op_truediv_ns(a, b):
-    if a is not None and jstype(a.__truediv__) is 'function': return a.__truediv__(b)
-    if b is not None and jstype(b.__rtruediv__) is 'function': return b.__rtruediv__(a)
+    if a is not None and jstype(a.__truediv__) is 'function':
+        ρσ_r = a.__truediv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rtruediv__) is 'function':
+        ρσ_r = b.__rtruediv__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if v'Number(b) === 0' and (jstype(a) is 'number' or jstype(a) is 'boolean') and (jstype(b) is 'number' or jstype(b) is 'boolean'):
         raise ZeroDivisionError('division by zero')
     return v'a / b'
 
 def ρσ_op_floordiv_ns(a, b):
-    if a is not None and jstype(a.__floordiv__) is 'function': return a.__floordiv__(b)
-    if b is not None and jstype(b.__rfloordiv__) is 'function': return b.__rfloordiv__(a)
+    if a is not None and jstype(a.__floordiv__) is 'function':
+        ρσ_r = a.__floordiv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rfloordiv__) is 'function':
+        ρσ_r = b.__rfloordiv__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if jstype(a) is 'bigint' and jstype(b) is 'bigint':
         if v'b === 0n': raise ZeroDivisionError('integer division or modulo by zero')
         v'var ρσ_bq = a / b, ρσ_br = a % b; if (ρσ_br !== 0n && (ρσ_br < 0n) !== (b < 0n)) { return ρσ_bq - 1n; } return ρσ_bq;'
@@ -687,8 +1270,12 @@ def ρσ_op_floordiv_ns(a, b):
     return Math.floor(v'a / b')
 
 def ρσ_op_mod_ns(a, b):
-    if a is not None and jstype(a.__mod__) is 'function': return a.__mod__(b)
-    if b is not None and jstype(b.__rmod__) is 'function': return b.__rmod__(a)
+    if a is not None and jstype(a.__mod__) is 'function':
+        ρσ_r = a.__mod__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rmod__) is 'function':
+        ρσ_r = b.__rmod__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     ta = jstype(a)
     tb = jstype(b)
     if ta is 'string' or v'a instanceof String':
@@ -702,14 +1289,22 @@ def ρσ_op_mod_ns(a, b):
     return v'a % b'
 
 def ρσ_op_pow_ns(a, b):
-    if a is not None and jstype(a.__pow__) is 'function': return a.__pow__(b)
-    if b is not None and jstype(b.__rpow__) is 'function': return b.__rpow__(a)
+    if a is not None and jstype(a.__pow__) is 'function':
+        ρσ_r = a.__pow__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__rpow__) is 'function':
+        ρσ_r = b.__rpow__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if jstype(a) is 'bigint' and jstype(b) is 'bigint': return v'a ** b'
     return Math.pow(a, b)
 
 def ρσ_op_lt_ns(a, b):
-    if a is not None and jstype(a.__lt__) is 'function': return a.__lt__(b)
-    if b is not None and jstype(b.__gt__) is 'function': return b.__gt__(a)
+    if a is not None and jstype(a.__lt__) is 'function':
+        ρσ_r = a.__lt__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__gt__) is 'function':
+        ρσ_r = b.__gt__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b):
         n = Math.min(a.length, b.length)
         for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
@@ -721,8 +1316,12 @@ def ρσ_op_lt_ns(a, b):
     return v'a < b'
 
 def ρσ_op_le_ns(a, b):
-    if a is not None and jstype(a.__le__) is 'function': return a.__le__(b)
-    if b is not None and jstype(b.__ge__) is 'function': return b.__ge__(a)
+    if a is not None and jstype(a.__le__) is 'function':
+        ρσ_r = a.__le__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__ge__) is 'function':
+        ρσ_r = b.__ge__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b):
         n = Math.min(a.length, b.length)
         for v'var ρσ_ci = 0; ρσ_ci < n; ρσ_ci++':
@@ -734,44 +1333,66 @@ def ρσ_op_le_ns(a, b):
     return v'a <= b'
 
 def ρσ_op_gt_ns(a, b):
-    if a is not None and jstype(a.__gt__) is 'function': return a.__gt__(b)
-    if b is not None and jstype(b.__lt__) is 'function': return b.__lt__(a)
+    if a is not None and jstype(a.__gt__) is 'function':
+        ρσ_r = a.__gt__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__lt__) is 'function':
+        ρσ_r = b.__lt__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b): return ρσ_op_lt_ns(b, a)
     return v'a > b'
 
 def ρσ_op_ge_ns(a, b):
-    if a is not None and jstype(a.__ge__) is 'function': return a.__ge__(b)
-    if b is not None and jstype(b.__le__) is 'function': return b.__le__(a)
+    if a is not None and jstype(a.__ge__) is 'function':
+        ρσ_r = a.__ge__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
+    if b is not None and jstype(b.__le__) is 'function':
+        ρσ_r = b.__le__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if Array.isArray(a) and Array.isArray(b): return ρσ_op_le_ns(b, a)
     return v'a >= b'
 
 # No-strict augmented-assignment helpers
 def ρσ_op_iadd_ns(a, b):
-    if a is not None and jstype(a.__iadd__) is 'function': return a.__iadd__(b)
+    if a is not None and jstype(a.__iadd__) is 'function':
+        ρσ_r = a.__iadd__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_add_ns(a, b)
 
 def ρσ_op_isub_ns(a, b):
-    if a is not None and jstype(a.__isub__) is 'function': return a.__isub__(b)
+    if a is not None and jstype(a.__isub__) is 'function':
+        ρσ_r = a.__isub__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_sub_ns(a, b)
 
 def ρσ_op_imul_ns(a, b):
-    if a is not None and jstype(a.__imul__) is 'function': return a.__imul__(b)
+    if a is not None and jstype(a.__imul__) is 'function':
+        ρσ_r = a.__imul__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_mul_ns(a, b)
 
 def ρσ_op_itruediv_ns(a, b):
-    if a is not None and jstype(a.__itruediv__) is 'function': return a.__itruediv__(b)
+    if a is not None and jstype(a.__itruediv__) is 'function':
+        ρσ_r = a.__itruediv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_truediv_ns(a, b)
 
 def ρσ_op_ifloordiv_ns(a, b):
-    if a is not None and jstype(a.__ifloordiv__) is 'function': return a.__ifloordiv__(b)
+    if a is not None and jstype(a.__ifloordiv__) is 'function':
+        ρσ_r = a.__ifloordiv__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_floordiv_ns(a, b)
 
 def ρσ_op_imod_ns(a, b):
-    if a is not None and jstype(a.__imod__) is 'function': return a.__imod__(b)
+    if a is not None and jstype(a.__imod__) is 'function':
+        ρσ_r = a.__imod__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_mod_ns(a, b)
 
 def ρσ_op_ipow_ns(a, b):
-    if a is not None and jstype(a.__ipow__) is 'function': return a.__ipow__(b)
+    if a is not None and jstype(a.__ipow__) is 'function':
+        ρσ_r = a.__ipow__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     return ρσ_op_pow_ns(a, b)
 
 def ρσ_instanceof():
@@ -784,6 +1405,12 @@ def ρσ_instanceof():
         # ── typing.Any (special form) — matches every value ────────────────
         if q and q.__is_typing_any__ is True:
             return True
+        # ── A class-level __instancecheck__ (ABCs such as numbers.Number,
+        # collections.abc.Iterable) decides for itself ─────────────────────
+        if q and jstype(q.__instancecheck__) is 'function':
+            if q.__instancecheck__(obj):
+                return True
+            continue
         # ── Parameterised typing generic (Optional[…], List[…], Union[…], …) ──
         # Detected by duck-typing on the _GenericAlias contract: a non-class
         # object that exposes an `__args__` Array.
@@ -832,6 +1459,8 @@ def ρσ_instanceof():
             return True
         if v'obj instanceof q':
             return True
+        if jstype(obj) is 'function' and (q is ρσ_type or (obj.ρσ_metaclass and (obj.ρσ_metaclass is q or v'obj.ρσ_metaclass.prototype instanceof q'))):
+            return True  # a class is an instance of type (and of its metaclass)
         if (q is Array or q is ρσ_list_constructor) and Array.isArray(obj) and obj.ρσ_is_tuple is not True:
             return True
         if q is ρσ_tuple_constructor and Array.isArray(obj) and obj.ρσ_is_tuple is True:
@@ -840,8 +1469,10 @@ def ρσ_instanceof():
             return True
         if q is ρσ_bool and (jstype(obj) is 'boolean' or v'obj instanceof Boolean'):
             return True
-        if q is ρσ_int and (jstype(obj) is 'number' and Number.isInteger(obj)):
-            return True
+        if q is ρσ_int and ((jstype(obj) is 'number' and Number.isInteger(obj)) or jstype(obj) is 'boolean'):
+            return True  # (bool is a subclass of int)
+        if q is ρσ_object and obj is not undefined:
+            return True  # everything is an object
         if q is ρσ_float and (jstype(obj) is 'number' and not Number.isInteger(obj)):
             return True
         if q is ρσ_long and jstype(obj) is 'bigint':
@@ -857,6 +1488,144 @@ def ρσ_instanceof():
                         break
                     cls = p.constructor
     return False
+
+# ── Annotations: generic aliases (list[int]), X | Y unions, and type_enforcement ──
+
+def ρσ_annotation_repr(a):
+    if a is None:
+        return 'None'
+    if jstype(a) is 'function':
+        return a.__name__ or a.name
+    return ρσ_str(a)
+
+def ρσ_generic_alias(origin, args):
+    # What list[int], dict[str, int], tuple[int, ...] evaluate to: enough for
+    # isinstance-style checks (against the origin) and a readable repr.
+    args = args if Array.isArray(args) and not args.ρσ_is_tuple else [args]
+    alias = v'{__origin__: origin, __args__: args, _name: ""}'
+    alias.toString = alias.__repr__ = alias.__str__ = def():
+        return ρσ_annotation_repr(origin) + '[' + [ρσ_annotation_repr(x) for x in args].join(', ') + ']'
+    return alias
+
+def ρσ_is_annotation_like(x):
+    if x is None or jstype(x) is 'function':
+        return True
+    return jstype(x) is 'object' and (Array.isArray(x.__args__) or bool(x.__origin__))
+
+def ρσ_union_alias(a, b):
+    args = []
+    for x in [a, b]:
+        if x is not None and x._name is 'Union' and Array.isArray(x.__args__):
+            args = args.concat(x.__args__)
+        elif args.indexOf(x) is -1:
+            args.push(x)
+    alias = v'{__args__: args, _name: "Union"}'
+    alias.toString = alias.__repr__ = alias.__str__ = def():
+        return [ρσ_annotation_repr(x) for x in args].join(' | ')
+    alias.__or__ = def(other): return ρσ_union_alias(alias, other);
+    return alias
+
+def ρσ_type_check(obj, q):
+    # Whether a value satisfies a parameter annotation, for type_enforcement.
+    # Looser than isinstance() where Python's type system is: int is accepted
+    # for float/complex and bool for int (PEP 484's numeric tower), and
+    # annotations with no runtime meaning (string forward references,
+    # TypeVars, ...) accept anything.
+    if q is None:
+        return obj is None
+    if jstype(q) is not 'function' and not (jstype(q) is 'object' and (Array.isArray(q.__args__) or q.__origin__ or q.__is_typing_any__)):
+        return True
+    if Array.isArray(q.__args__) and (q._name is 'Union' or q._name is 'Optional'):
+        for a in q.__args__:
+            if ρσ_type_check(obj, a):
+                return True
+        return False
+    if q is ρσ_float:
+        return jstype(obj) is 'number' or jstype(obj) is 'boolean'
+    if q is ρσ_complex:
+        return jstype(obj) is 'number' or jstype(obj) is 'boolean' or ρσ_instanceof(obj, q)
+    if q is ρσ_int and jstype(obj) is 'boolean':
+        return True
+    return ρσ_instanceof(obj, q)
+
+# ── Python generator methods ──
+v'''function ρσ_generator_exception(typ, val) {
+    // g.throw(ValueError) / g.throw(ValueError("x")) / g.throw(ValueError, "x")
+    if (typeof typ === "function") return (val instanceof typ) ? val : (val !== undefined ? new typ(val) : new typ());
+    return typ;
+}
+function ρσ_stop_iteration(value, cls) {
+    var e = new (cls || StopIteration)();
+    e.value = value === undefined ? null : value;  // a generator's return value
+    return e;
+}
+function ρσ_generator_methods(gen) {
+    // send() / throw() return the next yielded value (raising StopIteration when
+    // the generator finishes), as in Python; next() keeps the JS iterator protocol.
+    var js_next = gen.next, js_throw = gen["throw"], js_return = gen["return"];
+    gen.ρσ_js_throw = js_throw;  // the iterator-protocol throw(), for runtime code such as contextlib
+    function unwrap(r) { if (r.done) throw ρσ_stop_iteration(r.value); return r.value; }
+    gen.send = function (value) { return unwrap(js_next.call(gen, value)); };
+    gen["throw"] = function (typ, val) { return unwrap(js_throw.call(gen, ρσ_generator_exception(typ, val))); };
+    gen.close = function () { js_return.call(gen); return null; };
+    return gen;
+}
+function ρσ_async_generator_methods(gen) {
+    var js_next = gen.next, js_throw = gen["throw"], js_return = gen["return"];
+    gen.ρσ_js_throw = js_throw;  // the iterator-protocol throw(), for runtime code such as contextlib
+    function unwrap(r) { if (r.done) throw ρσ_stop_iteration(r.value, StopAsyncIteration); return r.value; }
+    gen.send = js_next;  // (kept from earlier releases; Python async generators only have asend)
+    gen.asend = function (value) { return js_next.call(gen, value).then(unwrap); };
+    gen.athrow = function (typ, val) { return js_throw.call(gen, ρσ_generator_exception(typ, val)).then(unwrap); };
+    gen.aclose = function () { return js_return.call(gen).then(function () { return null; }); };
+    return gen;
+}'''
+
+# ── match / case pattern helpers ──
+v'''var ρσ_match_self_types = null;
+function ρσ_match_is_self_type(cls) {
+    // Builtins whose single positional pattern captures the subject itself: case int(n)
+    if (!ρσ_match_self_types) ρσ_match_self_types = [ρσ_int, ρσ_float, ρσ_str, ρσ_bool, ρσ_list_constructor,
+        ρσ_tuple_constructor, ρσ_dict, ρσ_set, ρσ_frozenset, ρσ_bytes, ρσ_bytearray];
+    return ρσ_match_self_types.indexOf(cls) >= 0;
+}
+function ρσ_match_class(subj, cls) {
+    if (typeof cls !== "function") throw new TypeError("called match pattern must be a class");
+    return ρσ_instanceof(subj, cls);
+}
+function ρσ_match_pos(subj, cls, i) {
+    // The value a positional sub-pattern matches: through __match_args__
+    // (looked up on the class or its prototype), or the subject itself for builtins
+    var args = (typeof cls === "function" && cls.__match_args__) || (cls && cls.prototype && cls.prototype.__match_args__);
+    if (args && i < args.length) return subj[args[i]];
+    if (i === 0 && ρσ_match_is_self_type(cls)) return subj;
+    throw new TypeError((cls && (cls.__name__ || cls.name)) + "() accepts " + (args ? args.length : 0) + " positional sub-pattern" + (args && args.length === 1 ? "" : "s") + " (" + (i + 1) + " given)");
+}
+function ρσ_match_mapping(subj) {
+    if (subj === null || subj === undefined || typeof subj !== "object" || Array.isArray(subj)) return false;
+    if (subj instanceof ρσ_dict || (typeof Map === "function" && subj instanceof Map)) return true;
+    var proto = Object.getPrototypeOf(subj);
+    return proto === Object.prototype || proto === null;  // a plain JS object used as a mapping
+}
+function ρσ_match_has(subj, key) {
+    if (subj instanceof ρσ_dict) return subj.jsmap.has(key);
+    if (typeof Map === "function" && subj instanceof Map) return subj.has(key);
+    return Object.prototype.hasOwnProperty.call(subj, key);
+}
+function ρσ_match_get(subj, key) {
+    if (subj instanceof ρσ_dict) return subj.jsmap.get(key);
+    if (typeof Map === "function" && subj instanceof Map) return subj.get(key);
+    return subj[key];
+}
+function ρσ_match_rest(subj, keys) {
+    // **rest in a mapping pattern: a dict of the entries the pattern didn't name
+    var rest = ρσ_dict(), m = rest.jsmap;
+    function keep(k, v) { for (var i = 0; i < keys.length; i++) if (ρσ_equals(keys[i], k)) return; m.set(k, v); }
+    if (subj instanceof ρσ_dict) subj.jsmap.forEach(function (v, k) { keep(k, v); });
+    else if (typeof Map === "function" && subj instanceof Map) subj.forEach(function (v, k) { keep(k, v); });
+    else Object.keys(subj).forEach(function (k) { keep(k, subj[k]); });
+    return rest;
+}'''
 
 # ── Attribute-dunder support (__getattr__ / __setattr__ / __delattr__ / __getattribute__) ──
 # We use a JavaScript Proxy to intercept attribute access/assignment/deletion on class instances

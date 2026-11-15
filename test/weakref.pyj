@@ -1,0 +1,113 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# weakref.pyj
+# Tests for the weakref standard library module.
+# (Garbage collection is non-deterministic, so these tests cover the API with
+# live referents; collection itself needs node --expose-gc and is not tested here.)
+
+from __python__ import overload_getitem
+import weakref
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+class Obj:
+    def __init__(self, n):
+        self.n = n
+
+# ── 1. ref ────────────────────────────────────────────────────────────────────
+a = Obj(1)
+r = weakref.ref(a)
+ok(r() is a)
+ok(isinstance(r, weakref.ref))
+ok(isinstance(r, weakref.ReferenceType))
+ok(callable(r))
+ok(r == weakref.ref(a))
+ok(r != weakref.ref(Obj(2)))
+ae(hash(r), hash(a))
+ok(repr(r).indexOf('Obj') >= 0)
+for bad in [5, 's', None, True]:
+    try:
+        weakref.ref(bad)
+        ok(False)
+    except TypeError:
+        pass
+
+# ── 2. WeakKeyDictionary ──────────────────────────────────────────────────────
+d = weakref.WeakKeyDictionary()
+k1, k2 = Obj(1), Obj(2)
+d[k1] = 'one'
+d[k2] = 'two'
+ae(len(d), 2)
+ae(d[k1], 'one')
+ok(k2 in d)
+ok(Obj(3) not in d)
+ade(sorted(d.values()), ['one', 'two'])
+ae(d.get(Obj(9), 'dflt'), 'dflt')
+del d[k1]
+ae(len(d), 1)
+ok(list(d.keys())[0] is k2)
+try:
+    d['str-key'] = 1
+    ok(False)
+except TypeError:
+    pass
+ae(d.pop(k2), 'two')
+ae(len(d), 0)
+
+# ── 3. WeakValueDictionary ────────────────────────────────────────────────────
+v = weakref.WeakValueDictionary()
+v['a'] = k1
+v['b'] = k2
+ae(len(v), 2)
+ok(v['a'] is k1)
+ok('a' in v)
+ok('z' not in v)
+ade(sorted(v.keys()), ['a', 'b'])
+ae(v.get('z'), None)
+try:
+    v['c'] = 3
+    ok(False)
+except TypeError:
+    pass
+try:
+    v['zz']
+    ok(False)
+except KeyError:
+    pass
+
+# ── 4. WeakSet ────────────────────────────────────────────────────────────────
+s = weakref.WeakSet([k1, k2])
+s.add(k1)
+ae(len(s), 2)
+ok(k1 in s)
+ok(Obj(5) not in s)
+s.discard(k1)
+ae(len(s), 1)
+
+# ── 5. finalize ───────────────────────────────────────────────────────────────
+calls = []
+f = weakref.finalize(k1, def(x, y=0): calls.push([x, y]); return 'ret';, 'done', y=7)
+ok(f.alive)
+ok(isinstance(f, weakref.finalize))
+ae(f(), 'ret')
+ae(f(), None)  # runs only once
+ok(not f.alive)
+ade(calls, [['done', 7]])
+f2 = weakref.finalize(k2, def(): calls.push('x');)
+info = f2.peek()
+ok(info[0] is k2)
+det = f2.detach()
+ok(det[0] is k2)
+ok(not f2.alive)
+ae(f2.detach(), None)
+f2()
+ae(calls.length, 1)
+
+# ── 6. proxy ──────────────────────────────────────────────────────────────────
+p = weakref.proxy(k1)
+ae(p.n, 1)
+p.n = 10
+ae(k1.n, 10)

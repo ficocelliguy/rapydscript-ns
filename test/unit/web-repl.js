@@ -1532,8 +1532,8 @@ var TESTS = [
                 "name = 'Alice'",
                 "flag = True",
                 "assrt.equal(f'{x=}', 'x=42')",
-                "assrt.equal(f'{name=}', \"name=Alice\")",
-                "assrt.equal(f'{flag=}', 'flag=true')",
+                "assrt.equal(f'{name=}', \"name='Alice'\")",  // {x=} shows the repr, as in Python
+                "assrt.equal(f'{flag=}', 'flag=True')",
             ].join("\n"));
             run_js(js);
         },
@@ -2227,7 +2227,7 @@ var TESTS = [
             var js = bundle_compile(repl, [
                 "from json import dumps",
                 // sort_keys
-                "assrt.equal(dumps({'b': 2, 'a': 1}, sort_keys=True), '{\"a\":1,\"b\":2}')",
+                "assrt.equal(dumps({'b': 2, 'a': 1}, sort_keys=True), '{\"a\": 1, \"b\": 2}')",
                 // indent produces newlines
                 "pretty = dumps([1, 2], indent=2)",
                 "assrt.ok(pretty.indexOf('\\n') >= 0)",

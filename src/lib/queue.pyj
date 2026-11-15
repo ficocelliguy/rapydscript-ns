@@ -1,0 +1,214 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'queue' module.
+#
+# Supported:
+#   Queue(maxsize=0)          — FIFO
+#   LifoQueue(maxsize=0)      — LIFO (stack)
+#   PriorityQueue(maxsize=0)  — lowest entry first (heapq ordering, so
+#                               (priority, data) tuples work)
+#   SimpleQueue()             — unbounded FIFO
+#   Empty, Full, ShutDown exceptions
+#   Methods: put, get, put_nowait, get_nowait, qsize, empty, full,
+#            task_done, join, shutdown (3.13)
+#
+# IMPORTANT — no blocking:
+#   JavaScript is single-threaded, so nothing could ever fill an empty queue
+#   (or drain a full one) while get()/put() waits.  Therefore:
+#     - get() on an empty queue raises queue.Empty immediately (whatever the
+#       block/timeout arguments);
+#     - put() on a full bounded queue raises queue.Full immediately;
+#     - join() returns immediately when every item has been marked with
+#       task_done(), and otherwise raises RuntimeError (it would deadlock).
+#   Use asyncio.Queue for producer/consumer code that needs to wait.
+
+
+def _lt(a, b):
+    # Python ordering semantics (tuples compare element-wise, __lt__ honoured)
+    from __python__ import overload_operators
+    return a < b
+
+
+def _heappush(heap, item):
+    heap.push(item)
+    pos = heap.length - 1
+    while pos > 0:
+        parentpos = (pos - 1) >> 1
+        parent = heap[parentpos]
+        if _lt(item, parent):
+            heap[pos] = parent
+            pos = parentpos
+        else:
+            break
+    heap[pos] = item
+
+
+def _heappop(heap):
+    last = heap.pop()
+    if not heap.length:
+        return last
+    top = heap[0]
+    n = heap.length
+    pos = 0
+    while True:
+        child = 2 * pos + 1
+        if child >= n:
+            break
+        if child + 1 < n and _lt(heap[child + 1], heap[child]):
+            child += 1
+        if _lt(heap[child], last):
+            heap[pos] = heap[child]
+            pos = child
+        else:
+            break
+    heap[pos] = last
+    return top
+
+
+class Empty(Exception):
+    pass
+
+
+class Full(Exception):
+    pass
+
+
+class ShutDown(Exception):
+    pass
+
+
+class Queue:
+
+    def __init__(self, maxsize=0):
+        self.maxsize = maxsize
+        self.unfinished_tasks = 0
+        self.is_shutdown = False
+        self._init(maxsize)
+
+    # Overridable storage primitives (same names as CPython's Queue)
+    def _init(self, maxsize):
+        self.queue = []
+
+    def _qsize(self):
+        return self.queue.length
+
+    def _put(self, item):
+        self.queue.push(item)
+
+    def _get(self):
+        return self.queue.shift()
+
+    # Public API
+    def task_done(self):
+        if self.unfinished_tasks <= 0:
+            raise ValueError('task_done() called too many times')
+        self.unfinished_tasks -= 1
+
+    def join(self):
+        if self.unfinished_tasks > 0:
+            raise RuntimeError('Queue.join() would block forever: ' + self.unfinished_tasks +
+                               ' unfinished task(s) and JavaScript cannot wait for other threads')
+
+    def qsize(self):
+        return self._qsize()
+
+    def empty(self):
+        return self._qsize() is 0
+
+    def full(self):
+        return 0 < self.maxsize <= self._qsize()
+
+    def put(self, item, block=True, timeout=None):
+        if self.is_shutdown:
+            raise ShutDown()
+        if self.maxsize > 0 and self._qsize() >= self.maxsize:
+            raise Full()
+        if timeout is not None and timeout is not undefined and timeout < 0:
+            raise ValueError("'timeout' must be a non-negative number")
+        self._put(item)
+        self.unfinished_tasks += 1
+
+    def get(self, block=True, timeout=None):
+        if timeout is not None and timeout is not undefined and timeout < 0:
+            raise ValueError("'timeout' must be a non-negative number")
+        if self._qsize() is 0:
+            if self.is_shutdown:
+                raise ShutDown()
+            raise Empty()
+        return self._get()
+
+    def put_nowait(self, item):
+        return self.put(item, False)
+
+    def get_nowait(self):
+        return self.get(False)
+
+    def shutdown(self, immediate=False):
+        self.is_shutdown = True
+        if immediate:
+            while self._qsize():
+                self._get()
+                if self.unfinished_tasks > 0:
+                    self.unfinished_tasks -= 1
+
+
+class LifoQueue(Queue):
+
+    def _init(self, maxsize):
+        self.queue = []
+
+    def _qsize(self):
+        return self.queue.length
+
+    def _put(self, item):
+        self.queue.push(item)
+
+    def _get(self):
+        return self.queue.pop()
+
+
+class PriorityQueue(Queue):
+
+    def _init(self, maxsize):
+        self.queue = []
+
+    def _qsize(self):
+        return self.queue.length
+
+    def _put(self, item):
+        _heappush(self.queue, item)
+
+    def _get(self):
+        return _heappop(self.queue)
+
+
+class SimpleQueue:
+
+    def __init__(self):
+        self._queue = []
+
+    def put(self, item, block=True, timeout=None):
+        self._queue.push(item)
+
+    def put_nowait(self, item):
+        self._queue.push(item)
+
+    def get(self, block=True, timeout=None):
+        if timeout is not None and timeout is not undefined and timeout < 0:
+            raise ValueError("'timeout' must be a non-negative number")
+        if not self._queue.length:
+            raise Empty()
+        return self._queue.shift()
+
+    def get_nowait(self):
+        if not self._queue.length:
+            raise Empty()
+        return self._queue.shift()
+
+    def empty(self):
+        return self._queue.length is 0
+
+    def qsize(self):
+        return self._queue.length

@@ -98,6 +98,11 @@ ALL_KEYWORDS = KEYWORDS + " " + KEYWORDS_ATOM
 
 KEYWORDS = make_predicate(KEYWORDS)
 RESERVED_WORDS = make_predicate(RESERVED_WORDS)
+
+# JavaScript reserved words that are ordinary names in Python (default=...,
+# case, static, public, ...). The parser accepts them as identifiers and the
+# output stream renames them (default -> ρσ_default) so the JS stays valid.
+PYTHON_NAMES_RESERVED_IN_JS = make_predicate("default case switch function var const let static export extends implements interface package private protected public catch throw enum")
 KEYWORDS_BEFORE_EXPRESSION = make_predicate(KEYWORDS_BEFORE_EXPRESSION)
 KEYWORDS_ATOM = make_predicate(KEYWORDS_ATOM)
 IDENTIFIER_PAT = /^[a-z_$][_a-z0-9$]*$/i
@@ -157,7 +162,7 @@ EX_EOF = {}
 
 def tokenizer(raw_text, filename):
     S = {
-        'text': raw_text.replace(/\r\n?|[\n\u2028\u2029]/g, "\n").replace(/\uFEFF/g, ""),
+        'text': raw_text.replace(/\r\n?/g, "\n").replace(/\uFEFF/g, ""),
         'filename': filename,
         'pos': 0,
         'tokpos': 0,

@@ -62,7 +62,8 @@ ok(mask & 0b1010 in allowed)
 # ── Bitwise vs `is` ─────────────────────────────────────────────────────────
 flag_a = True
 ok((0b1100 & 0b1010 == 0b1000) is True)
-ok(0b1100 & 0b1010 == 0b1000 is True)
+# Unparenthesized, `==` and `is` chain as in Python: (8 == 8) and (8 is True) → False
+ok(not (0b1100 & 0b1010 == 0b1000 is True))
 
 # ── Inter-bitwise relative precedence preserved (& > ^ > |) ─────────────────
 # Python: 0b1100 | 0b1010 & 0b0101  →  0b1100 | (0b1010 & 0b0101)  →  0b1100 | 0  →  0b1100

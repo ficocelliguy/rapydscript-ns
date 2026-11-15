@@ -609,7 +609,10 @@ RapydScript supports Python's ``/`` and ``*`` parameter separators:
 - **``/`` (positional-only separator)**: parameters listed before ``/`` can only
   be passed positionally — they cannot be named at the call site.
 - **``*`` (keyword-only separator)**: parameters listed after a bare ``*`` can
-  only be passed by name — they cannot be passed positionally.
+  only be passed by name — they cannot be passed positionally. Parameters after
+  ``*args`` are keyword-only too (``def join(*parts, sep=" ")``), and a required
+  keyword-only parameter may follow an optional one (``def f(*, a=1, b)``).
+  Lambdas accept the same forms (``lambda x, *, factor=3: x * factor``).
 
 ```py
 	def greet(name, /, greeting="Hello", *, punctuation="!"):
@@ -633,8 +636,10 @@ signature help and hover tooltips.
 
 ### Argument type enforcement
 
-``from __python__ import type_enforcement`` activates Python-compatible runtime
-argument checking for every function defined in that scope:
+Python-compatible runtime argument checking is **on by default** (the
+``type_enforcement`` flag); turn it off for a scope with
+``from __python__ import no_type_enforcement``. It checks every function defined
+in that scope:
 
 | Check | Behaviour |
 |---|---|
@@ -665,6 +670,13 @@ add(1, 2)       # 3
 add("x", 2)    # TypeError: argument 'a' must be int
 ```
 
+Annotation checks follow what a type checker accepts rather than strict
+``isinstance``: an ``int`` (or ``bool``) is accepted where ``float`` or
+``complex`` is annotated (PEP 484's numeric tower) and a ``bool`` where ``int``
+is. ``list[int]``, ``dict[str, int]`` and ``int | None`` work as annotations,
+and annotations that have no runtime meaning (string forward references such as
+``'Node'``, ``TypeVar``s) accept any value.
+
 Annotations referring to ``typing`` generic forms — ``Optional[X]``,
 ``Union[X, Y]``, ``List[X]``, ``Dict[K, V]``, ``Tuple[...]``, ``Type[X]``,
 ``Literal[...]``, ``Callable``, ``Any``, etc. — are also enforced at runtime
@@ -683,16 +695,15 @@ isinstance([1, 2], List[int])     # True
 isinstance(5, Any)                # True (Any matches every value)
 ```
 
-The flag applies to the function definitions that follow it in scope — it does
-not retroactively affect imported functions or functions defined before the
-import.  It can be combined with any other ``from __python__ import`` flag.
+A ``from __python__ import (no_)type_enforcement`` line applies to the function
+definitions that follow it in scope — it does not retroactively affect imported
+functions or functions defined before it.  It can be combined with any other ``from __python__ import`` flag.
 
 The Monaco language service also reports violations **statically** for
 calls to locally-defined enforced functions, underlining the problem at the
 call site with an error marker.
 
-One difference compared to un-enforced RapydScript: without
-``type_enforcement``, missing arguments become ``undefined`` (JavaScript
+With ``no_type_enforcement``, missing arguments become ``undefined`` (JavaScript
 default) instead of raising ``TypeError``, and positional/keyword-only
 conventions are not checked.
 
@@ -929,8 +940,10 @@ No special flag is required. The `+` operator compiles to a lightweight helper
 Sets in RapydScript are identical to those in python. You can create them using
 set literals or comprehensions and all set operations are supported. You can
 store any object in a set. For primitive types (strings, numbers) the value is
-used for equality; for class instances, object identity (``is``) is used by
-default unless the class defines a ``__hash__`` method.
+used for equality, and tuples and frozensets compare by value, so
+``{(0, 0), (0, 0)}`` has one member. For class instances, object identity
+(``is``) is used by default; a class that defines ``__hash__`` (with ``__eq__``)
+is looked up by hash and equality, the same in sets and as dict keys.
 
 Python-style set algebra is supported via the standard operators (with
 `overload_operators`, on by default):
@@ -1306,7 +1319,12 @@ Chained comparisons work just like Python — each middle operand is evaluated o
 assert 1 < 2 < 3      # True
 assert 1 < 2 > 0      # True  (1<2 AND 2>0)
 assert [1] < [2] < [3]   # True  (lexicographic chain)
+assert 0 < 5 == 5     # True  (0<5 AND 5==5): ==, !=, is, in chain too
+assert not 1 == 2     # True  (`not` binds looser than comparisons)
 ```
+
+As in Python, a parenthesized comparison is not part of a chain:
+`(1 < 2) < 3` compares `True` with `3`.
 
 ### Python Truthiness and `__bool__`
 
@@ -1584,6 +1602,8 @@ semantics:
 | `int` / whole `float` | the integer value itself |
 | other `float` | derived from the bit pattern |
 | `str` | djb2 algorithm — stable within a process |
+| `tuple` | combines the elements' hashes (equal tuples hash alike; an unhashable element raises) |
+| `frozenset` | combines the elements' hashes, independent of order |
 | object with `__hash__` | dispatches to `__hash__()` |
 | class instance (no `__hash__`) | stable identity hash (assigned on first call) |
 | class with `__eq__` but no `__hash__` | `TypeError` (unhashable — Python semantics) |
@@ -2823,9 +2843,10 @@ class Dog(Animal):
 ```
 
 Both the zero-argument form `super()` (Python 3 style) and the two-argument
-form `super(ClassName, self)` (Python 2 style) are supported. The call
-`super().method(args)` compiles to `ParentClass.prototype.method.call(this,
-args)` in JavaScript. The Monaco language service also recognises `super` for
+form `super(ClassName, self)` (Python 2 style) are supported. With multiple
+inheritance, `super()` follows Python's C3 method resolution order, so
+cooperative diamond hierarchies (`class D(B, C)`) call each class once, in
+Python's order. A class with several bases has `__mro__`. The Monaco language service also recognises `super` for
 completions, hover documentation, and diagnostics.
 
 Like Python, RapydScript allows multiple inheritance. The only caveat is that 
@@ -3576,6 +3597,25 @@ except SomeInternalError:
 
 Basically, `try/except/finally` in RapydScript works very similar to the way it does in Python 3.
 
+Python's builtin exception hierarchy is available: `BaseException` →
+`Exception`, `SystemExit`, `KeyboardInterrupt`, `GeneratorExit`; under
+`Exception`: `ArithmeticError` (`ZeroDivisionError`, `OverflowError`,
+`FloatingPointError`), `LookupError` (`IndexError`, `KeyError`),
+`RuntimeError` (`NotImplementedError`, `RecursionError`), `OSError` (alias
+`IOError`; `FileNotFoundError`, `FileExistsError`, `PermissionError`,
+`TimeoutError`, `ConnectionError` and its subclasses, ...), `ValueError`
+(`UnicodeError` and its subclasses), `AttributeError`, `AssertionError`,
+`ImportError`, `StopIteration`, `StopAsyncIteration`, `EOFError`,
+`BufferError`, and the `Warning` classes. `except Exception` does not catch
+`SystemExit`, `KeyboardInterrupt` or `GeneratorExit`, a JS stack overflow is
+caught by `except RecursionError`, and `raise SomeError` (the class) raises an
+instance.
+
+As in Python, `str(e)` is the message (`str(ValueError('bad')) == 'bad'`),
+`repr(e)` is `ValueError('bad')`, `e.args` is a tuple and `str(KeyError('k'))`
+is `"'k'"`. Binary dunders may `return NotImplemented` to let the other
+operand's reflected method (`__radd__`, ...) handle the operation.
+
 ### Exception Groups (`except*`, Python 3.11+)
 
 RapydScript supports exception groups via the `ExceptionGroup` class and `except*` syntax. An `ExceptionGroup` bundles multiple exceptions under a single message:
@@ -3698,6 +3738,19 @@ One of Python's main strengths is the number of libraries available to the devel
 	base64              # b64encode/decode, urlsafe_b64encode/decode, b32encode/decode, b16encode/decode, encodebytes/decodebytes
 	statistics          # mean, median, mode, variance, stdev, quantiles, correlation,
 	                    # linear_regression, NormalDist
+	sys                 # version_info, platform, argv, exit(), stdout/stderr, maxsize, ...
+	os, os.path         # environ, getenv, getcwd, listdir; POSIX path functions
+	time                # time(), monotonic(), perf_counter(), sleep(), strftime/strptime, struct_time
+	types               # SimpleNamespace, MappingProxyType, FunctionType, MethodType, ...
+	numbers             # Number, Complex, Real, Rational, Integral ABCs
+	collections.abc     # Iterable, Sequence, Mapping, ... ABCs with structural isinstance checks
+	warnings            # warn(), filterwarnings(), simplefilter(), catch_warnings()
+	weakref             # ref, finalize, WeakKeyDictionary, WeakValueDictionary, WeakSet
+	struct              # pack, unpack, calcsize, Struct
+	queue               # Queue, LifoQueue, PriorityQueue, SimpleQueue (non-blocking)
+	secrets             # token_bytes, token_hex, token_urlsafe, choice, randbelow
+	inspect             # signature(), getmembers(), isfunction(), isclass(), ...
+	calendar            # monthrange, monthcalendar, isleap, TextCalendar, ...
 
 For the most part, the logic implemented in these libraries functions identically to the Python versions. I'd be happy to include more libraries, if other members of the community want them. However, unlike most other Python-to-JavaScript compilers, RapydScript doesn't need them to be complete since there are already tons of available JavaScript libraries that it can use natively.
 
@@ -4274,7 +4327,7 @@ Python Feature Coverage
 | `str.isspace()`, `str.islower()`, `str.isupper()`                                                                                                                                                                                                             | Working string predicates |
 | `str.isalpha()`                                                                                                                                                                                                                                               | Regex-based; empty string returns `False` |
 | `str.isdigit()`                                                                                                                                                                                                                                               | Regex-based (`\d+`) |
-| `str.isalnum()`                                                                                                                                                                                                                                               | Regex-based |
+| `str.isalnum()`                                                                                                                                                                                                                                               | Unicode-aware |
 | `str.isidentifier()`                                                                                                                                                                                                                                          | Checks `^[a-zA-Z_][a-zA-Z0-9_]*$` |
 | `str.casefold()`                                                                                                                                                                                                                                              | Maps to `.toLowerCase()` |
 | `str.removeprefix(prefix)`                                                                                                                                                                                                                                    | Returns unchanged string if prefix not found |
@@ -4285,7 +4338,7 @@ Python Feature Coverage
 | `list + list` concatenation                                                                                                                                                                                                                                   | `[1,2] + [3,4]` returns `[1, 2, 3, 4]`; `+=` extends in-place. No flag required. |
 | `match / case`                                                                                                                                                                                                                                                | Structural pattern matching (Python 3.10) fully supported |
 | Variable type annotations `x: int = 1`                                                                                                                                                                                                                        | Parsed and ignored (no runtime enforcement); annotated assignments work normally |
-| Argument type enforcement (`from __python__ import type_enforcement`)                                                                                                                                                                                          | Activates runtime `TypeError` for wrong argument count, positional-only kwargs, missing required keyword-only args, and type-annotated arg mismatches; Monaco language service reports violations statically at call sites |
+| Argument type enforcement (on by default; `from __python__ import no_type_enforcement` to disable)                                                                                                                                                                                          | Activates runtime `TypeError` for wrong argument count, positional-only kwargs, missing required keyword-only args, and type-annotated arg mismatches; Monaco language service reports violations statically at call sites |
 | Ellipsis literal `...` as expression                                                                                                                                                                                                                          | Parsed as a valid expression; evaluates to JS `undefined` at runtime |
 | Generator `.throw()`                                                                                                                                                                                                                                          | Works via JS generator protocol |
 | Generator `.send()`                                                                                                                                                                                                                                           | Works via `g.next(value)` |
@@ -4303,7 +4356,7 @@ Python Feature Coverage
 | `@classmethod`, `@staticmethod`, `@property` / `@prop.setter`                                                                                                                                                                                                 | All work |
 | `{**dict1, **dict2}` dict spread                                                                                                                                                                                                                              | Works as merge replacement for the missing `\|` operator |
 | `dict.fromkeys()`                                                                                                                                                                                                                                             | Works (via `dict_literals`, on by default) |
-| Chained comparisons `a < b < c` and `a < b > c`                                                                                                                                                                                                               | Same-direction and mixed-direction chains both work; middle operand evaluated once; with `overload_operators` each comparison dispatches via `ρσ_op_lt` etc. |
+| Chained comparisons `a < b < c`, `a < b > c`, `a == b == c`                                                                                                                                                                                                   | Same-direction and mixed-direction chains both work; middle operand evaluated once; with `overload_operators` each comparison dispatches via `ρσ_op_lt` etc. |
 | `for`, `while`, `try/except/finally`, `with`, `match/case`                                                                                                                                                                                                    | All control-flow constructs work |
 | Classes, inheritance, decorators, `__dunder__` methods                                                                                                                                                                                                        | Fully supported |
 | Nested class definitions                                                                                                                                                                                                                                      | Accessible as `Outer.Inner` and via instance (`self.Inner`); arbitrary nesting depth; nested class may inherit from outer-scope classes |
@@ -4404,7 +4457,7 @@ This restores the original RapydScript behavior: plain JS objects for `{}`, no o
 | `overload_operators` | Arithmetic and bitwise operators (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `\|`, `^`, `~`, `<<`, `>>`) and ordered-comparison operators (`<`, `>`, `<=`, `>=`) dispatch to dunder methods (`__add__`, `__lt__`, etc.) when defined on the left operand. Also enables variable-operand `str * n` string repetition, `list * n` / `n * list` list repetition, `dict \| dict` / `dict \|= dict` merge, and Python-style lexicographic list comparison. | All operators compile directly to JS; no dunder dispatch. Literal `'abc' * n` / `n * 'abc'` still works (compile-time fast-path emits `.repeat(Math.max(0, n))`), but `s * n` for a variable `s` produces `NaN`. List repetition, dict merge, and Python-style list ordering are unavailable. |
 | `truthiness` | Python truthiness semantics: `[]`, `{}`, `set()`, `''`, `0`, `None` are falsy; objects with `__bool__` are dispatched; `and`/`or` return the deciding operand value (not `True`/`False`); `not`, `if`, `while`, `assert`, and ternary all route through `ρσ_bool()`. Also enables `__call__` dispatch: `obj(args)` invokes `obj.__call__(args)` for callable objects. | Truthiness is JS-native (all objects truthy); `__bool__` is never called; `and`/`or` return booleans; `__call__` is not dispatched. |
 | `jsx` | JSX syntax (`<Tag attr={expr}>children</Tag>` and `<>...</>` fragments) is recognised as expression syntax and compiled to `React.createElement` calls (or equivalent). | `<` is always a less-than operator; angle-bracket tokens are never parsed as JSX. |
-| `pythonize_strings` *(output-level option, not a `from __python__` flag)* | `String.prototype` is patched at startup with Python string methods (`strip`, `lstrip`, `rstrip`, `join`, `format`, `capitalize`, `lower`, `upper`, `find`, `rfind`, `index`, `rindex`, `count`, `startswith`, `endswith`, `center`, `ljust`, `rjust`, `zfill`, `partition`, `rpartition`, `splitlines`, `expandtabs`, `swapcase`, `title`, `isspace`, `islower`, `isupper`). Equivalent to calling `from pythonize import strings; strings()` manually. Note: `replace()` is intentionally kept as its JS version; `split()` is always Python-style for no-arg/`None`-separator calls (any-whitespace, stripped) but keeps JS semantics for explicit separators. | Python string methods are not available on string instances; call `str.strip(s)` etc., or import and call `strings()` from `pythonize` manually. Disable globally with `--legacy-rapydscript`. |
+| `pythonize_strings` *(output-level option, not a `from __python__` flag)* | `String.prototype` is patched at startup with Python string methods (`strip`, `lstrip`, `rstrip`, `join`, `format`, `capitalize`, `lower`, `upper`, `find`, `rfind`, `index`, `rindex`, `count`, `startswith`, `endswith`, `center`, `ljust`, `rjust`, `zfill`, `partition`, `rpartition`, `splitlines`, `expandtabs`, `swapcase`, `title`, `isspace`, `islower`, `isupper`, `rsplit`, `casefold`, `removeprefix`, `removesuffix`, `isalpha`, `isdigit`, `isdecimal`, `isnumeric`, `isalnum`, `isidentifier`, `isascii`, `isprintable`, `istitle`, `translate`, `encode`). Equivalent to calling `from pythonize import strings; strings()` manually. Note: `replace()` is intentionally kept as its JS version; `split()` is always Python-style for no-arg/`None`-separator calls (any-whitespace, stripped) but keeps JS semantics for explicit separators. | Python string methods are not available on string instances; call `str.strip(s)` etc., or import and call `strings()` from `pythonize` manually. Disable globally with `--legacy-rapydscript`. |
 
 ---
 
@@ -4428,8 +4481,8 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 
 | Module        | Status      | Notes                                                                                         |
 |---------------|-------------|-----------------------------------------------------------------------------------------------|
-| `math`        | ✅           | Full implementation in `src/lib/math.pyj`                                                     |
-| `random`      | ✅           | RC4-seeded PRNG in `src/lib/random.pyj`                                                       |
+| `math`        | ✅           | `src/lib/math.pyj`, including `isclose`, `gcd`/`lcm` (any number of arguments), `comb`, `perm`, `prod`, `isqrt`, `dist`, n-dimensional `hypot`, `log2`, `cbrt`, `exp2`, `tau`, `nan`; domain errors raise `ValueError` |
+| `random`      | ✅           | RC4-seeded PRNG in `src/lib/random.pyj`: `Random` class (independent seeded streams, `getstate`/`setstate`), `random`, `seed`, `randint`, `randrange`, `uniform`, `choice`, `choices` (weights / cum_weights), `sample` (any sequence or set), `shuffle`, `getrandbits`, `gauss`, `normalvariate`, `expovariate`, `triangular`, `betavariate`, `gammavariate` |
 | `re`          | ✅           | Regex wrapper in `src/lib/re.pyj`; uses the JS engine — full PCRE-level support on modern runtimes: positive/negative lookbehind (ES2018+, including variable-width), unicode via automatic `u` flag (ES2015+), `re.fullmatch()`, `re.S`/`re.NOFLAG` aliases. `MatchObject.start()`/`.end()` return exact positions on runtimes with the ES2022 `d` flag (Node 18+); heuristic fallback on older runtimes. Conditional groups `(?(id)yes\|no)` are not supported (JS limitation) and raise `re.error`. |
 | `encodings`   | ✅           | UTF-8 encode/decode helpers and low-level base64 utilities; for the standard Python API use the `base64` module instead |
 | `collections` | ✅           | `defaultdict`, `Counter`, `OrderedDict`, `deque`, `namedtuple`, `ChainMap`                     |
@@ -4438,15 +4491,15 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `numpy`       | ✅           | Full numpy-like library in `src/lib/numpy.pyj`; `numpy.random` and `numpy.linalg` sub-modules |
 | `copy`        | ✅           | `copy()` shallow copy and `deepcopy()` (circular-ref-safe via memo Map); `__copy__` / `__deepcopy__(memo)` hooks honoured; handles list, set, frozenset, dict, class instances, and plain JS objects |
 | `typing`      | ✅           | `TYPE_CHECKING`, `Any`, `Union`, `Optional`, `ClassVar`, `Final`, `Literal`, `NoReturn`, `List`, `Dict`, `Set`, `FrozenSet`, `Tuple`, `Type`, `Callable`, `Iterator`, `Iterable`, `Generator`, `Sequence`, `MutableSequence`, `Mapping`, `MutableMapping`, `Awaitable`, `Coroutine`, `AsyncGenerator`, `AsyncIterator`, `AsyncIterable`, `IO`, `TextIO`, `BinaryIO`, `Pattern`, `Match`, `TypeVar`, `Generic`, `Protocol`, `cast`, `overload`, `no_type_check`, `no_type_check_decorator`, `runtime_checkable`, `get_type_hints`, `TypedDict`, `NamedTuple`, `AnyStr`, `Text` — all available in `src/lib/typing.pyj` |
-| `dataclasses` | ✅           | `@dataclass`, `field()`, `asdict()`, `astuple()`, `replace()`, `fields()`, `is_dataclass()`, `MISSING` in `src/lib/dataclasses.pyj`; `frozen=True`, `order=True`, inheritance supported; note: `field()` first positional arg is the default value (JS reserved word `default` cannot be used as a kwarg) |
+| `dataclasses` | ✅           | `@dataclass`, `field()`, `asdict()`, `astuple()`, `replace()`, `fields()`, `is_dataclass()`, `MISSING` in `src/lib/dataclasses.pyj`; `frozen=True`, `order=True`, inheritance supported; `field(default=...)` and `field(default_factory=...)` work |
 | `enum`        | ✅           | `Enum` base class in `src/lib/enum.pyj`; `.name`, `.value`, iteration, `isinstance` checks; `IntEnum`/`Flag` not available |
-| `abc`         | ✅           | `ABC`, `@abstractmethod`, `Protocol`, `@runtime_checkable`, `ABCMeta` (informational), `get_cache_token()` in `src/lib/abc.pyj`; abstract method enforcement via `__init__` guard; `ABC.register()` for virtual subclasses with isinstance support; `Symbol.hasInstance` enables structural isinstance for `@runtime_checkable` protocols; `ABCMeta` metaclass not usable (no metaclass support), use `ABC` base class instead |
+| `abc`         | ✅           | `ABC`, `@abstractmethod`, `Protocol`, `@runtime_checkable`, `get_cache_token()` in `src/lib/abc.pyj`; abstract method enforcement via `__init__` guard; `ABC.register()` for virtual subclasses with isinstance support; `Symbol.hasInstance` enables structural isinstance for `@runtime_checkable` protocols; `class Base(metaclass=ABCMeta)` is equivalent to inheriting from `ABC` |
 | `contextlib`  | ✅           | `AbstractContextManager`, `@contextmanager`, `@asynccontextmanager`, `closing`, `nullcontext`, `suppress`, `ExitStack` in `src/lib/contextlib.pyj`; generator-based context managers via `@contextmanager`; async generator-based context managers via `@asynccontextmanager` paired with the `async with` statement |
-| `datetime`    | ✅           | `date`, `time`, `datetime`, `timedelta`, `MINYEAR`, `MAXYEAR` in `src/lib/datetime.pyj`; construction, `isoformat()`, `fromisoformat()`, `today()`/`now()`, `combine()`, arithmetic (via `__add__`/`__sub__`; operators need `overload_operators`), comparisons, `replace()`, `strftime()` (%Y %m %d %H %M %S %f %A %a %B %b %j %p %I %%); no tzinfo/timezone support |
-| `json`        | ✅           | `dumps()`, `loads()`, `dump()`, `load()`, `JSONDecodeError` in `src/lib/json.pyj`; `indent`, `sort_keys`, `separators`, `dflt` (Python's `default`) callback, `object_hook`, `object_pairs_hook`, `parse_float`, `parse_int` supported; backed by the JS `JSON` global; note: `default` is a JS reserved word — use `dflt=` instead |
+| `datetime`    | ✅           | `date`, `time`, `datetime`, `timedelta`, `tzinfo`, `timezone` (with `timezone.utc` / `UTC`), `MINYEAR`, `MAXYEAR` in `src/lib/datetime.pyj`; construction, `isoformat(timespec=)`, `fromisoformat()` (Python 3.11 formats, including offsets), `strptime()`, `strftime()` (all the C-locale directives), `today()`/`now(tz)`, `combine()`, arithmetic and comparisons (aware datetimes compare in UTC), `replace()`, `astimezone()`. Fixed-offset zones only (no `zoneinfo`) |
+| `json`        | ✅           | `dumps()`, `loads()`, `dump()`, `load()`, `JSONDecodeError` in `src/lib/json.pyj`. `dumps` matches Python's output (default `', '`/`': '` separators, `indent` layout, `sort_keys`, `separators`, `allow_nan`, `ensure_ascii`, `skipkeys`, circular-reference check, `TypeError` for unserializable values); `loads` returns dicts and lists and supports `object_hook`, `object_pairs_hook`, `parse_float`, `parse_int`. Pass the fallback serializer as `default=fn` (`dflt=fn` is accepted too) |
 | `io`          | ✅           | `StringIO`, `BytesIO`, `UnsupportedOperation` in `src/lib/io.pyj`; `read([size])`, `readline([size])`, `readlines([hint])`, `write()`, `writelines()`, `seek(pos[, whence])`, `tell()`, `truncate([pos])`, `getvalue()`, `close()`, `closed`; context manager support; `readable()`, `writable()`, `seekable()` return True; `newline` parameter accepted for API compatibility |
 | `base64`      | ✅           | `b64encode(s[, altchars])`, `b64decode(s[, altchars][, validate])`, `standard_b64encode`, `standard_b64decode`, `urlsafe_b64encode`, `urlsafe_b64decode`, `b32encode`, `b32decode([casefold][, map01])`, `b16encode`, `b16decode([casefold])`, `encodebytes`, `decodebytes`, `Error` in `src/lib/base64.pyj`; pure-JS implementation, works in browser and Node; all encode functions return `bytes` |
-| `string`      | ✅           | Character constants (`ascii_letters`, `ascii_lowercase`, `ascii_uppercase`, `digits`, `hexdigits`, `octdigits`, `punctuation`, `whitespace`, `printable`), `Template` ($-substitution with `substitute(mapping)` and `safe_substitute(mapping)`), `Formatter` (`format(*args)`, `vformat(fmt, args, kwargs)`, `format_field`, `convert_field`, `get_value`, `get_field`, `parse`) in `src/lib/string.pyj`; `Formatter.format()` accepts positional args — for named-field substitution use `vformat(fmt, [], {'key': val})`; `Template.substitute()` and `safe_substitute()` accept a dict (or plain object) |
+| `string`      | ✅           | Character constants (`ascii_letters`, `ascii_lowercase`, `ascii_uppercase`, `digits`, `hexdigits`, `octdigits`, `punctuation`, `whitespace`, `printable`), `capwords()`, `Template` (`substitute` / `safe_substitute` with a mapping and/or keyword arguments, `get_identifiers()`, `is_valid()`, subclassable `delimiter` / `idpattern` / `pattern`), `Formatter` (`format(*args, **kwargs)`, `vformat`, `parse`, and the `get_value` / `get_field` / `convert_field` / `format_field` / `check_unused_args` hooks) in `src/lib/string.pyj` |
 | `html`        | ✅           | `escape(s[, quote=True])`, `unescape(s)`, `HTMLParser` (event-driven parser; subclass and override `handle_starttag`, `handle_endtag`, `handle_data`, `handle_comment`, `handle_decl`, etc.) in `src/lib/html.pyj`; full HTML4 + common HTML5 named entity table; `convert_charrefs=True` by default (entities in text and attributes auto-decoded); `html.parser` sub-module not available as a separate import — use `from html import HTMLParser` |
 | `asyncio`     | ✅           | `sleep()`, `gather()`, `create_task()`, `ensure_future()`, `run()`, `shield()`, `wait_for()`, `wait()`, `iscoroutine()`, `iscoroutinefunction()`, `current_task()`, `all_tasks()`, `get_event_loop()`, `get_running_loop()`, `new_event_loop()` in `src/lib/asyncio.pyj`; synchronization primitives: `Lock`, `Event`, `Semaphore`, `BoundedSemaphore`, `Queue`, `LifoQueue`, `PriorityQueue`; exceptions: `CancelledError`, `TimeoutError`, `InvalidStateError`, `QueueEmpty`, `QueueFull`; `async def` / `await` syntax compiles to native JS async functions; `async def` with `yield` (async generators), `async for`, and `async with` are supported (see "Async generators" section); `asyncio.run(coro)` returns the Promise (cannot block in JS); for `Lock`/`Semaphore` use the dunder protocol (`__aenter__`/`__aexit__`) or call `.acquire()`/`.release()` directly |
 | `urllib`      | ✅           | `urllib.parse`: `quote()`, `unquote()`, `quote_plus()`, `unquote_plus()`, `urlencode()`, `urlsplit()` → `SplitResult`, `urlparse()` → `ParseResult`, `urlunsplit()`, `urlunparse()`, `urljoin()`, `parse_qs()`, `parse_qsl()` in `src/lib/urllib/parse.pyj`; `urllib.error`: `URLError`, `HTTPError` in `src/lib/urllib/error.pyj`; `urllib.request`: `urlopen(url[, data[, timeout]])` returns a Promise wrapping the Fetch API in `src/lib/urllib/request.pyj` — use with `await` in an async function; `SplitResult`/`ParseResult` expose `.scheme`, `.netloc`, `.path`, `.query`, `.fragment` plus `.hostname`, `.port`, `.username`, `.password` and `.geturl()`; backed by the JS `URL` constructor and `encodeURIComponent`/`decodeURIComponent`; RFC 3986 unreserved characters (`A-Z a-z 0-9 - _ . ~`) never encoded |
@@ -4461,8 +4514,19 @@ Modules with a `src/lib/` implementation available are marked ✅. All others ar
 | `fractions`   | ✅           | `Fraction(numerator=0, denominator=None)` constructor accepts int/int pairs, single ints, floats (decoded via JS Number→string so `Fraction(0.1)` → `Fraction(1, 10)`), strings (`'3/4'`, `'0.25'`, `'1e-2'`), and other Fractions; `Fraction(Fraction, Fraction)` performs rational division. Class methods `from_float(f)` / `from_number(x)`. Properties `.numerator` / `.denominator` are always reduced with positive denominator. Full arithmetic via dunders: `+`, `-`, `*`, `/`, `//`, `%`, `**` (with reflected forms; mixed with int/float; integer powers stay exact, non-integer falls back to float). Unary `+x`, `-x`, `abs(x)`. Comparisons `==`, `!=`, `<`, `<=`, `>`, `>=` against Fraction, int, or float. Conversions `float(x)`, `int(x)` (truncates toward zero via `__int__`), `bool(x)`, `round(x[, n])` (banker's rounding via `__round__`). Methods `.limit_denominator(max_denominator=10**6)` (continued-fraction best approximation), `.as_integer_ratio()`. `str(x)` → `'n/d'` (or `'n'` when denominator is 1); `repr(x)` → `'Fraction(n, d)'`; `hash(x)` is stable across equivalent forms. `ZeroDivisionError` on a zero denominator; `ValueError` on malformed strings. Internally numerator and denominator are stored as JS Numbers and reduced via Euclid's GCD after every operation — values stay exact while both stay within ±2^53. |
 | `decimal`     | ✅           | `Decimal(value=0)` constructor accepts int, bool, BigInt (`long`), str (`'1.23'`, `'-1e-2'`, `'NaN'`, `'Infinity'`, with `_` digit separators), tuple (`(sign, digits, exp)`), Decimal copy, and float (string round-trip; use `Decimal.from_float(f)` for IEEE-754-faithful decoding). Coefficient stored as a BigInt + integer exponent, so values are exact until an inexact operation rounds to `context.prec` digits. Full dunder arithmetic with reflected forms: `+`, `-`, `*`, `/`, `//`, `%`, `**` (integer and non-integer exponents), `divmod()` via `__divmod__`, unary `+`/`-`/`abs()`. Comparisons `==`, `!=`, `<`, `<=`, `>`, `>=` against Decimal, int, and float (floats use their exact IEEE-754 value). Conversions `float(x)`, `int(x)` (truncates toward zero), `bool(x)`, `round(x[, n])`. Methods `adjusted()`, `as_tuple()`, `canonical()`, `compare()`, `copy_abs()`, `copy_negate()`, `copy_sign(other)`, `is_finite()`, `is_infinite()`, `is_nan()`, `is_qnan()`, `is_snan()`, `is_signed()`, `is_zero()`, `normalize()`, `quantize(exp[, rounding])`, `sqrt()` (stripped trailing zeros on exact results), `to_eng_string()`, `to_integral_value([rounding])`, `to_integral_exact([rounding])`, `fma(other, third)`. `Context(prec=28, rounding=ROUND_HALF_EVEN)` with `getcontext()`, `setcontext()`, `localcontext()` (a context manager). Rounding modes: `ROUND_CEILING`, `ROUND_FLOOR`, `ROUND_UP`, `ROUND_DOWN`, `ROUND_HALF_UP`, `ROUND_HALF_DOWN`, `ROUND_HALF_EVEN` (default), `ROUND_05UP`. Exceptions `DecimalException`, `InvalidOperation`, `DivisionByZero`, `ConversionSyntax`, `DivisionUndefined`, `DivisionImpossible`. Note: signal traps (Inexact, Rounded, Overflow, Underflow, Clamped, …) are not raised — only InvalidOperation, DivisionByZero, and ConversionSyntax surface. NaN identity short-circuit: `nan == nan` is True when both sides are the same instance (JS identity); use distinct instances or `is_nan()` to detect NaN. |
 | `difflib`     | ✅           | `SequenceMatcher` (with `ratio`, `quick_ratio`, `real_quick_ratio`, `find_longest_match`, `get_matching_blocks`, `get_opcodes`, `get_grouped_opcodes`, `set_seq1`/`set_seq2`/`set_seqs`, `autojunk`), `Differ` (`compare`), `get_close_matches(word, possibilities, n=3, cutoff=0.6)`, `ndiff(a, b, linejunk=None, charjunk=IS_CHARACTER_JUNK)`, `unified_diff(a, b, fromfile, tofile, fromfiledate, tofiledate, n=3, lineterm='\n')`, `context_diff(...)`, `restore(delta, which)`, `IS_LINE_JUNK`, `IS_CHARACTER_JUNK` in `src/lib/difflib.pyj`; algorithms ported from CPython; sequences may be strings, lists of strings, or any object with `.length` and integer indexing; `Match` is a small class exposing `.a`/`.b`/`.size` and integer indexing (`m[0]`, `m[1]`, `m[2]`) |
-| `inspect`     | ❌           | `signature`, `getmembers`, `isfunction` etc. not available                                    |
-| `struct`      | ❌           | Binary packing/unpacking not available                                                        |
+| `sys`         | ✅           | `version_info`, `platform` (from the JS host; `'browser'` otherwise), `argv` (empty), `maxsize`, `path`, `modules`, `exit()` (raises `SystemExit` with `.code`), `stdout.write` / `stderr.write`, `getrecursionlimit()` |
+| `os`          | ✅           | `os.path` (POSIX semantics: `join`, `split`, `basename`, `dirname`, `splitext`, `normpath`, `abspath`, `relpath`, ...), `environ` (a snapshot of `process.env`), `getenv` (the fallback parameter is `dflt`), `sep`, `linesep`, `getcwd()`; file-system queries use Node's `fs` when present and return `False` in a browser |
+| `time`        | ✅           | `time()`, `time_ns()`, `monotonic()`, `perf_counter()`, `sleep()` (blocking, capped at 60 s; use `asyncio.sleep` in async code), `strftime`, `strptime`, `localtime`, `gmtime`, `mktime`, `struct_time` |
+| `types`       | ✅           | `SimpleNamespace`, `MappingProxyType`, `FunctionType`/`LambdaType`, `MethodType`, `ModuleType`, `GeneratorType`, `NoneType`, `new_class` |
+| `numbers`     | ✅           | `Number`, `Complex`, `Real`, `Rational`, `Integral` ABCs with `isinstance` support and `register()` |
+| `collections.abc` | ✅           | `Iterable`, `Iterator`, `Sized`, `Container`, `Callable`, `Hashable`, `Sequence`, `MutableSequence`, `Mapping`, `MutableMapping`, `Set`, `MutableSet`, ... with structural `isinstance` checks and the mixin methods |
+| `warnings`    | ✅           | `warn()`, `filterwarnings()`, `simplefilter()`, `resetwarnings()`, `catch_warnings()`; the `'default'` action shows a message once per message and category |
+| `weakref`     | ✅           | `ref`, `finalize`, `WeakKeyDictionary`, `WeakValueDictionary`, `WeakSet` (on `WeakRef` / `FinalizationRegistry`) |
+| `struct`      | ✅           | `pack`, `unpack`, `calcsize`, `iter_unpack`, `pack_into`, `unpack_from`, `Struct`; native `l` is 8 bytes; 64-bit values beyond 2**53 lose precision |
+| `queue`       | ✅           | `Queue`, `LifoQueue`, `PriorityQueue`, `SimpleQueue`, `Empty`, `Full`; `get()` on an empty queue and `put()` on a full one raise immediately (no blocking) |
+| `secrets`     | ✅           | `token_bytes`, `token_hex`, `token_urlsafe`, `choice`, `randbelow`, `randbits`, `compare_digest` (Web Crypto random source) |
+| `inspect`     | ✅           | `signature()`, `Parameter`, `getmembers`, `isfunction`, `isclass`, `ismethod`, `iscoroutinefunction`, `isgeneratorfunction`, `getdoc`, ... |
+| `calendar`    | ✅           | `isleap`, `leapdays`, `weekday`, `monthrange`, `monthcalendar`, `month`/`calendar` text layouts, `Calendar`, `TextCalendar`, `day_name`, `month_name`, ... (no `HTMLCalendar`) |
 | `hashlib`     | ❌           | MD5, SHA-256 etc. not available; use Web Crypto API via verbatim JS                           |
 | `hmac`        | ❌           | Keyed hashing not available                                                                   |
 | `unittest`    | ❌           | Not available; RapydScript uses a custom test runner (`node bin/rapydscript test`)            |
@@ -4475,6 +4539,7 @@ Features that exist in RapydScript but behave differently from standard Python:
 
 | Feature | Python Behavior | RapydScript Behavior                                                                                                                                                                                                       |
 |---|---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Errors thrown by the JS engine | `None.attr` raises `AttributeError` | Errors the JS engine throws keep their JS class: `None.attr` raises `TypeError`, and an undefined name raises `NameError` (JS `ReferenceError`). `str(e)` is the message and `type(e).__name__` gives the Python name. |
 | `is` / `is not` | Object identity | Strict equality `===` / `!==`, which is not object/pointer comparison for JS primitives  |
 | `//` floor division on floats | `math.floor(a/b)` always | uses `Math.floor` - same result for well-behaved floats                                                                                                                                                                    |
 | `%` on negative numbers | Result takes the sign of the divisor (`-7 % 3 == 2`) | Same as Python by default (via `python_modulo`, on by default). Disable with `from __python__ import no_python_modulo` to revert to raw JS remainder semantics.                                                              |
@@ -4487,10 +4552,10 @@ Features that exist in RapydScript but behave differently from standard Python:
 | Default `{}` dict — numeric keys | Integer keys are stored as integers | Numeric keys are auto-coerced to strings by the JS engine: `d[1]` and `d['1']` refer to the same slot                                                                                                                      |
 | Default `{}` dict — attribute access | `d.foo` raises `AttributeError` | `d.foo` and `d['foo']` access the same slot; keys are also properties                                                                                                                                                      |
 | String encoding | Unicode strings (full code-point aware) | UTF-16 — non-BMP characters (e.g. emoji) are stored as surrogate pairs. Use `str.uchrs()`, `str.uslice()`, `str.ulen()` for code-point-aware operations.                                                                   |
-| Multiple inheritance MRO | C3 linearization (MRO) always deterministic | Built on JS prototype chain; may differ from Python's C3 MRO in complex or diamond-inheritance hierarchies                                                                                                                 |
+| Multiple inheritance MRO | C3 linearization (MRO) always deterministic | `super()`, `__mro__` and `issubclass` follow C3. Plain attribute lookup on an instance follows the JS prototype chain (first base, then the attributes copied from the other bases), which can differ from C3 in unusual hierarchies |
 | Generators — output format | Native Python generator objects | Down-compiled to ES5 state-machine switch statements by default; pass `--js-version 6` for native ES6 generators (smaller and faster)                                                                                      |
 | `dict` key ordering | Insertion order guaranteed (3.7+) | Depends on JS engine (V8 preserves insertion order in practice)                                                                                                                                                            |
-| Reserved keywords | Python keywords only | All JavaScript reserved words (`default`, `switch`, `delete`, `void`, `typeof`, etc.) are also reserved in RapydScript, since it compiles to JS                                                                            |
+| Reserved keywords | Python keywords only | JavaScript keywords that are ordinary Python names (`default`, `function`, `var`, `static`, `switch`, `case`, `catch`, `enum`, ...) can be used and are renamed in the output. A few that RapydScript uses itself (`new`, `delete`, `void`, `typeof`, `instanceof`, `this`, `do`, `debugger`, `null`, `true`, `false`) remain reserved |
 | `parenthesized with (A() as a, B() as b):` | Multiple context managers in parenthesized form (3.10+) | Fully supported; multi-line and trailing comma accepted; semantics identical to the flat form |
 
 ---

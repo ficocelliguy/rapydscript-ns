@@ -1,0 +1,138 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# inspect.pyj
+# Tests for the inspect standard library module.
+
+from __python__ import overload_getitem
+import inspect
+from inspect import signature, Parameter
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+def f(a, b=1, *args, c, d=2, **kw):
+    """
+    Doc here.
+        indented
+    """
+    return a
+
+def g(x, y='s', z=None):
+    pass
+
+def h(*items):
+    pass
+
+def k(a, *, flag=False):
+    pass
+
+def nothing():
+    pass
+
+async def af(x):
+    pass
+
+def gf():
+    yield 1
+
+class K:
+    """Klass doc."""
+    def __init__(self, x, y=3):
+        self.x = x
+    def m(self, q):
+        pass
+    @staticmethod
+    def s(z):
+        pass
+
+# ── 1. signature() strings (match CPython) ────────────────────────────────────
+ae(str(signature(f)), '(a, b=1, *args, c, d=2, **kw)')
+ae(str(signature(g)), "(x, y='s', z=None)")
+ae(str(signature(h)), '(*items)')
+ae(str(signature(k)), '(a, *, flag=False)')
+ae(str(signature(nothing)), '()')
+ae(str(signature(af)), '(x)')
+ae(str(signature(gf)), '()')
+ae(str(signature(K)), '(x, y=3)')
+ae(str(signature(K.prototype.m)), '(q)')
+
+# ── 2. Parameter objects ──────────────────────────────────────────────────────
+sig = signature(f)
+ade(list(sig.parameters.keys()), ['a', 'b', 'args', 'c', 'd', 'kw'])
+ae(sig.parameters['b'].default, 1)
+ok(sig.parameters['a'].default is Parameter.empty)
+ae(sig.parameters['a'].kind, Parameter.POSITIONAL_OR_KEYWORD)
+ae(sig.parameters['args'].kind, Parameter.VAR_POSITIONAL)
+ae(sig.parameters['c'].kind, Parameter.KEYWORD_ONLY)
+ae(sig.parameters['kw'].kind, Parameter.VAR_KEYWORD)
+ae(str(sig.parameters['b']), 'b=1')
+ae(repr(sig.parameters['args']), '<Parameter "*args">')
+ok(sig.return_annotation is inspect.Signature.empty)
+
+# ── 3. bind / apply_defaults ──────────────────────────────────────────────────
+ba = signature(g).bind(1, z=3)
+ba.apply_defaults()
+ade(list(ba.args), [1, 's', 3])
+ade(list(ba.arguments.keys()), ['x', 'y', 'z'])
+try:
+    signature(g).bind()
+    ok(False)
+except TypeError:
+    pass
+
+# ── 4. getfullargspec ─────────────────────────────────────────────────────────
+spec = inspect.getfullargspec(f)
+ade(spec.args, ['a', 'b'])
+ae(spec.varargs, 'args')
+ae(spec.varkw, 'kw')
+ade(list(spec.defaults), [1])
+ade(spec.kwonlyargs, ['c', 'd'])
+ae(spec.kwonlydefaults['d'], 2)
+
+# ── 5. Predicates ─────────────────────────────────────────────────────────────
+ok(inspect.isfunction(f))
+ok(not inspect.isfunction(K))
+ok(inspect.isclass(K))
+ok(not inspect.isclass(f))
+ok(inspect.isclass(int))
+ok(inspect.isclass(ValueError))
+ok(inspect.isgeneratorfunction(gf))
+ok(not inspect.isgeneratorfunction(f))
+ok(inspect.isgenerator(gf()))
+ok(not inspect.isgenerator([]))
+ok(inspect.iscoroutinefunction(af))
+ok(not inspect.iscoroutinefunction(f))
+ok(inspect.isawaitable(af(1)))
+ok(not inspect.isawaitable(1))
+ok(inspect.ismodule(inspect))
+ok(not inspect.ismodule(f))
+ok(inspect.isroutine(f))
+ok(inspect.ismethod(f.bind(None)))
+ok(not inspect.ismethod(f))
+ok(inspect.isbuiltin(Math.max))
+ok(not inspect.isbuiltin(f))
+
+# ── 6. getdoc / cleandoc ──────────────────────────────────────────────────────
+ae(inspect.getdoc(f), 'Doc here.\n    indented')
+ae(inspect.getdoc(K), 'Klass doc.')
+ae(inspect.getdoc(K(1)), 'Klass doc.')
+ae(inspect.getdoc(nothing), None)
+ae(inspect.cleandoc('  first\n    second\n      third\n'), 'first\nsecond\n  third')
+
+# ── 7. getmembers ─────────────────────────────────────────────────────────────
+names = [p[0] for p in inspect.getmembers(K(1)) if not p[0].startsWith('__')]
+ade(names, ['m', 's', 'x'])
+names = [p[0] for p in inspect.getmembers(K, inspect.isfunction) if not p[0].startsWith('__')]
+ade(names, ['m', 's'])
+pairs = inspect.getmembers(K(5), def(v): return v is 5;)
+ae(pairs.length, 1)
+ae(pairs[0][0], 'x')
+
+# ── 8. getmro / getmodule ─────────────────────────────────────────────────────
+class K2(K):
+    pass
+mro = inspect.getmro(K2)
+ok(mro[0] is K2 and mro[1] is K and mro[mro.length - 1] is object)
+ok(inspect.getmodule(inspect.signature) is inspect)

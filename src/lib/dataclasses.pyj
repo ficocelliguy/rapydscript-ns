@@ -88,16 +88,14 @@ def field(*args, **kwargs):
     """
     Return a Field descriptor for use as a class-level default in a dataclass.
 
-    Because 'default' is a JS reserved word, pass a plain default value as
-    the FIRST POSITIONAL ARGUMENT instead of default=...:
-
-        name: str = field("unnamed")              # plain default
+        name: str = field(default="unnamed")      # plain default
+        name: str = field("unnamed")              # (positional form also accepted)
         items: list = field(default_factory=list) # factory default
         secret: str = field(repr=False)           # repr suppressed, no default
         dist: float = field(init=False)           # computed in __post_init__
     """
-    # First positional arg (if any) is the plain default value.
-    _default = args[0] if args.length > 0 else MISSING
+    # default=... (or, as in earlier releases, the first positional argument)
+    _default = kwargs['default'] if 'default' in kwargs else (args[0] if args.length > 0 else MISSING)
     _default_factory = kwargs['default_factory'] if 'default_factory' in kwargs else MISSING
 
     if _default is not MISSING and _default_factory is not MISSING:

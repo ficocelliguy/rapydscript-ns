@@ -43,33 +43,66 @@ def wraps(wrapped):
     return decorator
 
 
+class CacheInfo:
+    """What cache_info() returns: hits, misses, maxsize and currsize."""
+
+    def __init__(self, hits, misses, maxsize, currsize):
+        self.hits = hits
+        self.misses = misses
+        self.maxsize = maxsize
+        self.currsize = currsize
+
+    def __repr__(self):
+        return 'CacheInfo(hits=' + self.hits + ', misses=' + self.misses + ', maxsize=' + repr(self.maxsize) + ', currsize=' + self.currsize + ')'
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return isinstance(other, CacheInfo) and self.hits is other.hits and self.misses is other.misses and self.maxsize is other.maxsize and self.currsize is other.currsize
+
+
+_kw_mark = 'ρσ:kwargs'  # separates positional from keyword arguments in a cache key (hashable)
+
+
 def _make_lru_cached(func, maxsize):
-    state = v"{'cache': new Map(), 'order': [], 'hits': 0, 'misses': 0}"
-    def wrapper(*args):
-        key = JSON.stringify(args)
-        if state.cache.has(key):
+    # The cache is a dict keyed by a tuple of the arguments, so arguments are
+    # matched with Python's hash() / == (equal tuples, numbers and strings hit;
+    # other objects by identity or their __hash__). Its insertion order doubles
+    # as recency: a hit moves its key to the end, and the first key is evicted.
+    cache = v'new ρσ_dict_implementation()'
+    state = v"{'hits': 0, 'misses': 0}"
+    def wrapper(*args, **kwargs):
+        key = args.slice()
+        names = Object.keys(kwargs).sort()
+        if names.length:
+            key.push(_kw_mark)
+            for name in names:
+                key.push(name, kwargs[name])
+        key = ρσ_tuple_decorate(key)
+        if cache.has(key):
             state.hits += 1
-            return state.cache.get(key)
+            result = cache.get(key)
+            cache.delete(key)
+            cache.set(key, result)
+            return result
         state.misses += 1
-        result = func(*args)
-        if maxsize is None or state.order.length < maxsize:
-            state.cache.set(key, result)
-            state.order.push(key)
-        elif maxsize > 0:
-            old = state.order.shift()
-            state.cache.delete(old)
-            state.cache.set(key, result)
-            state.order.push(key)
+        result = func(*args, **kwargs)
+        if maxsize is None or maxsize > 0:
+            cache.set(key, result)
+            if maxsize is not None and cache.size > maxsize:
+                cache.delete(cache.keys().next().value)
         return result
     def cache_clear():
-        v'state.cache.clear(); state.order.length = 0;'
+        cache.clear()
         state.hits = 0
         state.misses = 0
     wrapper.cache_clear = cache_clear
     wrapper.cache_info = def():
-        return {'hits': state.hits, 'misses': state.misses,
-                'maxsize': maxsize, 'currsize': state.cache.size}
+        return CacheInfo(state.hits, state.misses, maxsize, cache.size)
     wrapper.__wrapped__ = func
+    if func.name:
+        v'Object.defineProperty(wrapper, "name", {value: func.name, configurable: true})'
     return wrapper
 
 

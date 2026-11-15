@@ -1,0 +1,87 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# calendar.pyj
+# Tests for the calendar standard library module.
+# Expected text was produced with CPython.
+
+from __python__ import overload_getitem
+import calendar
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Leap years / weekdays / monthrange ─────────────────────────────────────
+ok(calendar.isleap(2000))
+ok(not calendar.isleap(1900))
+ok(calendar.isleap(2024))
+ae(calendar.leapdays(1900, 2025), 31)
+ae(calendar.weekday(2024, 1, 1), calendar.MONDAY)
+ae(calendar.weekday(1, 1, 1), 0)
+ae(calendar.weekday(2000, 2, 29), calendar.TUESDAY)
+ade(list(calendar.monthrange(2024, 2)), [3, 29])
+ade(list(calendar.monthrange(2023, 2)), [2, 28])
+ade(list(calendar.monthrange(1999, 12)), [2, 31])
+
+# ── 2. Names ──────────────────────────────────────────────────────────────────
+ae(calendar.month_name[1], 'January')
+ae(calendar.month_name[0], '')
+ae(calendar.month_name[-1], 'December')
+ae(calendar.month_abbr[12], 'Dec')
+ae(calendar.day_name[0], 'Monday')
+ae(calendar.day_abbr[6], 'Sun')
+ae(len(calendar.month_name), 13)
+ae(calendar.SUNDAY, 6)
+ae(calendar.DECEMBER, 12)
+
+# ── 3. monthcalendar / timegm ─────────────────────────────────────────────────
+ade(calendar.monthcalendar(2024, 3), [[0, 0, 0, 0, 1, 2, 3], [4, 5, 6, 7, 8, 9, 10], [11, 12, 13, 14, 15, 16, 17],
+                                      [18, 19, 20, 21, 22, 23, 24], [25, 26, 27, 28, 29, 30, 31]])
+ae(calendar.timegm([2023, 11, 14, 22, 13, 20, 0, 0, 0]), 1700000000)
+ae(calendar.timegm([1970, 1, 1, 0, 0, 0]), 0)
+
+# ── 4. Text output ────────────────────────────────────────────────────────────
+ae(calendar.month(2024, 2), '   February 2024\nMo Tu We Th Fr Sa Su\n          1  2  3  4\n 5  6  7  8  9 10 11\n12 13 14 15 16 17 18\n19 20 21 22 23 24 25\n26 27 28 29\n')
+ae(calendar.month(2023, 10, 3, 2), '        October 2023\n\nMon Tue Wed Thu Fri Sat Sun\n\n                          1\n\n  2   3   4   5   6   7   8\n\n  9  10  11  12  13  14  15\n\n 16  17  18  19  20  21  22\n\n 23  24  25  26  27  28  29\n\n 30  31\n\n')
+ae(calendar.weekheader(9), '  Monday   Tuesday  Wednesday  Thursday   Friday   Saturday   Sunday ')
+year_lines = calendar.calendar(2024).split('\n')
+ade(year_lines[:12], ['                                  2024', '', '      January                   February                   March',
+    'Mo Tu We Th Fr Sa Su      Mo Tu We Th Fr Sa Su      Mo Tu We Th Fr Sa Su',
+    ' 1  2  3  4  5  6  7                1  2  3  4                   1  2  3',
+    ' 8  9 10 11 12 13 14       5  6  7  8  9 10 11       4  5  6  7  8  9 10',
+    '15 16 17 18 19 20 21      12 13 14 15 16 17 18      11 12 13 14 15 16 17',
+    '22 23 24 25 26 27 28      19 20 21 22 23 24 25      18 19 20 21 22 23 24',
+    '29 30 31                  26 27 28 29               25 26 27 28 29 30 31', '',
+    '       April                      May                       June',
+    'Mo Tu We Th Fr Sa Su      Mo Tu We Th Fr Sa Su      Mo Tu We Th Fr Sa Su'])
+
+# ── 5. First weekday ──────────────────────────────────────────────────────────
+tc = calendar.TextCalendar(6)
+ae(tc.formatmonth(2025, 1), '    January 2025\nSu Mo Tu We Th Fr Sa\n          1  2  3  4\n 5  6  7  8  9 10 11\n12 13 14 15 16 17 18\n19 20 21 22 23 24 25\n26 27 28 29 30 31\n')
+ae(tc.firstweekday, 6)
+calendar.setfirstweekday(calendar.SUNDAY)
+ae(calendar.firstweekday(), 6)
+ade(calendar.monthcalendar(2024, 9)[0], [1, 2, 3, 4, 5, 6, 7])
+calendar.setfirstweekday(calendar.MONDAY)
+ade(calendar.monthcalendar(2024, 9)[0], [0, 0, 0, 0, 0, 0, 1])
+
+# ── 6. Calendar iterators ─────────────────────────────────────────────────────
+c = calendar.Calendar()
+ade(list(c.iterweekdays()), [0, 1, 2, 3, 4, 5, 6])
+ade([list(t) for t in c.itermonthdays3(2024, 3)][:3], [[2024, 2, 26], [2024, 2, 27], [2024, 2, 28]])
+ade(list(calendar.Calendar(2).itermonthdays(2024, 3))[:8], [0, 0, 1, 2, 3, 4, 5, 6])
+ade(list(c.itermonthdays2(2024, 3)[4]), [1, 4])
+
+# ── 7. Errors ─────────────────────────────────────────────────────────────────
+try:
+    calendar.monthrange(2024, 13)
+    ok(False)
+except calendar.IllegalMonthError as e:
+    ae(str(e), 'bad month number 13; must be 1-12')
+    ok(isinstance(e, ValueError))
+try:
+    calendar.setfirstweekday(9)
+    ok(False)
+except calendar.IllegalWeekdayError:
+    pass

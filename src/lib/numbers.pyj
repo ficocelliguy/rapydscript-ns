@@ -1,0 +1,175 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'numbers' module: the numeric tower
+#   Number > Complex > Real > Rational > Integral
+#
+# isinstance()/issubclass() work through class-level __instancecheck__ /
+# __subclasscheck__ hooks:
+#   Integral — JS integers, bool, BigInt (int, bool, long)
+#   Rational — Integral + fractions.Fraction
+#   Real     — Rational + every JS number (float)
+#   Complex  — Real + the builtin complex
+#   Number   — Complex + decimal.Decimal
+# plus any class registered with X.register(cls) or deriving from X.
+#
+# register() is redeclared on every class so that `Integral.register(C)`
+# compiles to a direct (static) call even when only Integral is imported.
+#
+# Approximation: JS has a single number type, so a float with an integral
+# value (2.0) is indistinguishable from the int 2 and is an Integral.
+
+from _abc_support import abc_instancecheck, abc_subclasscheck, abc_register, set_predicates
+
+# The class Number below shadows the JS global of the same name throughout
+# this module, so keep a handle on the JS one.
+_JSNumber = v'(0).constructor'
+
+
+def _ctor_name(obj):
+    if obj is None or obj is undefined:
+        return ''
+    c = obj.constructor
+    return (c.__name__ or c.name) if c else ''
+
+
+def _is_fraction(obj):
+    return jstype(obj) is 'object' and _ctor_name(obj) is 'Fraction' and obj.numerator is not undefined and obj.denominator is not undefined
+
+
+def _is_decimal(obj):
+    return jstype(obj) is 'object' and _ctor_name(obj) is 'Decimal'
+
+
+def _is_complex(obj):
+    return obj is not None and obj is not undefined and v'obj instanceof complex'
+
+
+def _is_integral(obj):
+    t = jstype(obj)
+    return (t is 'number' and _JSNumber.isInteger(obj)) or t is 'boolean' or t is 'bigint'
+
+
+def _is_real(obj):
+    t = jstype(obj)
+    return t is 'number' or t is 'boolean' or t is 'bigint' or v'obj instanceof _JSNumber'
+
+
+def _cls_name(c):
+    return c.__name__ or c.name or ''
+
+
+def _cls_integral(c):
+    return c is int or c is bool or c is long or c is v'(typeof BigInt === "function" ? BigInt : null)' or c is Boolean
+
+
+def _cls_rational(c):
+    return _cls_integral(c) or _cls_name(c) is 'Fraction'
+
+
+def _cls_real(c):
+    return _cls_rational(c) or c is float or c is _JSNumber
+
+
+def _cls_complex(c):
+    return _cls_real(c) or c is complex
+
+
+def _cls_number(c):
+    return _cls_complex(c) or _cls_name(c) is 'Decimal'
+
+
+class Number:
+    """All numbers inherit from this class."""
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return abc_instancecheck(cls, obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return abc_subclasscheck(cls, sub)
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+class Complex(Number):
+    """Complex numbers: real, imag, conjugate(), abs(), arithmetic."""
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+    def __bool__(self):
+        return self != 0
+
+    @property
+    def real(self):
+        raise NotImplementedError()
+
+    @property
+    def imag(self):
+        raise NotImplementedError()
+
+
+class Real(Complex):
+    """Real numbers: adds ordering, floor/ceil/trunc/round, divmod."""
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+    @property
+    def real(self):
+        return self
+
+    @property
+    def imag(self):
+        return 0
+
+    def conjugate(self):
+        return self
+
+
+class Rational(Real):
+    """Rational numbers: numerator and denominator."""
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+    def __float__(self):
+        return self.numerator / self.denominator
+
+
+class Integral(Rational):
+    """Integers."""
+
+    @classmethod
+    def register(cls, subclass):
+        return abc_register(cls, subclass)
+
+
+    @property
+    def numerator(self):
+        return self
+
+    @property
+    def denominator(self):
+        return 1
+
+    def __index__(self):
+        return self.__int__()
+
+
+set_predicates(Number, def(obj): return _is_real(obj) or _is_complex(obj) or _is_fraction(obj) or _is_decimal(obj);, _cls_number)
+set_predicates(Complex, def(obj): return _is_real(obj) or _is_complex(obj) or _is_fraction(obj);, _cls_complex)
+set_predicates(Real, def(obj): return _is_real(obj) or _is_fraction(obj);, _cls_real)
+set_predicates(Rational, def(obj): return _is_integral(obj) or _is_fraction(obj);, _cls_rational)
+set_predicates(Integral, _is_integral, _cls_integral)

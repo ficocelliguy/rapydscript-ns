@@ -9,7 +9,8 @@ ok  = assrt.ok
 # Built-in Python-mapped types
 ae(str(type([])),       "<class 'list'>")
 ae(str(type('hello')),  "<class 'str'>")
-ae(str(type(42)),       "<class 'float'>")
+ae(str(type(42)),       "<class 'int'>")
+ae(str(type(4.5)),      "<class 'float'>")
 ae(str(type(True)),     "<class 'bool'>")
 ae(str(type(None)),     "<class 'NoneType'>")
 

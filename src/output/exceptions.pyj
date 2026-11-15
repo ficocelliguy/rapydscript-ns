@@ -27,6 +27,21 @@ def print_try(self, output):
         print_else(self.belse, else_var_name, output)
 
 
+def exception_test(varname, name):
+    # JS condition for `except <name>` when the name needs more than `instanceof`, else None.
+    if name is 'Exception':
+        # Every JS error counts (a TypeError thrown by the runtime is a Python
+        # TypeError), except the BaseException-only classes Python keeps out
+        # of `except Exception`: SystemExit, KeyboardInterrupt, GeneratorExit.
+        return '(' + varname + ' instanceof Error && !(' + varname + ' instanceof BaseException && !(' + varname + ' instanceof Exception)))'
+    if name is 'BaseException':
+        return varname + ' instanceof Error'
+    if name is 'RecursionError':
+        # The engine reports stack overflow as RangeError (V8) or InternalError (Firefox).
+        return '(' + varname + ' instanceof RecursionError || (' + varname + ' instanceof Error && /maximum call stack|too much recursion/i.test(' + varname + '.message)))'
+    return None
+
+
 def print_catch(self, output):
     # Dispatch to except* handler when any clause is an exception group handler
     if self.body.length and self.body[0].is_star:
@@ -58,13 +73,14 @@ def print_catch(self, output):
                             output.print("||")
                             output.space()
 
-                        output.print("ρσ_Exception")
-                        output.space()
-                        output.print("instanceof")
-                        output.space()
-                        if err.name is 'Exception':
-                            output.print('Error')
+                        special = exception_test("ρσ_Exception", err.name)
+                        if special:
+                            output.print(special)
                         else:
+                            output.print("ρσ_Exception")
+                            output.space()
+                            output.print("instanceof")
+                            output.space()
                             err.print(output)
                 )
                 output.space()
@@ -91,8 +107,9 @@ def _eg_type_cond(errors, varname):
     # Build a JS condition string testing varname against each error type
     parts = []
     for err in errors:
-        if err.name is 'Exception':
-            parts.push(varname + " instanceof Error")
+        special = exception_test(varname, err.name)
+        if special:
+            parts.push(special)
         else:
             parts.push(varname + " instanceof " + err.name)
     return parts.join(" || ")

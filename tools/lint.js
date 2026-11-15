@@ -32,14 +32,14 @@ var BUILTINS = Object.create(null);
 ('this self window document chr ord iterator_symbol print len range dir' + 
  ' eval undefined arguments abs max min enumerate pow callable reversed sum' + 
  ' getattr isFinite setattr hasattr parseInt parseFloat options_object' +
- ' isNaN JSON Math list set list_wrap ρσ_modules require bool int bin' +
+ ' isNaN JSON Math list set list_wrap ρσ_modules require bool int bin oct' +
  ' float iter Error EvalError set_wrap frozenset RangeError ReferenceError SyntaxError' +
  ' str TypeError URIError Exception AssertionError IndexError AttributeError KeyError' +
  ' ValueError ZeroDivisionError map hex filter zip dict dict_wrap UnicodeDecodeError HTMLCollection' +
  ' NodeList alert console Node Symbol NamedNodeMap ρσ_eslice ρσ_delslice Number' +
  ' Boolean encodeURIComponent decodeURIComponent setTimeout setInterval' +
  ' setImmediate clearTimeout clearInterval clearImmediate requestAnimationFrame' +
- ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN Ellipsis bytes bytearray'
+ ' id repr sorted __name__ equals get_module ρσ_str jstype divmod NaN Ellipsis bytes bytearray LookupError StopIteration ImportError ModuleNotFoundError NameError ExceptionGroup BaseExceptionGroup BaseException SystemExit KeyboardInterrupt GeneratorExit ArithmeticError OverflowError FloatingPointError RuntimeError NotImplementedError RecursionError OSError IOError EnvironmentError FileNotFoundError FileExistsError IsADirectoryError NotADirectoryError PermissionError TimeoutError InterruptedError BlockingIOError ChildProcessError ProcessLookupError ConnectionError BrokenPipeError ConnectionAbortedError ConnectionRefusedError ConnectionResetError EOFError BufferError StopAsyncIteration Warning UserWarning DeprecationWarning PendingDeprecationWarning RuntimeWarning SyntaxWarning FutureWarning ImportWarning UnicodeWarning BytesWarning ResourceWarning UnicodeError UnicodeEncodeError UnicodeTranslateError NotImplemented property delattr ascii type UnboundLocalError'
  ).split(' ').forEach(function(x) { BUILTINS[x] = true; });
 
 Object.keys(RapydScript.NATIVE_CLASSES).forEach(function (name) { BUILTINS[name] = true; });
@@ -271,7 +271,7 @@ function Linter(toplevel, filename, code, options) {
             if (node instanceof RapydScript.AST_Method) {
                 scope.methods[name] = true;
                 if (has_prop(scope.seen_method_names, name)) {
-                    if (!node.is_setter) this.messages.push(msg_from_node(filename, 'dup-method', node.name, node, WARN, scope.seen_method_names[name]));
+                    if (!node.is_setter && !node.is_deleter) this.messages.push(msg_from_node(filename, 'dup-method', node.name, node, WARN, scope.seen_method_names[name]));
                 } else scope.seen_method_names[name] = node.start.line;
             } else this.add_binding(name);
         }

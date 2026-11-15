@@ -1,0 +1,84 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# sys.pyj
+# Tests for the sys standard library module.
+
+from __python__ import overload_getitem, overload_operators
+import sys
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+# ── 1. Basic attributes ───────────────────────────────────────────────────────
+ade(sys.argv, [])
+ade(sys.path, [])
+ok(['linux', 'win32', 'darwin', 'browser', 'freebsd'].indexOf(sys.platform) >= 0 or len(sys.platform) > 0)
+ae(sys.byteorder, 'little')
+ae(sys.maxsize, 9007199254740991)
+ok(sys.float_info.epsilon > 0 and sys.float_info.epsilon < 1e-15)
+ae(sys.float_info.max, 1.7976931348623157e+308)
+ae(sys.getrecursionlimit(), 1000)
+sys.setrecursionlimit(1500)
+ae(sys.getrecursionlimit(), 1500)
+sys.setrecursionlimit(1000)
+ae(sys.getdefaultencoding(), 'utf-8')
+ok(jstype(sys.modules) is 'object')
+
+# ── 2. version_info is an indexable tuple with named fields ───────────────────
+vi = sys.version_info
+ae(vi[0], 3)
+ae(vi.major, 3)
+ae(vi.minor, vi[1])
+ae(vi.micro, vi[2])
+ae(vi.releaselevel, 'final')
+ae(len(vi), 5)
+ok(vi >= (3, 8))
+ok(isinstance(vi, tuple))
+major, minor = vi[:2]
+ae(major, 3)
+ok(repr(vi).startsWith('sys.version_info(major=3, minor='))
+ok(jstype(sys.version) is 'string' and sys.version.startsWith('3.'))
+
+# ── 3. exit raises SystemExit carrying the code ───────────────────────────────
+for code, expected in [(None, None), (0, 0), (3, 3), ('bye', 'bye')]:
+    caught = None
+    try:
+        if code is None:
+            sys.exit()
+        else:
+            sys.exit(code)
+    except SystemExit as e:
+        caught = e
+    ok(caught is not None)
+    ae(caught.code, expected)
+
+# ── 4. stdout / stderr buffer partial lines ───────────────────────────────────
+logged, errors = [], []
+orig_log, orig_err = console.log, console.error
+console.log = def(*a): logged.push(a.join(' '));
+console.error = def(*a): errors.push(a.join(' '));
+try:
+    ae(sys.stdout.write('abc'), 3)
+    ade(logged, [])
+    sys.stdout.write('def\nghi')
+    ade(logged, ['abcdef'])
+    sys.stdout.flush()
+    ade(logged, ['abcdef', 'ghi'])
+    sys.stderr.write('e1')
+    ade(errors, [])
+    sys.stderr.write('\ne2\n')
+    ade(errors, ['e1\ne2'])  # everything up to the last newline in one call
+    sys.stderr.write('tail')
+    sys.stderr.flush()
+    ade(errors, ['e1\ne2', 'tail'])
+    print('x', end='')
+    sys.stdout.write('y\n')
+    ade(logged, ['abcdef', 'ghi', 'xy'])
+    print('to-err', file=sys.stderr)
+    ade(errors, ['e1\ne2', 'tail', 'to-err'])
+finally:
+    console.log, console.error = orig_log, orig_err
+ok(not sys.stdout.isatty())
+ae(sys.stderr.fileno(), 2)

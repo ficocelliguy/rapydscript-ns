@@ -4,18 +4,97 @@
 # globals: ρσ_str
 
 v'var NameError = ReferenceError'
+# UnboundLocalError subclasses NameError (the native ReferenceError)
+v'''var UnboundLocalError = function UnboundLocalError(message) {
+    var e = new ReferenceError(message);
+    Object.setPrototypeOf(e, UnboundLocalError.prototype);
+    return e;
+}'''
+v'UnboundLocalError.prototype = Object.create(ReferenceError.prototype, {constructor: {value: UnboundLocalError, writable: true, configurable: true}, name: {value: "UnboundLocalError", writable: true, configurable: true}})'
+v'UnboundLocalError.__name__ = "UnboundLocalError"'
 v'var _ρσ_NativeError = Error'
 
-class Exception(Error):
+class BaseException(Error):
 
     def __init__(self):
-        self.args = v'Array.prototype.slice.call(arguments)'
+        self.args = ρσ_tuple_decorate(v'Array.prototype.slice.call(arguments)')
         self.message = self.args[0] if self.args.length > 0 else ''
         self.stack = v'_ρσ_NativeError'().stack
         self.name = self.constructor.name
 
+    def __str__(self):
+        # Like Python: str(ValueError('x')) == 'x', str(ValueError()) == '',
+        # str(ValueError('x', 1)) == "('x', 1)"
+        if self.args.length is 0:
+            return ''
+        if self.args.length is 1:
+            return ρσ_str(self.args[0])
+        return ρσ_repr(self.args)
+
     def __repr__(self):
-        return self.name + ': ' + self.message
+        return self.name + '(' + self.args.map(def(a): return ρσ_repr(a);).join(', ') + ')'
+
+class Exception(BaseException):
+    pass
+
+# Leaf classes that need no methods of their own are built by ρσ_exc_class
+# rather than class statements: a compiled empty class costs ~1.7 KB of
+# baselib, which every compiled program carries.
+# Also recorded in ρσ_builtin_exceptions, so a module can re-export one under its
+# own name (`RuntimeError = ρσ_builtin_exceptions.RuntimeError`) without its
+# hoisted module-level variable shadowing the builtin.
+ρσ_builtin_exceptions = {}
+
+def ρσ_exc_class(name, base):
+    cls = v'{[name]: function () { if (!(this instanceof cls)) return new cls(...arguments); if (this.ρσ_object_id === undefined) Object.defineProperty(this, "ρσ_object_id", {"value":++ρσ_object_counter}); cls.prototype.__init__.apply(this, arguments); }}[name]'
+    ρσ_extends(cls, base)
+    v'Object.defineProperty(cls.prototype, "__bases__", {value: [base]})'
+    cls.__name__ = cls.__qualname__ = name
+    cls.__module__ = 'builtins'
+    ρσ_builtin_exceptions[name] = cls
+    return cls
+
+v'var SystemExit = ρσ_exc_class("SystemExit", BaseException)'
+v'SystemExit.prototype.__init__ = function () { BaseException.prototype.__init__.apply(this, arguments); this.code = this.args.length === 0 ? null : (this.args.length === 1 ? this.args[0] : this.args); }'
+v'var KeyboardInterrupt = ρσ_exc_class("KeyboardInterrupt", BaseException)'
+v'var GeneratorExit = ρσ_exc_class("GeneratorExit", BaseException)'
+v'var ArithmeticError = ρσ_exc_class("ArithmeticError", Exception)'
+v'var OverflowError = ρσ_exc_class("OverflowError", ArithmeticError)'
+v'var FloatingPointError = ρσ_exc_class("FloatingPointError", ArithmeticError)'
+v'var RuntimeError = ρσ_exc_class("RuntimeError", Exception)'
+v'var NotImplementedError = ρσ_exc_class("NotImplementedError", RuntimeError)'
+v'var RecursionError = ρσ_exc_class("RecursionError", RuntimeError)'
+v'var OSError = ρσ_exc_class("OSError", Exception)'
+v'var IOError = OSError, EnvironmentError = OSError'
+v'var FileNotFoundError = ρσ_exc_class("FileNotFoundError", OSError)'
+v'var FileExistsError = ρσ_exc_class("FileExistsError", OSError)'
+v'var IsADirectoryError = ρσ_exc_class("IsADirectoryError", OSError)'
+v'var NotADirectoryError = ρσ_exc_class("NotADirectoryError", OSError)'
+v'var PermissionError = ρσ_exc_class("PermissionError", OSError)'
+v'var TimeoutError = ρσ_exc_class("TimeoutError", OSError)'
+v'var InterruptedError = ρσ_exc_class("InterruptedError", OSError)'
+v'var BlockingIOError = ρσ_exc_class("BlockingIOError", OSError)'
+v'var ChildProcessError = ρσ_exc_class("ChildProcessError", OSError)'
+v'var ProcessLookupError = ρσ_exc_class("ProcessLookupError", OSError)'
+v'var ConnectionError = ρσ_exc_class("ConnectionError", OSError)'
+v'var BrokenPipeError = ρσ_exc_class("BrokenPipeError", ConnectionError)'
+v'var ConnectionAbortedError = ρσ_exc_class("ConnectionAbortedError", ConnectionError)'
+v'var ConnectionRefusedError = ρσ_exc_class("ConnectionRefusedError", ConnectionError)'
+v'var ConnectionResetError = ρσ_exc_class("ConnectionResetError", ConnectionError)'
+v'var EOFError = ρσ_exc_class("EOFError", Exception)'
+v'var BufferError = ρσ_exc_class("BufferError", Exception)'
+v'var StopAsyncIteration = ρσ_exc_class("StopAsyncIteration", Exception)'
+v'var Warning = ρσ_exc_class("Warning", Exception)'
+v'var UserWarning = ρσ_exc_class("UserWarning", Warning)'
+v'var DeprecationWarning = ρσ_exc_class("DeprecationWarning", Warning)'
+v'var PendingDeprecationWarning = ρσ_exc_class("PendingDeprecationWarning", Warning)'
+v'var RuntimeWarning = ρσ_exc_class("RuntimeWarning", Warning)'
+v'var SyntaxWarning = ρσ_exc_class("SyntaxWarning", Warning)'
+v'var FutureWarning = ρσ_exc_class("FutureWarning", Warning)'
+v'var ImportWarning = ρσ_exc_class("ImportWarning", Warning)'
+v'var UnicodeWarning = ρσ_exc_class("UnicodeWarning", Warning)'
+v'var BytesWarning = ρσ_exc_class("BytesWarning", Warning)'
+v'var ResourceWarning = ρσ_exc_class("ResourceWarning", Warning)'
 
 class AttributeError(Exception):
     pass
@@ -27,18 +106,25 @@ class IndexError(LookupError):
     pass
 
 class KeyError(LookupError):
-    pass
+
+    def __str__(self):
+        # Python shows the missing key's repr: str(KeyError('k')) == "'k'"
+        if self.args.length is 1:
+            return ρσ_repr(self.args[0])
+        return BaseException.prototype.__str__.call(self)
 
 class ValueError(Exception):
     pass
 
-class UnicodeDecodeError(Exception):
-    pass
+v'var UnicodeError = ρσ_exc_class("UnicodeError", ValueError)'
+v'var UnicodeDecodeError = ρσ_exc_class("UnicodeDecodeError", UnicodeError)'
+v'var UnicodeEncodeError = ρσ_exc_class("UnicodeEncodeError", UnicodeError)'
+v'var UnicodeTranslateError = ρσ_exc_class("UnicodeTranslateError", UnicodeError)'
 
 class AssertionError(Exception):
     pass
 
-class ZeroDivisionError(Exception):
+class ZeroDivisionError(ArithmeticError):
     pass
 
 class StopIteration(Exception):
@@ -85,5 +171,11 @@ class ExceptionGroup(Exception):
             ExceptionGroup(self.message, rest) if rest else None
         ]
 
+    def __str__(self):
+        n = self.exceptions.length
+        return ρσ_str(self.message) + ' (' + n + ' sub-exception' + ('' if n is 1 else 's') + ')'
+
     def __repr__(self):
         return 'ExceptionGroup(' + repr(self.message) + ', ' + repr(self.exceptions) + ')'
+
+v'var BaseExceptionGroup = ExceptionGroup'

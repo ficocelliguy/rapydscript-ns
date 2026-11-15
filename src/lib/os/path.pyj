@@ -1,0 +1,289 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of Python's 'os.path' module (POSIX semantics).
+#
+# Pure string functions:
+#   join, split, splitext, basename, dirname, normpath, isabs, abspath,
+#   realpath, relpath, commonprefix, commonpath, expanduser, expandvars,
+#   splitdrive, normcase
+#
+# Filesystem queries (exists, lexists, isfile, isdir, islink, getsize,
+# getmtime, ...): use Node's fs module when require('fs') is available,
+# otherwise (e.g. in a browser) they report False / raise FileNotFoundError.
+
+sep = '/'
+curdir = '.'
+pardir = '..'
+extsep = '.'
+altsep = None
+pathsep = ':'
+devnull = '/dev/null'
+
+
+def _node_process():
+    v'if (typeof process !== "undefined" && process && process.versions) return process'
+    v'if (typeof window === "undefined" && typeof require === "function") { try { return require("process"); } catch (e) {} }'
+    return None
+
+
+def _node_fs():
+    v'if (typeof window === "undefined" && typeof require === "function") { try { return require("fs"); } catch (e) {} }'
+    return None
+
+
+def _getcwd():
+    proc = _node_process()
+    if proc and jstype(proc.cwd) is 'function':
+        cwd = proc.cwd()
+        if proc.platform is 'win32':
+            cwd = cwd.replace(/\\/g, '/')
+        return cwd
+    return '/'
+
+
+def _check(p):
+    if jstype(p) is not 'string':
+        if p and jstype(p.__fspath__) is 'function':
+            return p.__fspath__()
+        raise TypeError('expected str, bytes or os.PathLike object, not ' + jstype(p))
+    return p
+
+
+def _strip_trailing_slashes(head):
+    if head and head is not '/'.repeat(head.length):
+        head = head.replace(/\/+$/, '')
+    return head
+
+
+def normcase(s):
+    return _check(s)
+
+
+def isabs(s):
+    return _check(s).startsWith('/')
+
+
+def join(a, *p):
+    path = _check(a)
+    for b in p:
+        b = _check(b)
+        if b.startsWith('/'):
+            path = b
+        elif not path or path.endsWith('/'):
+            path += b
+        else:
+            path += '/' + b
+    return path
+
+
+def split(p):
+    p = _check(p)
+    i = p.lastIndexOf('/') + 1
+    return (_strip_trailing_slashes(p.slice(0, i)), p.slice(i))
+
+
+def splitext(p):
+    p = _check(p)
+    sep_index = p.lastIndexOf('/')
+    dot_index = p.lastIndexOf('.')
+    if dot_index > sep_index:
+        filename_index = sep_index + 1
+        while filename_index < dot_index:
+            if p[filename_index] is not '.':
+                return (p.slice(0, dot_index), p.slice(dot_index))
+            filename_index += 1
+    return (p, '')
+
+
+def splitdrive(p):
+    return ('', _check(p))
+
+
+def basename(p):
+    p = _check(p)
+    return p.slice(p.lastIndexOf('/') + 1)
+
+
+def dirname(p):
+    p = _check(p)
+    return _strip_trailing_slashes(p.slice(0, p.lastIndexOf('/') + 1))
+
+
+def normpath(path):
+    path = _check(path)
+    if path is '':
+        return '.'
+    initial_slashes = 1 if path.startsWith('/') else 0
+    # POSIX allows one or two initial slashes, but treats three or more as one.
+    if initial_slashes and path.startsWith('//') and not path.startsWith('///'):
+        initial_slashes = 2
+    new_comps = []
+    for comp in path.split('/'):
+        if comp is '' or comp is '.':
+            continue
+        if comp is not '..' or (not initial_slashes and not new_comps.length) or (new_comps.length and new_comps[new_comps.length - 1] is '..'):
+            new_comps.push(comp)
+        elif new_comps.length:
+            new_comps.pop()
+    path = new_comps.join('/')
+    if initial_slashes:
+        path = '/'.repeat(initial_slashes) + path
+    return path or '.'
+
+
+def abspath(path):
+    path = _check(path)
+    if not isabs(path):
+        path = join(_getcwd(), path)
+    return normpath(path)
+
+
+def realpath(path, strict=False):
+    return abspath(path)
+
+
+def relpath(path, start=None):
+    path = _check(path)
+    if not path:
+        raise ValueError('no path specified')
+    if start is None or start is undefined:
+        start = '.'
+    start_list = [x for x in abspath(start).split('/') if x]
+    path_list = [x for x in abspath(path).split('/') if x]
+    i = 0
+    while i < start_list.length and i < path_list.length and start_list[i] is path_list[i]:
+        i += 1
+    rel_list = []
+    for j in range(start_list.length - i):
+        rel_list.push('..')
+    rel_list = rel_list.concat(path_list.slice(i))
+    if not rel_list.length:
+        return '.'
+    return rel_list.join('/')
+
+
+def commonprefix(m):
+    if not m or not m.length:
+        return ''
+    s1 = m[0]
+    s2 = m[0]
+    for x in m:
+        if x < s1:
+            s1 = x
+        if x > s2:
+            s2 = x
+    for i in range(s1.length):
+        if s1[i] is not s2[i]:
+            return s1.slice(0, i)
+    return s1
+
+
+def commonpath(paths):
+    if not paths or not paths.length:
+        raise ValueError('commonpath() arg is an empty sequence')
+    is_abs = isabs(_check(paths[0]))
+    split_paths = []
+    for p in paths:
+        if isabs(_check(p)) is not is_abs:
+            raise ValueError("Can't mix absolute and relative paths")
+        split_paths.push([c for c in p.split('/') if c and c is not '.'])
+    common = split_paths[0]
+    for sp in split_paths:
+        n = 0
+        while n < common.length and n < sp.length and common[n] is sp[n]:
+            n += 1
+        common = common.slice(0, n)
+    return ('/' if is_abs else '') + common.join('/')
+
+
+def expanduser(path):
+    path = _check(path)
+    if not path.startsWith('~'):
+        return path
+    i = path.indexOf('/')
+    if i is -1:
+        i = path.length
+    if i is not 1:
+        return path  # ~user form is not supported
+    proc = _node_process()
+    home = None
+    if proc and proc.env:
+        home = proc.env.HOME or proc.env.USERPROFILE
+    if not home:
+        return path
+    home = home.replace(/\\/g, '/').replace(/\/+$/, '')
+    return (home + path.slice(i)) or '/'
+
+
+def expandvars(path):
+    path = _check(path)
+    proc = _node_process()
+    env = proc.env if proc and proc.env else {}
+    def repl(m, name):
+        if name.startsWith('{'):
+            name = name.slice(1, -1)
+        val = env[name]
+        return m if val is undefined else val
+    return path.replace(/\$(\w+|\{[^}]*\})/g, repl)
+
+
+def _stat(path, follow):
+    fs = _node_fs()
+    if not fs:
+        return None
+    try:
+        return fs.statSync(path) if follow else fs.lstatSync(path)
+    except:
+        return None
+
+
+def exists(path):
+    return _stat(_check(path), True) is not None
+
+
+def lexists(path):
+    return _stat(_check(path), False) is not None
+
+
+def isfile(path):
+    st = _stat(_check(path), True)
+    return st is not None and st.isFile()
+
+
+def isdir(path):
+    st = _stat(_check(path), True)
+    return st is not None and st.isDirectory()
+
+
+def islink(path):
+    st = _stat(_check(path), False)
+    return st is not None and st.isSymbolicLink()
+
+
+def ismount(path):
+    return abspath(path) is '/'
+
+
+def _require_stat(path):
+    st = _stat(_check(path), True)
+    if st is None:
+        raise FileNotFoundError("[Errno 2] No such file or directory: '" + path + "'")
+    return st
+
+
+def getsize(path):
+    return _require_stat(path).size
+
+
+def getmtime(path):
+    return _require_stat(path).mtimeMs / 1000
+
+
+def getatime(path):
+    return _require_stat(path).atimeMs / 1000
+
+
+def getctime(path):
+    return _require_stat(path).ctimeMs / 1000

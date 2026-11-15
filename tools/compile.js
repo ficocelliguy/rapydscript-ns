@@ -126,7 +126,7 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
         private_scope: !argv.bare && !argv.export_main && !export_all,
         omit_baselib: argv.omit_baselib,
         js_version: parseInt(argv.js_version),
-        keep_docstrings: argv.keep_docstrings,
+        keep_docstrings: argv.keep_docstrings || !!argv.execute,  // -x runs the code, so keep __doc__ as Python does
         discard_asserts: argv.discard_asserts,
         module_cache_dir: cache_dir,
         pythonize_strings: argv.pythonize_strings,
@@ -166,7 +166,14 @@ module.exports = function(start_time, argv, base_path, src_path, lib_path) {
             console.log(output);
         }
         if (argv.execute) {
-            vm.runInNewContext(output, {'console':console, 'require':require}, {'filename':files[0]});
+            // Timers let async code (asyncio.sleep, setTimeout) and the
+            // print(..., end='') line buffer work when executing with -x.
+            vm.runInNewContext(output, {
+                'console':console, 'require':require,
+                'setTimeout':setTimeout, 'clearTimeout':clearTimeout,
+                'setInterval':setInterval, 'clearInterval':clearInterval,
+                'queueMicrotask':queueMicrotask,
+            }, {'filename':files[0]});
         }
     }
 

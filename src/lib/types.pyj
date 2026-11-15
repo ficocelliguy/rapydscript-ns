@@ -1,0 +1,262 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of a subset of Python's 'types' module.
+#
+# Supported:
+#   SimpleNamespace — attribute bag; repr namespace(a=1, b=2); == compares
+#                     attributes
+#   MappingProxyType — read-only view of a dict (best effort)
+#   FunctionType, LambdaType, BuiltinFunctionType, MethodType,
+#   GeneratorType, AsyncGeneratorType, CoroutineType, NoneType,
+#   ModuleType, new_class (minimal), coroutine (identity)
+#
+# Notes (approximations):
+#   - JS has one function type: FunctionType / LambdaType /
+#     BuiltinFunctionType match any non-class function.  MethodType matches
+#     functions bound with .bind() (best effort: JS gives no reliable marker).
+#   - isinstance(x, ModuleType) matches RapydScript module objects (entries of
+#     ρσ_modules) and ModuleType instances.
+
+def _is_class(f):
+    if jstype(f) is not 'function':
+        return False
+    if f.__name__ and f.prototype and f.prototype.constructor is f and (Object.getOwnPropertyNames(f.prototype).length > 1 or f.prototype.__bases__ or f.__qualname__):
+        return True
+    v'try { return /^class[\s{]/.test(Function.prototype.toString.call(f)); } catch (e) { return false; }'
+
+
+def _generator_proto():
+    v'try { return Object.getPrototypeOf(Object.getPrototypeOf((function*(){})())); } catch (e) { return null; }'
+
+
+def _async_generator_proto():
+    v'try { return Object.getPrototypeOf(Object.getPrototypeOf(eval("(async function*(){})")())); } catch (e) { return null; }'
+
+
+_GEN_PROTO = _generator_proto()
+_ASYNC_GEN_PROTO = _async_generator_proto()
+
+
+class SimpleNamespace:
+
+    def __init__(self, mapping=None, **kwargs):
+        if mapping is not None and mapping is not undefined:
+            items = mapping.items() if jstype(mapping.items) is 'function' else Object.entries(mapping)
+            for item in items:
+                self[item[0]] = item[1]
+        for key in Object.keys(kwargs):
+            self[key] = kwargs[key]
+
+    def __repr__(self):
+        parts = []
+        for key in Object.keys(self):
+            parts.push(key + '=' + repr(self[key]))
+        return 'namespace(' + parts.join(', ') + ')'
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        if not v'other instanceof SimpleNamespace':
+            return False
+        a, b = Object.keys(self), Object.keys(other)
+        if a.length is not b.length:
+            return False
+        for key in a:
+            if not Object.prototype.hasOwnProperty.call(other, key) or self[key] != other[key]:
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __contains__(self, key):
+        return Object.prototype.hasOwnProperty.call(self, key)
+
+
+SimpleNamespace.prototype.__hash__ = None
+
+
+class MappingProxyType:
+
+    def __init__(self, mapping):
+        Object.defineProperty(self, '_mapping', {'value': mapping, 'enumerable': False})
+
+    def __getitem__(self, key):
+        m = self._mapping
+        if jstype(m.__getitem__) is 'function':
+            return m.__getitem__(key)
+        if not Object.prototype.hasOwnProperty.call(m, key):
+            raise KeyError(key)
+        return m[key]
+
+    def __setitem__(self, key, value):
+        raise TypeError("'mappingproxy' object does not support item assignment")
+
+    def __delitem__(self, key):
+        raise TypeError("'mappingproxy' object does not support item deletion")
+
+    def __contains__(self, key):
+        m = self._mapping
+        if jstype(m.__contains__) is 'function':
+            return m.__contains__(key)
+        return Object.prototype.hasOwnProperty.call(m, key)
+
+    def __len__(self):
+        m = self._mapping
+        if jstype(m.__len__) is 'function':
+            return m.__len__()
+        return Object.keys(m).length
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def get(self, key, dflt=None):
+        if self.__contains__(key):
+            return self.__getitem__(key)
+        return dflt
+
+    def keys(self):
+        m = self._mapping
+        return list(m.keys()) if jstype(m.keys) is 'function' else Object.keys(m)
+
+    def values(self):
+        return [self.__getitem__(k) for k in self.keys()]
+
+    def items(self):
+        return [(k, self.__getitem__(k)) for k in self.keys()]
+
+    def copy(self):
+        m = self._mapping
+        return m.copy() if jstype(m.copy) is 'function' else Object.assign({}, m)
+
+    def __repr__(self):
+        return 'mappingproxy(' + repr(self._mapping) + ')'
+
+
+class FunctionType:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return jstype(obj) is 'function' and not _is_class(obj)
+
+    @classmethod
+    def __subclasscheck__(cls, sub):
+        return sub is FunctionType or sub is LambdaType
+
+
+LambdaType = FunctionType
+BuiltinFunctionType = FunctionType
+BuiltinMethodType = FunctionType
+
+
+class MethodType:
+
+    def __new__(cls, func, obj):
+        # Python passes obj as the first argument; `this` is bound too so that
+        # functions written in JS style (using this) also see the instance.
+        bound = v'function() { return func.apply(obj, [obj].concat(Array.prototype.slice.call(arguments))); }'
+        bound.__func__ = func
+        bound.__self__ = obj
+        return bound
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        if jstype(obj) is not 'function':
+            return False
+        if obj.__self__ is not undefined and obj.__func__ is not undefined:
+            return True
+        return jstype(obj.name) is 'string' and obj.name.startsWith('bound ') and not obj.hasOwnProperty('prototype')
+
+
+class GeneratorType:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        if obj is None or obj is undefined or jstype(obj) is not 'object':
+            return False
+        if _GEN_PROTO and v'Object.prototype.isPrototypeOf.call(_GEN_PROTO, obj)':
+            return True
+        return Object.prototype.toString.call(obj) is '[object Generator]'
+
+
+class AsyncGeneratorType:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        if obj is None or obj is undefined or jstype(obj) is not 'object':
+            return False
+        if _ASYNC_GEN_PROTO and v'Object.prototype.isPrototypeOf.call(_ASYNC_GEN_PROTO, obj)':
+            return True
+        return Object.prototype.toString.call(obj) is '[object AsyncGenerator]'
+
+
+class CoroutineType:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return v'obj instanceof Promise' if jstype(Promise) is 'function' else False
+
+
+class _NoneTypeClass:
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        return obj is None or obj is undefined
+
+    def __repr__(self):
+        return "<class 'NoneType'>"
+
+
+NoneType = _NoneTypeClass
+NoneType.__name__ = 'NoneType'
+NoneType.__qualname__ = 'NoneType'
+EllipsisType = v'(typeof Ellipsis !== "undefined" && Ellipsis !== null && Ellipsis.constructor) ? Ellipsis.constructor : Object'
+NotImplementedType = v'(typeof NotImplemented !== "undefined" && NotImplemented !== null && NotImplemented.constructor) ? NotImplemented.constructor : Object'
+
+
+class ModuleType:
+
+    def __init__(self, name, doc=None):
+        self.__name__ = name
+        self.__doc__ = doc
+
+    @classmethod
+    def __instancecheck__(cls, obj):
+        if v'obj instanceof cls':
+            return True
+        if obj is None or obj is undefined or jstype(obj) is not 'object':
+            return False
+        v'if (typeof ρσ_modules === "object" && ρσ_modules) { for (var k in ρσ_modules) { if (ρσ_modules[k] === obj) return true; } }'
+        return False
+
+    def __repr__(self):
+        return "<module '" + self.__name__ + "'>"
+
+
+def new_class(name, bases=None, kwds=None, exec_body=None):
+    bases = bases or []
+    parent = bases[0] if bases.length else None
+    cls = v"""function() {
+        if (!(this instanceof cls)) return new (Function.prototype.bind.apply(cls, [null].concat(Array.prototype.slice.call(arguments))))();
+        if (parent && typeof parent === "function") parent.apply(this, arguments);
+        else if (typeof this.__init__ === "function") this.__init__.apply(this, arguments);
+    }"""
+    if parent:
+        cls.prototype = Object.create(parent.prototype)
+        Object.setPrototypeOf(cls, parent)
+    cls.prototype.constructor = cls
+    cls.__name__ = name
+    cls.__qualname__ = name
+    if exec_body:
+        ns = {}
+        exec_body(ns)
+        for key in Object.keys(ns):
+            cls.prototype[key] = ns[key]
+    return cls
+
+
+def coroutine(func):
+    return func

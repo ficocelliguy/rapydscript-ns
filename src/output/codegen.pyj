@@ -16,7 +16,7 @@ from ast import (
     AST_Number, AST_Object, AST_ObjectKeyVal, AST_ObjectProperty, AST_ObjectSpread, AST_Spread, AST_PropAccess,
     AST_RegExp, AST_Return, AST_Set, AST_Seq, AST_SimpleStatement, AST_Splice,
     AST_Statement, AST_StatementWithBody, AST_String, AST_Sub, AST_ItemAccess,
-    AST_Symbol, AST_This, AST_Throw, AST_Toplevel, AST_Try, AST_Unary,
+    AST_Symbol, AST_SymbolCatch, AST_This, AST_Throw, AST_Toplevel, AST_Try, AST_Unary,
     AST_UnaryPrefix, AST_Undefined, AST_Var, AST_VarDef, AST_Assert,
     AST_Verbatim, AST_While, AST_With, AST_Yield, AST_Await, TreeWalker, AST_Existential,
     AST_Match, AST_AnnotatedAssign, AST_Super,
@@ -280,6 +280,21 @@ def generate_code():
     DEFPRINT(AST_Return, def(self, output):
         self._do_print(output, "return")
     )
+    def print_raise_value(value, output):
+        # `raise ValueError` raises an instance, as in Python. Only bare names and
+        # attribute chains can be classes; anything else (calls, `raise e` where
+        # e holds an instance) passes through the runtime check unchanged.
+        if (is_node_type(value, AST_Symbol) and not is_node_type(value, AST_SymbolCatch)) or is_node_type(value, AST_Dot):
+            output.print('(typeof ')
+            value.print(output)
+            output.print(' === "function" ? new ')
+            value.print(output)
+            output.print('() : ')
+            value.print(output)
+            output.print(')')
+        else:
+            value.print(output)
+
     DEFPRINT(AST_Throw, def(self, output):
         if self.cause:
             # raise X from Y: set __cause__ on exception before throwing
@@ -287,7 +302,7 @@ def generate_code():
             output.space()
             output.print('=')
             output.space()
-            self.value.print(output)
+            print_raise_value(self.value, output)
             output.semicolon()
             output.newline()
             output.indent()
@@ -302,7 +317,10 @@ def generate_code():
             output.print('throw ρσ_throw_tmp')
             output.semicolon()
         else:
-            self._do_print(output, "throw")
+            output.print('throw')
+            output.space()
+            print_raise_value(self.value, output)
+            output.semicolon()
     )
 
     # -----[ loop control ]-----
@@ -499,6 +517,12 @@ def generate_code():
 
     DEFPRINT(AST_Symbol, def(self, output):
         def_ = self.definition()
+        if self.unbound_check:
+            # a read that may find the name unbound (see mark_unbound_reads in parse.pyj)
+            output.print('ρσ_check_bound(')
+            output.print_name((def_.mangled_name or def_.name) if def_ else self.name)
+            output.print(', ' + JSON.stringify(self.name) + ', ' + JSON.stringify(self.unbound_check) + ')')
+            return
         output.print_name((def_.mangled_name or def_.name) if def_ else self.name)
     )
     DEFPRINT(AST_Undefined, def(self, output):

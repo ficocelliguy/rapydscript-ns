@@ -12,11 +12,16 @@
 # Provides:
 #   Character constants: ascii_letters, ascii_lowercase, ascii_uppercase,
 #     digits, hexdigits, octdigits, punctuation, printable, whitespace
-#   Template: $-substitution string templates (substitute, safe_substitute)
+#   capwords(s, sep=None)
+#   Template: $-substitution string templates (substitute, safe_substitute,
+#     get_identifiers, is_valid; subclasses may override delimiter,
+#     idpattern, braceidpattern, flags or pattern)
 #   Formatter: customizable str.format() foundation with subclassing support
 #
-# NOTE: Formatter.format() only accepts positional args via *args.
-# For named-field substitution use vformat(fmt, [], {'key': val}) directly.
+# Regex patterns given in Template subclasses are Python-syntax strings; they
+# are translated to JavaScript RegExp syntax ((?P<name>...) -> (?<name>...),
+# inline (?a:...)/(?-i:...) groups are dropped, re.VERBOSE whitespace and
+# comments are stripped).
 
 
 # ---------------------------------------------------------------------------
@@ -36,13 +41,30 @@ whitespace      = ' \t\n\r' + chr(11) + chr(12)
 printable       = digits + ascii_letters + punctuation + whitespace
 
 
+
+
+# ---------------------------------------------------------------------------
+# capwords
+# ---------------------------------------------------------------------------
+
+def capwords(s, sep=None):
+    """Split *s* on *sep*, capitalize each word, and join them with *sep*.
+
+    With sep=None, runs of whitespace are collapsed and leading/trailing
+    whitespace is removed; words are joined with a single space.
+    """
+    parts = str.split(s, sep)
+    out = []
+    for part in parts:
+        out.push(str.capitalize(part))
+    return out.join(' ' if sep is None else sep)
+
+
 # ---------------------------------------------------------------------------
 # Internal JS helpers
 # ---------------------------------------------------------------------------
 
 v"""
-// ── Shared numeric-string helper ────────────────────────────────────────────
-
 function _str_is_digits_only(s) {
     if (!s.length) return false;
     for (var _di = 0; _di < s.length; _di++) {
@@ -52,69 +74,159 @@ function _str_is_digits_only(s) {
     return true;
 }
 
-// ── Template helpers ─────────────────────────────────────────────────────────
-
-// Pattern groups:
-//   1: $$  (escaped dollar → literal $)
-//   2: ${identifier}
-//   3: $identifier
-//   4: $<anything-else> (invalid placeholder; [^]? also captures trailing $)
-var _tmpl_re = /\$(?:(\$)|\{([_a-zA-Z][_a-zA-Z0-9]*)\}|([_a-zA-Z][_a-zA-Z0-9]*)|([^]?))/g;
-
-// Convert a mapping to a plain JS object (handles ρσ_dict with .jsmap).
-function _tmpl_to_plain(mapping) {
-    if (mapping === null || mapping === undefined) return Object.create(null);
-    if (mapping.jsmap !== undefined && mapping.jsmap !== null) {
-        var _out = Object.create(null);
-        mapping.jsmap.forEach(function(_v, _k) { _out[_k] = _v; });
-        return _out;
+// Generic mapping lookup.  Returns [found, value].
+function _str_map_lookup(mapping, key) {
+    if (mapping === null || mapping === undefined) return [false, undefined];
+    if (mapping.jsmap !== undefined && mapping.jsmap !== null && typeof mapping.jsmap.has === 'function') {
+        if (mapping.jsmap.has(key)) return [true, mapping.jsmap.get(key)];
+        if (typeof mapping.__missing__ === 'function') return [true, mapping.__missing__(key)];
+        return [false, undefined];
     }
-    return mapping;
-}
-
-function _tmpl_substitute_impl(template_str, mapping, safe) {
-    var _re = _tmpl_re;
-    _re.lastIndex = 0;
-    var _res = [];
-    var _last = 0;
-    var _m;
-    while ((_m = _re.exec(template_str)) !== null) {
-        _res.push(template_str.slice(_last, _m.index));
-        _last = _m.index + _m[0].length;
-        if (_m[1] !== undefined) {
-            _res.push('$');
-        } else if (_m[2] !== undefined || _m[3] !== undefined) {
-            var _key = _m[2] !== undefined ? _m[2] : _m[3];
-            var _val = mapping[_key];
-            if (_val === undefined) {
-                if (safe) { _res.push(_m[0]); }
-                else { throw new KeyError(_key); }
-            } else {
-                _res.push(ρσ_str(_val));
-            }
-        } else {
-            // m[4]: invalid placeholder char (or empty for trailing $)
-            if (safe) { _res.push(_m[0]); }
-            else { throw new ValueError('Invalid placeholder in string: ' + JSON.stringify(_m[0])); }
+    if (typeof mapping.__getitem__ === 'function') {
+        try {
+            return [true, mapping.__getitem__(key)];
+        } catch (_e) {
+            if (_e instanceof KeyError) return [false, undefined];
+            throw _e;
         }
     }
-    _res.push(template_str.slice(_last));
+    if (typeof mapping === 'object' && (key in mapping)) return [true, mapping[key]];
+    return [false, undefined];
+}
+
+// ── Template helpers ─────────────────────────────────────────────────────────
+
+function _tmpl_escape_re(s) {
+    return s.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&');
+}
+
+// Strip whitespace and #-comments (re.VERBOSE) outside character classes.
+function _tmpl_strip_verbose(src) {
+    var _out = '', _in_class = false;
+    for (var _i = 0; _i < src.length; _i++) {
+        var _c = src[_i];
+        if (_c === '\\') { _out += _c + (src[_i + 1] || ''); _i++; continue; }
+        if (_in_class) { if (_c === ']') _in_class = false; _out += _c; continue; }
+        if (_c === '[') { _in_class = true; _out += _c; continue; }
+        if (_c === '#') { while (_i < src.length && src[_i] !== '\n') _i++; continue; }
+        if (/\s/.test(_c)) continue;
+        _out += _c;
+    }
+    return _out;
+}
+
+// Translate Python regex syntax to JS RegExp syntax (best effort).
+function _tmpl_py_to_js(src) {
+    return src.replace(/\(\?P</g, '(?<')
+              .replace(/\(\?P=(\w+)\)/g, '\\k<$1>')
+              .replace(/\(\?[aiLmsux]*-?[imsx]*:/g, '(?:')
+              .replace(/\\Z/g, '$')
+              .replace(/\\A/g, '^');
+}
+
+function _tmpl_flags(pyflags) {
+    var _f = 'g';
+    if (pyflags & 2) _f += 'i';
+    if (pyflags & 8) _f += 'm';
+    if (pyflags & 16) _f += 's';
+    return _f;
+}
+
+var _tmpl_cache = new Map();
+
+function _tmpl_regex(self_obj) {
+    var _pat = self_obj.pattern, _flags = self_obj.flags || 0, _src, _cache_key;
+    if (_pat !== null && _pat !== undefined) {
+        if (typeof _pat !== 'string') {
+            if (typeof _pat.pattern === 'string') {
+                if (typeof _pat.flags === 'number') _flags = _pat.flags;
+                _pat = _pat.pattern;
+            } else {
+                _pat = _pat + '';
+            }
+        }
+        _cache_key = 'P\u0000' + _pat + '\u0000' + _flags;
+        if (_tmpl_cache.has(_cache_key)) return _tmpl_cache.get(_cache_key);
+        // Custom patterns are always compiled with re.VERBOSE in CPython
+        _src = _tmpl_py_to_js(_tmpl_strip_verbose(_pat));
+    } else {
+        var _delim = _tmpl_escape_re(self_obj.delimiter);
+        var _id = self_obj.idpattern;
+        var _bid = self_obj.braceidpattern;
+        if (_bid === null || _bid === undefined) _bid = _id;
+        _cache_key = 'D\u0000' + _delim + '\u0000' + _id + '\u0000' + _bid + '\u0000' + _flags;
+        if (_tmpl_cache.has(_cache_key)) return _tmpl_cache.get(_cache_key);
+        _src = _delim + '(?:(?<escaped>' + _delim + ')|(?<named>' + _tmpl_py_to_js(_id) +
+               ')|\\{(?<braced>' + _tmpl_py_to_js(_bid) + ')\\}|(?<invalid>))';
+    }
+    var _re = new RegExp(_src, _tmpl_flags(_flags));
+    _tmpl_cache.set(_cache_key, _re);
+    return _re;
+}
+
+function _tmpl_each(self_obj, callback) {
+    var _re = _tmpl_regex(self_obj);
+    var _template = self_obj.template;
+    _re.lastIndex = 0;
+    var _m;
+    while ((_m = _re.exec(_template)) !== null) {
+        if (_m[0].length === 0) _re.lastIndex++;
+        if (callback(_m) === false) break;
+    }
+}
+
+var _tmpl_linebreak_src = '\\r\\n|[\\n\\r\\u000b\\u000c\\u001c\\u001d\\u001e\\u0085\\u2028\\u2029]';
+
+// Mirror CPython's Template._invalid(): position is reported via splitlines().
+function _tmpl_invalid(template, m) {
+    var _g = m.groups || {};
+    var _i = m.index + m[0].length - (_g.invalid !== undefined ? _g.invalid.length : 0);
+    var _prefix = template.slice(0, _i);
+    if (!_prefix.length) return new ValueError('Invalid placeholder in string: line 1, col 1');
+    // Collect the start offsets of every line splitlines(keepends=True) would yield
+    var _starts = [0];
+    var _br = new RegExp(_tmpl_linebreak_src, 'g'), _bm;
+    while ((_bm = _br.exec(_prefix)) !== null) {
+        var _end = _bm.index + _bm[0].length;
+        if (_end < _prefix.length) _starts.push(_end);
+    }
+    var _lineno = _starts.length;
+    var _colno = _i - _starts[_starts.length - 1];
+    return new ValueError('Invalid placeholder in string: line ' + _lineno + ', col ' + _colno);
+}
+
+function _tmpl_substitute_impl(self_obj, mapping, kws, safe) {
+    var _template = self_obj.template;
+    var _res = [];
+    var _last = 0;
+    _tmpl_each(self_obj, function(_m) {
+        var _g = _m.groups || {};
+        _res.push(_template.slice(_last, _m.index));
+        _last = _m.index + _m[0].length;
+        var _named = _g.named !== undefined ? _g.named : _g.braced;
+        if (_named !== undefined) {
+            var _r = _str_map_lookup(kws, _named);
+            if (!_r[0]) _r = _str_map_lookup(mapping, _named);
+            if (!_r[0]) {
+                if (safe) _res.push(_m[0]);
+                else throw new KeyError(_named);
+            } else {
+                _res.push(ρσ_str(_r[1]));
+            }
+        } else if (_g.escaped !== undefined) {
+            _res.push(self_obj.delimiter);
+        } else if (_g.invalid !== undefined) {
+            if (safe) _res.push(_m[0]);
+            else throw _tmpl_invalid(_template, _m);
+        } else {
+            throw new ValueError('Unrecognized named group in pattern');
+        }
+    });
+    _res.push(_template.slice(_last));
     return _res.join('');
 }
 
 // ── Formatter helpers ────────────────────────────────────────────────────────
-
-function _fmt_get_kwarg(kwargs, key) {
-    if (!kwargs) return undefined;
-    if (kwargs.jsmap !== undefined && kwargs.jsmap !== null) return kwargs.jsmap.get(key);
-    return kwargs[key];
-}
-
-function _fmt_has_kwarg(kwargs, key) {
-    if (!kwargs) return false;
-    if (kwargs.jsmap !== undefined && kwargs.jsmap !== null) return kwargs.jsmap.has(key);
-    return Object.prototype.hasOwnProperty.call(kwargs, key);
-}
 
 // parse: walk format_string, return array of [literal, field_name, fmt_spec, conversion].
 // A trailing literal with no field has field_name === null.
@@ -122,7 +234,7 @@ function _fmt_parse(format_string) {
     var _items = [];
     var _i = 0, _n = format_string.length;
 
-    while (_i <= _n) {
+    while (_i < _n) {
         var _lit = '';
         while (_i < _n) {
             var _ch = format_string[_i];
@@ -132,132 +244,137 @@ function _fmt_parse(format_string) {
             } else if (_ch === '}') {
                 if (_i + 1 < _n && format_string[_i + 1] === '}') { _lit += '}'; _i += 2; }
                 else throw new ValueError("Single '}' encountered in format string");
-            } else { _lit += _ch; _i++; }
+            } else { _lit += _ch; _i++; continue; }
+            // CPython ends a literal chunk at each escaped brace
+            if (_lit[_lit.length - 1] === _ch && (_ch === '{' || _ch === '}') && format_string[_i - 2] === _ch && format_string[_i - 1] === _ch) {
+                _items.push([_lit, null, null, null]);
+                _lit = '';
+            }
         }
 
-        if (_i >= _n) { _items.push([_lit, null, null, null]); break; }
+        if (_i >= _n) { if (_lit) _items.push([_lit, null, null, null]); break; }
 
         _i++; // skip '{'
+        if (_i >= _n) throw new ValueError("Single '{' encountered in format string");
         var _j = _i, _depth = 1;
         while (_j < _n && _depth > 0) {
             if (format_string[_j] === '{') _depth++;
             else if (format_string[_j] === '}') _depth--;
             _j++;
         }
-        if (_depth !== 0) throw new ValueError("Single '{' encountered in format string");
+        if (_depth !== 0) throw new ValueError("expected '}' before end of string");
 
         var _ft = format_string.slice(_i, _j - 1);
         _i = _j;
 
-        // Locate ! (conversion) and : (format spec), skipping nested {}
-        var _bang = -1, _colon = -1;
-        for (var _k = 0; _k < _ft.length; _k++) {
+        // Field name ends at the first ':' or '!' outside [...]
+        var _k = 0, _stop = -1;
+        while (_k < _ft.length) {
             var _fc = _ft[_k];
-            if (_fc === '{') { while (_k < _ft.length && _ft[_k] !== '}') _k++; }
-            else if (_fc === '!' && _bang === -1 && _colon === -1) _bang = _k;
-            else if (_fc === ':' && _colon === -1) { _colon = _k; break; }
+            if (_fc === '[') {
+                while (_k < _ft.length && _ft[_k] !== ']') _k++;
+                _k++;
+                continue;
+            }
+            if (_fc === '{') throw new ValueError("unexpected '{' in field name");
+            if (_fc === ':' || _fc === '!') { _stop = _k; break; }
+            _k++;
         }
-
-        var _fname, _conv, _spec;
-        if (_bang !== -1 && (_colon === -1 || _bang < _colon)) {
-            _fname = _ft.slice(0, _bang);
-            _conv  = (_bang + 1 < _ft.length) ? _ft[_bang + 1] : null;
-            _spec  = _colon !== -1 ? _ft.slice(_colon + 1) : '';
-        } else if (_colon !== -1) {
-            _fname = _ft.slice(0, _colon);
-            _conv  = null;
-            _spec  = _ft.slice(_colon + 1);
-        } else {
+        var _fname, _conv = null, _spec = '';
+        if (_stop === -1) {
             _fname = _ft;
-            _conv  = null;
-            _spec  = '';
+        } else {
+            _fname = _ft.slice(0, _stop);
+            if (_ft[_stop] === '!') {
+                if (_stop + 1 >= _ft.length) throw new ValueError('end of string while looking for conversion specifier');
+                _conv = _ft[_stop + 1];
+                if (_stop + 2 < _ft.length) {
+                    if (_ft[_stop + 2] !== ':') throw new ValueError("expected ':' after conversion specifier");
+                    _spec = _ft.slice(_stop + 3);
+                }
+            } else {
+                _spec = _ft.slice(_stop + 1);
+            }
         }
-
         _items.push([_lit, _fname, _spec, _conv]);
     }
 
     return _items;
 }
 
-// get_field: resolve dotted/bracket access chain.  Returns [value, first_key].
-function _fmt_get_field(field_name, args, kwargs, self_obj) {
-    // Find first '.' or '['
-    var _fe = -1;
+// Split "a.b[0][key]" into [first, [[is_attr, key], ...]]  (formatter_field_name_split)
+function _fmt_field_name_split(field_name) {
+    var _fe = field_name.length;
     for (var _ci = 0; _ci < field_name.length; _ci++) {
         var _cc = field_name[_ci];
         if (_cc === '.' || _cc === '[') { _fe = _ci; break; }
     }
-    var _fk = _fe === -1 ? field_name : field_name.slice(0, _fe);
-    var _rest = _fe === -1 ? '' : field_name.slice(_fe);
-
-    var _lookup_key = _str_is_digits_only(_fk) ? parseInt(_fk, 10) : _fk;
-    var _value = self_obj.get_value(_lookup_key, args, kwargs);
-
-    while (_rest.length > 0) {
-        if (_rest[0] === '.') {
-            var _de = _rest.length;
-            for (var _di2 = 1; _di2 < _rest.length; _di2++) {
-                if (_rest[_di2] === '.' || _rest[_di2] === '[') { _de = _di2; break; }
-            }
-            _value = _value[_rest.slice(1, _de)];
-            _rest = _rest.slice(_de);
-        } else if (_rest[0] === '[') {
-            var _cl = _rest.indexOf(']', 1);
-            if (_cl === -1) break;
-            var _idx = _rest.slice(1, _cl);
-            _value = _str_is_digits_only(_idx) ? _value[parseInt(_idx, 10)] : _value[_idx];
-            _rest = _rest.slice(_cl + 1);
+    var _first = field_name.slice(0, _fe);
+    if (_str_is_digits_only(_first)) _first = parseInt(_first, 10);
+    var _rest = [];
+    var _p = _fe;
+    while (_p < field_name.length) {
+        var _c = field_name[_p];
+        if (_c === '.') {
+            var _e = _p + 1;
+            while (_e < field_name.length && field_name[_e] !== '.' && field_name[_e] !== '[') _e++;
+            var _attr = field_name.slice(_p + 1, _e);
+            if (!_attr) throw new ValueError('Empty attribute in format string');
+            _rest.push([true, _attr]);
+            _p = _e;
+        } else if (_c === '[') {
+            var _cl = field_name.indexOf(']', _p + 1);
+            if (_cl === -1) throw new ValueError("Missing ']' in format string");
+            var _key = field_name.slice(_p + 1, _cl);
+            if (!_key) throw new ValueError('Empty attribute in format string');
+            _rest.push([false, _str_is_digits_only(_key) ? parseInt(_key, 10) : _key]);
+            _p = _cl + 1;
+            if (_p < field_name.length && field_name[_p] !== '.' && field_name[_p] !== '[')
+                throw new ValueError("Only '.' or '[' may follow ']' in format field specifier");
         } else {
-            break;
+            throw new ValueError("Only '.' or '[' may follow ']' in format field specifier");
         }
     }
-
-    return [_value, _fk];
+    return [_first, _rest];
 }
 
-// vformat: render a format string, calling self_obj's methods for each field.
-function _fmt_vformat(fmt_str, args, kwargs, self_obj) {
-    var _items = _fmt_parse(fmt_str);
-    var _result = [];
-    var _auto_idx = 0, _auto_used = false, _manual_used = false;
+function _fmt_type_name(obj) {
+    if (obj === null || obj === undefined) return 'NoneType';
+    if (typeof obj === 'number') return Number.isInteger(obj) ? 'int' : 'float';
+    if (typeof obj === 'string') return 'str';
+    if (typeof obj === 'boolean') return 'bool';
+    return (obj.constructor && (obj.constructor.__name__ || obj.constructor.name)) || 'object';
+}
 
-    for (var _ii = 0; _ii < _items.length; _ii++) {
-        var _item = _items[_ii];
-        var _lit2 = _item[0], _fname2 = _item[1], _spec2 = _item[2], _conv2 = _item[3];
-
-        if (_lit2) _result.push(_lit2);
-        if (_fname2 === null) continue;
-
-        // Auto-numbering vs manual
-        var _ename;
-        if (_fname2 === '') {
-            if (_manual_used) throw new ValueError('cannot switch from manual field specification to automatic field numbering');
-            _auto_used = true;
-            _ename = _auto_idx++;
-        } else if (_str_is_digits_only(_fname2)) {
-            if (_auto_used) throw new ValueError('cannot switch from automatic field numbering to manual field specification');
-            _manual_used = true;
-            _ename = parseInt(_fname2, 10);
-        } else {
-            // Named or complex field (e.g. "obj.attr" — let get_field handle it)
-            _ename = _fname2;
-        }
-
-        var _fr = self_obj.get_field(typeof _ename === 'number' ? String(_ename) : _ename, args, kwargs);
-        var _val2 = _fr[0];
-
-        if (_conv2 !== null) _val2 = self_obj.convert_field(_val2, _conv2);
-
-        // Resolve nested format specs (e.g. {:{}f})
-        var _rspec = _spec2;
-        if (_spec2 && _spec2.indexOf('{') !== -1) {
-            _rspec = _fmt_vformat(_spec2, args, kwargs, self_obj);
-        }
-
-        _result.push(self_obj.format_field(_val2, _rspec));
+function _fmt_getattr(obj, name) {
+    if (obj === null || obj === undefined || (typeof obj !== 'object' && typeof obj !== 'function')) {
+        var _v = (obj === null || obj === undefined) ? undefined : obj[name];
+        if (_v === undefined) throw new AttributeError("'" + _fmt_type_name(obj) + "' object has no attribute '" + name + "'");
+        return _v;
     }
+    try {
+        return getattr(obj, name);
+    } catch (_ae) {
+        if (_ae instanceof AttributeError) throw new AttributeError("'" + _fmt_type_name(obj) + "' object has no attribute '" + name + "'");
+        throw _ae;
+    }
+}
 
-    return _result.join('');
+function _fmt_getitem(obj, key) {
+    if (obj !== null && obj !== undefined && typeof obj.__getitem__ === 'function') return obj.__getitem__(key);
+    if (typeof key === 'number' && (Array.isArray(obj) || typeof obj === 'string')) {
+        if (key >= obj.length) throw new IndexError((typeof obj === 'string' ? 'string' : (obj.ρσ_is_tuple ? 'tuple' : 'list')) + ' index out of range');
+        return obj[key];
+    }
+    if (typeof key !== 'number' && (Array.isArray(obj) || typeof obj === 'string')) {
+        throw new TypeError((typeof obj === 'string' ? 'string' : (obj.ρσ_is_tuple ? 'tuple' : 'list')) + ' indices must be integers or slices, not str');
+    }
+    if (obj !== null && typeof obj === 'object') {
+        var _r = _str_map_lookup(obj, key);
+        if (_r[0]) return _r[1];
+        throw new KeyError(key);
+    }
+    throw new TypeError("'" + _fmt_type_name(obj) + "' object is not subscriptable");
 }
 """
 
@@ -267,28 +384,57 @@ function _fmt_vformat(fmt_str, args, kwargs, self_obj) {
 # ---------------------------------------------------------------------------
 
 class Template:
-    """String template with $-based substitution."""
-    delimiter     = '$'
-    idpattern     = '(?-i:[_a-zA-Z][_a-zA-Z0-9]*)'
+    """String template with $-based substitution.
+
+    Subclasses may override the class attributes ``delimiter``, ``idpattern``,
+    ``braceidpattern``, ``flags`` (re.IGNORECASE == 2) or ``pattern``.
+    """
+    delimiter      = '$'
+    idpattern      = '(?a:[_a-z][_a-z0-9]*)'
     braceidpattern = None
-    flags         = 0  # re.IGNORECASE not used; provided for API compatibility
+    flags          = 2   # re.IGNORECASE
+    pattern        = None
 
     def __init__(self, template):
         self.template = template
 
-    def substitute(self, mapping=None):
-        """Return a copy of the template with placeholders filled from *mapping*.
+    def substitute(self, mapping=None, **kws):
+        """Return the template with placeholders filled from *mapping* and/or
+        keyword arguments (keywords take precedence).
 
         Raises KeyError for missing keys and ValueError for invalid placeholders.
-        *mapping* may be a plain dict or any object supporting key lookup.
         """
-        m = v'_tmpl_to_plain(mapping)'
-        return v'_tmpl_substitute_impl(self.template, m, false)'
+        return v'_tmpl_substitute_impl(self, mapping, kws, false)'
 
-    def safe_substitute(self, mapping=None):
-        """Like substitute(), but leaves unrecognised placeholders unchanged."""
-        m = v'_tmpl_to_plain(mapping)'
-        return v'_tmpl_substitute_impl(self.template, m, true)'
+    def safe_substitute(self, mapping=None, **kws):
+        """Like substitute(), but leaves unknown or invalid placeholders unchanged."""
+        return v'_tmpl_substitute_impl(self, mapping, kws, true)'
+
+    def is_valid(self):
+        """Return False if the template has invalid placeholders."""
+        ans = True
+        v"""_tmpl_each(self, function(_m) {
+            var _g = _m.groups || {};
+            if (_g.invalid !== undefined) { ans = false; return false; }
+            if (_g.named === undefined && _g.braced === undefined && _g.escaped === undefined)
+                throw new ValueError('Unrecognized named group in pattern');
+        });"""
+        return ans
+
+    def get_identifiers(self):
+        """Return a list of the valid identifiers in the template, in order of
+        first appearance, ignoring invalid placeholders."""
+        ids = []
+        v"""_tmpl_each(self, function(_m) {
+            var _g = _m.groups || {};
+            var _named = _g.named !== undefined ? _g.named : _g.braced;
+            if (_named !== undefined) {
+                if (ids.indexOf(_named) === -1) ids.push(_named);
+            } else if (_g.invalid === undefined && _g.escaped === undefined) {
+                throw new ValueError('Unrecognized named group in pattern');
+            }
+        });"""
+        return ids
 
 
 # ---------------------------------------------------------------------------
@@ -299,59 +445,100 @@ class Formatter:
     """Customisable string formatter — the foundation behind str.format().
 
     Subclass and override format_field / convert_field / get_value / get_field
-    to change formatting behaviour.
-
-    Note: format() only accepts positional *args.  For named-field substitution
-    call vformat(fmt, [], {'key': value}) directly.
+    / check_unused_args to change formatting behaviour.
     """
 
-    def format(self, format_string, *args):
-        """Format *format_string* using positional *args*."""
-        return self.vformat(format_string, list(args), {})
+    def format(self, format_string, *args, **kwargs):
+        """Format *format_string* using positional *args* and keyword *kwargs*."""
+        return self.vformat(format_string, args, kwargs)
 
     def vformat(self, format_string, args, kwargs):
-        """Format *format_string* with explicit *args* list and *kwargs* dict."""
-        return v'_fmt_vformat(format_string, args, kwargs, self)'
+        """Format *format_string* with an explicit *args* sequence and *kwargs* mapping."""
+        used_args = set()
+        result = self._vformat(format_string, args, kwargs, used_args, 2, 0)
+        self.check_unused_args(used_args, args, kwargs)
+        return result[0]
+
+    def _vformat(self, format_string, args, kwargs, used_args, recursion_depth, auto_arg_index):
+        if recursion_depth < 0:
+            raise ValueError('Max string recursion exceeded')
+        result = []
+        for item in self.parse(format_string):
+            literal_text = item[0]
+            field_name = item[1]
+            format_spec = item[2]
+            conversion = item[3]
+            if literal_text:
+                result.push(literal_text)
+            if field_name is not None:
+                if field_name is '':
+                    if auto_arg_index is False:
+                        raise ValueError('cannot switch from manual field specification to automatic field numbering')
+                    field_name = str(auto_arg_index)
+                    auto_arg_index += 1
+                elif str.isdigit(field_name):
+                    if auto_arg_index:
+                        raise ValueError('cannot switch from manual field specification to automatic field numbering')
+                    auto_arg_index = False
+                obj_used = self.get_field(field_name, args, kwargs)
+                obj = obj_used[0]
+                used_args.add(obj_used[1])
+                obj = self.convert_field(obj, conversion)
+                spec_res = self._vformat(format_spec, args, kwargs, used_args, recursion_depth - 1, auto_arg_index)
+                auto_arg_index = spec_res[1]
+                result.push(self.format_field(obj, spec_res[0]))
+        return [result.join(''), auto_arg_index]
 
     def parse(self, format_string):
         """Return a list of (literal_text, field_name, format_spec, conversion) tuples."""
-        return v'_fmt_parse(format_string)'
+        items = v'_fmt_parse(format_string)'
+        return [tuple(it) for it in items]
 
     def get_value(self, key, args, kwargs):
         """Retrieve a field value: integer key → args, string key → kwargs."""
-        is_int = jstype(key) is 'number'
-        is_int_str = not is_int and jstype(key) is 'string' and v'_str_is_digits_only(key)'
-        if is_int or is_int_str:
-            idx = key if is_int else int(key)
-            if idx < 0 or idx >= len(args):
-                raise IndexError('Replacement index ' + str(idx) + ' out of range for positional args tuple')
-            return args[idx]
-        val = v'_fmt_get_kwarg(kwargs, key)'
-        if val is undefined:
+        if jstype(key) is 'number':
+            if key < 0 or key >= args.length:
+                raise IndexError('tuple index out of range')
+            return args[key]
+        r = v'_str_map_lookup(kwargs, key)'
+        if not r[0]:
             raise KeyError(key)
-        return val
+        return r[1]
 
     def get_field(self, field_name, args, kwargs):
-        """Look up *field_name* (may include dotted/bracket access).
+        """Look up *field_name* (may include attribute/index access).
 
         Returns (value, first_key_used).
         """
-        return v'_fmt_get_field(field_name, args, kwargs, self)'
+        split = v'_fmt_field_name_split(field_name)'
+        first = split[0]
+        obj = self.get_value(first, args, kwargs)
+        for part in split[1]:
+            if part[0]:
+                obj = v'_fmt_getattr(obj, part[1])'
+            else:
+                obj = v'_fmt_getitem(obj, part[1])'
+        return tuple([obj, first])
+
+    def check_unused_args(self, used_args, args, kwargs):
+        """Hook for subclasses; the default implementation does nothing."""
+        pass
 
     def convert_field(self, value, conversion):
         """Apply a conversion specifier (!s, !r, !a) to *value*."""
         if conversion is None or conversion is undefined:
             return value
-        if conversion == 's':
+        if conversion is 's':
             return str(value)
-        if conversion == 'r':
+        if conversion is 'r':
             return repr(value)
-        if conversion == 'a':
-            return repr(value)
-        raise ValueError('Unknown conversion specifier: ' + str(conversion))
+        if conversion is 'a':
+            return ascii(value)
+        raise ValueError('Unknown conversion specifier ' + str(conversion))
 
     def format_field(self, value, format_spec):
         """Format a single *value* according to *format_spec*."""
-        if format_spec is not None and format_spec is not undefined and format_spec:
-            return format(value, format_spec)
-        return str(value)
+        if jstype(value) is 'string' and format_spec and not v"/^(.?[<>=^])/.test(format_spec)":
+            # Strings are left-aligned by default (the builtin format() right-aligns them)
+            format_spec = ('0<' + format_spec.slice(1)) if format_spec.charAt(0) is '0' else ('<' + format_spec)
+        return format(value, format_spec)

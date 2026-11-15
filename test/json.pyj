@@ -24,12 +24,12 @@ ae(dumps('with "quotes"'), '"with \\"quotes\\""')
 # ── 2. dumps — collections ────────────────────────────────────────────────────
 
 ae(dumps([]),          '[]')
-ae(dumps([1, 2, 3]),   '[1,2,3]')
+ae(dumps([1, 2, 3]),   '[1, 2, 3]')  # Python's default separators: ', ' and ': '
 ae(dumps({}),          '{}')
 
 # Object with single key (no ordering ambiguity)
 _d1 = dumps({'a': 1})
-ae(_d1, '{"a":1}')
+ae(_d1, '{"a": 1}')
 
 # ── 3. dumps — indent ─────────────────────────────────────────────────────────
 
@@ -40,11 +40,11 @@ ok(_pretty.indexOf('  ') >= 0, 'indented output should contain spaces')
 # ── 4. dumps — sort_keys ──────────────────────────────────────────────────────
 
 _sk = dumps({'b': 2, 'a': 1}, sort_keys=True)
-ae(_sk, '{"a":1,"b":2}')
+ae(_sk, '{"a": 1, "b": 2}')
 
 # Nested sort_keys
 _sk2 = dumps({'z': {'y': 3, 'x': 4}, 'a': 1}, sort_keys=True)
-ae(_sk2, '{"a":1,"z":{"x":4,"y":3}}')
+ae(_sk2, '{"a": 1, "z": {"x": 4, "y": 3}}')
 
 # ── 5. dumps — separators ─────────────────────────────────────────────────────
 
@@ -71,23 +71,23 @@ ae(_pt_obj.y, 4)
 
 # ── 7. dumps — allow_nan ──────────────────────────────────────────────────────
 
+# As in Python, NaN / Infinity are written as JS literals by default
+ae(dumps(v'NaN'), 'NaN')
+ae(dumps(v'-Infinity'), '-Infinity')
+
 _nan_raised = False
 try:
-    dumps(v'NaN')
+    dumps(v'NaN', allow_nan=False)
 except ValueError:
     _nan_raised = True
-ok(_nan_raised, 'dumps(NaN) should raise ValueError by default')
+ok(_nan_raised, 'dumps(NaN, allow_nan=False) should raise ValueError')
 
 _inf_raised = False
 try:
-    dumps(v'Infinity')
+    dumps(v'Infinity', allow_nan=False)
 except ValueError:
     _inf_raised = True
-ok(_inf_raised, 'dumps(Infinity) should raise ValueError by default')
-
-# allow_nan=True should not raise
-_nan_str = dumps(v'NaN', allow_nan=True)
-ok(_nan_str.length > 0, 'allow_nan=True should return a string')
+ok(_inf_raised, 'dumps(Infinity, allow_nan=False) should raise ValueError')
 
 # ── 8. loads — basic types ────────────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ ok(_err_raised, 'invalid JSON should raise JSONDecodeError')
 _original = {'name': 'test', 'values': [1, 2, 3], 'nested': {'ok': True}}
 _rt = loads(dumps(_original))
 ae(_rt.name,          _original.name)
-ade(_rt.values,       _original.values)
+ade(_rt.get('values'), _original.values)  # (a dict: .values is the method)
 ae(_rt.nested.ok,     _original.nested.ok)
 
 # ── 16. dump / load via file-like object ──────────────────────────────────────

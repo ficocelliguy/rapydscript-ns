@@ -39,18 +39,58 @@ def ρσ_html_element_to_string(elem):
     ans = f'<{elem.tagName}{attrs}>'
     return ans
 
+def ρσ_number_repr(x):
+    # How Python writes a float. JS has one number type, so integer values
+    # (1, but also 1.0) print as ints; everything else follows float repr:
+    # inf / nan, -0.0, and exponent form below 1e-4 with a two-digit exponent.
+    if v'x !== x':
+        return 'nan'
+    if v'x === Infinity':
+        return 'inf'
+    if v'x === -Infinity':
+        return '-inf'
+    if v'x === 0':
+        return '-0.0' if v'1 / x < 0' else '0'
+    if v'x % 1 === 0':
+        return v'String(x)'
+    parts = v'x.toExponential()'.split('e')  # shortest round-trip digits
+    exp = parseInt(parts[1], 10)
+    if exp < -4 or exp >= 16:
+        digits = v'String(Math.abs(exp))'
+        return parts[0] + 'e' + ('-' if exp < 0 else '+') + ('0' + digits if digits.length < 2 else digits)
+    return v'String(x)'
+
 def ρσ_repr(x):
     if x is None:
         return 'None'
     if x is undefined:
         return 'undefined'
+    if v'typeof x === "number"':
+        return ρσ_number_repr(x)
     ans = x
     if v'typeof x.__repr__ === "function"':
         ans = x.__repr__()
     elif x is True or x is False:
         ans = 'True' if x else 'False'
     elif jstype(x) is 'string':
-        ans = "'" + x.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "'"
+        # Like Python: double quotes when the text has ' but no ", else single
+        # quotes with ' escaped. repr("it's") is "it's"
+        body = x.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+        # other non-printable characters are escaped, as Python's repr does
+        body = body.replace(v'/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Zs}]/gu', def(ch):
+            if ch is ' ':
+                return ch
+            code = ch.codePointAt(0)
+            if code < 0x100:
+                return '\\x' + ('0' + code.toString(16)).slice(-2)
+            if code < 0x10000:
+                return '\\u' + ('000' + code.toString(16)).slice(-4)
+            return '\\U' + ('0000000' + code.toString(16)).slice(-8)
+        )
+        if x.indexOf("'") >= 0 and x.indexOf('"') < 0:
+            ans = '"' + body + '"'
+        else:
+            ans = "'" + body.replace("'", "\\'") + "'"
     elif Array.isArray(x):
         if x.ρσ_is_tuple:
             if x.length is 0: return '()'
@@ -64,6 +104,8 @@ def ρσ_repr(x):
     elif jstype(x) is 'object' and not x.toString:
         # Assume this is a dictionary
         ans = ρσ_repr_js_builtin(x)
+    elif v'x instanceof Error':
+        ans = ρσ_type(x).__name__ + '(' + ρσ_repr(x.message) + ')'
     else:
         name = Object.prototype.toString.call(x).slice(8, -1)
         if "Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".indexOf(name) != -1:
@@ -86,6 +128,8 @@ def ρσ_str(x):
         return 'None'
     if x is undefined:
         return 'undefined'
+    if v'typeof x === "number"':
+        return ρσ_number_repr(x)
     if v'typeof x === "bigint"':
         return v'String(x)'
     ans = x
@@ -103,6 +147,9 @@ def ρσ_str(x):
                 inner.push(ρσ_repr(x[ti]))
             return '(' + inner[0] + ',)' if x.length is 1 else '(' + inner.join(', ') + ')'
         ans = ρσ_repr_js_builtin(x, True)
+    elif v'x instanceof Error':
+        # A native error caught by `except`: str(e) is its message, as in Python.
+        ans = x.message
     elif v'typeof x.toString === "function"':
         name = Object.prototype.toString.call(x).slice(8, -1)
         if "Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array".indexOf(name) != -1:
@@ -193,14 +240,14 @@ define_str_func('format', def ():
 
     def safe_fixed(value, precision, comma):
         if not comma:
-            return value.toFixed(precision)
+            return ρσ_to_fixed(value, precision)
         try:
             return set_comma(value.toLocaleString(undefined, v'{useGrouping: true, minimumFractionDigits: precision, maximumFractionDigits: precision}'), comma)
         except:
-            return value.toFixed(precision)
+            return ρσ_to_fixed(value, precision)
 
 
-    def apply_formatting(value, format_spec):
+    def apply_formatting(value, format_spec, was_number):
         if format_spec.indexOf('{') is not -1:
             format_spec = resolve_format_spec(format_spec)
         if ρσ_str.format._template_format_pat is undefined:
@@ -219,13 +266,15 @@ define_str_func('format', def ():
             fill, align, sign, fhash, zeropad, width, comma, precision, ftype = format_spec.match(ρσ_str.format._template_format_pat)[1:]
         except TypeError:
             return value
+        is_numeric = v'Number(value) === value'
+        # numbers align right by default, everything else left (as in Python)
+        numeric_type = was_number or is_numeric or (ftype and 'bcdoxXneEfFgG%'.indexOf(ftype) is not -1)
         if zeropad:
             fill = fill or '0'
-            align = align or '='
+            align = align or ('=' if numeric_type else '<')
         else:
             fill = fill or ' '
-            align = align or '>'
-        is_numeric = v'Number(value) === value'
+            align = align or ('>' if numeric_type else '<')
         is_int = is_numeric and v'value % 1 === 0'
         precision = parseInt(precision, 10)
         lftype = (ftype or '').toLowerCase()
@@ -273,7 +322,7 @@ define_str_func('format', def ():
             value = parseFloat(value)
             prec = 6 if isNaN(precision) else precision
             if lftype is 'e':
-                value = value.toExponential(prec)
+                value = ρσ_normalize_exp(value.toExponential(prec))  # e+04, as Python pads to two digits
                 value = value.toUpperCase() if ftype is 'E' else value.toLowerCase()
             elif lftype is 'f':
                 value = safe_fixed(value, prec, comma)
@@ -286,11 +335,19 @@ define_str_func('format', def ():
                 exp = parseInt(split(value.toExponential(prec - 1).toLowerCase(), 'e')[1], 10)
                 if -4 <= exp < prec:
                     value = safe_fixed(value, prec - 1 - exp, comma)
+                    mantissa = value
+                    exponent = ''
                 else:
-                    value = value.toExponential(prec - 1)
-                value = value.replace(/0+$/g, '')
-                if value[-1] is decimal_sep:
-                    value = value[:-1]
+                    parts = split(value.toExponential(prec - 1), 'e')
+                    mantissa = parts[0]
+                    exponent = ρσ_normalize_exp('e' + parts[1])
+                # g drops trailing zeros (of the mantissa only, never the
+                # exponent) unless # is given
+                if not fhash and mantissa.indexOf(decimal_sep) >= 0:
+                    mantissa = mantissa.replace(/0+$/, '')
+                    if mantissa[-1] is decimal_sep:
+                        mantissa = mantissa[:-1]
+                value = mantissa + exponent
                 if ftype is 'G':
                     value = value.toUpperCase()
 
@@ -401,14 +458,16 @@ define_str_func('format', def ():
         elif transformer is 's':
             object = ρσ_str(object)
         elif transformer is 'a':
-            object = ρσ_repr(object)
+            object = ρσ_ascii(object)
         # Dispatch to __format__ when defined and no transformer was applied
         if not transformer and object is not None and object is not undefined and v'typeof object.__format__ === "function"':
             ans = object.__format__(format_spec or '')
         else:
-            ans = '' + object
+            # Python's format(x, '') is str(x) (True, None, [1, 2]), but numbers
+            # stay raw for the numeric formatting below
+            ans = '' + object if v'typeof object === "number"' and format_spec else ρσ_str(object)
             if format_spec:
-                ans = apply_formatting(ans, format_spec)
+                ans = apply_formatting(ans, format_spec, v'typeof object === "number"')
         if ends_with_equal:
             ans = f'{key}={ans}'
         return ans
@@ -472,7 +531,9 @@ def ρσ_normalize_exp(s):
 
 def ρσ_format_percent(template, values):
     template_str = '' + template
-    is_tuple = Array.isArray(values)
+    # A tuple (or a bare JS array, which is what an implicit tuple a, b is)
+    # supplies the arguments; a list is a single value: '%s' % [1, 2]
+    is_tuple = Array.isArray(values) and v'values.append !== Array.prototype.push'
     if is_tuple:
         pos_args = values
     else:
@@ -686,7 +747,7 @@ def ρσ_format_percent_one(value, flags, width, precision, conv):
                 if conv is 'E':
                     body = body.toUpperCase()
             elif conv is 'f' or conv is 'F':
-                body = abs_val.toFixed(prec)
+                body = ρσ_to_fixed(abs_val, prec)
                 if conv is 'F':
                     body = body.toUpperCase()
             else:
@@ -696,7 +757,7 @@ def ρσ_format_percent_one(value, flags, width, precision, conv):
                 exp_str = abs_val.toExponential(prec - 1)
                 exp_val = parseInt(exp_str.split('e')[1], 10)
                 if -4 <= exp_val and exp_val < prec:
-                    body = abs_val.toFixed(prec - 1 - exp_val)
+                    body = ρσ_to_fixed(abs_val, prec - 1 - exp_val)
                 else:
                     body = abs_val.toExponential(prec - 1)
                 if not alt_form:
@@ -775,7 +836,8 @@ define_str_func('count', def(needle, start, end):
     pos = start
     step = needle.length
     if not step:
-        return 0
+        return Math.max(Math.min(end, string.length) - start, -1) + 1  # '' occurs between every character
+
     ans = 0
     while pos is not -1:
         pos = string.indexOf(needle, pos)
@@ -862,23 +924,88 @@ define_str_func('isspace', def():
 )
 
 define_str_func('isalpha', def():
-    return this.length > 0 and /^[a-zA-Z]+$/.test(this)
+    return this.length > 0 and v'/^\p{L}+$/u'.test(this)
 )
 
 define_str_func('isdigit', def():
-    return this.length > 0 and /^\d+$/.test(this)
+    return this.length > 0 and v'/^[\p{Nd}²³¹⁰-⁹₀-₉]+$/u'.test(this)
+)
+
+define_str_func('isdecimal', def():
+    return this.length > 0 and v'/^\p{Nd}+$/u'.test(this)
+)
+
+define_str_func('isnumeric', def():
+    return this.length > 0 and v'/^\p{N}+$/u'.test(this)
 )
 
 define_str_func('isalnum', def():
-    return this.length > 0 and /^[a-zA-Z0-9]+$/.test(this)
+    return this.length > 0 and v'/^[\p{L}\p{N}]+$/u'.test(this)
 )
 
 define_str_func('isidentifier', def():
-    return this.length > 0 and /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this)
+    return this.length > 0 and v'/^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*$/u'.test(this)
+)
+
+define_str_func('isascii', def():
+    return v'/^[\x00-\x7f]*$/'.test(this)
+)
+
+define_str_func('isprintable', def():
+    return not v'/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]|[^\S ]/u'.test(this)
+)
+
+define_str_func('istitle', def():
+    # uppercase letters only after uncased characters, lowercase only after cased ones
+    cased = previous_cased = False
+    for v'var i = 0; i < this.length; i++':
+        ch = this[i]
+        if v'/\p{Lu}|\p{Lt}/u'.test(ch):
+            if previous_cased:
+                return False
+            previous_cased = cased = True
+        elif v'/\p{Ll}/u'.test(ch):
+            if not previous_cased:
+                return False
+            previous_cased = cased = True
+        else:
+            previous_cased = False
+    return cased
 )
 
 define_str_func('casefold', def():
-    return this.toLowerCase()
+    return this.toLowerCase().replace(/ß/g, 'ss').replace(/ς/g, 'σ')
+)
+
+define_str_func('translate', def(table):
+    ans = ''
+    for ch in v'Array.from(this)':
+        code = ch.codePointAt(0)
+        if table and table.jsmap:
+            has = table.jsmap.has(code)
+            val = table.jsmap.get(code)
+        elif table and jstype(table.__getitem__) is 'function':
+            try:
+                val = table.__getitem__(code)
+                has = True
+            except LookupError:
+                has = False
+        else:
+            has = table and v'Object.prototype.hasOwnProperty.call(table, code)'
+            val = table[code] if has else undefined
+        if not has:
+            ans += ch
+        elif val is None or val is undefined:
+            pass
+        elif jstype(val) is 'number':
+            ans += v'String.fromCodePoint(val)'
+        else:
+            ans += val
+    return ans
+)
+
+define_str_func('encode', def(encoding, errors):
+    return ρσ_bytes(this + '', encoding or 'utf-8', errors)
 )
 
 define_str_func('removeprefix', def(prefix):
@@ -896,16 +1023,11 @@ define_str_func('removesuffix', def(suffix):
 )
 
 define_str_func('join', def(iterable):
-    if Array.isArray(iterable):
-        return iterable.join(this)
-    ans = ''
-    r = iterable.next()
-    while not r.done:
-        if ans:
-            ans += this
-        ans += r.value
-        r = iterable.next()
-    return ans
+    # Any iterable: list, tuple, generator, dict (its keys), set, str.
+    # (Non-string items are converted, as RapydScript always has, where
+    # Python would raise TypeError.)
+    items = iterable if Array.isArray(iterable) else ρσ_list_constructor(iterable)
+    return items.join(this)
 )
 
 define_str_func('ljust', def(width, fill):
@@ -972,15 +1094,15 @@ define_str_func('strip', def(chars):
 define_str_func('partition', def(sep):
     idx = this.indexOf(sep)
     if idx is -1:
-        return this, '', ''
-    return this[:idx], sep, this[idx + sep.length:]
+        return ρσ_tuple_decorate([this + '', '', ''])
+    return ρσ_tuple_decorate([this[:idx], sep, this[idx + sep.length:]])
 )
 
 define_str_func('rpartition', def(sep):
     idx = this.lastIndexOf(sep)
     if idx is -1:
-        return '', '', this
-    return this[:idx], sep, this[idx + sep.length:]
+        return ρσ_tuple_decorate(['', '', this + ''])
+    return ρσ_tuple_decorate([this[:idx], sep, this[idx + sep.length:]])
 )
 
 define_str_func('replace', def(old, repl, count):
@@ -990,6 +1112,17 @@ define_str_func('replace', def(old, repl, count):
     if count is 0:
         return string
     count = count if count > 0 else Number.MAX_VALUE
+    if old is '':
+        # Python inserts repl before every character and at the end:
+        # 'abc'.replace('', '-') is '-a-b-c-' (the search loop below would never advance)
+        parts = ρσ_orig_split(string, '')
+        out = ''
+        for v'var ci = 0; ci <= parts.length; ci++':
+            if ci < count:
+                out += repl
+            if ci < parts.length:
+                out += parts[ci]
+        return out
     pos = 0
     while count > 0:
         count -= 1
@@ -1093,8 +1226,9 @@ define_str_func('rsplit', def(sep, maxsplit):
 
 define_str_func('splitlines', def(keepends):
     split = ρσ_orig_split
+    # the line boundaries Python recognises
     if keepends:
-        parts = split(this, /((?:\r?\n)|\r)/)
+        parts = split(this, v'/(\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029])/')
         ans = v'[]'
         for v'var i = 0; i < parts.length; i++':
             if i % 2 is 0:
@@ -1102,7 +1236,9 @@ define_str_func('splitlines', def(keepends):
             else:
                 ans[-1] += parts[i]  # noqa:undef
     else:
-        ans = split(this, /(?:\r?\n)|\r/)
+        ans = split(this, v'/\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/')
+    if ans.length and ans[ans.length - 1] is '':
+        ans.pop()  # no empty line after a final line break
     return ρσ_list_decorate(ans)
 )
 
@@ -1119,9 +1255,12 @@ define_str_func('swapcase', def():
 )
 
 define_str_func('zfill', def(width):
-    string = this
+    string = this + ''
     if width > string.length:
-        string = v'new Array(width - string.length + 1).join("0")' + string
+        pad = v'new Array(width - string.length + 1).join("0")'
+        if string[0] is '+' or string[0] is '-':
+            return string[0] + pad + string.slice(1)  # zeros go after the sign
+        string = pad + string
     return string
 )
 
@@ -1202,6 +1341,34 @@ define_str_func('expandtabs', def(tabsize):
 ρσ_str.printable = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
 ρσ_str.whitespace   = ' \t\n\r\x0b\x0c'
 
+# str.maketrans(dict) / str.maketrans(from, to[, delete]): a table for translate()
+ρσ_str.maketrans = def(x, y, z):
+    table = ρσ_dict()
+    if arguments.length is 1:
+        pairs = v'[]'
+        if x and x.jsmap:
+            x.jsmap.forEach(def(v, k): pairs.push([k, v]);)
+        else:
+            for k in Object.keys(x):
+                pairs.push([k, x[k]])
+        for pair in pairs:
+            k = pair[0]
+            if jstype(k) is 'string':
+                if k.length is not 1:
+                    raise ValueError('string keys in translate table must be of length 1')
+                k = k.codePointAt(0)
+            table.jsmap.set(k, pair[1])
+        return table
+    xs, ys = Array.from(x), Array.from(y)
+    if xs.length is not ys.length:
+        raise ValueError('the first two maketrans arguments must have equal length')
+    for v'var i = 0; i < xs.length; i++':
+        table.jsmap.set(xs[i].codePointAt(0), ys[i].codePointAt(0))
+    if z:
+        for ch in Array.from(z):
+            table.jsmap.set(ch.codePointAt(0), None)
+    return table
+
 v'define_str_func = undefined'
 def ρσ_format(value, spec):
     if value is not None and value is not undefined and v'typeof value.__format__ === "function"':
@@ -1212,3 +1379,15 @@ def ρσ_format(value, spec):
 
 ρσ_str.__name__ = 'str'
 v'var str = ρσ_str, repr = ρσ_repr, format = ρσ_format'
+
+# ascii(): repr() with the non-ASCII characters escaped
+def ρσ_ascii(x):
+    return ρσ_repr(x).replace(v'/[^\x00-\x7f]/gu', def(ch):
+        code = ch.codePointAt(0)
+        if code < 0x100:
+            return '\\x' + ('0' + code.toString(16)).slice(-2)
+        if code < 0x10000:
+            return '\\u' + ('000' + code.toString(16)).slice(-4)
+        return '\\U' + ('0000000' + code.toString(16)).slice(-8)
+    )
+v'var ascii = ρσ_ascii'

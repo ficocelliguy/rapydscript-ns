@@ -1,0 +1,120 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Internal helpers shared by the `numbers` and `collections.abc` modules.
+#
+# An ABC here is an ordinary class whose (inherited) classmethods
+# __instancecheck__ / __subclasscheck__ delegate to abc_instancecheck /
+# abc_subclasscheck below.  isinstance(x, C) / issubclass(c, C) call those
+# hooks at runtime.  Membership is decided by:
+#   1. inheritance — the JS prototype chain, the extra bases RapydScript
+#      records in Cls.prototype.__bases__ (multiple inheritance), and the
+#      virtual parents declared with set_parents() (for ABCs that have
+#      several parents in Python but a single JS prototype chain here);
+#   2. the predicates installed on C itself with set_predicates() — they
+#      describe which builtin values/classes belong to the ABC.  Predicates
+#      are looked up as *own* properties, so a user class deriving from an
+#      ABC (class MyList(Sequence)) does not inherit them and only matches
+#      its real subclasses;
+#   3. classes registered with C.register(cls) — registering with C also
+#      registers with every ABC ancestor of C (as Python's ABCMeta does
+#      through __subclasses__).
+
+def _own(cls, name):
+    return Object.prototype.hasOwnProperty.call(cls, name)
+
+
+def _registry(cls):
+    if not _own(cls, '_abc_registry'):
+        Object.defineProperty(cls, '_abc_registry', {'value': v'[]', 'enumerable': False, 'writable': True})
+    return cls._abc_registry
+
+
+def _is_abc(cls):
+    return cls and jstype(cls) is 'function' and jstype(cls.__instancecheck__) is 'function' and jstype(cls.__subclasscheck__) is 'function'
+
+
+def _direct_parents(c):
+    # All classes c directly derives from (real or virtual).
+    ans = []
+    if _own(c, '_abc_parents'):
+        ans = ans.concat(c._abc_parents)
+    if c.prototype and Object.prototype.hasOwnProperty.call(c.prototype, '__bases__') and Array.isArray(c.prototype.__bases__):
+        ans = ans.concat(c.prototype.__bases__)
+    p = Object.getPrototypeOf(c)
+    if p and p is not v'Function.prototype' and jstype(p) is 'function':
+        ans.push(p)
+    return ans
+
+
+def inherits(sub, cls):
+    if jstype(sub) is not 'function':
+        return False
+    if sub is cls:
+        return True
+    if sub.prototype and cls.prototype and v'Object.prototype.isPrototypeOf.call(cls.prototype, sub.prototype)':
+        return True
+    for p in _direct_parents(sub):
+        if p is not sub and inherits(p, cls):
+            return True
+    return False
+
+
+def set_parents(cls, parents):
+    Object.defineProperty(cls, '_abc_parents', {'value': parents, 'enumerable': False, 'writable': True})
+
+
+def set_predicates(cls, instance_pred, class_pred):
+    Object.defineProperty(cls, '_abc_instance_pred', {'value': instance_pred, 'enumerable': False, 'writable': True})
+    Object.defineProperty(cls, '_abc_class_pred', {'value': class_pred, 'enumerable': False, 'writable': True})
+
+
+def abc_register(cls, sub):
+    if jstype(sub) is not 'function':
+        raise TypeError('Can only register classes')
+    seen = []
+    stack = [cls]
+    while stack.length:
+        c = stack.pop()
+        if not _is_abc(c) or seen.indexOf(c) >= 0:
+            continue
+        seen.push(c)
+        reg = _registry(c)
+        if reg.indexOf(sub) < 0:
+            reg.push(sub)
+        stack = stack.concat(_direct_parents(c))
+    return sub
+
+
+def abc_subclasscheck(cls, sub):
+    if sub is None or sub is undefined:
+        return False
+    if inherits(sub, cls):
+        return True
+    if _own(cls, '_abc_class_pred') and cls._abc_class_pred(sub):
+        return True
+    if _own(cls, '_abc_registry'):
+        for r in cls._abc_registry:
+            if inherits(sub, r):
+                return True
+    return False
+
+
+def abc_instancecheck(cls, obj):
+    # Predicates see None too (e.g. isinstance(None, Hashable) is True).
+    if _own(cls, '_abc_instance_pred') and cls._abc_instance_pred(obj):
+        return True
+    if obj is None or obj is undefined:
+        return False
+    if v'obj instanceof cls':
+        return True
+    ctor = obj.constructor
+    if jstype(ctor) is 'function' and ctor is not Object and ctor is not Function:
+        if inherits(ctor, cls):
+            return True
+        if _own(cls, '_abc_registry'):
+            for r in cls._abc_registry:
+                if v'obj instanceof r' or inherits(ctor, r):
+                    return True
+    return False

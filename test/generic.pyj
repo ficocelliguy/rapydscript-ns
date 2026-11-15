@@ -87,9 +87,8 @@ assrt.deepEqual([a, b, c], [[1,2], 1, 2])
 throw_test('a += b += 1')
 throw_test('a += 1, 2 += b')
 throw_test('a += [1, 2] += b')
-throw_test('function = 1')
-throw_test('def function():\n pass')
-throw_test('class function:\n pass')
+# JavaScript reserved words that are ordinary Python names compile (renamed in the JS)
+RapydScript.parse('function = 1\ndef default():\n pass\nclass static:\n pass\n', {'filename': 'reserved'})
 throw_test('while 1:\npass')
 throw_test('def f():\n while 1:\n pass')
 throw_test('1 1')
@@ -106,8 +105,8 @@ throw_test('for a in [1]\n   pass')
 # strict equality
 assrt(1 == 1)                  # number vs number: ok
 assrt(True == True)            # boolean vs boolean: ok
-assrt(not (1 == True))         # number vs boolean: NEVER equal
-assrt(1 != True)               # number vs boolean: NEVER equal
+assrt(1 == True)               # number vs boolean: bool is an int in Python
+assrt(not (2 == True))         # ...so only 1 / 0 equal True / False
 assrt(not ("" == False))       # string vs boolean: NEVER equal
 assrt(not ("0" == 0))          # string vs integer: NEVER equal
 assrt(not ("" == 0))           # string vs integer: NEVER equal

@@ -1,0 +1,209 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# collections_abc.pyj
+# Tests for the collections.abc standard library module.
+
+from __python__ import overload_getitem, overload_operators
+import collections.abc
+from collections.abc import (Iterable, Iterator, Sized, Container, Hashable, Callable, Sequence,
+    MutableSequence, Mapping, MutableMapping, Set, MutableSet, Collection, Generator, Reversible,
+    KeysView, ItemsView, ValuesView, Awaitable)
+from collections import deque, OrderedDict, Counter, defaultdict, ChainMap, Counter
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+ABCS = [Iterable, Iterator, Sized, Container, Hashable, Callable, Sequence, MutableSequence,
+        Mapping, MutableMapping, Set, MutableSet, Collection, Generator, Reversible]
+
+def bits(v):
+    return ['1' if isinstance(v, a) else '0' for a in ABCS].join('')
+
+def sub_bits(t):
+    return ['1' if issubclass(t, a) else '0' for a in ABCS].join('')
+
+def gen():
+    yield 1
+
+# ── 1. isinstance for builtin values (expected strings produced by CPython) ──
+ae(bits([1]), '101100110000101')
+ae(bits((1,)), '101110100000101')
+ae(bits('ab'), '101110100000101')
+ae(bits(dict({'a': 1})), '101100001100101')
+ae(bits(set([1, 2])), '101100000011100')
+ae(bits(frozenset([1])), '101110000010100')
+ae(bits(range(3)), '101110100000101')
+ae(bits(5), '000010000000000')
+ae(bits(None), '000010000000000')
+ae(bits(len), '000011000000000')
+ae(bits(gen()), '110010000000010')
+ae(bits(iter([1])), '110010000000000')
+ae(bits(deque([1])), '101100110000101')
+ae(bits(OrderedDict()), '101100001100101')
+ae(bits(Counter('ab')), '101100001100101')
+ae(bits(defaultdict(int)), '101100001100101')
+ae(bits(ChainMap(dict())), '101100001100100')
+
+# ── 2. issubclass for builtin classes ─────────────────────────────────────────
+ae(sub_bits(list), '101100110000101')
+ae(sub_bits(tuple), '101110100000101')
+ae(sub_bits(str), '101110100000101')
+ae(sub_bits(dict), '101100001100101')
+ae(sub_bits(set), '101100000011100')
+ae(sub_bits(frozenset), '101110000010100')
+ae(sub_bits(int), '000010000000000')
+ok(issubclass(Sequence, Collection))
+ok(issubclass(MutableMapping, Sized))
+ok(issubclass(Set, Iterable))
+ok(not issubclass(Iterable, Sequence))
+ok(collections.abc.Iterable is Iterable)
+
+# ── 3. dict views ─────────────────────────────────────────────────────────────
+d = dict({'a': 1})
+ok(isinstance(d.keys(), KeysView))
+ok(isinstance(d.items(), ItemsView))
+ok(isinstance(d.values(), ValuesView))
+ok(isinstance(d.keys(), Set))
+ok(not isinstance(d.values(), Set))
+
+# ── 4. Sequence mixins on a user class ────────────────────────────────────────
+class MyList(Sequence):
+    def __init__(self, *items):
+        self._items = list(items)
+    def __getitem__(self, i):
+        return self._items[i]
+    def __len__(self):
+        return len(self._items)
+
+m = MyList(3, 1, 4, 1)
+ade(list(m), [3, 1, 4, 1])
+ok(4 in m)
+ok(9 not in m)
+ae(m.index(1), 1)
+ae(m.count(1), 2)
+ade(list(reversed(m)), [1, 4, 1, 3])
+ae(len(m), 4)
+ok(isinstance(m, Sequence))
+ok(isinstance(m, Collection))
+ok(isinstance(m, Iterable))
+ok(isinstance(m, Sized))
+ok(not isinstance(m, MutableSequence))
+ok(not isinstance([], MyList))
+ok(issubclass(MyList, Reversible))
+
+# ── 5. MutableSequence mixins ─────────────────────────────────────────────────
+class MySeq(MutableSequence):
+    def __init__(self):
+        self._d = []
+    def __getitem__(self, i):
+        return self._d[i]
+    def __setitem__(self, i, v):
+        self._d[i] = v
+    def __delitem__(self, i):
+        self._d.splice(i, 1)
+    def __len__(self):
+        return self._d.length
+    def insert(self, i, v):
+        self._d.splice(i, 0, v)
+
+s = MySeq()
+s.append(1)
+s.extend([2, 3])
+ade(list(s), [1, 2, 3])
+ae(s.pop(), 3)
+s.reverse()
+ade(list(s), [2, 1])
+s.remove(2)
+ade(list(s), [1])
+s += [7]
+ade(list(s), [1, 7])
+
+# ── 6. MutableMapping mixins ──────────────────────────────────────────────────
+class MyMap(MutableMapping):
+    def __init__(self):
+        self._d = dict()
+    def __getitem__(self, k):
+        return self._d[k]
+    def __setitem__(self, k, v):
+        self._d[k] = v
+    def __delitem__(self, k):
+        del self._d[k]
+    def __iter__(self):
+        return iter(self._d)
+    def __len__(self):
+        return len(self._d)
+
+mm = MyMap()
+mm['a'] = 1
+mm.update(dict({'b': 2}), c=3)
+ade(sorted(mm.keys()), ['a', 'b', 'c'])
+ae(mm.get('z', 0), 0)
+ae(mm.get('a'), 1)
+ok('b' in mm)
+ae(mm.setdefault('d', 4), 4)
+ae(mm.pop('a'), 1)
+ae(mm.pop('nope', 'dflt'), 'dflt')
+ae(len(mm), 3)
+ok(isinstance(mm, Mapping))
+ok(isinstance(mm, Container))
+mm.clear()
+ae(len(mm), 0)
+
+# ── 7. MutableSet mixins ──────────────────────────────────────────────────────
+class MySet(MutableSet):
+    def __init__(self, it=None):
+        self._s = []
+        for x in (it or []):
+            self.add(x)
+    def __contains__(self, x):
+        return self._s.indexOf(x) >= 0
+    def __iter__(self):
+        return iter(self._s)
+    def __len__(self):
+        return self._s.length
+    def add(self, x):
+        if self._s.indexOf(x) < 0:
+            self._s.push(x)
+    def discard(self, x):
+        i = self._s.indexOf(x)
+        if i >= 0:
+            self._s.splice(i, 1)
+
+a = MySet([1, 2, 3])
+b = MySet([2, 3, 4])
+ade(sorted(a & b), [2, 3])
+ade(sorted(a | b), [1, 2, 3, 4])
+ade(sorted(a - b), [1])
+ade(sorted(a ^ b), [1, 4])
+ok(a <= MySet([1, 2, 3, 5]))
+ok(not (a <= b))
+ok(a.isdisjoint([9]))
+a.remove(1)
+ade(sorted(a), [2, 3])
+a |= [8]
+ade(sorted(a), [2, 3, 8])
+
+# ── 8. register() ─────────────────────────────────────────────────────────────
+class Reg:
+    pass
+Sequence.register(Reg)
+ok(isinstance(Reg(), Sequence))
+ok(isinstance(Reg(), Iterable))
+ok(issubclass(Reg, Collection))
+ok(not isinstance(Reg(), Mapping))
+
+# ── 9. Structural checks for one-method ABCs ──────────────────────────────────
+class HasLen:
+    def __len__(self):
+        return 0
+class HasIter:
+    def __iter__(self):
+        return iter([])
+ok(isinstance(HasLen(), Sized))
+ok(issubclass(HasLen, Sized))
+ok(not isinstance(HasLen(), Iterable))
+ok(isinstance(HasIter(), Iterable))
+ok(issubclass(HasIter, Iterable))
+ok(isinstance(Promise.resolve(1), Awaitable))

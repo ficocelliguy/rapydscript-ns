@@ -40,7 +40,18 @@ def print_class(output):
 
         # decorate the method
         if stmt.decorators and stmt.decorators.length:
-            decorate(stmt.decorators, output, def():function_definition(stmt, output, strip_first, True);)
+            if strip_first:
+                # The decorator sees a function taking self (or cls) first, as in
+                # Python; its result is turned back into a method (see ρσ_func_from_method).
+                output.print('ρσ_method_from_func(')
+                decorate(stmt.decorators, output, def():
+                    output.print('ρσ_func_from_method(')
+                    function_definition(stmt, output, strip_first, True)
+                    output.print(')')
+                )
+                output.print(')')
+            else:
+                decorate(stmt.decorators, output, def():function_definition(stmt, output, strip_first, True);)
             output.end_statement()
         else:
             function_definition(stmt, output, strip_first)
@@ -59,6 +70,14 @@ def print_class(output):
                 else:
                     fname = self.name.name + ('.' if is_static else '.prototype.') + name
                     function_annotation(stmt, output, strip_first, fname)
+                    if is_static and name is not '__new__':
+                        # A staticmethod is also reachable through instances: obj.helper(x)
+                        output.indent()
+                        self.name.print(output)
+                        output.assign('.prototype.' + name)
+                        self.name.print(output)
+                        output.print('.' + name)
+                        output.end_statement()
 
     def define_default_method(name, body):
         class_def(name)
@@ -82,6 +101,11 @@ def print_class(output):
         output.with_block(def():
             output.indent()
             cname = self.name.name
+            if self.has_metaclass:
+                # Cls(...) goes through the metaclass's __call__ when it defines one
+                output.print('if (' + cname + '.ρσ_mcall && ρσ_meta_enter(' + cname + ', this)) return ρσ_meta_call(' + cname + ', arguments);')
+                output.newline()
+                output.indent()
             if self.has_new:
                 # When __new__ is defined, call it to get the instance
                 output.print('if (!(this instanceof ' + cname + '))')
@@ -200,11 +224,21 @@ def print_class(output):
                         output.indent(), base.print(output), output.spaced('.prototype.__bind_methods__', '&&', '')
                         base.print(output), output.print('.prototype.__bind_methods__.call(this)')
                         output.end_statement()
+                decorated = Object.create(None)
+                for stmt in self.body:
+                    if is_node_type(stmt, AST_Method) and stmt.decorators and stmt.decorators.length:
+                        decorated[stmt.name.name] = True
                 for bname in self.bound:
                     if seen_methods[bname] or self.dynamic_properties[bname]:
                         continue
+                    if bname is '__new__' or (self.static and self.static[bname]) or (self.classmethod and self.classmethod[bname]):
+                        continue  # lives on the class, not the prototype
                     seen_methods[bname] = True
-                    output.indent(), output.assign('this.' + bname)
+                    output.indent()
+                    if decorated[bname]:
+                        # a decorator may have turned the method into a descriptor
+                        output.print('if (typeof '), self.name.print(output), output.print('.prototype.' + bname + ' === "function") ')
+                    output.assign('this.' + bname)
                     self.name.print(output), output.print('.prototype.' + bname + '.bind(this)')
                     output.end_statement()
             )
@@ -222,6 +256,7 @@ def print_class(output):
                     output.indent(), output.print(JSON.stringify(name) + ':'), output.space()
                     output.with_block(def():
                         output.indent(), output.print('"enumerable":'), output.space(), output.print('true'), output.comma(), output.newline()
+                        output.indent(), output.print('"configurable":'), output.space(), output.print('true'), output.comma(), output.newline()
                         if prop.getter:
                             output.indent(), output.print('"get":'), output.space()
                             define_method(prop.getter, True), output.comma(), output.newline()
@@ -235,6 +270,12 @@ def print_class(output):
             )
         )
         output.end_statement()
+        # @x.deleter methods: looked up by del obj.x (ρσ_delattr)
+        for name in property_names:
+            prop = self.dynamic_properties[name]
+            if prop.deleter:
+                output.indent(), output.print('ρσ_define_deleter('), self.name.print(output), output.print('.prototype, ' + JSON.stringify(name) + ', ')
+                define_method(prop.deleter, True), output.print(')'), output.end_statement()
 
     # actual methods
     if not self.init:
@@ -257,16 +298,20 @@ def print_class(output):
 
     for stmt in self.body:
         if is_node_type(stmt, AST_Method):
-            if stmt.is_getter or stmt.is_setter:
+            if stmt.is_getter or stmt.is_setter or stmt.is_deleter:
                 continue
             define_method(stmt)
             defined_methods[stmt.name.name] = True
             sname = stmt.name.name
             if sname is '__init__':
                 # Copy argument handling data so that kwarg interpolation works when calling the constructor
-                for attr in ['.__argnames__', '.__handles_kwarg_interpolation__']:
-                    output.indent(), self.name.print(output), output.assign(attr)
-                    self.name.print(output), output.print('.prototype.__init__' + attr), output.end_statement()
+                # (defined, not assigned: a base like `dict` may carry these as
+                # read-only properties, which a plain assignment can't shadow)
+                for attr in ['__argnames__', '__handles_kwarg_interpolation__']:
+                    output.indent(), output.print('Object.defineProperty('), self.name.print(output)
+                    output.print(', "' + attr + '", {value: '), self.name.print(output)
+                    output.print('.prototype.__init__.' + attr + ', writable: true, configurable: true})')
+                    output.end_statement()
             if sname is '__iter__':
                 class_def('ρσ_iterator_symbol', True)
                 self.name.print(output)
@@ -337,7 +382,10 @@ def print_class(output):
     cname_str = JSON.stringify(self.name.name)
     output.indent(), self.name.print(output), output.print('.__name__ = ' + cname_str), output.end_statement()
     output.indent(), self.name.print(output), output.print('.__qualname__ = ' + cname_str), output.end_statement()
-    output.indent(), self.name.print(output), output.print('.__module__ = ' + JSON.stringify(self.module_id)), output.end_statement()
+    # __module__ is defined rather than assigned: builtin bases such as dict carry
+    # it as a read-only property, which an assignment can't shadow.
+    output.indent(), output.print('Object.defineProperty('), self.name.print(output)
+    output.print(', "__module__", {value: ' + JSON.stringify(self.module_id) + ', writable: true, configurable: true})'), output.end_statement()
     output.indent()
     output.print('Object.defineProperty(')
     self.name.print(output)
@@ -415,6 +463,25 @@ def print_class(output):
         output.print('}')
         output.end_statement()
 
+    # Descriptors among the class variables (objects with __get__ / __set__ /
+    # __delete__, such as property(...)) become accessors, and __set_name__ is
+    # called, as type.__new__ does before __init_subclass__.
+    has_class_vars = False
+    for stmt in self.statements:
+        if not is_node_type(stmt, AST_Class) and not is_node_type(stmt, AST_Method):
+            has_class_vars = True
+    if has_class_vars:
+        output.indent(), output.print('ρσ_install_descriptors('), self.name.print(output), output.print(')'), output.end_statement()
+
+    # metaclass= goes to the metaclass, not to __init_subclass__
+    metaclass_kw = None
+    other_kws = []
+    for kw_pair in (self.class_kwargs or []):
+        if kw_pair[0].name is 'metaclass':
+            metaclass_kw = kw_pair[1]
+        else:
+            other_kws.push(kw_pair)
+
     # __init_subclass__ hook: call after identity properties and class variables
     # so cls.__name__ is correct and cls.prototype reflects the full class body.
     if self.parent:
@@ -423,7 +490,7 @@ def print_class(output):
         self.parent.print(output)
         output.print('.__init_subclass__ === "function")')
         output.space()
-        kws = self.class_kwargs
+        kws = other_kws
         if kws and kws.length:
             output.with_block(def():
                 output.indent()
@@ -461,6 +528,16 @@ def print_class(output):
             output.comma()
             self.bases[i].print(output)
         output.print(')'), output.end_statement()
+
+    # A metaclass (given here, or inherited from a base) gets its __new__ /
+    # __init__ hooks once the class exists (see ρσ_apply_metaclass)
+    if metaclass_kw:
+        output.indent(), output.print('ρσ_apply_metaclass('), self.name.print(output), output.comma()
+        metaclass_kw.print(output)
+        output.print(')'), output.end_statement()
+    elif self.parent:
+        output.indent(), output.print('if ('), self.name.print(output), output.print('.ρσ_metaclass) ρσ_apply_metaclass(')
+        self.name.print(output), output.comma(), self.name.print(output), output.print('.ρσ_metaclass)'), output.end_statement()
 
     # Docstring
     if self.docstrings and self.docstrings.length and output.options.keep_docstrings:

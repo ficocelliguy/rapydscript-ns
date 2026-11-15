@@ -400,20 +400,56 @@ class RegexObject:
         self._pattern.lastIndex = 0
         return string.split(self._pattern, maxsplit or undefined)
 
-    def findall(self, string):
+    def _next_match(self, pat, string):
+        # pat.exec() that steps past an empty match, so patterns like 'x*'
+        # or r'' don't match at the same position forever.
+        m = pat.exec(string)
+        if m is not None and m[0].length is 0:
+            code = string.charCodeAt(pat.lastIndex)
+            # with the unicode flag, step over a whole surrogate pair
+            pat.lastIndex += 2 if self._modifiers.indexOf('u') >= 0 and code >= 0xD800 and code <= 0xDBFF else 1
+        return m
+
+    def _all_matches(self, string, count):
         self._pattern.lastIndex = 0
-        return ρσ_list_decorate(string.match(self._pattern) or v'[]')
+        ans = v'[]'
+        while count < 1 or ans.length < count:
+            m = self._next_match(self._pattern, string)
+            if m is None:
+                break
+            ans.push(m)
+            if self._pattern.lastIndex > string.length:
+                break
+        return ans
+
+    def findall(self, string):
+        # Like Python: whole matches when the pattern has no groups, the group
+        # when it has one, a tuple of groups when it has several.
+        matches = self._all_matches(string, 0)
+        ngroups = RegExp(self.js_pattern + '|', self._modifiers.replace('g', '')).exec('').length - 1
+        ans = v'[]'
+        for m in matches:
+            if ngroups is 0:
+                ans.push(m[0])
+            elif ngroups is 1:
+                ans.push(m[1] if m[1] is not undefined else '')
+            else:
+                ans.push(ρσ_tuple_decorate([(g if g is not undefined else '') for g in m[1:]]))
+        return ρσ_list_decorate(ans)
 
     def finditer(self, string):
         # We have to copy pat since lastIndex is mutable
         pat = RegExp(this._pattern.source, this._modifiers)  # noqa: unused-local
-        ans = v"{'_string':string, '_r':pat, '_self':self}"
+        ans = v"{'_string':string, '_r':pat, '_self':self, '_done':false}"
         ans[ρσ_iterator_symbol] = def():
             return this
         ans['next'] = def():
-            m = this._r.exec(this._string)
+            m = None if this._done else this._self._next_match(this._r, this._string)
             if m is None:
+                this._done = True
                 return v"{'done':true}"
+            if this._r.lastIndex > this._string.length:
+                this._done = True
             return v"{'done':false, 'value':new MatchObject(this._self, m, 0, null)}"
         return ans
 
@@ -421,23 +457,14 @@ class RegexObject:
         expand = _expand
         if jstype(repl) is 'function':
             expand = def(m, repl, gnm): return '' + repl(MatchObject(self, m, 0, None))
-        this._pattern.lastIndex = 0
-        num = 0
-        matches = v'[]'
-
-        while count < 1 or num < count:
-            m = this._pattern.exec(string)
-            if m is None:
-                break
-            matches.push(m)
-            num += 1
+        matches = self._all_matches(string, count)
 
         for v'var i = matches.length - 1; i > -1; i--':
             m = matches[i]  # noqa:undef
             start = m.index
             end = start + m[0].length
             string = string[:start] + expand(m, repl, self.group_name_map) + string[end:]
-        return string, matches.length
+        return (string, matches.length)
 
     def sub(self, repl, string, count=0):
         return self.subn(repl, string, count)[0]

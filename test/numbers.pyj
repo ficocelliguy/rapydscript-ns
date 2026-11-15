@@ -1,0 +1,84 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# numbers.pyj
+# Tests for the numbers standard library module (numeric tower ABCs).
+
+import numbers
+from numbers import Number, Complex, Real, Rational, Integral
+from fractions import Fraction
+from decimal import Decimal
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+TOWER = [Number, Complex, Real, Rational, Integral]
+
+def membership(v):
+    return [isinstance(v, c) for c in TOWER]
+
+def sub_membership(t):
+    return [issubclass(t, c) for c in TOWER]
+
+# ── 1. isinstance across the tower (matches CPython) ──────────────────────────
+ade(membership(1), [True, True, True, True, True])
+ade(membership(2.5), [True, True, True, False, False])
+ade(membership(True), [True, True, True, True, True])
+ade(membership(Fraction(1, 3)), [True, True, True, True, False])
+ade(membership(complex(1, 2)), [True, True, False, False, False])
+ade(membership(Decimal('1.5')), [True, False, False, False, False])
+ade(membership('x'), [False, False, False, False, False])
+ade(membership(None), [False, False, False, False, False])
+ade(membership([1]), [False, False, False, False, False])
+
+# ── 2. issubclass with builtin types ──────────────────────────────────────────
+ade(sub_membership(int), [True, True, True, True, True])
+ade(sub_membership(float), [True, True, True, False, False])
+ade(sub_membership(bool), [True, True, True, True, True])
+ade(sub_membership(complex), [True, True, False, False, False])
+ade(sub_membership(str), [False, False, False, False, False])
+ade(sub_membership(Fraction), [True, True, True, True, False])
+ade(sub_membership(Decimal), [True, False, False, False, False])
+
+# ── 3. ABC hierarchy ──────────────────────────────────────────────────────────
+ok(issubclass(Integral, Real))
+ok(not issubclass(Real, Integral))
+ok(issubclass(Real, Number))
+ok(issubclass(Rational, Complex))
+
+# ── 4. register() — also counts for every ancestor ABC ────────────────────────
+class MyNum:
+    pass
+Integral.register(MyNum)
+ok(isinstance(MyNum(), Integral))
+ok(isinstance(MyNum(), Real))
+ok(isinstance(MyNum(), Number))
+ok(issubclass(MyNum, Rational))
+ok(not isinstance(MyNum(), str))
+
+class MyComplex:
+    pass
+numbers.Complex.register(MyComplex)
+ok(isinstance(MyComplex(), Complex))
+ok(isinstance(MyComplex(), Number))
+ok(not isinstance(MyComplex(), Real))
+
+# ── 5. Subclassing an ABC ─────────────────────────────────────────────────────
+class MyReal(Real):
+    def __init__(self, v):
+        self.v = v
+
+r = MyReal(2)
+ok(isinstance(r, Real))
+ok(isinstance(r, Complex))
+ok(isinstance(r, Number))
+ok(not isinstance(r, Integral))
+ok(not isinstance(1.5, MyReal))  # predicates are not inherited by user classes
+ok(issubclass(MyReal, Number))
+ae(r.real, r)
+ae(r.imag, 0)
+
+# ── 6. Tuple form of isinstance ───────────────────────────────────────────────
+ok(isinstance(5, (str, Integral)))
+ok(not isinstance('s', (Integral, Real)))

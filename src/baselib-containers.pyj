@@ -7,11 +7,18 @@
 def ρσ_equals(a, b):
     if a is b:
         return True
+    if v'(typeof a === "boolean" && typeof b === "number") || (typeof a === "number" && typeof b === "boolean")':
+        return v'Number(a) === Number(b)'  # bool is an int in Python: True == 1
     if a and jstype(a.__eq__) is 'function':
-        return a.__eq__(b)
+        ρσ_r = a.__eq__(b)
+        if ρσ_r is not NotImplemented: return ρσ_r
     if b and jstype(b.__eq__) is 'function':
-        return b.__eq__(a)
-    if ρσ_arraylike(a) and ρσ_arraylike(b):
+        ρσ_r = b.__eq__(a)
+        if ρσ_r is not NotImplemented: return ρσ_r
+        return False  # neither side knows how to compare; a is not b
+    # Strings are array-like but not containers: equal ones were caught by `is`
+    # above, and recursing into their characters would never terminate.
+    if ρσ_arraylike(a) and ρσ_arraylike(b) and jstype(a) is not 'string' and jstype(b) is not 'string':
         if a.length != b.length:
             return False
         for v'var i=0; i < a.length; i++':
@@ -119,7 +126,8 @@ def ρσ_list_as_array():
     return Array.prototype.slice.call(this)
 
 def ρσ_list_count(value):
-    return this.reduce(def(n, val): return n + (val is value);, 0)
+    # == comparison, as Python's count() does ([[1]].count([1]) is 1)
+    return this.reduce(def(n, val): return n + (1 if val is value or ρσ_equals(val, value) else 0);, 0)
 
 def ρσ_list_sort_key(value):
     t = jstype(value)
@@ -149,7 +157,8 @@ def ρσ_list_sort_cmp(a, b, ap, bp):
 
 def ρσ_list_sort(key=None, reverse=False):
     mult = -1 if reverse else 1
-    if key is not None and key is not undefined and jstype(key) is 'function' and key.length is 2:
+    # (not when the second parameter is optional: key=d.get is a key function)
+    if key is not None and key is not undefined and jstype(key) is 'function' and key.length is 2 and not (key.__defaults__ and Object.keys(key.__defaults__).length):
         # A two-argument function is treated as a comparator (à la
         # functools.cmp_to_key) rather than a key function, so a JS-style
         # `.sort((a, b) => ...)` callback works as expected.
@@ -256,7 +265,7 @@ def ρσ_list_constructor(iterable):
         # non-pythonic optimization to allocate all needed memory in a single operation
         ans = new Array(iterable)
     else:
-        ans = Object.keys(iterable)
+        ans = ρσ_Iterable(iterable)
     return ρσ_list_decorate(ans)
 ρσ_list_constructor.__name__ = 'list'
 
@@ -271,7 +280,8 @@ def sorted(iterable, key=None, reverse=False):
 # tuple {{{
 
 def ρσ_tuple_count(value):
-    return this.reduce(def(n, val): return n + (val is value);, 0)
+    # == comparison, as Python's count() does ([[1]].count([1]) is 1)
+    return this.reduce(def(n, val): return n + (1 if val is value or ρσ_equals(val, value) else 0);, 0)
 
 def ρσ_tuple_index(val, start, stop):
     start = start or 0
@@ -318,9 +328,13 @@ def ρσ_tuple_decorate(ans):
     ans.__contains__ = ρσ_list_contains
     ans.__eq__ = ρσ_tuple_eq
     ans.constructor = ρσ_tuple_constructor
+    ans.slice = ρσ_tuple_slice
     if jstype(ans[ρσ_iterator_symbol]) is not 'function':
         ans[ρσ_iterator_symbol] = ρσ_list_iterator
     return ans
+
+def ρσ_tuple_slice():  # a slice of a tuple is a tuple
+    return ρσ_tuple_decorate(Array.prototype.slice.apply(this, arguments))
 
 def ρσ_tuple_constructor(iterable):
     if iterable is undefined:
@@ -335,7 +349,7 @@ def ρσ_tuple_constructor(iterable):
             ans.push(result.value)
             result = iterator.next()
         return ρσ_tuple_decorate(ans)
-    return ρσ_tuple_decorate(Object.keys(iterable))
+    return ρσ_tuple_decorate(ρσ_Iterable(iterable).slice())
 
 ρσ_tuple_constructor.__name__ = 'tuple'
 v'var tuple = ρσ_tuple_constructor, tuple_wrap = ρσ_tuple_decorate'
@@ -415,7 +429,7 @@ def ρσ_set(iterable):
                 s.add(result.value)
                 result = iterator.next()
         else:
-            keys = Object.keys(iterable)
+            keys = ρσ_Iterable(iterable)
             for v'var j=0; j < keys.length; j++':
                 s.add(keys[j])
         return ans
@@ -437,7 +451,12 @@ Object.defineProperties(ρσ_set.prototype, {
 ρσ_set.prototype.discard = def(x): this.jsset.delete(x)
 ρσ_set.prototype[ρσ_iterator_symbol] = def(): return this.jsset.values()
 
+# set operations accept any iterable as the other operand
+def ρσ_as_set(x):
+    return x if x and x.jsset else ρσ_set(x)
+
 ρσ_set.prototype.difference = def():
+    others = v'Array.prototype.map.call(arguments, ρσ_as_set)'
     ans = new ρσ_set()
     s = ans.jsset
     iterator = this.jsset.values()
@@ -445,8 +464,8 @@ Object.defineProperties(ρσ_set.prototype, {
     while not r.done:
         x = r.value
         has = False
-        for v'var i = 0; i < arguments.length; i++':
-            if arguments[i].has(x):  # noqa:undef
+        for v'var i = 0; i < others.length; i++':
+            if others[i].has(x):  # noqa:undef
                 has = True
                 break
         if not has:
@@ -455,14 +474,15 @@ Object.defineProperties(ρσ_set.prototype, {
     return ans
 
 ρσ_set.prototype.difference_update = def():
+    others = v'Array.prototype.map.call(arguments, ρσ_as_set)'
     s = this.jsset
     remove = v'[]'
     iterator = s.values()
     r = iterator.next()
     while not r.done:
         x = r.value
-        for v'var i = 0; i < arguments.length; i++':
-            if arguments[i].has(x):  # noqa:undef
+        for v'var i = 0; i < others.length; i++':
+            if others[i].has(x):  # noqa:undef
                 remove.push(x)
                 break
         r = iterator.next()
@@ -470,6 +490,7 @@ Object.defineProperties(ρσ_set.prototype, {
         s.delete(remove[j])  # noqa:undef
 
 ρσ_set.prototype.intersection = def():
+    others = v'Array.prototype.map.call(arguments, ρσ_as_set)'
     ans = new ρσ_set()
     s = ans.jsset
     iterator = this.jsset.values()
@@ -477,8 +498,8 @@ Object.defineProperties(ρσ_set.prototype, {
     while not r.done:
         x = r.value
         has = True
-        for v'var i = 0; i < arguments.length; i++':
-            if not arguments[i].has(x):  # noqa:undef
+        for v'var i = 0; i < others.length; i++':
+            if not others[i].has(x):  # noqa:undef
                 has = False
                 break
         if has:
@@ -487,14 +508,15 @@ Object.defineProperties(ρσ_set.prototype, {
     return ans
 
 ρσ_set.prototype.intersection_update = def():
+    others = v'Array.prototype.map.call(arguments, ρσ_as_set)'
     s = this.jsset
     remove = v'[]'
     iterator = s.values()
     r = iterator.next()
     while not r.done:
         x = r.value
-        for v'var i = 0; i < arguments.length; i++':
-            if not arguments[i].has(x):  # noqa:undef
+        for v'var i = 0; i < others.length; i++':
+            if not others[i].has(x):  # noqa:undef
                 remove.push(x)
                 break
         r = iterator.next()
@@ -502,6 +524,7 @@ Object.defineProperties(ρσ_set.prototype, {
         s.delete(remove[j])  # noqa:undef
 
 ρσ_set.prototype.isdisjoint = def(other):
+    other = ρσ_as_set(other)
     iterator = this.jsset.values()
     r = iterator.next()
     while not r.done:
@@ -512,6 +535,7 @@ Object.defineProperties(ρσ_set.prototype, {
     return True
 
 ρσ_set.prototype.issubset = def(other):
+    other = ρσ_as_set(other)
     iterator = this.jsset.values()
     r = iterator.next()
     while not r.done:
@@ -522,6 +546,7 @@ Object.defineProperties(ρσ_set.prototype, {
     return True
 
 ρσ_set.prototype.issuperset = def(other):
+    other = ρσ_as_set(other)
     s = this.jsset
     iterator = other.jsset.values()
     r = iterator.next()
@@ -545,9 +570,11 @@ Object.defineProperties(ρσ_set.prototype, {
         raise KeyError(x.toString())
 
 ρσ_set.prototype.symmetric_difference = def(other):
+    other = ρσ_as_set(other)
     return this.union(other).difference(this.intersection(other))
 
 ρσ_set.prototype.symmetric_difference_update = def(other):
+    other = ρσ_as_set(other)
     common = this.intersection(other)
     this.update(other)
     this.difference_update(common)
@@ -560,7 +587,7 @@ Object.defineProperties(ρσ_set.prototype, {
 ρσ_set.prototype.update = def():
     s = this.jsset
     for v'var i=0; i < arguments.length; i++':
-        iterator = arguments[i][ρσ_iterator_symbol]()  # noqa:undef
+        iterator = ρσ_iter(arguments[i])  # noqa:undef
         r = iterator.next()
         while not r.done:
             s.add(r.value)
@@ -573,6 +600,8 @@ Object.defineProperties(ρσ_set.prototype, {
     while not r.done:
         ans.push(ρσ_repr(r.value))
         r = iterator.next()
+    if not ans.length:
+        return 'set()'
     return '{' + ans.join(', ') + '}'
 
 ρσ_set.prototype.__eq__ = def(other):
@@ -595,22 +624,22 @@ Object.defineProperties(ρσ_set.prototype, {
 # TypeError to match CPython semantics for `|`, `&`, `-`, `^`, `<=`, `>=`.
 ρσ_set.prototype.__or__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for |: 'set' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.union(other)
 
 ρσ_set.prototype.__and__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for &: 'set' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.intersection(other)
 
 ρσ_set.prototype.__sub__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for -: 'set' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.difference(other)
 
 ρσ_set.prototype.__xor__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for ^: 'set' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.symmetric_difference(other)
 
 ρσ_set.prototype.__le__ = def(other):
@@ -684,7 +713,7 @@ def ρσ_frozenset(iterable):
                 s.add(result.value)
                 result = iterator.next()
         else:
-            keys = Object.keys(iterable)
+            keys = ρσ_Iterable(iterable)
             for v'var j=0; j < keys.length; j++':
                 s.add(keys[j])
         return ans
@@ -698,11 +727,21 @@ Object.defineProperties(ρσ_frozenset.prototype, {
 })
 
 ρσ_frozenset.prototype.__len__ = def(): return this.jsset.size
+ρσ_frozenset.prototype.__hash__ = def():
+    # Order-independent, so equal frozensets hash alike whatever their insertion order
+    h = 1927868237
+    iterator = this.jsset.values()
+    r = iterator.next()
+    while not r.done:
+        v'h = (h + Math.imul(ρσ_hash(r.value) ^ 89869747, 3644798167)) | 0'
+        r = iterator.next()
+    return v'(h ^ this.jsset.size) | 0'
 ρσ_frozenset.prototype.has = ρσ_frozenset.prototype.__contains__ = def(x): return this.jsset.has(x)
 ρσ_frozenset.prototype.copy = def(): return ρσ_frozenset(this)
 ρσ_frozenset.prototype[ρσ_iterator_symbol] = def(): return this.jsset.values()
 
 ρσ_frozenset.prototype.difference = def():
+    others = v'Array.prototype.map.call(arguments, ρσ_as_set)'
     ans = new ρσ_frozenset()
     s = ans.jsset
     iterator = this.jsset.values()
@@ -710,8 +749,8 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     while not r.done:
         x = r.value
         has = False
-        for v'var i = 0; i < arguments.length; i++':
-            if arguments[i].has(x):  # noqa:undef
+        for v'var i = 0; i < others.length; i++':
+            if others[i].has(x):  # noqa:undef
                 has = True
                 break
         if not has:
@@ -720,6 +759,7 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     return ans
 
 ρσ_frozenset.prototype.intersection = def():
+    others = v'Array.prototype.map.call(arguments, ρσ_as_set)'
     ans = new ρσ_frozenset()
     s = ans.jsset
     iterator = this.jsset.values()
@@ -727,8 +767,8 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     while not r.done:
         x = r.value
         has = True
-        for v'var i = 0; i < arguments.length; i++':
-            if not arguments[i].has(x):  # noqa:undef
+        for v'var i = 0; i < others.length; i++':
+            if not others[i].has(x):  # noqa:undef
                 has = False
                 break
         if has:
@@ -737,6 +777,7 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     return ans
 
 ρσ_frozenset.prototype.isdisjoint = def(other):
+    other = ρσ_as_set(other)
     iterator = this.jsset.values()
     r = iterator.next()
     while not r.done:
@@ -747,6 +788,7 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     return True
 
 ρσ_frozenset.prototype.issubset = def(other):
+    other = ρσ_as_set(other)
     iterator = this.jsset.values()
     r = iterator.next()
     while not r.done:
@@ -757,6 +799,7 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     return True
 
 ρσ_frozenset.prototype.issuperset = def(other):
+    other = ρσ_as_set(other)
     s = this.jsset
     iterator = other[ρσ_iterator_symbol]()
     r = iterator.next()
@@ -768,13 +811,14 @@ Object.defineProperties(ρσ_frozenset.prototype, {
     return True
 
 ρσ_frozenset.prototype.symmetric_difference = def(other):
+    other = ρσ_as_set(other)
     return this.union(other).difference(this.intersection(other))
 
 ρσ_frozenset.prototype.union = def():
     ans = ρσ_frozenset(this)
     s = ans.jsset
     for v'var i=0; i < arguments.length; i++':
-        iterator = arguments[i][ρσ_iterator_symbol]()  # noqa:undef
+        iterator = ρσ_iter(arguments[i])  # noqa:undef
         r = iterator.next()
         while not r.done:
             s.add(r.value)
@@ -810,22 +854,22 @@ Object.defineProperties(ρσ_frozenset.prototype, {
 # produce a new frozenset bound to the variable.
 ρσ_frozenset.prototype.__or__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for |: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.union(other)
 
 ρσ_frozenset.prototype.__and__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for &: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.intersection(other)
 
 ρσ_frozenset.prototype.__sub__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for -: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.difference(other)
 
 ρσ_frozenset.prototype.__xor__ = def(other):
     if v'!other || other.jsset === undefined':
-        raise TypeError("unsupported operand type(s) for ^: 'frozenset' and '" + ρσ_arith_type_name(other) + "'")
+        return NotImplemented  # lets the other operand's reflected method try; the operator then raises TypeError
     return this.symmetric_difference(other)
 
 ρσ_frozenset.prototype.__le__ = def(other):
@@ -930,11 +974,112 @@ if jstype(Map) is not 'function' or jstype(Map.prototype.delete) is not 'functio
 else:
     v'ρσ_dict_implementation = Map'
 
+# Python sets and dicts compare members by value for hashable objects: two equal
+# tuples, frozensets, or instances defining __hash__/__eq__ are the same member.
+# A native Set/Map compares objects by identity, so the backing store
+# (`.jsset` / `.jsmap`) wraps one: those objects are looked up by hash() and
+# __eq__, and the first equal object stored stands in for every later equal one.
+# Everything else (numbers, strings, lists, plain objects) goes straight to the
+# native store, so the common case costs one type check. The wrappers keep the
+# Set / Map API the rest of the runtime (and JS interop) uses.
+v'''var ρσ_hash_miss = {};
+function ρσ_hash_key_of(x) {
+    if (x === null || typeof x !== "object") return undefined;
+    if (x.ρσ_is_tuple !== true && typeof x.__hash__ !== "function") return undefined;
+    try { return ρσ_hash(x); } catch (e) { return undefined; }  // e.g. a tuple holding a list: identity
+}
+function ρσ_hash_buckets_find(buckets, x, h) {
+    var b = buckets[h];
+    if (b) for (var i = 0; i < b.length; i++) if (b[i] === x || ρσ_equals(b[i], x)) return b[i];
+    return ρσ_hash_miss;
+}
+function ρσ_hash_buckets_canon(buckets, x, add) {
+    // The stored object equal to x (or x itself when it isn't value-hashed);
+    // ρσ_hash_miss when x is value-hashed and absent, unless add is set.
+    var h = ρσ_hash_key_of(x);
+    if (h === undefined) return x;
+    var k = ρσ_hash_buckets_find(buckets, x, h);
+    if (k !== ρσ_hash_miss || !add) return k;
+    (buckets[h] || (buckets[h] = [])).push(x);
+    return x;
+}
+function ρσ_hash_buckets_remove(buckets, x) {
+    var h = ρσ_hash_key_of(x);
+    if (h === undefined) return x;
+    var k = ρσ_hash_buckets_find(buckets, x, h);
+    if (k === ρσ_hash_miss) return k;
+    var b = buckets[h]; b.splice(b.indexOf(k), 1);
+    return k;
+}
+function ρσ_hashing_set(Base) {
+    function HashSet() { this._s = new Base(); this._b = Object.create(null); }
+    var p = HashSet.prototype;
+    p.add = function (x) { this._s.add(ρσ_hash_buckets_canon(this._b, x, true)); return this; };
+    p.has = function (x) { var k = ρσ_hash_buckets_canon(this._b, x, false); return k !== ρσ_hash_miss && this._s.has(k); };
+    p["delete"] = function (x) { var k = ρσ_hash_buckets_remove(this._b, x); return k !== ρσ_hash_miss && this._s["delete"](k); };
+    p.clear = function () { this._s.clear(); this._b = Object.create(null); };
+    Object.defineProperty(p, "size", {get: function () { return this._s.size; }});
+    p.values = p.keys = function () { return this._s.values(); };
+    p.entries = function () { return this._s.entries(); };
+    p.forEach = function (cb, thisArg) { var self = this; this._s.forEach(function (v) { cb.call(thisArg, v, v, self); }); };
+    p[ρσ_iterator_symbol] = p.values;
+    return HashSet;
+}
+function ρσ_hashing_map(Base) {
+    function HashMap() { this._m = new Base(); this._b = Object.create(null); }
+    var p = HashMap.prototype;
+    p.get = function (k) { k = ρσ_hash_buckets_canon(this._b, k, false); return k === ρσ_hash_miss ? undefined : this._m.get(k); };
+    p.has = function (k) { k = ρσ_hash_buckets_canon(this._b, k, false); return k !== ρσ_hash_miss && this._m.has(k); };
+    p.set = function (k, v) { this._m.set(ρσ_hash_buckets_canon(this._b, k, true), v); return this; };
+    p["delete"] = function (k) { k = ρσ_hash_buckets_remove(this._b, k); return k !== ρσ_hash_miss && this._m["delete"](k); };
+    p.clear = function () { this._m.clear(); this._b = Object.create(null); };
+    Object.defineProperty(p, "size", {get: function () { return this._m.size; }});
+    p.keys = function () { return this._m.keys(); };
+    p.values = function () { return this._m.values(); };
+    p.entries = function () { return this._m.entries(); };
+    p.forEach = function (cb, thisArg) { var self = this; this._m.forEach(function (v, k) { cb.call(thisArg, v, k, self); }); };
+    p[ρσ_iterator_symbol] = p.entries;
+    return HashMap;
+}
+ρσ_set_implementation = ρσ_hashing_set(ρσ_set_implementation);
+ρσ_dict_implementation = ρσ_hashing_map(ρσ_dict_implementation);'''
+
 # Proxy handler that lets dict entries be read/written via dot notation and
 # destructuring like plain JS objects, while existing dict methods still win
 # on name collision. Assignment via d.foo = x routes into the map.
 # ρσ_JS_Proxy and ρσ_proxy_target_symbol are declared in baselib-internal.pyj;
 # both are var-hoisted but only referenced from these handlers at call time.
+v'''function ρσ_bound_method(holder, name, fn, self) {
+    // fn bound to self, cached on holder (a hidden ρσ_bound table); keeps the
+    // kwargs metadata (__argnames__, __defaults__, ...) RapydScript calls rely on
+    var cache = holder.ρσ_bound;
+    // (configurable, so a dict Proxy's ownKeys trap may leave it out)
+    if (!cache) { cache = Object.create(null); Object.defineProperty(holder, "ρσ_bound", {value: cache, configurable: true}); }
+    var b = cache[name];
+    if (b && b.ρσ_unbound === fn) return b;
+    b = fn.bind(self);
+    Object.getOwnPropertyNames(fn).forEach(function (k) {
+        if (k !== "length" && k !== "name" && k !== "prototype" && k !== "arguments" && k !== "caller")
+            try { Object.defineProperty(b, k, Object.getOwnPropertyDescriptor(fn, k)); } catch (e) {}
+    });
+    Object.defineProperty(b, "ρσ_unbound", {value: fn});
+    return (cache[name] = b);
+}
+function ρσ_bind_methods(obj, stop_proto) {
+    // Give obj own bound copies of the methods it inherits (up to, not including,
+    // stop_proto), so they work when taken as values: f = counter.most_common
+    var seen = Object.create(null);
+    for (var p = Object.getPrototypeOf(obj); p && p !== stop_proto; p = Object.getPrototypeOf(p)) {
+        Object.getOwnPropertyNames(p).forEach(function (k) {
+            if (seen[k] || k === "constructor" || k.charAt(0) === "ρ") return;
+            seen[k] = true;
+            var d = Object.getOwnPropertyDescriptor(p, k);
+            if (d && typeof d.value === "function")
+                Object.defineProperty(obj, k, {value: ρσ_bound_method(obj, k, d.value, obj), writable: true, configurable: true});
+        });
+    }
+}'''
+
 ρσ_dict_proxy_handler = {
     'get': def(target, prop, receiver):
         if prop is ρσ_proxy_target_symbol:
@@ -944,7 +1089,12 @@ else:
         if jstype(prop) is 'string' and prop[0] is 'ρ':
             return v'Reflect.get(target, prop, target)'
         if v'(prop in target)':
-            return v'Reflect.get(target, prop, target)'
+            val = v'Reflect.get(target, prop, target)'
+            if jstype(val) is 'function' and not v'Object.prototype.hasOwnProperty.call(target, prop)':
+                # A method taken as a value stays bound to its dict, as in
+                # Python: max(d, key=d.get). Bound once per dict and method.
+                return ρσ_bound_method(target, prop, val, receiver)
+            return val
         m = target.jsmap
         if m and m.has(prop):
             return m.get(prop)
@@ -1020,9 +1170,65 @@ Object.defineProperties(ρσ_dict.prototype, {
 ρσ_dict.prototype.__delitem__ = def (key): this.jsmap.delete(key)
 ρσ_dict.prototype.clear = def(): this.jsmap.clear()
 ρσ_dict.prototype.copy = def(): return ρσ_dict(this)
-ρσ_dict.prototype.keys = def(): return this.jsmap.keys()
-ρσ_dict.prototype.values = def(): return this.jsmap.values()
-ρσ_dict.prototype.items = ρσ_dict.prototype.entries = def(): return this.jsmap.entries()
+# keys() / values() / items() return live views, as in Python: iterable any
+# number of times, sized, supporting `in`, and (keys, items) set operations.
+# Views also keep the JS iterator `next()` they used to have, for existing code.
+v'''function ρσ_dict_view(d, kind) {
+    this._d = d; this._kind = kind; this._it = null;
+}
+(function () {
+    var p = ρσ_dict_view.prototype;
+    p[ρσ_iterator_symbol] = function () {
+        var m = this._d.jsmap;
+        if (this._kind === "keys") return m.keys();
+        if (this._kind === "values") return m.values();
+        var inner = m.entries(), it = {next: function () {
+            var r = inner.next();
+            return r.done ? r : {done: false, value: ρσ_tuple_decorate([r.value[0], r.value[1]])};
+        }};
+        it[ρσ_iterator_symbol] = function () { return this; };
+        return it;
+    };
+    p.next = function () {
+        if (!this._it) this._it = this[ρσ_iterator_symbol]();
+        return this._it.next();
+    };
+    p.__len__ = function () { return this._d.jsmap.size; };
+    p.__contains__ = function (x) {
+        var m = this._d.jsmap;
+        if (this._kind === "keys") return m.has(x);
+        if (this._kind === "items") return Array.isArray(x) && x.length === 2 && m.has(x[0]) && ρσ_equals(m.get(x[0]), x[1]);
+        var it = m.values(), r;
+        while (!(r = it.next()).done) if (r.value === x || ρσ_equals(r.value, x)) return true;
+        return false;
+    };
+    p.__repr__ = p.__str__ = p.toString = function () {
+        return "dict_" + this._kind + "(" + ρσ_repr(ρσ_list_constructor(this)) + ")";
+    };
+    p.__reversed__ = function () { return ρσ_reversed(ρσ_list_constructor(this)); };
+    // Set operations on keys() and items() views give sets, as in Python
+    function set_op(name, reflected) {
+        return function (other) {
+            if (this._kind === "values") return NotImplemented;
+            var mine = ρσ_set(this), theirs = ρσ_set(other);
+            return reflected ? theirs[name](mine) : mine[name](theirs);
+        };
+    }
+    p.__and__ = set_op("__and__"); p.__rand__ = set_op("__and__", true);
+    p.__or__ = set_op("__or__"); p.__ror__ = set_op("__or__", true);
+    p.__xor__ = set_op("__xor__"); p.__rxor__ = set_op("__xor__", true);
+    p.__sub__ = set_op("__sub__"); p.__rsub__ = set_op("__sub__", true);
+    p.isdisjoint = function (other) { return ρσ_set(this).isdisjoint(ρσ_set(other)); };
+    p.__eq__ = function (other) {
+        if (this._kind === "values") return this === other;
+        if (!other || (other.jsset === undefined && !(other instanceof ρσ_dict_view))) return false;
+        return ρσ_set(this).__eq__(ρσ_set(other));
+    };
+})();'''
+
+ρσ_dict.prototype.keys = def(): return v'new ρσ_dict_view(this, "keys")'
+ρσ_dict.prototype.values = def(): return v'new ρσ_dict_view(this, "values")'
+ρσ_dict.prototype.items = ρσ_dict.prototype.entries = def(): return v'new ρσ_dict_view(this, "items")'
 ρσ_dict.prototype[ρσ_iterator_symbol] = def(): return this.jsmap.keys()
 
 ρσ_dict.prototype.__getitem__ = def (key):
@@ -1031,7 +1237,7 @@ Object.defineProperties(ρσ_dict.prototype, {
         raise KeyError(key + '')
     return ans
 
-ρσ_dict.prototype.get = def (key, defval):
+ρσ_dict.prototype.get = def (key, defval=None):
     ans = this.jsmap.get(key)
     if ans is undefined and not this.jsmap.has(key):
         return None if defval is undefined else defval
@@ -1105,7 +1311,7 @@ Object.defineProperties(ρσ_dict.prototype, {
             m.set(result.value[0], result.value[1])
             result = iterator.next()
     else:
-        keys = Object.keys(iterable)
+        keys = ρσ_Iterable(iterable)
         for v'var j=0; j < keys.length; j++':
             if keys[j] is not ρσ_iterator_symbol:
                 m.set(keys[j], iterable[keys[j]])
@@ -1122,7 +1328,8 @@ Object.defineProperties(ρσ_dict.prototype, {
     return '{' + entries.join(', ') + '}'
 
 ρσ_dict.prototype.__eq__ = def(other):
-    if not v'(other instanceof this.constructor)':
+    # Any two dicts (subclasses included) are equal when their items are
+    if not v'(other instanceof ρσ_dict)':
         return False
     if other.size is not this.size:
         return False
@@ -1132,7 +1339,7 @@ Object.defineProperties(ρσ_dict.prototype, {
     r = iterator.next()
     while not r.done:
         x = this.jsmap.get(r.value[0])
-        if (x is undefined and not this.jsmap.has(r.value[0])) or x is not r.value[1]:
+        if (x is undefined and not this.jsmap.has(r.value[0])) or not ρσ_equals(x, r.value[1]):
             return False
         r = iterator.next()
     return True
@@ -1172,6 +1379,10 @@ def ρσ_dict_wrap(x):
 ρσ_dict.__name__ = 'dict'
 v'var dict = ρσ_dict, dict_wrap = ρσ_dict_wrap'
 
+# list[int], dict[str, int], set[str], tuple[int, ...]: generic aliases (PEP 585)
+for v'var ρσ_gi = 0, ρσ_gtypes = [ρσ_list_constructor, ρσ_tuple_constructor, ρσ_set, ρσ_frozenset, ρσ_dict]; ρσ_gi < ρσ_gtypes.length; ρσ_gi++':
+    v'ρσ_gtypes[ρσ_gi].__class_getitem__ = (function (origin) { return function (args) { return ρσ_generic_alias(origin, args); }; })(ρσ_gtypes[ρσ_gi])'
+
 v'''
 function ρσ_kwargs_to_dict(kw) {
     // Augment the plain kwargs object with non-enumerable Python dict methods so
@@ -1198,7 +1409,7 @@ function ρσ_kwargs_to_dict(kw) {
     }
     _def("items", function() {
         var ks = Object.keys(kw), arr = [], i;
-        for (i = 0; i < ks.length; i++) arr.push([ks[i], kw[ks[i]]]);
+        for (i = 0; i < ks.length; i++) arr.push(ρσ_tuple_decorate([ks[i], kw[ks[i]]]));  // (key, value) tuples, like dict.items()
         return _make_seq(arr);
     });
     _def("entries", kw.items);

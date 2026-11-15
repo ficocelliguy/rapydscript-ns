@@ -2,19 +2,25 @@
 # License: Apache 2.0
 # RapydScript implementation of Python's datetime standard library.
 #
-# Supported classes : timedelta, date, time, datetime
-# Constants         : MINYEAR, MAXYEAR
+# Supported classes : timedelta, date, time, datetime, tzinfo, timezone
+# Constants         : MINYEAR, MAXYEAR, UTC
 #
 # Usage:
-#   from datetime import date, time, datetime, timedelta, MINYEAR, MAXYEAR
+#   from datetime import date, time, datetime, timedelta, timezone, MINYEAR, MAXYEAR
 #
 # Notes:
 #   - Arithmetic operators (+, -, *, etc.) only dispatch to __add__/__sub__
 #     etc. when ``from __python__ import overload_operators`` is active.
 #     Without that flag, call the dunder methods directly, e.g.
 #     ``d.__add__(timedelta(days=1))``.
-#   - Timezone-aware datetimes are not supported (no tzinfo / UTC offsets).
-#   - strftime supports: %Y %m %d %H %M %S %f %A %a %B %b %j %p %I %%
+#   - Timezone-aware datetimes/times are supported through ``tzinfo`` and the
+#     fixed-offset ``timezone`` class (``timezone.utc``,
+#     ``timezone(timedelta(hours=2))``).  There is no IANA (zoneinfo) database;
+#     ``astimezone()`` with no argument uses the host's local UTC offset.
+#   - strftime supports: %a %A %b %B %c %d %f %G %H %I %j %m %M %p %S %u %U
+#     %V %w %W %x %X %y %Y %z %Z %%  (%c %x %X use the C/POSIX locale).
+#   - datetime.strptime supports the same directives (except %c/%x/%X are
+#     parsed using the C-locale layouts).
 
 MINYEAR = 1
 MAXYEAR = 9999
@@ -25,6 +31,15 @@ _DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 # Cumulative days before month m in a non-leap year (index 0 unused)
 _DBM = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
 
+_DAY_NAMES   = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+_DAY_ABBRS   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+_MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July',
+                'August', 'September', 'October', 'November', 'December']
+_MONTH_ABBRS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+_MAX_ORDINAL = 3652059   # date(9999, 12, 31).toordinal()
+_EPOCH_ORDINAL = 719163  # date(1970, 1, 1).toordinal()
+
 def _is_leap(year):
     return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
 
@@ -33,16 +48,54 @@ def _days_in_month(year, month):
         return 29
     return _DAYS_IN_MONTH[month]
 
-def _check_field(val, name, lo, hi):
+def _check_int(val, name):
     if jstype(val) is not 'number' or not isFinite(val) or Math.floor(val) != val:
         raise TypeError(name + ' must be an integer')
+
+def _check_field(val, name, lo, hi):
+    _check_int(val, name)
     if val < lo or val > hi:
         raise ValueError(name + ' must be in ' + str(lo) + '..' + str(hi))
+
+def _check_date_fields(year, month, day):
+    _check_int(year, 'year')
+    _check_int(month, 'month')
+    _check_int(day, 'day')
+    if year < MINYEAR or year > MAXYEAR:
+        raise ValueError('year ' + str(year) + ' is out of range')
+    if month < 1 or month > 12:
+        raise ValueError('month must be in 1..12')
+    if day < 1 or day > _days_in_month(year, month):
+        raise ValueError('day is out of range for month')
+
+def _check_time_fields(hour, minute, second, microsecond, fold):
+    _check_field(hour,        'hour',        0,      23)
+    _check_field(minute,      'minute',      0,      59)
+    _check_field(second,      'second',      0,      59)
+    _check_field(microsecond, 'microsecond', 0, 999999)
+    if fold is not 0 and fold is not 1:
+        raise ValueError('fold must be either 0 or 1')
+
+def _check_tzinfo_arg(tz):
+    if tz is not None and not isinstance(tz, _tzinfo_cls):
+        raise TypeError("tzinfo argument must be None or of a tzinfo subclass, not type '" + type(tz).__name__ + "'")
 
 def _pad2(n):
     if n < 10:
         return '0' + str(n)
     return str(n)
+
+def _pad3(n):
+    s = str(n)
+    while s.length < 3:
+        s = '0' + s
+    return s
+
+def _pad4(n):
+    s = str(n)
+    while s.length < 4:
+        s = '0' + s
+    return s
 
 def _pad6(n):
     s = str(n)
@@ -71,7 +124,146 @@ def _ord_to_ymd(n):
 def _yday(year, month, day):
     return _days_before_month(year, month) + day
 
+def _weekday(year, month, day):
+    # Monday=0, Sunday=6
+    return (_ymd_to_ord(year, month, day) + 6) % 7
+
+def _iso_week1_monday(year):
+    first = _ymd_to_ord(year, 1, 1)
+    first_wd = (first + 6) % 7
+    wk1 = first - first_wd
+    if first_wd > 3:
+        wk1 += 7
+    return wk1
+
+def _iso_calendar(year, month, day):
+    o = _ymd_to_ord(year, month, day)
+    iy = year
+    wk1 = _iso_week1_monday(iy)
+    if o < wk1:
+        iy -= 1
+        wk1 = _iso_week1_monday(iy)
+    elif o >= _iso_week1_monday(iy + 1):
+        iy += 1
+        wk1 = _iso_week1_monday(iy)
+    week = Math.floor((o - wk1) / 7) + 1
+    wd = (o - wk1) % 7 + 1
+    return [iy, week, wd]
+
+def _iso_to_ord(year, week, day):
+    if year < MINYEAR or year > MAXYEAR:
+        raise ValueError('Year is out of range: ' + str(year))
+    if week <= 0 or week >= 53:
+        out_of_range = True
+        if week == 53:
+            first_wd = _ymd_to_ord(year, 1, 1) % 7
+            if first_wd == 4 or (first_wd == 3 and _is_leap(year)):
+                out_of_range = False
+        if out_of_range:
+            raise ValueError('Invalid week: ' + str(week))
+    if day <= 0 or day > 7:
+        raise ValueError('Invalid weekday: ' + str(day) + ' (range is [1, 7])')
+    return _iso_week1_monday(year) + (week - 1) * 7 + (day - 1)
+
+def _local_date(y, mo, d, h, mi, s):
+    # JS Date in *local* time; setFullYear avoids the 0..99 → 19xx mapping.
+    return v"(function(){ var D = new Date(2000, 0, 1, 0, 0, 0, 0); D.setFullYear(y, mo - 1, d); D.setHours(h, mi, s, 0); return D; })()"
+
+def _local_offset_seconds(y, mo, d, h, mi, s):
+    D = _local_date(y, mo, d, h, mi, s)
+    return v"-D.getTimezoneOffset() * 60"
+
+def _local_tzname(D):
+    name = None
+    v"""try {
+        var _parts = new Intl.DateTimeFormat('en-US', {timeZoneName: 'short'}).formatToParts(D);
+        for (var _pi = 0; _pi < _parts.length; _pi++) {
+            if (_parts[_pi].type === 'timeZoneName') name = _parts[_pi].value;
+        }
+    } catch (_e) { name = null; }"""
+    return name
+
+def _fmt_offset(off, sep):
+    # Format a timedelta UTC offset as +HH<sep>MM[<sep>SS[.ffffff]] ('' for None)
+    if off is None or off is undefined:
+        return ''
+    days = off.days
+    secs = off.seconds
+    us = off.microseconds
+    sign = '+'
+    if days < 0:
+        sign = '-'
+        # negate (days, secs, us) → positive duration
+        total_us_neg = 1000000 - us if us else 0
+        secs_neg = (86400 * -days) - secs - (1 if us else 0)
+        us = total_us_neg
+        secs = secs_neg
+    hh = Math.floor(secs / 3600)
+    mm = Math.floor((secs % 3600) / 60)
+    ss = secs % 60
+    s = sign + _pad2(hh) + sep + _pad2(mm)
+    if ss or us:
+        s += sep + _pad2(ss)
+        if us:
+            s += '.' + _pad6(us)
+    return s
+
+def _check_utc_offset(name, off):
+    if off is None or off is undefined:
+        return None
+    if not isinstance(off, _timedelta_cls):
+        raise TypeError('tzinfo.' + name + '() must return None or timedelta')
+    if off.days < -1 or off.days > 0 or (off.days is -1 and off.seconds is 0 and off.microseconds is 0):
+        raise ValueError(name + '()=' + str(off) + ', must be strictly between -timedelta(hours=24) and timedelta(hours=24)')
+    return off
+
+def _call_tzname(tz, dt):
+    if tz is None:
+        return None
+    name = tz.tzname(dt)
+    if name is not None and name is not undefined and jstype(name) is not 'string':
+        raise TypeError('tzinfo.tzname() must return None or a string')
+    return name if name is not undefined else None
+
+def _cmp_keys(a, b):
+    if a[0] is not b[0]:
+        return -1 if a[0] < b[0] else 1
+    if a[1] is not b[1]:
+        return -1 if a[1] < b[1] else 1
+    return 0
+
+def _format_time(h, m, s, us, timespec):
+    if timespec is 'auto':
+        timespec = 'microseconds' if us else 'seconds'
+    if timespec is 'hours':
+        return _pad2(h)
+    if timespec is 'minutes':
+        return _pad2(h) + ':' + _pad2(m)
+    base = _pad2(h) + ':' + _pad2(m) + ':' + _pad2(s)
+    if timespec is 'seconds':
+        return base
+    if timespec is 'milliseconds':
+        return base + '.' + _pad3(Math.floor(us / 1000))
+    if timespec is 'microseconds':
+        return base + '.' + _pad6(us)
+    raise ValueError('Unknown timespec value')
+
+def _num_attr(obj, name, dflt):
+    val = obj[name]
+    return val if jstype(val) is 'number' else dflt
+
 def _strftime(fmt, obj):
+    if jstype(fmt) is not 'string':
+        raise TypeError('strftime() argument 1 must be str, not ' + type(fmt).__name__)
+    y  = _num_attr(obj, 'year', 1900)
+    mo = _num_attr(obj, 'month', 1)
+    d  = _num_attr(obj, 'day', 1)
+    h  = _num_attr(obj, 'hour', 0)
+    mi = _num_attr(obj, 'minute', 0)
+    s  = _num_attr(obj, 'second', 0)
+    us = _num_attr(obj, 'microsecond', 0)
+    wd = _weekday(y, mo, d)
+    yd = _yday(y, mo, d)
     result = ''
     i = 0
     n = fmt.length
@@ -80,44 +272,63 @@ def _strftime(fmt, obj):
         if c is '%' and i + 1 < n:
             directive = fmt.charAt(i + 1)
             if directive is 'Y':
-                sy = str(obj.year)
-                while sy.length < 4:
-                    sy = '0' + sy
-                result += sy
+                result += _pad4(y)
+            elif directive is 'y':
+                result += _pad2(y % 100)
             elif directive is 'm':
-                result += _pad2(obj.month)
+                result += _pad2(mo)
             elif directive is 'd':
-                result += _pad2(obj.day)
+                result += _pad2(d)
             elif directive is 'H':
-                result += _pad2(obj.hour if hasattr(obj, 'hour') else 0)
+                result += _pad2(h)
             elif directive is 'M':
-                result += _pad2(obj.minute if hasattr(obj, 'minute') else 0)
+                result += _pad2(mi)
             elif directive is 'S':
-                result += _pad2(obj.second if hasattr(obj, 'second') else 0)
+                result += _pad2(s)
             elif directive is 'f':
-                result += _pad6(obj.microsecond if hasattr(obj, 'microsecond') else 0)
+                result += _pad6(us)
             elif directive is 'A':
-                _dn = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
-                result += _dn[obj.weekday()]
+                result += _DAY_NAMES[wd]
             elif directive is 'a':
-                _dns = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
-                result += _dns[obj.weekday()]
+                result += _DAY_ABBRS[wd]
             elif directive is 'B':
-                _mn = ['','January','February','March','April','May','June','July','August','September','October','November','December']
-                result += _mn[obj.month]
+                result += _MONTH_NAMES[mo]
             elif directive is 'b':
-                _mns = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                result += _mns[obj.month]
+                result += _MONTH_ABBRS[mo]
             elif directive is 'j':
-                jday = str(_yday(obj.year, obj.month, obj.day))
-                while jday.length < 3:
-                    jday = '0' + jday
-                result += jday
+                result += _pad3(yd)
             elif directive is 'p':
-                result += 'AM' if (obj.hour if hasattr(obj, 'hour') else 0) < 12 else 'PM'
+                result += 'AM' if h < 12 else 'PM'
             elif directive is 'I':
-                h12 = (obj.hour if hasattr(obj, 'hour') else 0) % 12
+                h12 = h % 12
                 result += _pad2(h12 if h12 else 12)
+            elif directive is 'w':
+                result += str((wd + 1) % 7)
+            elif directive is 'u':
+                result += str(wd + 1)
+            elif directive is 'U':
+                result += _pad2(Math.floor((yd - 1 + 7 - ((wd + 1) % 7)) / 7))
+            elif directive is 'W':
+                result += _pad2(Math.floor((yd - 1 + 7 - wd) / 7))
+            elif directive is 'G':
+                result += _pad4(_iso_calendar(y, mo, d)[0])
+            elif directive is 'V':
+                result += _pad2(_iso_calendar(y, mo, d)[1])
+            elif directive is 'c':
+                dd = str(d) if d >= 10 else ' ' + str(d)
+                result += _DAY_ABBRS[wd] + ' ' + _MONTH_ABBRS[mo] + ' ' + dd + ' ' + _pad2(h) + ':' + _pad2(mi) + ':' + _pad2(s) + ' ' + _pad4(y)
+            elif directive is 'x':
+                result += _pad2(mo) + '/' + _pad2(d) + '/' + _pad2(y % 100)
+            elif directive is 'X':
+                result += _pad2(h) + ':' + _pad2(mi) + ':' + _pad2(s)
+            elif directive is 'z':
+                if jstype(obj.utcoffset) is 'function':
+                    result += _fmt_offset(obj.utcoffset(), '')
+            elif directive is 'Z':
+                if jstype(obj.tzname) is 'function':
+                    tzn = obj.tzname()
+                    if tzn is not None and tzn is not undefined:
+                        result += tzn
             elif directive is '%':
                 result += '%'
             else:
@@ -166,12 +377,18 @@ class timedelta:
             d_carry -= 1
         d += d_carry
 
+        if d < -999999999 or d > 999999999:
+            raise OverflowError('days=' + str(d) + '; must have magnitude <= 999999999')
+
         self.days = d
         self.seconds = s
         self.microseconds = us
 
     def total_seconds(self):
-        return self.days * 86400 + self.seconds + self.microseconds / 1000000
+        whole = self.days * 86400 + self.seconds
+        if Math.abs(whole) < 9000000000:
+            return (whole * 1000000 + self.microseconds) / 1000000
+        return whole + self.microseconds / 1000000
 
     def __repr__(self):
         parts = []
@@ -211,6 +428,9 @@ class timedelta:
     def __neg__(self):
         return timedelta(-self.days, -self.seconds, -self.microseconds)
 
+    def __pos__(self):
+        return self
+
     def __abs__(self):
         if self.days < 0:
             return timedelta(-self.days, -self.seconds, -self.microseconds)
@@ -220,6 +440,9 @@ class timedelta:
         if jstype(other) is 'number':
             return timedelta(0, 0, Math.round(self.total_seconds() * 1000000 * other))
         raise TypeError('unsupported operand type(s) for *')
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
 
     def __eq__(self, other):
         if isinstance(other, timedelta):
@@ -259,15 +482,378 @@ timedelta.resolution = timedelta(0, 0, 1)
 _timedelta_cls = timedelta   # capture before subclasses can shadow the name
 
 
+# ── tzinfo / timezone ─────────────────────────────────────────────────────────
+
+class tzinfo:
+    """Abstract base class for time zone info objects."""
+
+    def utcoffset(self, dt):
+        raise NotImplementedError('a tzinfo subclass must implement utcoffset()')
+
+    def dst(self, dt):
+        raise NotImplementedError('a tzinfo subclass must implement dst()')
+
+    def tzname(self, dt):
+        raise NotImplementedError('a tzinfo subclass must implement tzname()')
+
+    def fromutc(self, dt):
+        # Default implementation (mirrors CPython's pure-Python tzinfo.fromutc)
+        if not isinstance(dt, datetime):
+            raise TypeError('fromutc() requires a datetime argument')
+        if dt.tzinfo is not self:
+            raise ValueError('dt.tzinfo is not self')
+        dtoff = dt.utcoffset()
+        if dtoff is None:
+            raise ValueError('fromutc() requires a non-None utcoffset() result')
+        dtdst = dt.dst()
+        if dtdst is None:
+            raise ValueError('fromutc() requires a non-None dst() result')
+        delta = dtoff.__sub__(dtdst)
+        if delta.__bool__():
+            dt = dt.__add__(delta)
+            dtdst = dt.dst()
+            if dtdst is None:
+                raise ValueError('fromutc(): dt.dst gave inconsistent results; cannot convert')
+        return dt.__add__(dtdst)
+
+_tzinfo_cls = tzinfo
+
+
+class timezone(tzinfo):
+    """Fixed offset from UTC implementation of the tzinfo abstract base class."""
+
+    def __init__(self, offset, name=None):
+        if not isinstance(offset, _timedelta_cls):
+            raise TypeError('timezone() argument 1 must be datetime.timedelta, not ' + type(offset).__name__)
+        if name is not None and jstype(name) is not 'string':
+            raise TypeError('timezone() argument 2 must be str, not ' + type(name).__name__)
+        if offset.days < -1 or offset.days > 0 or (offset.days is -1 and offset.seconds is 0 and offset.microseconds is 0):
+            raise ValueError('offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24), not ' + repr(offset) + '.')
+        self._offset = offset
+        self._name = name
+
+    def utcoffset(self, dt):
+        return self._offset
+
+    def dst(self, dt):
+        return None
+
+    def tzname(self, dt):
+        if self._name is not None:
+            return self._name
+        if not self._offset.__bool__():
+            return 'UTC'
+        return 'UTC' + _fmt_offset(self._offset, ':')
+
+    def fromutc(self, dt):
+        if not isinstance(dt, datetime):
+            raise TypeError('fromutc() argument must be a datetime instance or None')
+        if dt.tzinfo is not self:
+            raise ValueError('fromutc: dt.tzinfo is not self')
+        return dt.__add__(self._offset)
+
+    def __str__(self):
+        return self.tzname(None)
+
+    def __repr__(self):
+        if self._name is None and not self._offset.__bool__():
+            return 'datetime.timezone.utc'
+        if self._name is None:
+            return 'datetime.timezone(' + repr(self._offset) + ')'
+        return 'datetime.timezone(' + repr(self._offset) + ', ' + repr(self._name) + ')'
+
+    def __eq__(self, other):
+        if isinstance(other, timezone):
+            return self._offset.__eq__(other._offset)
+        return False
+
+    def __hash__(self):
+        return self._offset.__hash__()
+
+
+timezone.utc = timezone(timedelta(0))
+timezone.min = timezone(timedelta(hours=-23, minutes=-59))
+timezone.max = timezone(timedelta(hours=23, minutes=59))
+UTC = timezone.utc
+
+
+def _local_timezone_at(D):
+    # D: JS Date.  Returns a fixed-offset timezone for the host's local zone.
+    off = timedelta(0, v"-D.getTimezoneOffset() * 60")
+    name = _local_tzname(D)
+    if name:
+        return timezone(off, name)
+    return timezone(off)
+
+
+# ── ISO 8601 parsing helpers ──────────────────────────────────────────────────
+
+def _iso_invalid(s):
+    raise ValueError('Invalid isoformat string: ' + repr(s))
+
+def _parse_iso_date(s, orig):
+    m = v"/^(\d{4})-(\d{2})-(\d{2})$/.exec(s) || /^(\d{4})(\d{2})(\d{2})$/.exec(s)"
+    if m:
+        return [int(m[1]), int(m[2]), int(m[3])]
+    m = v"/^(\d{4})-W(\d{2})(?:-(\d))?$/.exec(s) || /^(\d{4})W(\d{2})(\d)?$/.exec(s)"
+    if m:
+        iy = int(m[1])
+        o = _iso_to_ord(iy, int(m[2]), int(m[3]) if m[3] else 1)
+        return _ord_to_ymd(o)
+    _iso_invalid(orig)
+
+def _parse_iso_offset(sign, hh, mm, ss, frac):
+    us = 0
+    if frac:
+        fr = frac
+        while fr.length < 6:
+            fr += '0'
+        us = int(fr.slice(0, 6))
+    td = _timedelta_cls(0, int(hh) * 3600 + (int(mm) if mm else 0) * 60 + (int(ss) if ss else 0), us)
+    if sign is '-':
+        td = td.__neg__()
+    if not td.__bool__():
+        return timezone.utc
+    return timezone(td)
+
+def _parse_iso_time(s, orig):
+    # returns [h, m, s, us, tz]
+    m = v"/^(\d{2})(?:(:?)(\d{2})(?:\2(\d{2})(?:[.,](\d+))?)?)?(?:(Z)|([+-])(\d{2})(?::?(\d{2})(?::?(\d{2})(?:[.,](\d+))?)?)?)?$/.exec(s)"
+    if not m:
+        _iso_invalid(orig)
+    h = int(m[1])
+    mi = int(m[3]) if m[3] else 0
+    sc = int(m[4]) if m[4] else 0
+    us = 0
+    if m[5]:
+        frac = m[5]
+        while frac.length < 6:
+            frac += '0'
+        us = int(frac.slice(0, 6))
+    tz = None
+    if m[6]:
+        tz = timezone.utc
+    elif m[7]:
+        tz = _parse_iso_offset(m[7], m[8], m[9], m[10], m[11])
+    return [h, mi, sc, us, tz]
+
+
+# ── strptime ──────────────────────────────────────────────────────────────────
+
+def _names_re(names):
+    arr = [x.toLowerCase() for x in names if x]
+    v"Array.prototype.sort.call(arr, function(a, b) { return b.length - a.length; })"
+    return '(' + arr.join('|') + ')'
+
+_STRP_RE = {
+    'd': '(3[01]|[12]\\d|0[1-9]|[1-9]| [1-9])',
+    'f': '(\\d{1,6})',
+    'H': '(2[0-3]|[0-1]\\d|\\d)',
+    'I': '(1[0-2]|0[1-9]|[1-9])',
+    'G': '(\\d\\d\\d\\d)',
+    'j': '(36[0-6]|3[0-5]\\d|[12]\\d\\d|0[1-9]\\d|00[1-9]|[1-9]\\d|0[1-9]|[1-9])',
+    'm': '(1[0-2]|0[1-9]|[1-9])',
+    'M': '([0-5]\\d|\\d)',
+    'S': '(6[0-1]|[0-5]\\d|\\d)',
+    'U': '(5[0-3]|[0-4]\\d|\\d)',
+    'W': '(5[0-3]|[0-4]\\d|\\d)',
+    'V': '(5[0-3]|0[1-9]|[1-4]\\d|\\d)',
+    'w': '([0-6])',
+    'u': '([1-7])',
+    'y': '(\\d\\d)',
+    'Y': '(\\d\\d\\d\\d)',
+    'z': '([+-]\\d\\d:?[0-5]\\d(?::?[0-5]\\d(?:\\.\\d{1,6})?)?|Z)',
+    'Z': '(utc|gmt)',
+    'p': '(am|pm)',
+}
+_STRP_RE['a'] = _names_re(_DAY_ABBRS)
+_STRP_RE['A'] = _names_re(_DAY_NAMES)
+_STRP_RE['b'] = _names_re(_MONTH_ABBRS)
+_STRP_RE['B'] = _names_re(_MONTH_NAMES)
+_STRP_EXPAND = {'c': '%a %b %d %H:%M:%S %Y', 'x': '%m/%d/%y', 'X': '%H:%M:%S'}
+
+def _strp_index(names, val):
+    lv = val.toLowerCase()
+    for idx in range(names.length):
+        if names[idx].toLowerCase() is lv:
+            return idx
+    return -1
+
+def _calc_julian_from_U_or_W(year, week_of_year, day_of_week, week_starts_mon):
+    first_weekday = _weekday(year, 1, 1)
+    if not week_starts_mon:
+        first_weekday = (first_weekday + 1) % 7
+        day_of_week = (day_of_week + 1) % 7
+    week_0_length = (7 - first_weekday) % 7
+    if week_of_year == 0:
+        return 1 + day_of_week - first_weekday
+    return 1 + week_0_length + 7 * (week_of_year - 1) + day_of_week
+
+def _strptime(cls, data_string, fmt):
+    if jstype(data_string) is not 'string':
+        raise TypeError('strptime() argument 1 must be str, not ' + type(data_string).__name__)
+    if jstype(fmt) is not 'string':
+        raise TypeError('strptime() argument 2 must be str, not ' + type(fmt).__name__)
+    # Expand locale composites first
+    expanded = ''
+    i = 0
+    while i < fmt.length:
+        ch = fmt.charAt(i)
+        if ch is '%' and i + 1 < fmt.length:
+            nx = fmt.charAt(i + 1)
+            if v"Object.prototype.hasOwnProperty.call(_STRP_EXPAND, nx)":
+                expanded += _STRP_EXPAND[nx]
+            else:
+                expanded += ch + nx
+            i += 2
+        else:
+            expanded += ch
+            i += 1
+    src = '^'
+    groups = []
+    i = 0
+    while i < expanded.length:
+        ch = expanded.charAt(i)
+        if ch is '%':
+            if i + 1 >= expanded.length:
+                raise ValueError("stray % in format " + repr(fmt))
+            nx = expanded.charAt(i + 1)
+            if nx is '%':
+                src += '%'
+            elif v"Object.prototype.hasOwnProperty.call(_STRP_RE, nx)":
+                src += _STRP_RE[nx]
+                groups.push(nx)
+            else:
+                raise ValueError(repr(nx) + ' is a bad directive in format ' + repr(fmt))
+            i += 2
+        elif v"/\s/.test(ch)":
+            while i < expanded.length and v"/\s/.test(expanded.charAt(i))":
+                i += 1
+            src += '\\s+'
+        else:
+            src += v"ch.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&')"
+            i += 1
+    rx = v"new RegExp(src, 'i')"
+    found = rx.exec(data_string)
+    if not found:
+        raise ValueError('time data ' + repr(data_string) + ' does not match format ' + repr(fmt))
+    if found[0].length is not data_string.length:
+        raise ValueError('unconverted data remains: ' + data_string.slice(found[0].length))
+
+    iso_year = year = None
+    month = day = 1
+    hour = minute = second = fraction = 0
+    tz = None
+    iso_week = week_of_year = None
+    week_of_year_start = None
+    weekday = julian = None
+    hour12 = None
+    ampm = None
+    for gi in range(groups.length):
+        key = groups[gi]
+        val = found[gi + 1]
+        if key is 'y':
+            year = int(val)
+            year += 2000 if year <= 68 else 1900
+        elif key is 'Y':
+            year = int(val)
+        elif key is 'G':
+            iso_year = int(val)
+        elif key is 'm':
+            month = int(val)
+        elif key is 'B':
+            month = _strp_index(_MONTH_NAMES, val)
+        elif key is 'b':
+            month = _strp_index(_MONTH_ABBRS, val)
+        elif key is 'd':
+            day = int(val.trim())
+        elif key is 'H':
+            hour = int(val)
+            hour12 = None
+        elif key is 'I':
+            hour12 = int(val)
+        elif key is 'p':
+            ampm = val.toLowerCase()
+        elif key is 'M':
+            minute = int(val)
+        elif key is 'S':
+            second = int(val)
+        elif key is 'f':
+            fr = val
+            while fr.length < 6:
+                fr += '0'
+            fraction = int(fr)
+        elif key is 'A':
+            weekday = _strp_index(_DAY_NAMES, val)
+        elif key is 'a':
+            weekday = _strp_index(_DAY_ABBRS, val)
+        elif key is 'w':
+            weekday = int(val)
+            weekday = 6 if weekday is 0 else weekday - 1
+        elif key is 'u':
+            weekday = int(val) - 1
+        elif key is 'j':
+            julian = int(val)
+        elif key is 'U' or key is 'W':
+            week_of_year = int(val)
+            week_of_year_start = 6 if key is 'U' else 0
+        elif key is 'V':
+            iso_week = int(val)
+        elif key is 'z':
+            if val is 'Z' or val is 'z':
+                tz = timezone.utc
+            else:
+                zm = v"/^([+-])(\d\d)(:?)(\d\d)(?:(:?)(\d\d)(?:\.(\d{1,6}))?)?$/.exec(val)"
+                if not zm or (zm[5] is not undefined and zm[5] is not zm[3]):
+                    raise ValueError('Inconsistent use of : in ' + val)
+                tz = _parse_iso_offset(zm[1], zm[2], zm[4], zm[6], zm[7])
+    if hour12 is not None:
+        hour = hour12
+        if ampm is None or ampm is 'am':
+            if hour is 12:
+                hour = 0
+        elif ampm is 'pm':
+            if hour is not 12:
+                hour += 12
+    if iso_year is not None:
+        if julian is not None:
+            raise ValueError("Day of the year directive '%j' is not compatible with ISO year directive '%G'. Use '%Y' instead.")
+        if iso_week is None or weekday is None:
+            raise ValueError("ISO year directive '%G' must be used with the ISO week directive '%V' and a weekday directive ('%A', '%a', '%w', or '%u').")
+    elif iso_week is not None:
+        if year is None or weekday is None:
+            raise ValueError("ISO week directive '%V' must be used with the ISO year directive '%G' and a weekday directive ('%A', '%a', '%w', or '%u').")
+        raise ValueError("ISO week directive '%V' is incompatible with the year directive '%Y'. Use the ISO year '%G' instead.")
+
+    if year is None:
+        year = 1900
+    if julian is None and weekday is not None:
+        if week_of_year is not None:
+            julian = _calc_julian_from_U_or_W(year, week_of_year, weekday, week_of_year_start is 0)
+        elif iso_year is not None and iso_week is not None:
+            o = _iso_to_ord(iso_year, iso_week, weekday + 1)
+            ymd = _ord_to_ymd(o)
+            year = ymd[0]
+            julian = _yday(ymd[0], ymd[1], ymd[2])
+        if julian is not None and julian <= 0:
+            year -= 1
+            julian += 366 if _is_leap(year) else 365
+    if julian is not None:
+        o = _ymd_to_ord(year, 1, 1) + julian - 1
+        ymd = _ord_to_ymd(o)
+        year = ymd[0]
+        month = ymd[1]
+        day = ymd[2]
+    return cls(year, month, day, hour, minute, second, fraction, tz)
+
+
 # ── date ──────────────────────────────────────────────────────────────────────
 
 class date:
     """A calendar date (year, month, day) with no time of day."""
 
     def __init__(self, year, month, day):
-        _check_field(year,  'year',  MINYEAR, MAXYEAR)
-        _check_field(month, 'month', 1, 12)
-        _check_field(day,   'day',   1, _days_in_month(year, month))
+        _check_date_fields(year, month, day)
         self.year  = year
         self.month = month
         self.day   = day
@@ -279,20 +865,27 @@ class date:
 
     @classmethod
     def fromordinal(cls, n):
+        if n < 1 or n > _MAX_ORDINAL:
+            raise ValueError('ordinal must be >= 1')
         ymd = _ord_to_ymd(n)
         return cls(ymd[0], ymd[1], ymd[2])
 
     @classmethod
     def fromtimestamp(cls, timestamp):
-        d = v"new Date(timestamp * 1000)"
+        d = v"new Date(Math.floor(timestamp) * 1000)"
         return cls(v"d.getFullYear()", v"d.getMonth() + 1", v"d.getDate()")
 
     @classmethod
     def fromisoformat(cls, s):
-        parts = s.split('-')
-        if parts.length != 3:
-            raise ValueError('Invalid ISO date: ' + s)
-        return cls(int(parts[0]), int(parts[1]), int(parts[2]))
+        if jstype(s) is not 'string':
+            raise TypeError('fromisoformat: argument must be str')
+        ymd = _parse_iso_date(s, s)
+        return cls(ymd[0], ymd[1], ymd[2])
+
+    @classmethod
+    def fromisocalendar(cls, year, week, day):
+        ymd = _ord_to_ymd(_iso_to_ord(year, week, day))
+        return cls(ymd[0], ymd[1], ymd[2])
 
     def toordinal(self):
         return _ymd_to_ord(self.year, self.month, self.day)
@@ -306,30 +899,28 @@ class date:
         return self.toordinal() % 7 or 7
 
     def isocalendar(self):
-        # Returns [iso_year, iso_week, iso_weekday]
-        thu = self.toordinal() - self.weekday() + 3
-        ymd = _ord_to_ymd(thu)
-        iso_year = ymd[0]
-        week1_thu = _ymd_to_ord(iso_year, 1, 4)
-        iso_week = Math.floor((thu - (week1_thu - (week1_thu + 6) % 7)) / 7) + 1
-        return [iso_year, iso_week, self.isoweekday()]
+        # Returns a (year, week, weekday) tuple with named attributes
+        c = _iso_calendar(self.year, self.month, self.day)
+        ans = tuple(c)
+        ans.year = c[0]
+        ans.week = c[1]
+        ans.weekday = c[2]
+        return ans
 
     def isoformat(self):
-        sy = str(self.year)
-        while sy.length < 4:
-            sy = '0' + sy
-        return sy + '-' + _pad2(self.month) + '-' + _pad2(self.day)
+        return _pad4(self.year) + '-' + _pad2(self.month) + '-' + _pad2(self.day)
 
     def ctime(self):
-        day_names   = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
-        month_names = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-        sy = str(self.year)
-        while sy.length < 4:
-            sy = '0' + sy
-        return day_names[self.weekday()] + ' ' + month_names[self.month] + ' ' + _pad2(self.day) + ' 00:00:00 ' + sy
+        dd = str(self.day) if self.day >= 10 else ' ' + str(self.day)
+        return _DAY_ABBRS[self.weekday()] + ' ' + _MONTH_ABBRS[self.month] + ' ' + dd + ' 00:00:00 ' + _pad4(self.year)
 
     def strftime(self, fmt):
         return _strftime(fmt, self)
+
+    def __format__(self, fmt):
+        if fmt:
+            return self.strftime(fmt)
+        return str(self)
 
     def timetuple(self):
         yday = _days_before_month(self.year, self.month) + self.day
@@ -343,7 +934,10 @@ class date:
 
     def __add__(self, other):
         if isinstance(other, timedelta):
-            return date.fromordinal(self.toordinal() + other.days)
+            o = self.toordinal() + other.days
+            if o < 1 or o > _MAX_ORDINAL:
+                raise OverflowError('date value out of range')
+            return date.fromordinal(o)
         raise TypeError('unsupported operand type(s) for +: date and ' + jstype(other))
 
     def __radd__(self, other):
@@ -351,7 +945,7 @@ class date:
 
     def __sub__(self, other):
         if isinstance(other, timedelta):
-            return date.fromordinal(self.toordinal() - other.days)
+            return self.__add__(other.__neg__())
         if isinstance(other, date) and not isinstance(other, datetime):
             return timedelta(self.toordinal() - other.toordinal())
         raise TypeError('unsupported operand type(s) for -')
@@ -402,76 +996,123 @@ _date_cls = date    # capture before datetime can shadow the name
 class time:
     """A time of day (hour, minute, second, microsecond), independent of date."""
 
-    def __init__(self, hour=0, minute=0, second=0, microsecond=0):
-        _check_field(hour,        'hour',        0,      23)
-        _check_field(minute,      'minute',      0,      59)
-        _check_field(second,      'second',      0,      59)
-        _check_field(microsecond, 'microsecond', 0, 999999)
+    def __init__(self, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, fold=0):
+        _check_time_fields(hour, minute, second, microsecond, fold)
+        _check_tzinfo_arg(tzinfo)
         self.hour        = hour
         self.minute      = minute
         self.second      = second
         self.microsecond = microsecond
+        self.tzinfo      = tzinfo
+        self.fold        = fold
 
-    def replace(self, hour=None, minute=None, second=None, microsecond=None):
+    @classmethod
+    def fromisoformat(cls, s):
+        if jstype(s) is not 'string':
+            raise TypeError('fromisoformat: argument must be str')
+        ts = s.slice(1) if s.charAt(0) is 'T' else s
+        p = _parse_iso_time(ts, s)
+        return cls(p[0], p[1], p[2], p[3], p[4])
+
+    def utcoffset(self):
+        if self.tzinfo is None:
+            return None
+        return _check_utc_offset('utcoffset', self.tzinfo.utcoffset(None))
+
+    def dst(self):
+        if self.tzinfo is None:
+            return None
+        return _check_utc_offset('dst', self.tzinfo.dst(None))
+
+    def tzname(self):
+        return _call_tzname(self.tzinfo, None)
+
+    def replace(self, hour=None, minute=None, second=None, microsecond=None, tzinfo=True, fold=None):
         h  = hour        if hour        is not None else self.hour
         m  = minute      if minute      is not None else self.minute
         s  = second      if second      is not None else self.second
         us = microsecond if microsecond is not None else self.microsecond
-        return time(h, m, s, us)
+        tz = self.tzinfo if tzinfo is True else tzinfo
+        f  = fold        if fold        is not None else self.fold
+        return time(h, m, s, us, tz, f)
 
-    def isoformat(self):
-        s = _pad2(self.hour) + ':' + _pad2(self.minute) + ':' + _pad2(self.second)
-        if self.microsecond:
-            s += '.' + _pad6(self.microsecond)
-        return s
+    def isoformat(self, timespec='auto'):
+        return _format_time(self.hour, self.minute, self.second, self.microsecond, timespec) + _fmt_offset(self.utcoffset(), ':')
 
     def strftime(self, fmt):
         return _strftime(fmt, self)
+
+    def __format__(self, fmt):
+        if fmt:
+            return self.strftime(fmt)
+        return str(self)
 
     def __str__(self):
         return self.isoformat()
 
     def __repr__(self):
+        s = 'datetime.time(' + str(self.hour) + ', ' + str(self.minute)
         if self.microsecond:
-            return 'datetime.time(' + str(self.hour) + ', ' + str(self.minute) + ', ' + str(self.second) + ', ' + str(self.microsecond) + ')'
-        if self.second:
-            return 'datetime.time(' + str(self.hour) + ', ' + str(self.minute) + ', ' + str(self.second) + ')'
-        if self.minute:
-            return 'datetime.time(' + str(self.hour) + ', ' + str(self.minute) + ')'
-        return 'datetime.time(' + str(self.hour) + ')'
+            s += ', ' + str(self.second) + ', ' + str(self.microsecond)
+        elif self.second:
+            s += ', ' + str(self.second)
+        if self.tzinfo is not None:
+            s += ', tzinfo=' + repr(self.tzinfo)
+        if self.fold:
+            s += ', fold=1'
+        return s + ')'
+
+    def _key(self, off):
+        s = self.hour * 3600 + self.minute * 60 + self.second
+        us = self.microsecond
+        if off is not None:
+            s -= off.days * 86400 + off.seconds
+            us -= off.microseconds
+            if us < 0:
+                us += 1000000
+                s -= 1
+        return [s, us]
+
+    def _cmp(self, other, eq_only):
+        if self.tzinfo is other.tzinfo:
+            so = oo = None
+        else:
+            so = self.utcoffset()
+            oo = other.utcoffset()
+            if (so is None) is not (oo is None):
+                if eq_only:
+                    return 2
+                raise TypeError("can't compare offset-naive and offset-aware times")
+        return _cmp_keys(self._key(so), other._key(oo))
 
     def __eq__(self, other):
         if isinstance(other, time):
-            return self.hour is other.hour and self.minute is other.minute and self.second is other.second and self.microsecond is other.microsecond
+            return self._cmp(other, True) is 0
         return False
 
     def __lt__(self, other):
         if isinstance(other, time):
-            if self.hour is not other.hour:
-                return self.hour < other.hour
-            if self.minute is not other.minute:
-                return self.minute < other.minute
-            if self.second is not other.second:
-                return self.second < other.second
-            return self.microsecond < other.microsecond
+            return self._cmp(other, False) < 0
         raise TypeError('cannot compare time with ' + jstype(other))
 
     def __le__(self, other):
-        return self.__lt__(other) or self.__eq__(other)
+        if isinstance(other, time):
+            return self._cmp(other, False) <= 0
+        raise TypeError('cannot compare time with ' + jstype(other))
 
     def __gt__(self, other):
         if isinstance(other, time):
-            return other.__lt__(self)
+            return self._cmp(other, False) > 0
         raise TypeError('cannot compare time with ' + jstype(other))
 
     def __ge__(self, other):
-        return self.__gt__(other) or self.__eq__(other)
+        if isinstance(other, time):
+            return self._cmp(other, False) >= 0
+        raise TypeError('cannot compare time with ' + jstype(other))
 
     def __hash__(self):
-        return hash(self.hour * 3600 + self.minute * 60 + self.second + self.microsecond / 1000000)
-
-    def __bool__(self):
-        return self.hour is not 0 or self.minute is not 0 or self.second is not 0 or self.microsecond is not 0
+        k = self._key(self.utcoffset())
+        return hash(k[0] * 1000000 + k[1])
 
 
 time.min        = time(0, 0, 0, 0)
@@ -482,77 +1123,104 @@ _time_cls = time    # capture before datetime can shadow the name
 
 # ── datetime ──────────────────────────────────────────────────────────────────
 
+def _utc_fields_from_ts(ts):
+    # Returns [y, mo, d, h, mi, s, us] for a POSIX timestamp, in UTC.
+    s = Math.floor(ts)
+    us = Math.round((ts - s) * 1000000)
+    if us >= 1000000:
+        s += 1
+        us -= 1000000
+    days = Math.floor(s / 86400)
+    rem = s - days * 86400
+    o = days + _EPOCH_ORDINAL
+    if o < 1 or o > _MAX_ORDINAL:
+        raise ValueError('year is out of range')
+    ymd = _ord_to_ymd(o)
+    return [ymd[0], ymd[1], ymd[2], Math.floor(rem / 3600), Math.floor((rem % 3600) / 60), rem % 60, us]
+
+def _local_fields_from_ts(ts):
+    s = Math.floor(ts)
+    us = Math.round((ts - s) * 1000000)
+    if us >= 1000000:
+        s += 1
+        us -= 1000000
+    d = v"new Date(s * 1000)"
+    return [v"d.getFullYear()", v"d.getMonth() + 1", v"d.getDate()",
+            v"d.getHours()", v"d.getMinutes()", v"d.getSeconds()", us]
+
+
 class datetime(date):
     """A date combined with a time of day."""
 
-    def __init__(self, year, month, day, hour=0, minute=0, second=0, microsecond=0):
+    def __init__(self, year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, fold=0):
         date.__init__(self, year, month, day)
-        _check_field(hour,        'hour',        0,      23)
-        _check_field(minute,      'minute',      0,      59)
-        _check_field(second,      'second',      0,      59)
-        _check_field(microsecond, 'microsecond', 0, 999999)
+        _check_time_fields(hour, minute, second, microsecond, fold)
+        _check_tzinfo_arg(tzinfo)
         self.hour        = hour
         self.minute      = minute
         self.second      = second
         self.microsecond = microsecond
+        self.tzinfo      = tzinfo
+        self.fold        = fold
 
     @classmethod
     def now(cls, tz=None):
-        d = v"new Date()"
-        return cls(v"d.getFullYear()", v"d.getMonth()+1", v"d.getDate()",
-                   v"d.getHours()", v"d.getMinutes()", v"d.getSeconds()",
-                   v"d.getMilliseconds() * 1000")
+        return cls.fromtimestamp(v"Date.now() / 1000", tz)
 
     @classmethod
     def utcnow(cls):
-        d = v"new Date()"
-        return cls(v"d.getUTCFullYear()", v"d.getUTCMonth()+1", v"d.getUTCDate()",
-                   v"d.getUTCHours()", v"d.getUTCMinutes()", v"d.getUTCSeconds()",
-                   v"d.getUTCMilliseconds() * 1000")
+        return cls.utcfromtimestamp(v"Date.now() / 1000")
 
     @classmethod
     def fromtimestamp(cls, timestamp, tz=None):
-        d = v"new Date(timestamp * 1000)"
-        return cls(v"d.getFullYear()", v"d.getMonth()+1", v"d.getDate()",
-                   v"d.getHours()", v"d.getMinutes()", v"d.getSeconds()",
-                   v"d.getMilliseconds() * 1000")
+        if jstype(timestamp) is not 'number':
+            raise TypeError("'" + jstype(timestamp) + "' object cannot be interpreted as a timestamp")
+        _check_tzinfo_arg(tz)
+        if tz is None:
+            f = _local_fields_from_ts(timestamp)
+            return cls(f[0], f[1], f[2], f[3], f[4], f[5], f[6])
+        f = _utc_fields_from_ts(timestamp)
+        return tz.fromutc(cls(f[0], f[1], f[2], f[3], f[4], f[5], f[6], tz))
 
     @classmethod
     def utcfromtimestamp(cls, timestamp):
-        d = v"new Date(timestamp * 1000)"
-        return cls(v"d.getUTCFullYear()", v"d.getUTCMonth()+1", v"d.getUTCDate()",
-                   v"d.getUTCHours()", v"d.getUTCMinutes()", v"d.getUTCSeconds()",
-                   v"d.getUTCMilliseconds() * 1000")
+        f = _utc_fields_from_ts(timestamp)
+        return cls(f[0], f[1], f[2], f[3], f[4], f[5], f[6])
 
     @classmethod
-    def combine(cls, d, t):
-        return cls(d.year, d.month, d.day, t.hour, t.minute, t.second, t.microsecond)
+    def combine(cls, d, t, tzinfo=True):
+        tz = t.tzinfo if tzinfo is True else tzinfo
+        return cls(d.year, d.month, d.day, t.hour, t.minute, t.second, t.microsecond, tz, t.fold)
 
     @classmethod
     def fromisoformat(cls, s):
-        sep = s.indexOf('T')
-        if sep is -1:
-            sep = s.indexOf(' ')
-        if sep is -1:
-            # date only — produce a datetime at midnight
-            parts = s.split('-')
-            return cls(int(parts[0]), int(parts[1]), int(parts[2]))
-        ds = s.slice(0, sep)
-        ts = s.slice(sep + 1)
-        dp = ds.split('-')
-        us = 0
-        dot = ts.indexOf('.')
-        if dot is not -1:
-            frac = ts.slice(dot + 1)
-            while frac.length < 6:
-                frac += '0'
-            us = int(frac.slice(0, 6))
-            ts = ts.slice(0, dot)
-        tp = ts.split(':')
-        h  = int(tp[0]) if tp.length > 0 else 0
-        mi = int(tp[1]) if tp.length > 1 else 0
-        sc = int(tp[2]) if tp.length > 2 else 0
-        return cls(int(dp[0]), int(dp[1]), int(dp[2]), h, mi, sc, us)
+        if jstype(s) is not 'string':
+            raise TypeError('fromisoformat: argument must be str')
+        if s.length < 7:
+            _iso_invalid(s)
+        if s.charAt(4) is '-':
+            if s.charAt(5) is 'W':
+                dlen = 10 if (s.length >= 10 and s.charAt(8) is '-') else 8
+            else:
+                dlen = 10
+        else:
+            if s.charAt(4) is 'W':
+                dlen = 8 if (s.length >= 8 and v"/\d/.test(s.charAt(7))") else 7
+            else:
+                dlen = 8
+        if s.length < dlen:
+            _iso_invalid(s)
+        ymd = _parse_iso_date(s.slice(0, dlen), s)
+        if s.length is dlen:
+            return cls(ymd[0], ymd[1], ymd[2])
+        if s.length is dlen + 1:
+            _iso_invalid(s)
+        p = _parse_iso_time(s.slice(dlen + 1), s)
+        return cls(ymd[0], ymd[1], ymd[2], p[0], p[1], p[2], p[3], p[4])
+
+    @classmethod
+    def strptime(cls, date_string, format):
+        return _strptime(cls, date_string, format)
 
     def date(self):
         # Use _date_cls alias: inside `function date() {...}` the name 'date'
@@ -562,15 +1230,62 @@ class datetime(date):
 
     def time(self):
         # Same rationale as date() above — use _time_cls alias.
-        return _time_cls(self.hour, self.minute, self.second, self.microsecond)
+        return _time_cls(self.hour, self.minute, self.second, self.microsecond, None, self.fold)
+
+    def timetz(self):
+        return _time_cls(self.hour, self.minute, self.second, self.microsecond, self.tzinfo, self.fold)
+
+    def utcoffset(self):
+        if self.tzinfo is None:
+            return None
+        return _check_utc_offset('utcoffset', self.tzinfo.utcoffset(self))
+
+    def dst(self):
+        if self.tzinfo is None:
+            return None
+        return _check_utc_offset('dst', self.tzinfo.dst(self))
+
+    def tzname(self):
+        return _call_tzname(self.tzinfo, self)
+
+    def _key(self, off):
+        # [whole seconds since ordinal 0, microseconds], shifted to UTC by off
+        s = self.toordinal() * 86400 + self.hour * 3600 + self.minute * 60 + self.second
+        us = self.microsecond
+        if off is not None:
+            s -= off.days * 86400 + off.seconds
+            us -= off.microseconds
+            if us < 0:
+                us += 1000000
+                s -= 1
+        return [s, us]
 
     def timestamp(self):
-        v"""var _ts_d = new Date(this.year, this.month - 1, this.day,
-                                 this.hour, this.minute, this.second,
-                                 Math.floor(this.microsecond / 1000));"""
-        return v"_ts_d.getTime() / 1000"
+        off = self.utcoffset()
+        if off is None:
+            secs = v"_local_date(this.year, this.month, this.day, this.hour, this.minute, this.second).getTime() / 1000"
+            return (secs * 1000000 + self.microsecond) / 1000000
+        k = self._key(off)
+        secs = k[0] - _EPOCH_ORDINAL * 86400
+        return (secs * 1000000 + k[1]) / 1000000
 
-    def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None):
+    def astimezone(self, tz=None):
+        if tz is not None and not isinstance(tz, _tzinfo_cls):
+            raise TypeError('tz argument must be an instance of tzinfo')
+        off = self.utcoffset()
+        if off is None:
+            off = timedelta(0, _local_offset_seconds(self.year, self.month, self.day, self.hour, self.minute, self.second))
+            if tz is None:
+                tz = _local_timezone_at(_local_date(self.year, self.month, self.day, self.hour, self.minute, self.second))
+        elif tz is None:
+            ts = self.timestamp()
+            tz = _local_timezone_at(v"new Date(Math.floor(ts) * 1000)")
+        if tz is self.tzinfo:
+            return self
+        utc = self.__sub__(off).replace(tzinfo=tz)
+        return tz.fromutc(utc)
+
+    def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None, tzinfo=True, fold=None):
         y  = year        if year        is not None else self.year
         mo = month       if month       is not None else self.month
         d  = day         if day         is not None else self.day
@@ -578,40 +1293,47 @@ class datetime(date):
         mi = minute      if minute      is not None else self.minute
         s  = second      if second      is not None else self.second
         us = microsecond if microsecond is not None else self.microsecond
-        return datetime(y, mo, d, h, mi, s, us)
+        tz = self.tzinfo if tzinfo is True else tzinfo
+        f  = fold        if fold        is not None else self.fold
+        return datetime(y, mo, d, h, mi, s, us, tz, f)
 
-    def isoformat(self, sep='T'):
-        sy = str(self.year)
-        while sy.length < 4:
-            sy = '0' + sy
-        date_str = sy + '-' + _pad2(self.month) + '-' + _pad2(self.day)
-        time_str = _pad2(self.hour) + ':' + _pad2(self.minute) + ':' + _pad2(self.second)
-        if self.microsecond:
-            time_str += '.' + _pad6(self.microsecond)
-        return date_str + sep + time_str
+    def isoformat(self, sep='T', timespec='auto'):
+        return _pad4(self.year) + '-' + _pad2(self.month) + '-' + _pad2(self.day) + sep + _format_time(self.hour, self.minute, self.second, self.microsecond, timespec) + _fmt_offset(self.utcoffset(), ':')
 
     def ctime(self):
-        day_names   = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
-        month_names = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-        sy = str(self.year)
-        while sy.length < 4:
-            sy = '0' + sy
-        return day_names[self.weekday()] + ' ' + month_names[self.month] + ' ' + _pad2(self.day) + ' ' + _pad2(self.hour) + ':' + _pad2(self.minute) + ':' + _pad2(self.second) + ' ' + sy
+        dd = str(self.day) if self.day >= 10 else ' ' + str(self.day)
+        return _DAY_ABBRS[self.weekday()] + ' ' + _MONTH_ABBRS[self.month] + ' ' + dd + ' ' + _pad2(self.hour) + ':' + _pad2(self.minute) + ':' + _pad2(self.second) + ' ' + _pad4(self.year)
 
     def strftime(self, fmt):
         return _strftime(fmt, self)
 
     def timetuple(self):
         yday = _days_before_month(self.year, self.month) + self.day
-        return [self.year, self.month, self.day, self.hour, self.minute, self.second, self.weekday(), yday, -1]
+        dst = self.dst()
+        isdst = -1 if dst is None else (1 if dst.__bool__() else 0)
+        return [self.year, self.month, self.day, self.hour, self.minute, self.second, self.weekday(), yday, isdst]
+
+    def utctimetuple(self):
+        off = self.utcoffset()
+        dt = self
+        if off is not None:
+            dt = self.__sub__(off)
+        yday = _days_before_month(dt.year, dt.month) + dt.day
+        return [dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.weekday(), yday, 0]
 
     def __str__(self):
         return self.isoformat(' ')
 
     def __repr__(self):
-        s = 'datetime.datetime(' + str(self.year) + ', ' + str(self.month) + ', ' + str(self.day) + ', ' + str(self.hour) + ', ' + str(self.minute) + ', ' + str(self.second)
+        s = 'datetime.datetime(' + str(self.year) + ', ' + str(self.month) + ', ' + str(self.day) + ', ' + str(self.hour) + ', ' + str(self.minute)
         if self.microsecond:
-            s += ', ' + str(self.microsecond)
+            s += ', ' + str(self.second) + ', ' + str(self.microsecond)
+        elif self.second:
+            s += ', ' + str(self.second)
+        if self.tzinfo is not None:
+            s += ', tzinfo=' + repr(self.tzinfo)
+        if self.fold:
+            s += ', fold=1'
         return s + ')'
 
     def __add__(self, other):
@@ -627,34 +1349,24 @@ class datetime(date):
             # Cascade carries
             s_carry = Math.floor(us / 1000000)
             us = us - s_carry * 1000000
-            if us < 0:
-                us += 1000000
-                s_carry -= 1
             s += s_carry
 
             mi_carry = Math.floor(s / 60)
-            s = s % 60
-            if s < 0:
-                s += 60
-                mi_carry -= 1
+            s = s - mi_carry * 60
             mi += mi_carry
 
             h_carry = Math.floor(mi / 60)
-            mi = mi % 60
-            if mi < 0:
-                mi += 60
-                h_carry -= 1
+            mi = mi - h_carry * 60
             h += h_carry
 
             d_carry = Math.floor(h / 24)
-            h = h % 24
-            if h < 0:
-                h += 24
-                d_carry -= 1
+            h = h - d_carry * 24
             ord_day += d_carry
 
+            if ord_day < 1 or ord_day > _MAX_ORDINAL:
+                raise OverflowError('date value out of range')
             ymd = _ord_to_ymd(ord_day)
-            return datetime(ymd[0], ymd[1], ymd[2], h, mi, s, us)
+            return datetime(ymd[0], ymd[1], ymd[2], h, mi, s, us, self.tzinfo)
         raise TypeError('unsupported operand type(s) for +: datetime and ' + jstype(other))
 
     def __radd__(self, other):
@@ -665,46 +1377,60 @@ class datetime(date):
             delta_days = self.toordinal() - other.toordinal()
             delta_secs = (self.hour - other.hour) * 3600 + (self.minute - other.minute) * 60 + (self.second - other.second)
             delta_us   = self.microsecond - other.microsecond
+            if self.tzinfo is not other.tzinfo:
+                so = self.utcoffset()
+                oo = other.utcoffset()
+                if (so is None) is not (oo is None):
+                    raise TypeError("can't subtract offset-naive and offset-aware datetimes")
+                if so is not None:
+                    delta_days -= so.days - oo.days
+                    delta_secs -= so.seconds - oo.seconds
+                    delta_us   -= so.microseconds - oo.microseconds
             return timedelta(delta_days, delta_secs, delta_us)
         if isinstance(other, timedelta):
             return self.__add__(timedelta(-other.days, -other.seconds, -other.microseconds))
         raise TypeError('unsupported operand type(s) for -')
 
+    def _cmp(self, other, eq_only):
+        if self.tzinfo is other.tzinfo:
+            so = oo = None
+        else:
+            so = self.utcoffset()
+            oo = other.utcoffset()
+            if (so is None) is not (oo is None):
+                if eq_only:
+                    return 2
+                raise TypeError("can't compare offset-naive and offset-aware datetimes")
+        return _cmp_keys(self._key(so), other._key(oo))
+
     def __eq__(self, other):
         if isinstance(other, datetime):
-            return self.year is other.year and self.month is other.month and self.day is other.day and self.hour is other.hour and self.minute is other.minute and self.second is other.second and self.microsecond is other.microsecond
+            return self._cmp(other, True) is 0
         return False
 
     def __lt__(self, other):
         if isinstance(other, datetime):
-            if self.year is not other.year:
-                return self.year < other.year
-            if self.month is not other.month:
-                return self.month < other.month
-            if self.day is not other.day:
-                return self.day < other.day
-            if self.hour is not other.hour:
-                return self.hour < other.hour
-            if self.minute is not other.minute:
-                return self.minute < other.minute
-            if self.second is not other.second:
-                return self.second < other.second
-            return self.microsecond < other.microsecond
+            return self._cmp(other, False) < 0
         raise TypeError('cannot compare datetime with ' + jstype(other))
 
     def __le__(self, other):
-        return self.__lt__(other) or self.__eq__(other)
+        if isinstance(other, datetime):
+            return self._cmp(other, False) <= 0
+        raise TypeError('cannot compare datetime with ' + jstype(other))
 
     def __gt__(self, other):
         if isinstance(other, datetime):
-            return other.__lt__(self)
+            return self._cmp(other, False) > 0
         raise TypeError('cannot compare datetime with ' + jstype(other))
 
     def __ge__(self, other):
-        return self.__gt__(other) or self.__eq__(other)
+        if isinstance(other, datetime):
+            return self._cmp(other, False) >= 0
+        raise TypeError('cannot compare datetime with ' + jstype(other))
 
     def __hash__(self):
-        return hash(self.isoformat())
+        k = self._key(self.utcoffset())
+        return hash(str(k[0]) + '.' + str(k[1]))
 
 
 datetime.min        = datetime(MINYEAR, 1, 1, 0, 0, 0)

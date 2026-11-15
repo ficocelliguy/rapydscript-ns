@@ -78,7 +78,7 @@ def zip():
                         raise ValueError('zip() has arguments with different lengths')
                 return v"{'done':true}"
             args[i] = r.value  # noqa:undef
-        return v"{'done':false, 'value':args}"
+        return v"{'done':false, 'value':ρσ_tuple_decorate(args)}"
     return ans
 
 def any(iterable):

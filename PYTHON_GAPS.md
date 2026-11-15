@@ -10,6 +10,31 @@ README for the full feature and module support tables.
 
 ---
 
+## 0. Correctness Bugs Found In The 2026-11-14 Audit
+
+A three-part audit (builtins & types, syntax & classes, stdlib), each case run with
+`node bin/rapydscript -x` and compared against CPython. Only problems not covered
+elsewhere in this document are listed. Everything here is a bug, not a design
+trade-off: none of it is documented in the README, and several items contradict
+README claims (marked **README**).
+
+### 0.1 Silent wrong results (highest priority)
+
+All fixed (see CHANGELOG.md).
+
+### 0.2 Valid Python that crashes or fails to compile
+
+All fixed (see CHANGELOG.md).
+
+### 0.3 Smaller items
+
+All fixed (see CHANGELOG.md). Minor differences that remain:
+
+- `datetime` has fixed-offset time zones only (no `zoneinfo`). `%c`, `%x` and `%X` use the C locale, and `strptime`'s `%Z` accepts only UTC and GMT.
+- Reading a name that might be unbound costs a runtime check. Only reads that can actually hit an unbound name get one: any read of a name that is `del`eted in the scope, and reads that come before a local's first assignment, outside loops.
+
+---
+
 ## 1. Silent Behavioral Differences (Gotchas)
 
 These features exist but behave differently from Python in ways that will silently produce
@@ -79,45 +104,9 @@ when interoperating with JS APIs that return plain objects.
 
 ### 1.5 Multiple Inheritance MRO
 
-**Python:** C3 linearization guarantees a deterministic and consistent method resolution order.
-**RapydScript:** Built on the JS prototype chain. In diamond inheritance or complex hierarchies
-the order may differ from Python's C3 MRO.
+**Fixed.** `super()` follows Python's C3 linearization, so cooperative diamond hierarchies call every class once, in Python's order. `Cls.__mro__` is available on classes with multiple bases (and their subclasses), and an inconsistent hierarchy raises `TypeError` when the class is created. `issubclass` checks every base.
 
-**Impact:** Unexpected method is called when multiple parent classes define the same method
-name. Hard to debug because no error is raised.
-
----
-
-### 1.9 `str(ExceptionInstance)` Includes The Class Name
-
-**Python:** `str(ValueError("bad"))` → `"bad"`.
-**RapydScript:** `str(ValueError("bad"))` → `"ValueError: bad"`.
-
-```python
-try:
-    raise ValueError("bad")
-except ValueError as e:
-    assert str(e) == "bad"   # Fails — str(e) is "ValueError: bad"
-```
-
-**Impact:** Any code that introspects exception messages by stringifying the exception
-gets a different string than Python. Use `e.args[0]` or `e.message` instead.
-
----
-
-### 1.11 Tuples Are Unhashable As Dict Keys
-
-**Python:** Tuples of hashable values are themselves hashable and work as dict keys.
-**RapydScript:** Storing a tuple key works, but retrieval raises `KeyError` because
-each tuple literal is a fresh array with a different identity.
-
-```python
-d = {(1, 2): "a"}
-d[(1, 2)]   # Python: "a"; RapydScript: KeyError
-```
-
-**Impact:** Common patterns like memoising on `(x, y)` coordinates, sparse grid storage,
-or graph adjacency keyed by node pairs do not work.
+**Remaining difference:** plain attribute lookup on an instance (`obj.method()` without `super()`) still uses the JS prototype chain, which follows the first base and then the attributes copied from the other bases, depth-first. That matches C3 except in unusual hierarchies where a later base overrides a method that an earlier base also inherits.
 
 ---
 
@@ -141,7 +130,9 @@ silently produces wrong results.
 **Python:** `1.0` is a `float`; `isinstance(1.0, float)` is `True`.
 **RapydScript:** Float literals whose value happens to be integral (`1.0`, `2.0`,
 `100.0`) compile down to the integer `Number` `1`. `isinstance(1.0, float)` is `False`.
-`type(1.0)` is `int`.
+`type(1.0)` is `int`. For the same reason `1.0` and `10 / 2` print as `1` and `5`.
+(Values that can only be floats do print like Python's `repr`: `inf`, `nan`, `-0.0`,
+`1e-05`.)
 
 **Impact:** Code that branches on `isinstance(x, float)` to distinguish "definitely a
 float" from "could be int" misclassifies values that started life as `1.0`.
@@ -156,16 +147,6 @@ float" from "could be int" misclassifies values that started life as `1.0`.
 
 **Impact:** String-equality checks on formatted scientific notation fail. Affects
 log parsers, golden-file tests, and anything that text-matches numeric output.
-
----
-
-### 1.15 `Counter.most_common` Returns Lists, Not Tuples
-
-**Python:** `Counter("aab").most_common()` → `[('a', 2), ('b', 1)]` (list of tuples).
-**RapydScript:** Returns `[['a', 2], ['b', 1]]` (list of lists).
-
-**Impact:** Element access (`top[0][0]`) still works, but tuple-specific patterns
-(`for word, count in ...:` is fine; `isinstance(top[0], tuple)` is not) diverge.
 
 ---
 
@@ -245,21 +226,6 @@ network demos, computational geometry).
 
 ---
 
-### 2.7 `oct()` Builtin
-
-`hex()` and `bin()` are provided, but `oct()` is not. Octal literals (`0o755`) parse and
-evaluate correctly; only the conversion function is missing.
-
-```python
-hex(255)   # "0xff"     — works
-bin(10)    # "0b1010"   — works
-oct(8)     # ReferenceError: oct is not defined
-```
-
-**Workaround:** `"0o" + (n).toString(8)`.
-
----
-
 ### 2.8 `memoryview`
 
 `memoryview` does not exist. `bytes` and `bytearray` are supported, but the zero-copy
@@ -282,18 +248,6 @@ Python 3.6+ allows underscores in numeric literals for readability: `1_000_000`,
 
 ---
 
-### 2.11 PEP 604 Union Type Syntax `X | Y`
-
-Python 3.10+ allows `int | str` in annotations as shorthand for `Union[int, str]`.
-RapydScript parses the annotation, but at function-definition time it evaluates the
-expression `int | str` — which calls `__or__` on the `int` builtin (a JS function),
-throwing `TypeError: unsupported operand type(s) for |: 'function' and 'function'`.
-
-**Workaround:** use `Union[int, str]` or `Optional[X]` from `typing`. But see 2.12 —
-those also have issues.
-
----
-
 ### 2.14 Python Async Iterator Protocol (`__aiter__` / `__anext__`) Ignored
 
 Symmetric to 2.13 for the async case. `async for` compiles to JS `for await ... of`,
@@ -301,21 +255,6 @@ which requires `Symbol.asyncIterator`. Classes implementing `__aiter__` / `__ane
 fail with `TypeError: ρσ_Iter is not async iterable`.
 
 **Workaround:** use `async def` generators (`async def f(): yield ...`) instead.
-
----
-
-### 2.15 `print(..., file=buf)` Ignored
-
-The `file=` keyword argument to `print()` is silently dropped — output goes to the
-default sink (`console.log`) instead of the file-like object. `sep=` and `end=`
-both work.
-
-```python
-from io import StringIO
-buf = StringIO()
-print("hello", file=buf)
-buf.getvalue()    # Python: "hello\n". RapydScript: "" (and "hello" went to console).
-```
 
 ---
 
@@ -340,21 +279,6 @@ long = "this is text"   # SyntaxError at runtime
 **Impact:** A `long` variable in ported code (common for "long description", "long
 text") silently breaks compilation. The compiler does not flag this — the error
 surfaces only when the JS is executed.
-
----
-
-### 2.18 `import a, b` With One Missing Module Gives Confusing Error
-
-A single `import` statement that imports multiple modules where **one** is missing
-reports `Cannot read properties of undefined (reading 'classes')` instead of a clear
-"module not found" message. Splitting onto separate lines gives the correct error.
-
-```python
-import io, sys     # "Cannot read properties of undefined (reading 'classes')"
-# vs
-import io
-import sys         # "Failed Import: 'sys' module doesn't exist"
-```
 
 ---
 
@@ -425,23 +349,6 @@ These are heavily used as `key=` arguments to `sorted`, `min`, `max`, `groupby`,
 
 ---
 
-### 3.6 Missing `math` Functions
-
-`math.pi`, `math.sqrt`, `math.floor`, `math.ceil`, `math.factorial`, `math.log`,
-`math.sin`/`cos`/`tan`, and `math.e` are all present. Notably missing:
-
-- `math.gcd` (and `math.lcm`)
-- `math.isclose` (Python 3.5+)
-- `math.inf`, `math.nan` (constants)
-- `math.copysign`, `math.fmod`, `math.remainder`
-- `math.dist`, `math.hypot` (multi-arg)
-- `math.prod` (Python 3.8+)
-- `math.comb`, `math.perm` (Python 3.8+)
-
-`math.gcd` in particular is so common in numeric tutorials that its absence is jarring.
-
----
-
 ### 3.7 Missing String Methods On `str` Builtin
 
 - `str.maketrans(from, to)` — static method missing. `str.translate(table)` exists
@@ -449,20 +356,6 @@ These are heavily used as `key=` arguments to `sorted`, `min`, `max`, `groupby`,
 - `str.encode(encoding)` — instance method missing. `bytes` literals work, but
   converting an existing `str` to UTF-8 `bytes` requires `TextEncoder` via a v-block.
 - `bytes.decode(encoding)` — same limitation in reverse.
-
----
-
-### 3.8 Missing Built-In Exception Classes
-
-`RuntimeError` is **not** defined as a built-in. The `asyncio` library defines it
-locally, but user code that does `raise RuntimeError(...)` at module scope fails with
-`ReferenceError: RuntimeError is not defined`. Likely also missing or partially missing:
-`NotImplementedError`, `OSError`, `IOError`, `FileNotFoundError`, `PermissionError`,
-`InterruptedError`, `BlockingIOError`, `ConnectionError`, `LookupError`, `OverflowError`,
-`FloatingPointError`, `ArithmeticError`, `BufferError`, `EnvironmentError`.
-
-**Impact:** Code ported from Python often raises these without importing anything;
-porting requires substituting `Exception` or defining the class manually.
 
 ---
 
@@ -530,28 +423,19 @@ Entries marked **NEW** were added in the 2026-05-26 coverage audit.
 
 | Priority | Feature | Effort | Impact |
 |---|---|---|---|
-| **NEW** High | Tuples unhashable as dict keys (§1.11) | Medium | Memoisation, sparse grids, graph keys break |
 | **NEW** High | `str.encode()` / `bytes.decode()` missing (§3.7) | Low | Common UTF-8 conversion pattern needs v-block |
 | High | `enum.IntEnum`, `IntFlag`, `Flag` (§3.1) | Medium | Protocol and permission modeling; bitfield enums |
-| **NEW** Medium | PEP 604 `X \| Y` union syntax (§2.11) | Medium | Modern annotations break on definition |
-| **NEW** Medium | `str(exc)` includes class name (§1.9) | Low | Exception-message comparisons fail |
 | **NEW** Medium | Numeric underscore literals `1_000_000` (§2.9) | Low | Readable numeric constants fail to parse |
-| **NEW** Medium | `math.gcd`, `math.isclose`, `math.inf`/`nan`, `math.prod` (§3.6) | Low | Common numeric helpers |
 | **NEW** Medium | `operator.itemgetter`, `attrgetter`, `methodcaller` (§3.5) | Low | Idiomatic `key=` for `sorted`/`min`/`max` |
-| **NEW** Medium | `print(..., file=buf)` ignored (§2.15) | Low | Output redirection idiom fails silently |
 | **NEW** Medium | Async iterator protocol ignored (§2.14) | Medium | Async generator class pattern broken |
-| **NEW** Medium | `RuntimeError` and other builtin exceptions missing (§3.8) | Low | `raise RuntimeError(...)` fails |
 | **NEW** Medium | `sys` module missing (§3.3) | Low | `sys.platform`, `sys.version`, `sys.exit` |
 | **NEW** Medium | `pathlib` missing (§3.4) | Medium | Path-string parsing is browser-useful |
 | Medium | `@` matmul + `__matmul__` dunder (§2.6) | Medium | DSL hospitality (graphics, math libraries) |
 | Medium | `hashlib` shim over Web Crypto (§3.2) | Medium | Avoids verbatim Web Crypto calls in user code |
 | Medium | f-string `f'{x=}'` uses `str` not `repr` (§2.4) | Low | Subtle but easy to fix once known |
-| **NEW** Low | `Counter.most_common` returns lists not tuples (§1.15) | Low | Element access still works |
 | **NEW** Low | `format(x, '.2e')` 1-digit exponent (§1.14) | Trivial | Pad exponent in formatter |
 | **NEW** Low | Integer-valued float literals lose `float` type (§1.13) | Medium | Hard to fix without runtime type tagging |
 | **NEW** Low | Integer arbitrary precision (§1.12) | High | Workaround: explicit `long()` for big ints |
 | **NEW** Low | `raise X from Y` doesn't set `__cause__` (§2.16) | Low | Chained exceptions don't display |
 | **NEW** Low | `long`/`float`/`int` as variable names cause SyntaxError (§2.17) | Low | Compiler should reject or auto-rename |
-| **NEW** Low | `import a, b` confusing error if one missing (§2.18) | Trivial | Better diagnostic |
-| Low | `oct()` builtin (§2.7) | Trivial | Symmetry with `hex()` / `bin()` |
 | Low | `__del__` via `FinalizationRegistry` (§2.1) | Medium | Resource cleanup (best-effort) |

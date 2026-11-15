@@ -2,7 +2,7 @@
 # License: BSD Copyright: 2016, Kovid Goyal <kovid at kovidgoyal.net>
 from __python__ import hash_literals
 
-from ast import AST_BaseCall, AST_SymbolRef, AST_Array, AST_Unary, AST_Number, has_calls, AST_Seq, AST_ListComprehension, AST_Starred, is_node_type
+from ast import TreeWalker, AST_Await, AST_Lambda, AST_BaseCall, AST_SymbolRef, AST_Array, AST_Unary, AST_Number, has_calls, AST_Seq, AST_ListComprehension, AST_Starred, AST_ItemAccess, is_node_type
 from output.stream import OutputStream
 
 def unpack_tuple(elems, output, in_statement):
@@ -17,7 +17,14 @@ def unpack_tuple(elems, output, in_statement):
         output.indent()
         is_starred = is_node_type(elem, AST_Starred)
         actual_elem = elem.expression if is_starred else elem
-        output.assign(actual_elem)
+        # A Python-style subscript target (a[i], with overload_getitem) is
+        # assigned through ρσ_setitem(a, i, value), not `a[i] = value`.
+        is_item = is_node_type(actual_elem, AST_ItemAccess)
+        if is_item:
+            output.print('ρσ_setitem(')
+            actual_elem.expression.print(output), output.comma(), actual_elem.property.print(output), output.comma()
+        else:
+            output.assign(actual_elem)
         output.print("ρσ_unpack")
         if is_starred:
             output.print('.slice(')
@@ -35,6 +42,8 @@ def unpack_tuple(elems, output, in_statement):
             output.with_square(def():
                 output.print(i)
             )
+        if is_item:
+            output.print(')')
         if not in_statement or i < elems.length - 1:
             output.semicolon()
             output.newline()
@@ -303,6 +312,22 @@ def print_for_in(self, output):
         output.indent()
         output.print('}')
 
+def contains_await(node):
+    # Whether node awaits, outside any nested function (whose awaits are its own)
+    found = False
+    def visit(n):
+        nonlocal found
+        if found:
+            return True
+        if is_node_type(n, AST_Await):
+            found = True
+            return True
+        if is_node_type(n, AST_Lambda):
+            return True
+    node.walk(new TreeWalker(visit))
+    return found
+
+
 def print_list_comprehension(self, output):
     tname = self.constructor.name.slice(4)
     result_obj = {'ListComprehension':'[]', 'DictComprehension':('Object.create(null)' if self.is_jshash else '{}'), 'SetComprehension':'ρσ_set()'}[tname]
@@ -367,28 +392,30 @@ def print_list_comprehension(self, output):
             idx = 'ρσ_Index'
             init_node = self.init
             cond_node = self.condition
+            async_for = self.is_async_for
         else:
             iv = 'ρσ_Iter' + str(depth)
             idx = 'ρσ_Index' + str(depth)
             clause = clauses[depth - 1]
             init_node = clause.init
             cond_node = clause.condition
+            async_for = clause.is_async
             # Declare and initialise the inner iterable inside the outer loop body
             body_out.indent()
             body_out.assign("var " + iv)
-            if es5:
+            if es5 and not async_for:
                 body_out.print("ρσ_Iterable")
                 body_out.with_parens(def(): clause.object.print(body_out);)
             else:
                 clause.object.print(body_out)
             body_out.end_statement()
-            if not es5:
+            if not es5 and not async_for:
                 init_es6_itervar(body_out, iv)
         body_out.indent()
-        body_out.print("for")
+        body_out.print("for await" if async_for else "for")
         body_out.space()
         body_out.with_parens(def():
-            if es5:
+            if es5 and not async_for:
                 body_out.print("var")
                 body_out.space()
                 body_out.assign(idx)
@@ -409,7 +436,7 @@ def print_list_comprehension(self, output):
         body_out.space()
         body_out.with_block(def():
             body_out.indent()
-            itervar_expr = iv + '[' + idx + ']' if es5 else idx
+            itervar_expr = iv + '[' + idx + ']' if es5 and not async_for else idx
             if is_node_type(init_node, AST_Array):
                 flat = init_node.flatten()
                 body_out.assign("ρσ_unpack")
@@ -443,21 +470,31 @@ def print_list_comprehension(self, output):
         )
         body_out.newline()
 
+    # [await f(x) for x in xs] and [v async for v in agen()] run in an async
+    # function that is awaited; (v async for v in agen()) is an async generator
+    has_async_for = bool(self.is_async_for)
+    for clause in clauses:
+        if clause.is_async:
+            has_async_for = True
+    is_async = not is_generator and (has_async_for or contains_await(self))
+    async_generator = is_generator and (has_async_for or contains_await(self))
+    if is_async:
+        output.print('(await ')
     output.with_parens(def():
-        output.print("function")
+        output.print("async function" if is_async else "function")
         output.print("()")
         output.space()
         output.with_block(def():
             body_out = output
             if is_generator:
                 body_out.indent()
-                body_out.print('function* js_generator()'), body_out.space(), body_out.print('{')
+                body_out.print(('async ' if async_generator else '') + 'function* js_generator()'), body_out.space(), body_out.print('{')
                 body_out.newline()
                 previous_indentation = output.indentation()
                 output.set_indentation(output.next_indent())
             body_out.indent()
             body_out.assign("var ρσ_Iter")
-            if es5:
+            if es5 and not self.is_async_for:
                 body_out.print("ρσ_Iterable")
                 body_out.with_parens(def():
                     self.object.print(body_out)
@@ -487,6 +524,8 @@ def print_list_comprehension(self, output):
                 elif is_node_type(init_node, AST_Seq):
                     for i in init_node.to_array():
                         decl_loop_vars(i)
+                elif is_node_type(init_node, AST_Starred):
+                    decl_loop_vars(init_node.expression)  # for x, *rest in ...
                 else:
                     body_out.comma()
                     init_node.print(body_out)
@@ -495,7 +534,7 @@ def print_list_comprehension(self, output):
                 decl_loop_vars(clause.init)
             body_out.end_statement()
 
-            if not es5:
+            if not es5 and not self.is_async_for:
                 init_es6_itervar(body_out, 'ρσ_Iter')
             emit_loop(body_out, 0)
             if self.constructor is AST_ListComprehension:
@@ -514,7 +553,7 @@ def print_list_comprehension(self, output):
                 output.end_statement()
                 # Python's generator objects use a separate method to send data to the generator
                 output.indent()
-                output.spaced('result.send', '=', 'result.next')
+                output.print(('ρσ_async_generator_methods' if async_generator else 'ρσ_generator_methods') + '(result)')
                 output.end_statement()
                 output.indent()
                 output.spaced('return', 'result')
@@ -522,3 +561,5 @@ def print_list_comprehension(self, output):
         )
     )
     output.print("()")
+    if is_async:
+        output.print(')')

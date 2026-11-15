@@ -1,0 +1,193 @@
+###########################################################
+# RapydScript Standard Library
+# License: Apache License    2.0
+###########################################################
+# Implementation of a subset of Python's 'sys' module.
+#
+# Supported:
+#   argv, path, platform, version, version_info, implementation, maxsize,
+#   byteorder, float_info, modules, executable, exit(), stdout, stderr,
+#   getrecursionlimit(), setrecursionlimit(), getdefaultencoding(),
+#   getsizeof() (approximate), intern()
+#
+# Notes:
+#   - platform is 'linux' / 'win32' / 'darwin' (from process.platform) under
+#     Node, and 'browser' when running in a web page.
+#   - stdout.write() shares print()'s line buffer, so print(..., end='') and
+#     sys.stdout.write() interleave correctly.  A JS console can only emit
+#     whole lines: partial lines are held until a newline or flush().
+#   - stderr writes go to console.error with the same line buffering.
+#   - exit(code) raises SystemExit(code); nothing terminates the JS host.
+
+def _make_named_tuple(typename, names, values):
+    ans = tuple(values)
+    for i, name in enumerate(names):
+        Object.defineProperty(ans, name, {'value': values[i], 'enumerable': False})
+    def _repr():
+        parts = []
+        for i, name in enumerate(names):
+            parts.push(name + '=' + repr(values[i]))
+        return typename + '(' + parts.join(', ') + ')'
+    Object.defineProperty(ans, '__repr__', {'value': _repr, 'enumerable': False})
+    Object.defineProperty(ans, '__str__', {'value': _repr, 'enumerable': False})
+    Object.defineProperty(ans, 'toString', {'value': _repr, 'enumerable': False})
+    return ans
+
+
+def _node_process():
+    # The global `process` object, or require('process') when the code runs in
+    # a sandbox (vm context) that only exposes require.
+    v'if (typeof process !== "undefined" && process && process.versions) return process'
+    v'if (typeof window === "undefined" && typeof require === "function") { try { return require("process"); } catch (e) {} }'
+    return None
+
+
+def _detect_platform():
+    if v'typeof window !== "undefined" && typeof document !== "undefined"':
+        return 'browser'
+    proc = _node_process()
+    if proc and jstype(proc.platform) is 'string':
+        p = proc.platform
+        if p is 'win32' or p is 'darwin' or p is 'linux':
+            return p
+        if p.indexOf('freebsd') is 0:
+            return 'freebsd'
+        return p
+    return 'browser'
+
+
+argv = []
+path = []
+platform = _detect_platform()
+version_info = _make_named_tuple('sys.version_info', ['major', 'minor', 'micro', 'releaselevel', 'serial'], [3, 12, 0, 'final', 0])
+version = '3.12.0 (RapydScript)'
+hexversion = 0x030c00f0
+api_version = 1013
+implementation = {'name': 'rapydscript', 'version': version_info, 'cache_tag': None}
+maxsize = v'Number.MAX_SAFE_INTEGER'
+maxunicode = 0x10ffff
+byteorder = 'little'
+executable = ''
+prefix = ''
+dont_write_bytecode = True
+float_info = _make_named_tuple('sys.float_info',
+    ['max', 'max_exp', 'max_10_exp', 'min', 'min_exp', 'min_10_exp', 'dig', 'mant_dig', 'epsilon', 'radix', 'rounds'],
+    [v'Number.MAX_VALUE', 1024, 308, 2.2250738585072014e-308, -1021, -307, 15, 53, v'Number.EPSILON', 2, 1])
+int_info = _make_named_tuple('sys.int_info', ['bits_per_digit', 'sizeof_digit'], [30, 4])
+modules = v'(typeof ρσ_modules === "object" && ρσ_modules) ? ρσ_modules : {}'
+
+_recursion_limit = 1000
+
+
+def exit(code=None):
+    if code is undefined:
+        code = None
+    exc = SystemExit(code) if code is not None else SystemExit()
+    exc.code = code
+    raise exc
+
+
+def getrecursionlimit():
+    return _recursion_limit
+
+
+def setrecursionlimit(n):
+    nonlocal _recursion_limit
+    if jstype(n) is not 'number' or n < 1:
+        raise ValueError('recursion limit must be greater or equal than 1')
+    _recursion_limit = n
+
+
+def getdefaultencoding():
+    return 'utf-8'
+
+
+def getfilesystemencoding():
+    return 'utf-8'
+
+
+def getsizeof(obj, dflt=None):
+    # There is no way to measure memory in JS; return a plausible estimate.
+    if obj is None or obj is undefined:
+        return 16
+    t = jstype(obj)
+    if t is 'boolean' or t is 'number':
+        return 28
+    if t is 'string':
+        return 49 + obj.length
+    if Array.isArray(obj):
+        return 56 + 8 * obj.length
+    return 64
+
+
+def intern(s):
+    return s
+
+
+def exc_info():
+    return (None, None, None)
+
+
+class _TextStream:
+
+    def __init__(self, name, is_err):
+        self.name = name
+        self._is_err = is_err
+        self._pending = ''
+        self.encoding = 'utf-8'
+        self.errors = 'strict'
+
+    def _emit(self, line):
+        if v'typeof console' is not 'object':
+            return
+        if self._is_err:
+            console.error(line)
+        else:
+            console.log(line)
+
+    def write(self, s):
+        if jstype(s) is not 'string':
+            raise TypeError('write() argument must be str, not ' + jstype(s))
+        if not self._is_err:
+            print(s, end='')  # share print()'s partial-line buffer
+            return s.length
+        text = self._pending + s
+        nl = text.lastIndexOf('\n')
+        if nl >= 0:
+            self._emit(text.slice(0, nl))
+            text = text.slice(nl + 1)
+        self._pending = text
+        return s.length
+
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+    def flush(self):
+        if self._is_err:
+            if self._pending:
+                self._emit(self._pending)
+                self._pending = ''
+        else:
+            v'if (typeof ρσ_print_flush_pending === "function") ρσ_print_flush_pending()'
+
+    def isatty(self):
+        return False
+
+    def fileno(self):
+        return 2 if self._is_err else 1
+
+    def readable(self):
+        return False
+
+    def writable(self):
+        return True
+
+    def __repr__(self):
+        return "<_io.TextIOWrapper name='<" + self.name + ">' mode='w' encoding='utf-8'>"
+
+
+stdout = _TextStream('stdout', False)
+stderr = _TextStream('stderr', True)
+__stdout__ = stdout
+__stderr__ = stderr

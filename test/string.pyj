@@ -158,7 +158,7 @@ ae(f.format('{:x}', 255), 'ff')
 ae(f.format('{:X}', 255), 'FF')
 ae(f.format('{:b}', 10), '1010')
 ae(f.format('{:o}', 8), '10')
-ae(f.format('{:e}', 100000.0), '1.000000e+5')
+ae(f.format('{:e}', 100000.0), '1.000000e+05')  # two-digit exponent, as Python
 
 # {{ }} escaping
 ae(f.format('{{ }}'), '{ }')
@@ -184,7 +184,7 @@ ae(f.vformat('{0} {name}', ['hi'], {'name': 'Bob'}), 'hi Bob')
 # ── 9. Formatter — parse() ───────────────────────────────────────────────────
 
 _parsed = f.parse('literal {0} more {name!r:.5}')
-ae(len(_parsed), 3)
+ae(len(_parsed), 2)
 # first item: literal before first field
 ae(_parsed[0][0], 'literal ')
 ae(_parsed[0][1], '0')
@@ -195,9 +195,9 @@ ae(_parsed[1][0], ' more ')
 ae(_parsed[1][1], 'name')
 ae(_parsed[1][2], '.5')
 ae(_parsed[1][3], 'r')
-# trailing literal
-ae(_parsed[2][0], '')
-ae(_parsed[2][1], None)
+# no trailing empty literal after a final field (matches CPython)
+ae(len(f.parse('{0}')), 1)
+ae(len(f.parse('')), 0)
 
 # parse with only a trailing literal
 _p2 = f.parse('no fields here')
@@ -227,7 +227,7 @@ ae(f.get_value('x', [], {'x': 99}), 99)
 # get_field with dotted access
 _obj = {'name': 'Alice'}
 _gf = f.get_field('0', [_obj], {})
-ae(_gf[1], '0')  # first key used
+ok(_gf[1] is 0)  # first key used (an int for numeric fields)
 
 
 # ── 12. Formatter — convert_field ────────────────────────────────────────────
@@ -243,3 +243,111 @@ try:
 except ValueError:
     _bad_conv = True
 ok(_bad_conv)
+
+
+# ── 13. capwords ─────────────────────────────────────────────────────────────
+
+from string import capwords
+
+ae(capwords('  hello   wORLD  foo '), 'Hello World Foo')
+ae(capwords('a-b--c', '-'), 'A-B--C')
+ae(capwords(''), '')
+ae(capwords("they're bill's"), "They're Bill's")
+
+
+# ── 14. Template — kwargs, identifiers, validity ─────────────────────────────
+
+_tk = Template('$who likes ${what}, costs $$5 $$$amt')
+ae(_tk.substitute(who='tim', what='kung pao', amt=3), 'tim likes kung pao, costs $5 $3')
+ae(_tk.substitute({'who': 'tim', 'what': 'x', 'amt': 1}, who='bob'), 'bob likes x, costs $5 $1')
+ae(_tk.safe_substitute(who='tim'), 'tim likes ${what}, costs $5 $$amt')
+ade(_tk.get_identifiers(), ['who', 'what', 'amt'])
+ok(_tk.is_valid())
+ade(Template('$a $b ${a} $ $$ $c_1').get_identifiers(), ['a', 'b', 'c_1'])
+_tbad = Template('ok $x\nline two $ oops')
+ok(not _tbad.is_valid())
+_inv_msg = None
+try:
+    _tbad.substitute(x=1)
+except ValueError as e:
+    _inv_msg = str(e)
+ae(_inv_msg, 'Invalid placeholder in string: line 2, col 10')
+ae(_tbad.safe_substitute(x=1), 'ok 1\nline two $ oops')
+_missing_key = None
+try:
+    _tk.substitute(who='tim')
+except KeyError as e:
+    _missing_key = e.args[0] if e.args else str(e)
+ok(_missing_key is not None and str(_missing_key).indexOf('what') >= 0)
+
+
+# ── 15. Template — subclass customisation ────────────────────────────────────
+
+class PctTemplate(Template):
+    delimiter = '%'
+
+ae(PctTemplate('%x costs %% %{y}').substitute(x='a', y=5), 'a costs % 5')
+
+class DottedTemplate(Template):
+    idpattern = '[a-z]+\.[a-z]+'
+
+ae(DottedTemplate('$foo.bar ok').substitute({'foo.bar': 'V'}), 'V ok')
+
+class CaseTemplate(Template):
+    flags = 0
+
+ae(CaseTemplate('$abc $Abc').safe_substitute(abc=1, Abc=2), '1 $Abc')
+
+class BracketTemplate(Template):
+    pattern = '''
+    \[\[(?:
+      (?P<escaped>\[\[)       |
+      (?P<named>[a-z]+)\]\]   |
+      (?P<braced>BRACED)        |
+      (?P<invalid>)
+    )
+    '''
+
+ae(BracketTemplate('[[name]] and [[[[ lit').substitute(name='N'), 'N and $ lit')
+
+
+# ── 16. Formatter — kwargs, attributes, conversions, specs ───────────────────
+
+class _FP:
+    def __init__(self):
+        self.x = 3
+        self.items = [10, 20]
+
+_fp = _FP()
+ae(f.format('{name} is {age:>5}', name='Al', age=30), 'Al is    30')
+ae(f.format('{} {x}', 1, x=2), '1 2')
+ae(f.format('{0.x} {p.items[1]} {d[key]} {l[0]}', _fp, p=_fp, d={'key': 'v'}, l=[7]), '3 20 v 7')
+ae(f.format('{0!r} {0!s} {0!r:>8}', 'hi'), "'hi' hi     'hi'")
+ae(f.format('{:.3f} {:08.2f} {:x}', 3.14159, 2.5, 255), '3.142 00002.50 ff')
+ae(f.format('{:{}}|{:>{w}}', 'a', 5, 'b', w=4), 'a    |   b')
+ae(f.format('{{literal}} {0}', 'x'), '{literal} x')
+
+def _fmt_err(fmt, *args):
+    try:
+        f.format(fmt, *args)
+    except Exception as e:
+        return e.__class__.__name__ + ': ' + str(e)
+    return None
+
+ae(_fmt_err('{} {0}', 1), 'ValueError: cannot switch from manual field specification to automatic field numbering')
+ae(_fmt_err('{3}', 1), 'IndexError: tuple index out of range')
+ae(_fmt_err('oops }', 1), "ValueError: Single '}' encountered in format string")
+ae(_fmt_err('{0!x}', 1), 'ValueError: Unknown conversion specifier x')
+ae(_fmt_err('{:{:{}}}', 1, 2, 3), 'ValueError: Max string recursion exceeded')
+_pp = f.parse('a{0!r:>3}b{{}}')
+ae(len(_pp), 3)
+ae(_pp[1][0], 'b{')
+ae(_pp[2][0], '}')
+
+class _DefaultingFormatter(Formatter):
+    def get_value(self, key, args, kwargs):
+        if jstype(key) is 'string':
+            return kwargs[key] if key in kwargs else '<' + key + '>'
+        return Formatter.get_value(self, key, args, kwargs)
+
+ae(_DefaultingFormatter().format('{a} {b}', a=1), '1 <b>')

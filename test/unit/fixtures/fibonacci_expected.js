@@ -12,19 +12,21 @@ function memoize(f) {
         };
         if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
             __argnames__ : {value: ["x"]},
-            __module__ : {value: "__main__"}
+            __module__ : {value: "__main__"},
+            __name__ : {value: "<lambda>", writable: true, configurable: true}
         });
         return ρσ_anonfunc;
     })();
 };
 if (!memoize.__argnames__) Object.defineProperties(memoize, {
     __argnames__ : {value: ["f"]},
-    __module__ : {value: "__main__"}
+    __module__ : {value: "__main__"},
+    __name__ : {value: "memoize", writable: true, configurable: true}
 });
 
 
 var fib = memoize((function() {
-    var ρσ_anonfunc = function fib(n) {
+    var ρσ_anonfunc = function (n) {
         if ((n === 0 || typeof n === "object" && ρσ_equals(n, 0))) {
             return 0;
         } else if ((n === 1 || typeof n === "object" && ρσ_equals(n, 1))) {
@@ -33,9 +35,11 @@ var fib = memoize((function() {
             return ρσ_list_add(fib(n - 1), fib(n - 2));
         }
     };
+    Object.defineProperty(ρσ_anonfunc, "name", {value: "fib", configurable: true});
     if (!ρσ_anonfunc.__argnames__) Object.defineProperties(ρσ_anonfunc, {
         __argnames__ : {value: ["n"]},
-        __module__ : {value: "__main__"}
+        __module__ : {value: "__main__"},
+        __name__ : {value: "fib", writable: true, configurable: true}
     });
     return ρσ_anonfunc;
 })());

@@ -94,7 +94,9 @@ try {
 fs.writeFileSync('rapydscript.js', rs, {'encoding':'utf-8'});
 var web_repl = path.join(base, 'web-repl');
 fs.readdirSync(web_repl).forEach(function(x) {
-    if (['sha1.js', 'env.js'].indexOf(x) !== -1) return;
+    // rapydscript.js was just built above; don't overwrite it with web-repl's copy
+    if (['sha1.js', 'env.js', 'rapydscript.js'].indexOf(x) !== -1) return;
+    if (fs.statSync(path.join(web_repl, x)).isDirectory()) return;
     var data = fs.readFileSync(path.join(web_repl, x), {'encoding':'utf-8'});
     fs.writeFileSync(x, data, {'encoding':'utf-8'});
 });

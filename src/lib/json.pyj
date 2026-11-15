@@ -8,14 +8,11 @@
 ###########################################################
 
 
-# Python-compatible json module backed by the JS JSON global.
+# Python-compatible json module. loads() parses with the JS JSON global and
+# builds dicts and lists; dumps() is its own encoder, so output matches
+# Python's json.dumps (separators, indent layout, float formatting, errors).
 #
-# RapydScript dicts/lists map directly to JS objects/arrays, so
-# JSON.stringify / JSON.parse round-trip without conversion.
-# This wrapper provides the familiar Python json.dumps / json.loads API.
-#
-# NOTE: `default` is a JS reserved word in RapydScript; the parameter is
-# exposed as `dflt` in function signatures but documented as `default`.
+# (`dflt` is accepted as an older alias of the `default` parameter.)
 
 
 class JSONDecodeError(ValueError):
@@ -28,167 +25,138 @@ class JSONDecodeError(ValueError):
         ValueError.__init__(self, msg + ': line ' + str(self.lineno) + ' column ' + str(self.colno) + ' (char ' + str(pos) + ')')
 
 
-# ---------------------------------------------------------------------------
-# Internal JS helpers
-# ---------------------------------------------------------------------------
-
 v"""
-// Convert a value to a plain JS object recursively, honouring ρσ_dict.toJSON.
-function _json_to_plain(val) {
-    if (val === null || val === undefined) return val;
-    if (Array.isArray(val)) {
-        return val.map(_json_to_plain);
-    }
-    if (typeof val === 'object') {
-        if (typeof val.toJSON === 'function') {
-            // ρσ_dict.toJSON() converts the dict to a plain {k:v} object
-            val = val.toJSON();
+// A Python-compatible JSON encoder (json.dumps): Python's separators, indent
+// layout, key conversion and error cases, rather than JSON.stringify's.
+function _json_quote(str, ensure_ascii) {
+    var out = JSON.stringify(str);
+    if (ensure_ascii) out = out.replace(/[\u0080-￿]/g, function (c) {
+        return "\\u" + ("000" + c.charCodeAt(0).toString(16)).slice(-4);
+    });
+    return out;
+}
+function _json_encode(obj, opts) {
+    var stack = [];
+    function number(x) {
+        if (x !== x || x === Infinity || x === -Infinity) {
+            if (!opts.allow_nan) throw new ValueError("Out of range float values are not JSON compliant");
+            return x !== x ? "NaN" : (x > 0 ? "Infinity" : "-Infinity");
         }
-        var out = {};
-        var keys = Object.keys(val);
-        for (var i = 0; i < keys.length; i++) {
-            out[keys[i]] = _json_to_plain(val[keys[i]]);
-        }
-        return out;
+        return ρσ_number_repr(x);
     }
-    return val;
+    function key_of(k) {
+        if (typeof k === "string") return k;
+        if (typeof k === "number") return number(k);
+        if (typeof k === "boolean") return k ? "true" : "false";
+        if (k === null || k === undefined) return "null";
+        return undefined;  // not a JSON key
+    }
+    function enter(o) {
+        if (opts.check_circular) {
+            if (stack.indexOf(o) >= 0) throw new ValueError("Circular reference detected");
+            stack.push(o);
+        }
+    }
+    function leave() { if (opts.check_circular) stack.pop(); }
+    function layout(items, open, close, level) {
+        if (!items.length) return open + close;
+        if (opts.indent === null || opts.indent === undefined) return open + items.join(opts.item_sep) + close;
+        var inner = "\n" + opts.indent.repeat(level + 1), outer = "\n" + opts.indent.repeat(level);
+        return open + inner + items.join(opts.item_sep + inner) + outer + close;
+    }
+    function enc(o, level) {
+        if (o === null || o === undefined) return "null";
+        if (o === true) return "true";
+        if (o === false) return "false";
+        if (typeof o === "number") return number(o);
+        if (typeof o === "bigint") return String(o);
+        if (typeof o === "string") return _json_quote(o, opts.ensure_ascii);
+        var pairs = null, items;
+        if (Array.isArray(o)) {
+            enter(o);
+            items = o.map(function (x) { return enc(x, level + 1); });
+            leave();
+            return layout(items, "[", "]", level);
+        }
+        if (o instanceof ρσ_dict || (typeof Map === "function" && o instanceof Map)) {
+            pairs = [];
+            (o instanceof ρσ_dict ? o.jsmap : o).forEach(function (v, k) { pairs.push([k, v]); });
+        } else if (typeof o === "object" && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null)) {
+            pairs = Object.keys(o).map(function (k) { return [k, o[k]]; });  // a plain JS object
+        }
+        if (pairs === null) {
+            if (opts.dflt) return enc(opts.dflt(o), level);
+            throw new TypeError("Object of type " + ρσ_type(o).__name__ + " is not JSON serializable");
+        }
+        enter(o);
+        var entries = [];
+        for (var i = 0; i < pairs.length; i++) {
+            var key = key_of(pairs[i][0]);
+            if (key === undefined) {
+                if (opts.skipkeys) continue;
+                throw new TypeError("keys must be str, int, float, bool or None, not " + ρσ_type(pairs[i][0]).__name__);
+            }
+            entries.push([key, pairs[i][1]]);
+        }
+        if (opts.sort_keys) entries.sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
+        items = entries.map(function (e) { return _json_quote(e[0], opts.ensure_ascii) + opts.key_sep + enc(e[1], level + 1); });
+        leave();
+        return layout(items, "{", "}", level);
+    }
+    return enc(obj, 0);
 }
 
-// Sort keys recursively.
-function _json_sort_keys(val) {
-    if (val === null || val === undefined) return val;
-    if (Array.isArray(val)) {
-        return val.map(_json_sort_keys);
-    }
-    if (typeof val === 'object') {
-        var sorted = {};
-        Object.keys(val).sort().forEach(function(k) {
-            sorted[k] = _json_sort_keys(val[k]);
-        });
-        return sorted;
-    }
-    return val;
-}
-
-// Raise ValueError if any value in the tree is NaN or non-finite.
-function _json_check_nan(val, raise_fn) {
-    if (typeof val === 'number') {
-        if (isNaN(val) || !isFinite(val)) {
-            raise_fn();
+// json.loads: objects become dicts and arrays lists, as Python's json does
+function _json_reviver(object_hook, object_pairs_hook, parse_float, parse_int) {
+    return function (key, val) {
+        if (Array.isArray(val)) return ρσ_list_decorate(val);
+        if (val !== null && typeof val === "object") {
+            var keys = Object.keys(val);
+            if (object_pairs_hook) return object_pairs_hook(ρσ_list_decorate(keys.map(function (k) { return ρσ_tuple_decorate([k, val[k]]); })));
+            var d = ρσ_dict();
+            for (var i = 0; i < keys.length; i++) d.jsmap.set(keys[i], val[keys[i]]);
+            return object_hook ? object_hook(d) : d;
         }
-        return;
-    }
-    if (Array.isArray(val)) {
-        for (var i = 0; i < val.length; i++) _json_check_nan(val[i], raise_fn);
-        return;
-    }
-    if (val !== null && typeof val === 'object') {
-        var keys = Object.keys(val);
-        for (var j = 0; j < keys.length; j++) _json_check_nan(val[keys[j]], raise_fn);
-    }
-}
-
-// Walk a parsed JSON tree and apply object_hook / parse_float / parse_int.
-function _json_walk(val, parse_float, parse_int, object_hook, object_pairs_hook) {
-    if (Array.isArray(val)) {
-        for (var i = 0; i < val.length; i++) {
-            val[i] = _json_walk(val[i], parse_float, parse_int, object_hook, object_pairs_hook);
+        if (typeof val === "number") {
+            if (parse_int && val === Math.floor(val)) return parse_int(String(val));
+            if (parse_float && val !== Math.floor(val)) return parse_float(String(val));
         }
         return val;
-    }
-    if (val !== null && typeof val === 'object') {
-        var keys = Object.keys(val);
-        for (var j = 0; j < keys.length; j++) {
-            val[keys[j]] = _json_walk(val[keys[j]], parse_float, parse_int, object_hook, object_pairs_hook);
-        }
-        if (object_pairs_hook) {
-            var pairs = keys.map(function(k) { return [k, val[k]]; });
-            return object_pairs_hook(pairs);
-        }
-        if (object_hook) {
-            return object_hook(val);
-        }
-        return val;
-    }
-    if (typeof val === 'number') {
-        if (parse_int && val === Math.floor(val)) {
-            return parse_int(String(val));
-        }
-        if (parse_float && val !== Math.floor(val)) {
-            return parse_float(String(val));
-        }
-    }
-    return val;
+    };
 }
 """
 
 
 def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
-          allow_nan=False, sort_keys=False, indent=None, separators=None,
-          dflt=None):
-    """Serialize obj to a JSON-formatted string.
+          allow_nan=True, sort_keys=False, indent=None, separators=None,
+          default=None, dflt=None):
+    """Serialize obj to a JSON-formatted string, as Python's json.dumps.
 
-    Parameters:
-      indent     -- int or str; if not None, pretty-print output
-      sort_keys  -- if True, sort dict keys in the output
-      dflt       -- callable for objects that are not serializable (Python: default);
-                    should return a JSON-serializable value or raise TypeError
-      separators -- (item_sep, key_sep) pair; (',', ':') gives compact output
-      allow_nan  -- if False (default), NaN/Infinity raise ValueError
-      skipkeys, ensure_ascii, check_circular -- accepted for API compatibility
+    default -- called for objects that aren't serializable (dflt is an older alias)
     """
-    # Convert to plain JS (handles ρσ_dict via toJSON)
-    work = _json_to_plain(obj)
-
-    if not allow_nan:
-        def _raise_nan():
-            raise ValueError('Out of range float values are not JSON compliant')
-        _json_check_nan(work, _raise_nan)
-
-    if sort_keys:
-        work = _json_sort_keys(work)
-
-    js_indent = None
-    if indent is not None:
-        if jstype(indent) is 'number':
-            js_indent = indent
-        else:
-            js_indent = str(indent)
-
-    replacer = None
-    if dflt is not None:
-        _dflt_fn = dflt
-        def replacer(key, value):
-            if value is not None and jstype(value) is 'object' and not Array.isArray(value):
-                try:
-                    return _json_to_plain(_dflt_fn(value))
-                except TypeError:
-                    pass
-            return value
-
-    result = JSON.stringify(work, replacer, js_indent)
-
-    if result is undefined:
-        raise TypeError('Object of type ' + jstype(obj) + ' is not JSON serializable')
-
-    # Apply custom separators when not pretty-printing.
-    # JS default uses ", " between items and ": " between key and value.
-    if indent is None and separators is not None:
+    if dflt is None:
+        dflt = default
+    if indent is not None and jstype(indent) is 'number':
+        indent = ' '.repeat(indent)
+    if separators is not None:
         item_sep = separators[0]
-        key_sep  = separators[1]
-        result = result.split(', ').join(item_sep).split(': ').join(key_sep)
-
-    return result
+        key_sep = separators[1]
+    else:
+        item_sep = ', ' if indent is None else ','
+        key_sep = ': '
+    return _json_encode(obj, {
+        'skipkeys': skipkeys, 'ensure_ascii': ensure_ascii, 'check_circular': check_circular,
+        'allow_nan': allow_nan, 'sort_keys': sort_keys, 'indent': indent,
+        'item_sep': item_sep, 'key_sep': key_sep, 'dflt': dflt,
+    })
 
 
 def loads(s, cls=None, object_hook=None, parse_float=None,
           parse_int=None, parse_constant=None, object_pairs_hook=None):
-    """Deserialize s (a str) to a Python object.
-
-    Returns plain JS objects (access with obj['key'] or obj.key).
+    """Deserialize s (a str) to Python objects: dicts, lists, str, numbers, None.
 
     Parameters:
-      object_hook       -- callable applied to every decoded JSON object
+      object_hook       -- callable applied to every decoded JSON object (a dict)
       object_pairs_hook -- called with [(key, value), ...] for each object
                            (takes precedence over object_hook)
       parse_float       -- called with the string of each float literal
@@ -196,30 +164,24 @@ def loads(s, cls=None, object_hook=None, parse_float=None,
       cls, parse_constant -- accepted for API compatibility, ignored
     """
     try:
-        result = v'JSON.parse'(str(s))
+        result = v'JSON.parse'(str(s), _json_reviver(object_hook, object_pairs_hook, parse_float, parse_int))
     except Exception as _parse_err:
         msg = _parse_err.message if _parse_err.message else str(_parse_err)
         raise JSONDecodeError(msg, str(s), 0)
 
     if result is undefined:
         raise JSONDecodeError('No JSON object could be decoded', str(s), 0)
-
-    needs_walk = (parse_float is not None or parse_int is not None or
-                  object_hook is not None or object_pairs_hook is not None)
-    if needs_walk:
-        result = _json_walk(result, parse_float, parse_int, object_hook, object_pairs_hook)
-
     return result
 
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
-         allow_nan=False, sort_keys=False, indent=None, separators=None,
-         dflt=None):
+         allow_nan=True, sort_keys=False, indent=None, separators=None,
+         default=None, dflt=None):
     """Serialize obj as a JSON stream to fp (a file-like object with .write())."""
     fp.write(dumps(obj, skipkeys=skipkeys, ensure_ascii=ensure_ascii,
                    check_circular=check_circular, allow_nan=allow_nan,
                    sort_keys=sort_keys, indent=indent, separators=separators,
-                   dflt=dflt))
+                   dflt=dflt or default))
 
 
 def load(fp):

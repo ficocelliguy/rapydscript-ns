@@ -311,11 +311,14 @@ b = None
 assrt.equal(a == b, False)
 assrt.equal(b == a, False)
 
-a, b = range(1111111111)
+# Unpacking checks the count, as in Python, without materialising the range
+assrt.throws(def(): a, b = range(1111111111);, ValueError)
+a, b = range(2)
 assrt.equal(a, 0)
 assrt.equal(b, 1)
 assrt.equal(len(range(10)), 10)
-assrt.equal(str(range(10)), 'range(0, 10, 1)')
+assrt.equal(str(range(10)), 'range(0, 10)')
+assrt.equal(str(range(0, 10, 2)), 'range(0, 10, 2)')
 
 assrt.deepEqual(divmod(7, 3), [2, 1])
 assrt.deepEqual(divmod(-7, 3), [-3, 2])
@@ -331,10 +334,10 @@ assrt.equal(0, min(range(3)))
 assrt.equal(0, min([0, 1, 2]))
 assrt.equal(2, max([0, 1, 2]))
 assrt.throws(def(): min();, TypeError)
-assrt.throws(def(): max([]);, TypeError)
+assrt.throws(def(): max([]);, ValueError)
 assrt.equal(9, max(defval=9))
 assrt.equal(9, max([], defval=9))
-assrt.equal(1, max([{'k':0}, {'k':1}], key=def(x): return x.k;))
+assrt.equal(1, max([{'k':0}, {'k':1}], key=def(x): return x.k;).k)  # the element, not its key
 
 # any()/all()
 assrt.equal(any([1, 2, 3]), True)

@@ -8,111 +8,292 @@
 ###########################################################
 
 
-# basic implementation of Python's 'random' library
+# Implementation of Python's 'random' library.
+#
+# JavaScript's Math.random() does not allow seeding its random generator, so
+# this module implements its own seedable generator (RC4). As in Python, the
+# generator is a Random class, and the module-level functions use one shared
+# instance; Random(seed) gives an independent, reproducible stream.
 
-# JavaScript's Math.random() does not allow seeding its random generator, to bypass that, this module implements its own
-# version that can be seeded. I decided on RC4 algorithm for this.
 
-# please don't mess with this from the outside
-
-ρσ_seed_state = {
-    'key': [],
-    'key_i': 0,
-    'key_j': 0
-}
-
-ρσ_get_random_byte = def():
-    ρσ_seed_state.key_i = (ρσ_seed_state.key_i + 1) % 256
-    ρσ_seed_state.key_j = (ρσ_seed_state.key_j + ρσ_seed_state.key[ρσ_seed_state.key_i]) % 256
-    ρσ_seed_state.key[ρσ_seed_state.key_i], ρσ_seed_state.key[ρσ_seed_state.key_j] = \
-            ρσ_seed_state.key[ρσ_seed_state.key_j], ρσ_seed_state.key[ρσ_seed_state.key_i]
-    return ρσ_seed_state.key[(ρσ_seed_state.key[ρσ_seed_state.key_i] + \
-            ρσ_seed_state.key[ρσ_seed_state.key_j]) % 256]
-
-def seed(x=Date().getTime()):
-    ρσ_seed_state.key_i = ρσ_seed_state.key_j = 0
-    if jstype(x) is 'number':
+def _rc4_seed(state, x):
+    state.key_i = state.key_j = 0
+    if x is None or x is undefined:
+        x = Date().getTime()
+    if jstype(x) is 'number' or jstype(x) is 'boolean':
         x = x.toString()
     elif jstype(x) is not 'string':
-        raise TypeError("unhashable type: '" + jstype(x) + "'")
+        raise TypeError("The only supported seed types are: None, int, float, str")
+    key = state.key
     for i in range(256):
-        ρσ_seed_state.key[i] = i
+        key[i] = i
     j = 0
     for i in range(256):
-        j = (j + ρσ_seed_state.key[i] + x.charCodeAt(i % x.length)) % 256
-        ρσ_seed_state.key[i], ρσ_seed_state.key[j] = ρσ_seed_state.key[j], ρσ_seed_state.key[i]
-seed()
+        j = (j + key[i] + x.charCodeAt(i % x.length)) % 256
+        key[i], key[j] = key[j], key[i]
+
+
+def _rc4_byte(state):
+    key = state.key
+    state.key_i = (state.key_i + 1) % 256
+    state.key_j = (state.key_j + key[state.key_i]) % 256
+    key[state.key_i], key[state.key_j] = key[state.key_j], key[state.key_i]
+    return key[(key[state.key_i] + key[state.key_j]) % 256]
+
+
+def _length(seq):
+    return seq.length if seq.length is not undefined else len(seq)
+
+
+class Random:
+    """A seedable random number generator, as Python's random.Random."""
+
+    def __init__(self, x=None):
+        self._state = {'key': [], 'key_i': 0, 'key_j': 0}
+        self._gauss_next = None
+        self.seed(x)
+
+    def seed(self, a=None):
+        _rc4_seed(self._state, a)
+        self._gauss_next = None
+
+    def getstate(self):
+        s = self._state
+        return [s.key.slice(), s.key_i, s.key_j, self._gauss_next]
+
+    def setstate(self, state):
+        self._state = {'key': state[0].slice(), 'key_i': state[1], 'key_j': state[2]}
+        self._gauss_next = state[3]
+
+    def random(self):
+        n = 0
+        m = 1
+        for i in range(8):
+            n += _rc4_byte(self._state) * m
+            m *= 256
+        return v'n / 0x10000000000000000'
+
+    def getrandbits(self, k):
+        if k < 0:
+            raise ValueError('number of bits must be non-negative')
+        ans = 0
+        m = 1
+        while k > 0:
+            bits = Math.min(k, 8)
+            ans += (_rc4_byte(self._state) % (1 << bits)) * m
+            m *= (1 << bits)
+            k -= bits
+        return ans
+
+    def _randbelow(self, n):
+        return Math.floor(self.random() * n)
+
+    def randrange(self, start, stop=None, step=1):
+        start = int(start)
+        if stop is None:
+            if start > 0:
+                return self._randbelow(start)
+            raise ValueError("empty range for randrange()")
+        stop = int(stop)
+        step = int(step)
+        width = stop - start
+        if step is 1:
+            if width > 0:
+                return start + self._randbelow(width)
+            raise ValueError("empty range for randrange()")
+        if step > 0:
+            n = Math.floor((width + step - 1) / step)
+        elif step < 0:
+            n = Math.floor((width + step + 1) / step)
+        else:
+            raise ValueError("zero step for randrange()")
+        if n <= 0:
+            raise ValueError("empty range for randrange()")
+        return start + step * self._randbelow(n)
+
+    def randint(self, a, b):
+        return self.randrange(a, b + 1)
+
+    def uniform(self, a, b):
+        return a + (b - a) * self.random()
+
+    def choice(self, seq):
+        n = _length(seq)
+        if n is 0:
+            raise IndexError('Cannot choose from an empty sequence')
+        return seq[self._randbelow(n)]
+
+    def choices(self, population, weights=None, cum_weights=None, k=1):
+        # k picks with replacement, optionally weighted
+        n = _length(population)
+        if n is 0:
+            raise IndexError('Cannot choose from an empty population')
+        if weights is None and cum_weights is None:
+            return [population[self._randbelow(n)] for i in range(k)]
+        if cum_weights is None:
+            cum_weights = []
+            total = 0
+            for w in weights:
+                total += w
+                cum_weights.push(total)
+        elif weights is not None:
+            raise TypeError('Cannot specify both weights and cumulative weights')
+        if _length(cum_weights) is not n:
+            raise ValueError('The number of weights does not match the population')
+        total = cum_weights[n - 1]
+        if not (total > 0):
+            raise ValueError('Total of weights must be greater than zero')
+        ans = []
+        for i in range(k):
+            x = self.random() * total
+            lo = 0
+            hi = n - 1
+            while lo < hi:  # first cumulative weight above x
+                mid = (lo + hi) >> 1
+                if cum_weights[mid] > x:
+                    hi = mid
+                else:
+                    lo = mid + 1
+            ans.push(population[lo])
+        return ans
+
+    def shuffle(self, x):
+        # Fisher-Yates, in place (in the same order as earlier releases, so a
+        # given seed still produces the same shuffle)
+        for i in range(x.length):
+            j = Math.floor(self.random() * (i + 1))
+            x[i], x[j] = x[j], x[i]
+
+    def sample(self, population, k, counts=None):
+        # k distinct picks (without replacement), from any sequence or set
+        pool = list(population)
+        if counts is not None:
+            expanded = []
+            for i in range(pool.length):
+                for c in range(counts[i]):
+                    expanded.push(pool[i])
+            pool = expanded
+        n = pool.length
+        if k < 0 or k > n:
+            raise ValueError('Sample larger than population or is negative')
+        ans = []
+        for i in range(k):
+            j = i + self._randbelow(n - i)
+            pool[i], pool[j] = pool[j], pool[i]
+            ans.push(pool[i])
+        return ans
+
+    def gauss(self, mu=0.0, sigma=1.0):
+        # Box-Muller; each call pair yields two values
+        z = self._gauss_next
+        self._gauss_next = None
+        if z is None:
+            u = 1 - self.random()
+            v = self.random()
+            r = Math.sqrt(-2 * Math.log(u))
+            z = r * Math.cos(2 * Math.PI * v)
+            self._gauss_next = r * Math.sin(2 * Math.PI * v)
+        return mu + z * sigma
+
+    def normalvariate(self, mu=0.0, sigma=1.0):
+        u = 1 - self.random()
+        v = self.random()
+        return mu + sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
+
+    def expovariate(self, lambd=1.0):
+        return -Math.log(1 - self.random()) / lambd
+
+    def triangular(self, low=0.0, high=1.0, mode=None):
+        if high is low:
+            return low
+        u = self.random()
+        c = 0.5 if mode is None else (mode - low) / (high - low)
+        if u > c:
+            u = 1 - u
+            c = 1 - c
+            low, high = high, low
+        return low + (high - low) * Math.sqrt(u * c)
+
+    def betavariate(self, alpha, beta):
+        y = self.gammavariate(alpha, 1)
+        if y is 0:
+            return 0
+        return y / (y + self.gammavariate(beta, 1))
+
+    def gammavariate(self, alpha, beta=1.0):
+        # Marsaglia and Tsang (boosted for alpha < 1)
+        if alpha <= 0 or beta <= 0:
+            raise ValueError('gammavariate: alpha and beta must be > 0.0')
+        if alpha < 1:
+            return self.gammavariate(alpha + 1, beta) * Math.pow(self.random(), 1 / alpha)
+        d = alpha - 1 / 3
+        c = 1 / Math.sqrt(9 * d)
+        while True:
+            x = self.normalvariate()
+            v = 1 + c * x
+            if v <= 0:
+                continue
+            v = v * v * v
+            u = self.random()
+            if u < 1 - 0.0331 * x * x * x * x or Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v)):
+                return d * v * beta
+
+
+_inst = Random()
+
+def seed(a=None):
+    _inst.seed(a)
+
+def getstate():
+    return _inst.getstate()
+
+def setstate(state):
+    _inst.setstate(state)
 
 def random():
-    n = 0
-    m = 1
-    for i in range(8):
-        n += ρσ_get_random_byte() * m
-        m *= 256
-    return v'n / 0x10000000000000000'
+    return _inst.random()
 
-def randrange():
-    if arguments.length is 1:
-        return randbelow(int(arguments[0]))
-    start = int(arguments[0])
-    stop = int(arguments[1])
-    if arguments.length < 3:
-        step = 1
-    else:
-        step = int(arguments[2])
-    width = stop - start
-    if step is 1:
-        if width > 0:
-            return start + randbelow(width)
-        raise ValueError("empty range for randrange()")
-    if step > 0:
-        n = (width + step - 1) // step
-    elif step < 0:
-        n = (width + step + 1) // step
-    else:
-        raise ValueError("zero step for randrange()")
-    if n <= 0:
-        raise ValueError(f"empty range in randrange({start}, {stop}, {step})")
-    return start + step * randbelow(n)
+def getrandbits(k):
+    return _inst.getrandbits(k)
 
+def randrange(start, stop=None, step=1):
+    return _inst.randrange(start, stop, step)
 
 def randint(a, b):
-    return int(random()*(b-a+1) + a)
+    return _inst.randint(a, b)
 
 def uniform(a, b):
-    return random()*(b-a) + a
+    return _inst.uniform(a, b)
 
 def randbelow(n):
-    return Math.floor(random()*n)
+    return _inst._randbelow(n)
 
 def choice(seq):
-    if seq.length > 0:
-        return seq[randbelow(seq.length)]
-    else:
-        raise IndexError()
+    return _inst.choice(seq)
 
-# uses Fisher-Yates algorithm to shuffle an array
-def shuffle(x, random_f=random):
-    for i in range(x.length):
-        j = Math.floor(random_f() * (i+1))
-        x[i], x[j] = x[j], x[i]
-    return x
+def choices(population, weights=None, cum_weights=None, k=1):
+    return _inst.choices(population, weights, cum_weights, k)
 
-# similar to shuffle, but only shuffles a subset and creates a copy
-def sample(population, k):
-    x = population.slice()
-    for i in range(population.length-1, population.length-k-1, -1):
-        j = Math.floor(random() * (i+1))
-        x[i], x[j] = x[j], x[i]
-    return x.slice(population.length-k)
+def shuffle(x):
+    _inst.shuffle(x)
 
+def sample(population, k, counts=None):
+    return _inst.sample(population, k, counts)
 
-#import stdlib
-#a = range(50)
-#random.seed(5)
-#print(random.choice(a))
-#print(random.shuffle(a))
-#print(random.randrange(10))
-#print(random.randint(1,5))
-#print(random.uniform(1,5))
-#print(random.sample(range(20),5))
+def gauss(mu=0.0, sigma=1.0):
+    return _inst.gauss(mu, sigma)
+
+def normalvariate(mu=0.0, sigma=1.0):
+    return _inst.normalvariate(mu, sigma)
+
+def expovariate(lambd=1.0):
+    return _inst.expovariate(lambd)
+
+def triangular(low=0.0, high=1.0, mode=None):
+    return _inst.triangular(low, high, mode)
+
+def betavariate(alpha, beta):
+    return _inst.betavariate(alpha, beta)
+
+def gammavariate(alpha, beta=1.0):
+    return _inst.gammavariate(alpha, beta)

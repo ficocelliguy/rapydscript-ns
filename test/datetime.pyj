@@ -285,7 +285,7 @@ ae(str(time(14, 30, 5, 123456)),  '14:30:05.123456')
 ae(time(9).isoformat(),           '09:00:00')
 ae(repr(time(14, 30, 5)),         'datetime.time(14, 30, 5)')
 ae(repr(time(14, 30, 5, 123456)), 'datetime.time(14, 30, 5, 123456)')
-ae(repr(time(14)),                'datetime.time(14)')
+ae(repr(time(14)),                'datetime.time(14, 0)')
 
 # ── 19. time comparisons ──────────────────────────────────────────────────────
 # STATUS: ✓ WORKS
@@ -498,3 +498,137 @@ throws(def(): date(2023, 2, 29);)       # Feb 29 in non-leap year
 throws(def(): time(24, 0, 0);)          # hour > 23
 throws(def(): time(0, 60, 0);)          # minute > 59
 throws(def(): datetime(2024, 1, 1, 0, 0, 60);)  # second > 59
+
+# ── 36. strftime: extra directives ───────────────────────────────────────────
+
+from datetime import timezone, tzinfo, UTC
+
+_sf = datetime(2024, 1, 5, 14, 7, 9, 123456)
+ae(_sf.strftime('%y'), '24')
+ae(_sf.strftime('%U %W %w %u'), '00 01 5 5')
+ae(_sf.strftime('%G-W%V'), '2024-W01')
+ae(date(2021, 1, 1).strftime('%G %V %u'), '2020 53 5')
+ae(date(2023, 12, 31).strftime('%U %W %w'), '53 52 0')
+ae(_sf.strftime('%c'), 'Fri Jan  5 14:07:09 2024')
+ae(_sf.strftime('%x %X'), '01/05/24 14:07:09')
+ae(_sf.strftime('[%z][%Z]'), '[][]')
+ae(time(13, 5).strftime('%H:%M %Y'), '13:05 1900')
+ae(date(2024, 1, 5).ctime(), 'Fri Jan  5 00:00:00 2024')
+
+# ── 37. timezone ─────────────────────────────────────────────────────────────
+
+_tz2 = timezone(timedelta(hours=2))
+_tzx = timezone(timedelta(hours=-5, minutes=-30), 'XST')
+ae(str(timezone.utc), 'UTC')
+ok(UTC is timezone.utc)
+ae(repr(timezone.utc), 'datetime.timezone.utc')
+ae(str(_tz2), 'UTC+02:00')
+ae(repr(_tz2), 'datetime.timezone(datetime.timedelta(seconds=7200))')
+ae(repr(_tzx), "datetime.timezone(datetime.timedelta(days=-1, seconds=66600), 'XST')")
+ae(_tzx.tzname(None), 'XST')
+ok(_tz2.dst(None) is None)
+throws(def(): timezone(timedelta(hours=24));)
+throws(def(): timezone(5);)
+
+# ── 38. aware datetime ───────────────────────────────────────────────────────
+
+_aw = datetime(2024, 3, 10, 12, 0, tzinfo=_tz2)
+ok(_aw.tzinfo is _tz2)
+ae(str(_aw.utcoffset()), '2:00:00')
+ae(_aw.tzname(), 'UTC+02:00')
+ae(_aw.isoformat(), '2024-03-10T12:00:00+02:00')
+ae(str(_aw), '2024-03-10 12:00:00+02:00')
+ae(repr(_aw), 'datetime.datetime(2024, 3, 10, 12, 0, tzinfo=datetime.timezone(datetime.timedelta(seconds=7200)))')
+ae(_aw.strftime('%z %Z'), '+0200 UTC+02:00')
+ae(datetime(2024, 3, 10, tzinfo=_tzx).strftime('%z %Z'), '-0530 XST')
+_awu = _aw.astimezone(timezone.utc)
+ae(repr(_awu), 'datetime.datetime(2024, 3, 10, 10, 0, tzinfo=datetime.timezone.utc)')
+ok(_aw.__eq__(_awu))
+ae(str(_aw.__sub__(_awu)), '0:00:00')
+ae(_aw.timestamp(), 1710064800)
+ae(str(datetime(2024, 3, 10, 23, 0, tzinfo=_tzx).__sub__(datetime(2024, 3, 10, 1, 0, tzinfo=_tz2))), '1 day, 5:30:00')
+ae(str(_aw.__add__(timedelta(hours=20))), '2024-03-11 08:00:00+02:00')
+ae(repr(_aw.replace(tzinfo=None)), 'datetime.datetime(2024, 3, 10, 12, 0)')
+_naive = datetime(2024, 3, 10, 12, 0)
+ok(not _aw.__eq__(_naive))
+throws(def(): _aw.__lt__(_naive);)
+throws(def(): _aw.__sub__(_naive);)
+ok(_aw.__lt__(datetime(2024, 3, 10, 11, 0, tzinfo=timezone.utc)))
+ae(repr(datetime.fromtimestamp(1700000000.5, timezone.utc)), 'datetime.datetime(2023, 11, 14, 22, 13, 20, 500000, tzinfo=datetime.timezone.utc)')
+ae(str(datetime.fromtimestamp(0, _tzx)), '1969-12-31 18:30:00-05:30')
+ae(repr(datetime.utcfromtimestamp(1700000000.123456)), 'datetime.datetime(2023, 11, 14, 22, 13, 20, 123456)')
+ok(datetime.now(timezone.utc).tzinfo is timezone.utc)
+ok(datetime.now().tzinfo is None)
+ae(_naive.astimezone().replace(tzinfo=None).isoformat(), _naive.isoformat())
+ae(repr(datetime(2024, 1, 1)), 'datetime.datetime(2024, 1, 1, 0, 0)')
+ae(_sf.isoformat(timespec='milliseconds'), '2024-01-05T14:07:09.123')
+
+# ── 39. fromisoformat with offsets ───────────────────────────────────────────
+
+ae(repr(datetime.fromisoformat('2024-01-15T09:30:45Z')), 'datetime.datetime(2024, 1, 15, 9, 30, 45, tzinfo=datetime.timezone.utc)')
+ae(datetime.fromisoformat('2024-01-15 09:30:45.5-05:30').isoformat(), '2024-01-15T09:30:45.500000-05:30')
+ae(datetime.fromisoformat('20240115T093045+0100').isoformat(), '2024-01-15T09:30:45+01:00')
+ae(repr(date.fromisoformat('2024-W01-1')), 'datetime.date(2024, 1, 1)')
+throws(def(): datetime.fromisoformat('2024-1-15');)
+ae(time.fromisoformat('10:30:45+02:00').isoformat(), '10:30:45+02:00')
+
+# ── 40. aware time ───────────────────────────────────────────────────────────
+
+_tt = time(10, 30, tzinfo=_tz2)
+ae(repr(_tt), 'datetime.time(10, 30, tzinfo=datetime.timezone(datetime.timedelta(seconds=7200)))')
+ae(str(_tt), '10:30:00+02:00')
+ok(_tt.__eq__(time(8, 30, tzinfo=timezone.utc)))
+ok(not _tt.__eq__(time(10, 30)))
+throws(def(): _tt.__lt__(time(10, 30));)
+ae(repr(datetime.combine(date(2024, 1, 1), time(5, tzinfo=timezone.utc))), 'datetime.datetime(2024, 1, 1, 5, 0, tzinfo=datetime.timezone.utc)')
+
+# ── 41. custom tzinfo subclass ───────────────────────────────────────────────
+
+class _Fixed3(tzinfo):
+    def utcoffset(self, dt):
+        return timedelta(hours=3)
+    def dst(self, dt):
+        return timedelta(0)
+    def tzname(self, dt):
+        return 'F3'
+
+_f3 = _Fixed3()
+_e3 = datetime(2024, 6, 1, 12, tzinfo=_f3)
+ae(str(_e3), '2024-06-01 12:00:00+03:00')
+ae(_e3.tzname(), 'F3')
+ae(str(_e3.astimezone(timezone.utc)), '2024-06-01 09:00:00+00:00')
+ae(datetime(2024, 6, 1, 9, tzinfo=timezone.utc).astimezone(_f3).hour, 12)
+
+# ── 42. strptime ─────────────────────────────────────────────────────────────
+
+def _sp(s, f):
+    return repr(datetime.strptime(s, f))
+
+ae(_sp('2024-01-15 09:30:45', '%Y-%m-%d %H:%M:%S'), 'datetime.datetime(2024, 1, 15, 9, 30, 45)')
+ae(_sp('15/01/69', '%d/%m/%y'), 'datetime.datetime(1969, 1, 15, 0, 0)')
+ae(_sp('15/01/68', '%d/%m/%y'), 'datetime.datetime(2068, 1, 15, 0, 0)')
+ae(_sp('Monday, 15 January 2024', '%A, %d %B %Y'), 'datetime.datetime(2024, 1, 15, 0, 0)')
+ae(_sp('jan 5 2024', '%b %d %Y'), 'datetime.datetime(2024, 1, 5, 0, 0)')
+ae(_sp('09:30 PM', '%I:%M %p'), 'datetime.datetime(1900, 1, 1, 21, 30)')
+ae(_sp('12:30 am', '%I:%M %p'), 'datetime.datetime(1900, 1, 1, 0, 30)')
+ae(_sp('2024-01-15T09:30:45.123', '%Y-%m-%dT%H:%M:%S.%f'), 'datetime.datetime(2024, 1, 15, 9, 30, 45, 123000)')
+ae(_sp('2024-01-15 09:30:45 +0530', '%Y-%m-%d %H:%M:%S %z'), 'datetime.datetime(2024, 1, 15, 9, 30, 45, tzinfo=datetime.timezone(datetime.timedelta(seconds=19800)))')
+ae(_sp('2024-01-15 09:30:45Z', '%Y-%m-%d %H:%M:%S%z'), 'datetime.datetime(2024, 1, 15, 9, 30, 45, tzinfo=datetime.timezone.utc)')
+ae(_sp('2024-01-15 UTC', '%Y-%m-%d %Z'), 'datetime.datetime(2024, 1, 15, 0, 0)')
+ae(_sp('2024 100', '%Y %j'), 'datetime.datetime(2024, 4, 9, 0, 0)')
+ae(_sp('2024 10 1', '%Y %U %w'), 'datetime.datetime(2024, 3, 11, 0, 0)')
+ae(_sp('2024 15 3', '%G %V %u'), 'datetime.datetime(2024, 4, 10, 0, 0)')
+ae(_sp('2024   01    05', '%Y %m %d'), 'datetime.datetime(2024, 1, 5, 0, 0)')
+ae(_sp('100%', '%j%%'), 'datetime.datetime(1900, 4, 10, 0, 0)')
+
+def _sp_err(s, f):
+    try:
+        datetime.strptime(s, f)
+    except ValueError as e:
+        return str(e)
+    return None
+
+ae(_sp_err('2024-01-15x', '%Y-%m-%d'), 'unconverted data remains: x')
+ae(_sp_err('2024-13-15', '%Y-%m-%d'), "time data '2024-13-15' does not match format '%Y-%m-%d'")
+ae(_sp_err('2023-02-29', '%Y-%m-%d'), 'day is out of range for month')
+ae(_sp_err('x', '%Q'), "'Q' is a bad directive in format '%Q'")

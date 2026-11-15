@@ -1,0 +1,109 @@
+# globals: assrt
+# vim:fileencoding=utf-8
+#
+# warnings.pyj
+# Tests for the warnings standard library module.
+
+from __python__ import overload_getitem
+import warnings
+
+ae  = assrt.equal
+ade = assrt.deepEqual
+ok  = assrt.ok
+
+shown = []
+def show(message, category, filename, lineno, file=None, line=None):
+    shown.push(category.__name__ + ':' + str(message))
+
+def take():
+    ans = shown.slice()
+    shown.length = 0
+    return ans
+
+warnings.showwarning = show
+
+# ── 1. default action shows each distinct warning once ────────────────────────
+warnings.warn('first')
+warnings.warn('first')
+warnings.warn('dep', DeprecationWarning)
+ade(take(), ['UserWarning:first', 'DeprecationWarning:dep'])
+
+# ── 2. simplefilter('always') / ('ignore', category) ──────────────────────────
+warnings.simplefilter('always')
+warnings.warn('again')
+warnings.warn('again')
+ade(take(), ['UserWarning:again', 'UserWarning:again'])
+warnings.simplefilter('ignore', UserWarning)
+warnings.warn('ignored')
+warnings.warn('rt', RuntimeWarning)
+ade(take(), ['RuntimeWarning:rt'])
+
+# ── 3. filterwarnings('error', message=regex) raises ─────────────────────────
+warnings.resetwarnings()
+ae(len(warnings.filters), 0)
+warnings.filterwarnings('error', message='bad.*')
+raised = None
+try:
+    warnings.warn('bad thing')
+except UserWarning as e:
+    raised = e
+ok(raised is not None)
+ae(str(raised), 'bad thing')
+warnings.warn('good thing')
+ade(take(), ['UserWarning:good thing'])
+
+# ── 4. catch_warnings(record=True) ────────────────────────────────────────────
+with warnings.catch_warnings(record=True) as w:
+    warnings.simplefilter('always')
+    warnings.warn('rec1')
+    warnings.warn('rec2', FutureWarning)
+    warnings.warn(UserWarning('inst'))
+    ae(len(w), 3)
+    ade([str(x.message) for x in w], ['rec1', 'rec2', 'inst'])
+    ade([x.category.__name__ for x in w], ['UserWarning', 'FutureWarning', 'UserWarning'])
+    ok(isinstance(w[0].message, UserWarning))
+    ok(issubclass(w[1].category, FutureWarning))
+ade(take(), [])  # nothing reached showwarning while recording
+ae(len(warnings.filters), 1)  # filters restored on exit
+
+# ── 5. catch_warnings restores filters after 'error' ──────────────────────────
+with warnings.catch_warnings():
+    warnings.simplefilter('error')
+    try:
+        warnings.warn('x', SyntaxWarning)
+        ok(False)
+    except SyntaxWarning:
+        pass
+warnings.warn('after', RuntimeWarning)
+ade(take(), ['RuntimeWarning:after'])
+
+# ── 6. 'once' ─────────────────────────────────────────────────────────────────
+warnings.simplefilter('once')
+warnings.warn('o1')
+warnings.warn('o1')
+ade(take(), ['UserWarning:o1'])
+
+# ── 7. Bad arguments ──────────────────────────────────────────────────────────
+try:
+    warnings.simplefilter('bogus')
+    ok(False)
+except ValueError:
+    pass
+try:
+    warnings.warn('x', int)
+    ok(False)
+except TypeError:
+    pass
+
+# ── 8. Default output goes to console.warn ────────────────────────────────────
+warnings.showwarning = warnings._default_showwarning
+warnings.resetwarnings()
+warned = []
+orig = console.warn
+console.warn = def(*a): warned.push(a.join(' '));
+try:
+    warnings.warn('to console', RuntimeWarning)
+finally:
+    console.warn = orig
+ade(warned, ['RuntimeWarning: to console'])
+ae(warnings.formatwarning('m', UserWarning, 'f', 1), 'UserWarning: m')

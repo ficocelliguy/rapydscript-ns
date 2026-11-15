@@ -94,7 +94,8 @@ def declare_exports(module_id, exports, output, docstrings):
 def _inject_pythonize_strings(output):
     str_funcs = ('capitalize strip lstrip rstrip islower isupper isspace lower upper swapcase title'
         ' center count endswith startswith find rfind index rindex format join ljust rjust'
-        ' partition rpartition replace splitlines zfill').split(' ')
+        ' partition rpartition replace splitlines zfill rsplit expandtabs casefold removeprefix removesuffix'
+        ' isalpha isdigit isdecimal isnumeric isalnum isidentifier isascii isprintable istitle translate encode').split(' ')
     output.newline()
     output.indent()
     output.print('(function(){var _f=' + JSON.stringify(str_funcs) + ';for(var _i=0;_i<_f.length;_i++)String.prototype[_f[_i]]=\u03c1\u03c3_str.prototype[_f[_i]];})()')
@@ -259,7 +260,7 @@ def print_module(self, output):
                     }
                     for cname in Object.keys(self.classes):
                         cobj = self.classes[cname]
-                        cached.classes[cname] = {'name':{'name':cobj.name.name}, 'static':cobj.static, 'classmethod':cobj.classmethod, 'bound':cobj.bound, 'classvars':cobj.classvars}
+                        cached.classes[cname] = {'name':{'name':cobj.name.name}, 'static':cobj.static, 'classmethod':cobj.classmethod, 'bound':cobj.bound, 'classvars':cobj.classvars, 'has_new':cobj.has_new, 'has_attr_dunders':cobj.has_attr_dunders, 'inherited_static':cobj.inherited_static, 'inherited_classmethod':cobj.inherited_classmethod, 'has_metaclass':cobj.has_metaclass}
                     for symdef in self.exports:
                         cached.exports.push({'name':symdef.name})
                     for beautify in [True, False]:

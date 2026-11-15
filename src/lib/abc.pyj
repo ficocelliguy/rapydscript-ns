@@ -7,7 +7,7 @@
 #   @abstractmethod     — decorator marking a method as abstract
 #   Protocol            — base class for structural subtyping (PEP 544)
 #   @runtime_checkable  — allow isinstance() structural checks on Protocol
-#   ABCMeta             — informational placeholder (not a real metaclass)
+#   ABCMeta             — metaclass equivalent of inheriting from ABC
 #   get_cache_token()   — returns 0
 #
 # Usage:
@@ -131,15 +131,64 @@ def _install_abstract_guard(cls):
     """
 
 
-class ABCMeta:
-    """
-    Metaclass for defining Abstract Base Classes (informational in RapydScript).
+def _abc_init(cls):
+    # Abstract-method bookkeeping, register() and isinstance support for a new
+    # ABC (shared by ABC subclasses and classes using metaclass=ABCMeta)
+    am = _collect_abstract_methods(cls)
+    cls.__abstractmethods__ = am
 
-    In Python, ABCMeta is the true metaclass that powers abstract classes.
-    RapydScript does not support metaclasses; use ABC as a regular base class
-    instead.  ABCMeta is provided for compatibility with code that references it.
+    v"""
+    cls.__abc_registry__ = new Set();
+    var ρσ_registry = cls.__abc_registry__;
+    // Two install sites for register():
+    //
+    // 1. cls.register (constructor property): used when @MyABC.register is
+    //    written as a class decorator — RapydScript stores the expression value
+    //    [_MyABC.register] in ρσ_decorators, then calls ρσ_decorators[0](Cls).
+    //    Here 'subclass' receives the class being decorated.
+    cls.register = function(subclass) {
+        ρσ_registry.add(subclass);
+        return subclass;
+    };
+    // 2. cls.prototype.register (prototype method): used when the user writes
+    //    MyABC.register(Cls) as a plain call — RapydScript compiles this to
+    //    MyABC.prototype.register.call(Cls), so 'this' is the class to register.
+    cls.prototype.register = function() {
+        ρσ_registry.add(this);
+        return this;
+    };
+    Object.defineProperty(cls, Symbol.hasInstance, {
+        configurable: true,
+        value: function(instance) {
+            if (instance === null || instance === undefined) return false;
+            if (Object.prototype.isPrototypeOf.call(cls.prototype, instance)) return true;
+            var reg = cls.__abc_registry__;
+            if (reg && reg.size > 0) {
+                var ctor = instance.__class__ || instance.constructor;
+                while (ctor && ctor !== Function.prototype) {
+                    if (reg.has(ctor)) return true;
+                    ctor = Object.getPrototypeOf(ctor);
+                }
+            }
+            return false;
+        }
+    });
     """
-    pass
+
+    if am.size > 0:
+        _install_abstract_guard(cls)
+
+
+class ABCMeta(type):
+    """
+    Metaclass for defining Abstract Base Classes.
+
+    class Base(metaclass=ABCMeta) behaves like class Base(ABC): classes that
+    still have abstract methods can't be instantiated, and register() adds
+    virtual subclasses.
+    """
+    def __init__(cls, name, bases, namespace):
+        _abc_init(cls)
 
 
 class ABC:
@@ -170,49 +219,7 @@ class ABC:
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
-        am = _collect_abstract_methods(cls)
-        cls.__abstractmethods__ = am
-
-        v"""
-        cls.__abc_registry__ = new Set();
-        var ρσ_registry = cls.__abc_registry__;
-        // Two install sites for register():
-        //
-        // 1. cls.register (constructor property): used when @MyABC.register is
-        //    written as a class decorator — RapydScript stores the expression value
-        //    [_MyABC.register] in ρσ_decorators, then calls ρσ_decorators[0](Cls).
-        //    Here 'subclass' receives the class being decorated.
-        cls.register = function(subclass) {
-            ρσ_registry.add(subclass);
-            return subclass;
-        };
-        // 2. cls.prototype.register (prototype method): used when the user writes
-        //    MyABC.register(Cls) as a plain call — RapydScript compiles this to
-        //    MyABC.prototype.register.call(Cls), so 'this' is the class to register.
-        cls.prototype.register = function() {
-            ρσ_registry.add(this);
-            return this;
-        };
-        Object.defineProperty(cls, Symbol.hasInstance, {
-            configurable: true,
-            value: function(instance) {
-                if (instance === null || instance === undefined) return false;
-                if (Object.prototype.isPrototypeOf.call(cls.prototype, instance)) return true;
-                var reg = cls.__abc_registry__;
-                if (reg && reg.size > 0) {
-                    var ctor = instance.__class__ || instance.constructor;
-                    while (ctor && ctor !== Function.prototype) {
-                        if (reg.has(ctor)) return true;
-                        ctor = Object.getPrototypeOf(ctor);
-                    }
-                }
-                return false;
-            }
-        });
-        """
-
-        if am.size > 0:
-            _install_abstract_guard(cls)
+        _abc_init(cls)
 
 
 class Protocol:

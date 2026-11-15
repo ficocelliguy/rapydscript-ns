@@ -69,7 +69,7 @@ function _uparse_urlencode(query, doseq) {
     var items;
     if (Array.isArray(query)) {
         items = query;
-    } else if (query && query.jsmap instanceof Map) {
+    } else if (query && query.jsmap && typeof query.jsmap.forEach === "function") {
         // ρσ_dict (dict_literals mode)
         items = [];
         query.jsmap.forEach(function(v, k) { items.push([k, v]); });

@@ -68,8 +68,8 @@ test('0b11', '{:#b}', 3)
 test((30000).toLocaleString(), '{:,d}', 30000)
 # in e.g. the indian number system, this is 3,00,000
 test((300000).toLocaleString(), '{:,d}', 300000)
-test('1.234568e+8', '{:e}', 123456789)
-test('1.23E+8', '{:.2E}', 123456789)
+test('1.234568e+08', '{:e}', 123456789)  # two-digit exponent, as Python
+test('1.23E+08', '{:.2E}', 123456789)
 test('12.35%', '{:.2%}', .123456789)
 test((1234).toLocaleString(), '{:,}', 1234)
 test('1_234', '{:_d}', 1234)
@@ -112,7 +112,7 @@ ae('None', format(None))
 ae('hello     ', format('hello', '<10'))
 ae('     hello', format('hello', '>10'))
 ae('  hello   ', format('hello', '^10'))
-ae('1.23e+2', format(123.456, '.2e').toLowerCase())
+ae('1.23e+02', format(123.456, '.2e').toLowerCase())
 ae('hello', format('hello world', '.5'))
 
 class FormattableNum:

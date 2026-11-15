@@ -5,30 +5,108 @@ from __python__ import hash_literals
 def quoted_string(x):
     return '"' + x.replace(/\\/g, '\\\\').replace(/"/g, r'\"').replace(/\n/g, '\\n') + '"'
 
-def render_markup(markup):
-    pos, key = 0, ''
+def split_markup(markup):
+    # Split the text of a replacement field, {expr=!conv:spec}, into its parts.
+    # The expression ends at a top-level ! (not !=) or : -- not at ones inside
+    # brackets or strings, so {d['k']}, {x[1:]}, {x != 3}, { {'a': 1} } work.
+    depth = 0
+    quote = None
+    pos = 0
+    expr_end = markup.length
+    conv = ''
+    spec = None
     while pos < markup.length:
         ch = markup[pos]
-        if ch is '!' or ch is ':':
+        if quote:
+            if ch is '\\':
+                pos += 1
+            elif ch is quote:
+                quote = None
+        elif ch is '"' or ch is "'":
+            quote = ch
+        elif ch is '(' or ch is '[' or ch is '{':
+            depth += 1
+        elif ch is ')' or ch is ']' or ch is '}':
+            depth -= 1
+        elif depth is 0 and ch is '!' and markup[pos + 1] is not '=':
+            expr_end = pos
+            conv = markup[pos + 1]
+            if markup[pos + 2] is ':':
+                spec = markup[pos + 3:]
             break
-        key += ch
+        elif depth is 0 and ch is ':':
+            expr_end = pos
+            spec = markup[pos + 1:]
+            break
         pos += 1
-    fmtspec = markup[pos:]
+    expr = markup[:expr_end]
+    # Self-documenting {expr=}: the text up to and including = (and any spaces
+    # around it) is printed before the value, which defaults to repr()
     prefix = ''
-    if key.endsWith('='):
-        prefix=key
-        key = key[:-1]
-    return 'ρσ_str.format("' + prefix + '{' + fmtspec + '}", ' + key + ')'
+    m = v'/^([\s\S]*?[^=!<>])=(\s*)$/'.exec(expr)
+    if m and m[1].trim():
+        prefix = expr
+        expr = m[1]
+        if not conv and spec is None:
+            conv = 'r'
+    return [expr, prefix, conv, spec]
+
+
+def spec_source(spec):
+    # The format spec as source for a string: a literal, or a concatenation
+    # when it holds nested fields ({x:>{width}})
+    parts = []
+    literal = ''
+    pos = 0
+    while pos < spec.length:
+        ch = spec[pos]
+        if ch is '{':
+            end = spec.indexOf('}', pos)
+            if end < 0:
+                break
+            parts.push(quoted_string(literal))
+            parts.push('ρσ_str(' + spec[pos + 1:end] + ')')
+            literal = ''
+            pos = end + 1
+            continue
+        literal += ch
+        pos += 1
+    parts.push(quoted_string(literal))
+    return parts.join(' + ')
+
+
+def render_markup(markup):
+    expr, prefix, conv, spec = split_markup(markup)
+    template = quoted_string('{' + ('!' + conv if conv else '') + (':' if spec is not None else ''))
+    if spec is not None:
+        template += ' + ' + spec_source(spec)
+    template += ' + "}"'
+    ans = 'ρσ_str.format(' + template + ', (' + expr + '))'
+    if prefix:
+        ans = quoted_string(prefix) + ' + ' + ans
+    return ans
 
 
 def interpolate(template, raise_error):
     pos = in_brace = 0
+    quote = None
     markup = ''
     ans = v'[""]'
     while pos < template.length:
         ch = template[pos]
         if in_brace:
-            if ch is '{':
+            if quote:
+                # inside a string in the expression: braces don't count
+                markup += ch
+                if ch is '\\' and pos + 1 < template.length:
+                    pos += 1
+                    markup += template[pos]
+                elif ch is quote:
+                    quote = None
+            elif ch is '"' or ch is "'":
+                quote = ch
+                markup += ch
+            elif ch is '{':
                 in_brace += 1
                 markup += '{'
             elif ch is '}':
